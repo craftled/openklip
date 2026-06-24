@@ -14,12 +14,19 @@ export async function registerBroll(slug: string, fileArg: string): Promise<Asse
   if (!existsSync(src)) throw new Error(`b-roll file not found: ${src}`);
 
   const project = ProjectSchema.parse(JSON.parse(await Bun.file(p.project).text()));
-  let id = slugify(basename(src).replace(/\.[^.]+$/, ""));
-  const taken = new Set(project.assets.map((a) => a.id));
-  if (taken.has(id)) {
-    let n = 2;
-    while (taken.has(`${id}-${n}`)) n += 1;
-    id = `${id}-${n}`;
+  // Re-registering the same file overwrites that asset in place (no duplicate).
+  const existingBySrc = project.assets.find((a) => a.src === src);
+  let id: string;
+  if (existingBySrc) {
+    id = existingBySrc.id;
+  } else {
+    id = slugify(basename(src).replace(/\.[^.]+$/, ""));
+    const taken = new Set(project.assets.map((a) => a.id));
+    if (taken.has(id)) {
+      let n = 2;
+      while (taken.has(`${id}-${n}`)) n += 1;
+      id = `${id}-${n}`;
+    }
   }
 
   await mkdir(p.assets, { recursive: true });
@@ -33,6 +40,7 @@ export async function registerBroll(slug: string, fileArg: string): Promise<Asse
       "-vf", "scale=-2:720",
       "-c:v", "libx264", "-preset", "veryfast", "-crf", "26",
       "-g", "1", "-keyint_min", "1", "-sc_threshold", "0",
+      "-pix_fmt", "yuv420p",
       "-c:a", "aac", "-ar", String(SAMPLE_RATE), "-ac", "2",
       "-movflags", "+faststart",
       assetProxyPath(slug, id),

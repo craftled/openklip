@@ -32,6 +32,7 @@ export async function ingest(videoArg: string): Promise<string> {
       "-vf", "scale=-2:720",
       "-c:v", "libx264", "-preset", "veryfast", "-crf", "26",
       "-g", "1", "-keyint_min", "1", "-sc_threshold", "0",
+      "-pix_fmt", "yuv420p",
       "-c:a", "aac", "-ar", String(SAMPLE_RATE), "-ac", "2",
       "-movflags", "+faststart",
       p.proxy,

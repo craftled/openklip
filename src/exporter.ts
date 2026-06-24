@@ -106,6 +106,7 @@ export async function exportCut(slug: string): Promise<{ out: string; durationSe
       "-filter_complex", parts.join(";"),
       "-map", "[vout]", "-map", "[aout]",
       "-c:v", "libx264", "-preset", "medium", "-crf", "18",
+      "-pix_fmt", "yuv420p",
       "-c:a", "aac", "-b:a", "192k",
       "-movflags", "+faststart",
       p.out,
