@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+import { registerBroll } from "./broll.ts";
 import { exportCut } from "./exporter.ts";
 import { ingest } from "./ingest.ts";
 import { serve } from "./server.ts";
@@ -10,6 +11,7 @@ function help(): void {
 
   openklip ingest <video>    transcribe + build a project
   openklip serve [slug]      open the local editor (default: latest project)
+  openklip broll <slug> <f>  register a b-roll clip on a project
   openklip export <slug>     render the current cut to out.mp4
 `);
 }
@@ -24,6 +26,11 @@ try {
     case "dev":
       await serve(rest[0]);
       break;
+    case "broll": {
+      if (!(rest[0] && rest[1])) throw new Error("usage: openklip broll <slug> <file>");
+      await registerBroll(rest[0], rest[1]);
+      break;
+    }
     case "export": {
       if (!rest[0]) throw new Error("usage: openklip export <slug>");
       const r = await exportCut(rest[0]);

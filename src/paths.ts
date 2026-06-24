@@ -29,6 +29,11 @@ export function projectPaths(slug: string) {
     proxy: join(dir, "proxy.mp4"),
     audioRaw: join(dir, "audio16k.f32"),
     frames: join(dir, "frames"),
+    assets: join(dir, "assets"),
     out: join(dir, "out.mp4"),
   };
+}
+
+export function assetProxyPath(slug: string, assetId: string): string {
+  return join(projectDir(slug), "assets", `${assetId}.mp4`);
 }

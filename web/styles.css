@@ -100,6 +100,20 @@ body {
   border: 1px solid var(--line);
   aspect-ratio: 16 / 9;
 }
+.brollVideo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 10px;
+  background: #000;
+  display: none;
+  z-index: 1;
+}
+.brollVideo.on {
+  display: block;
+}
 .captions {
   position: absolute;
   left: 0;
@@ -108,6 +122,7 @@ body {
   display: flex;
   justify-content: center;
   pointer-events: none;
+  z-index: 2;
 }
 .capbox {
   background: rgba(0, 0, 0, 0.58);
@@ -142,6 +157,70 @@ body {
 }
 .cap-toggle input {
   accent-color: var(--accent);
+}
+.brollbar,
+.brolllist {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.brollbar {
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+.brollbar select {
+  background: #1d2025;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 13px;
+}
+.brollbar button {
+  background: #1d2025;
+  color: var(--text);
+  border: 1px solid var(--line);
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+}
+button.ghost {
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  cursor: pointer;
+}
+.hint {
+  padding: 2px;
+}
+.brolllist {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+.brollrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.tag {
+  font-size: 11px;
+  color: #5dcaa5;
+  border: 1px solid #1d3a30;
+  background: #0f1f1a;
+  border-radius: 4px;
+  padding: 1px 7px;
+}
+.word.sel {
+  background: #2a2d44;
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.word.covered {
+  border-bottom: 2px solid #1d9e75;
 }
 .controls button {
   background: #1d2025;

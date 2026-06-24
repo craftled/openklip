@@ -1,9 +1,9 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import index from "../web/index.html";
-import { type Project, ProjectSchema } from "./edl.ts";
+import { BrollSchema, type Project, ProjectSchema } from "./edl.ts";
 import { exportCut } from "./exporter.ts";
-import { PROJECTS_ROOT, projectPaths } from "./paths.ts";
+import { assetProxyPath, PROJECTS_ROOT, projectPaths } from "./paths.ts";
 
 function latestProject(): string | null {
   if (!existsSync(PROJECTS_ROOT)) return null;
@@ -91,7 +91,32 @@ export async function serve(slugArg?: string, port = 4399): Promise<void> {
           }
         },
       },
+      "/api/broll": {
+        async POST(req: Request) {
+          const body = (await req.json()) as { broll?: unknown[] };
+          const project = await loadProject(slug);
+          const assetIds = new Set(project.assets.map((a) => a.id));
+          const dur = project.durationSamples;
+          const items = [];
+          for (const raw of body.broll ?? []) {
+            const b = BrollSchema.parse(raw);
+            if (!assetIds.has(b.assetId)) continue;
+            const start = Math.max(0, Math.min(b.startSample, dur));
+            const end = Math.max(start + 1, Math.min(b.endSample, dur));
+            items.push({ ...b, startSample: start, endSample: end });
+          }
+          project.broll = items;
+          await Bun.write(projectPaths(slug).project, JSON.stringify(project, null, 2));
+          return Response.json({ ok: true, broll: items });
+        },
+      },
       "/media/proxy.mp4": (req: Request) => serveRange(req, projectPaths(slug).proxy, "video/mp4"),
+      "/media/asset/:id": (req: Request & { params: { id: string } }) => {
+        const id = req.params.id.replace(/[^a-zA-Z0-9._-]/g, "");
+        const fp = assetProxyPath(slug, id);
+        if (!existsSync(fp)) return new Response("not found", { status: 404 });
+        return serveRange(req, fp, "video/mp4");
+      },
       "/media/frames/:name": (req: Request & { params: { name: string } }) => {
         const name = req.params.name.replace(/[^a-zA-Z0-9._-]/g, "");
         const fp = join(projectPaths(slug).frames, name);

@@ -13,6 +13,26 @@ export const WordSchema = z.object({
 });
 export type Word = z.infer<typeof WordSchema>;
 
+export const AssetSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  src: z.string(),
+  proxy: z.string(),
+  durationSamples: z.number().int().nonnegative(),
+});
+export type Asset = z.infer<typeof AssetSchema>;
+
+// A b-roll clip covering a span of the talking-head SOURCE timeline. "cover"
+// swaps the video to the b-roll while the talker's audio continues.
+export const BrollSchema = z.object({
+  id: z.string(),
+  assetId: z.string(),
+  startSample: z.number().int().nonnegative(),
+  endSample: z.number().int().nonnegative(),
+  srcInSample: z.number().int().nonnegative().default(0),
+});
+export type Broll = z.infer<typeof BrollSchema>;
+
 export const ProjectSchema = z.object({
   version: z.literal(1),
   slug: z.string(),
@@ -30,6 +50,8 @@ export const ProjectSchema = z.object({
       maxWords: z.number().int().positive().default(6),
     })
     .default({ enabled: true, maxWords: 6 }),
+  assets: z.array(AssetSchema).default([]),
+  broll: z.array(BrollSchema).default([]),
   words: z.array(WordSchema),
 });
 export type Project = z.infer<typeof ProjectSchema>;
@@ -80,6 +102,19 @@ export function survivingRanges(project: Project): Range[] {
 
 export function totalDurationSec(ranges: Range[]): number {
   return ranges.reduce((a, r) => a + (r.endSec - r.startSec), 0);
+}
+
+// Map a source-time second into the cut (output) timeline. Monotonic; clamps a
+// time that falls inside a deleted gap to the nearest kept boundary. Used to
+// place b-roll overlays and burned captions in output time.
+export function sourceToOutputSec(sourceSec: number, ranges: Range[]): number {
+  let cum = 0;
+  for (const r of ranges) {
+    if (sourceSec < r.startSec) return cum;
+    if (sourceSec <= r.endSec) return cum + (sourceSec - r.startSec);
+    cum += r.endSec - r.startSec;
+  }
+  return cum;
 }
 
 export function sec(n: number): string {
