@@ -282,7 +282,7 @@ export function App() {
       }).then((x) => x.json());
       setExportMsg(
         r.ok
-          ? `exported ${r.ranges} cuts${r.broll ? ` + ${r.broll} b-roll` : ""}${r.zooms ? ` + ${r.zooms} zoom` : ""}${r.vignette ? " + vignette" : ""}${r.captions ? " + captions" : ""} @ ${r.height}p (${r.durationSec.toFixed(1)}s)  ->  ${r.out}`
+          ? `exported ${r.ranges} cuts${r.broll ? ` + ${r.broll} b-roll` : ""}${r.zooms ? ` + ${r.zooms} zoom` : ""}${r.titles ? ` + ${r.titles} title` : ""}${r.vignette ? " + vignette" : ""}${r.captions ? " + captions" : ""} @ ${r.height}p (${r.durationSec.toFixed(1)}s)  ->  ${r.out}`
           : `error: ${r.error}`,
       );
     } catch (e) {

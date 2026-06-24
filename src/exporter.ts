@@ -1,4 +1,6 @@
 import { buildAss, type CaptionWord, groupCaptions } from "./captions.ts";
+import { buildTitlesAss, type TitleItem } from "./titles.ts";
+import { buildZoompanZExpr, type ZoomWindow } from "./zoom-ramp.ts";
 import {
   type Broll,
   type Project,
@@ -52,7 +54,7 @@ interface BrollPlan {
 export async function exportCut(
   slug: string,
   opts: ExportOptions = {},
-): Promise<{ out: string; durationSec: number; ranges: number; captions: boolean; broll: number; zooms: number; vignette: boolean; height: number }> {
+): Promise<{ out: string; durationSec: number; ranges: number; captions: boolean; broll: number; zooms: number; titles: number; vignette: boolean; height: number }> {
   const p = projectPaths(slug);
   const project = ProjectSchema.parse(JSON.parse(await Bun.file(p.project).text()));
   const ranges = survivingRanges(project);
@@ -98,6 +100,21 @@ export async function exportCut(
     }
   }
 
+  // titles -> output time
+  let titlesAssPath: string | null = null;
+  const titleItems: TitleItem[] = (project.titles ?? [])
+    .map((t) => ({
+      text: t.text,
+      startSec: sourceToOutputSec(t.startSample / sr, ranges),
+      endSec: sourceToOutputSec(t.endSample / sr, ranges),
+      position: t.position,
+    }))
+    .filter((t) => t.text.trim().length > 0 && t.endSec - t.startSec > 0.05);
+  if (titleItems.length > 0) {
+    titlesAssPath = `${p.dir}/titles.ass`;
+    await Bun.write(titlesAssPath, buildTitlesAss(titleItems, { width: outW, height: outH }));
+  }
+
   // ---- filtergraph ----
   const parts: string[] = [];
   let base = `[0:v]select='${selectExpr}',setpts=N/FRAME_RATE/TB`;
@@ -106,19 +123,14 @@ export async function exportCut(
   let last = "v0";
 
   if (zoomWins.length > 0) {
-    // crop w/h can't vary per frame in ffmpeg, so each zoom is a static punch-in:
-    // scale a copy up by `scale`, center-crop back to frame, overlay during the window.
-    const splitLabels = zoomWins.map((_, i) => `[zsrc${i}]`).join("");
-    parts.push(`[${last}]split=${zoomWins.length + 1}[zbase]${splitLabels}`);
-    let zlast = "zbase";
-    zoomWins.forEach((z, i) => {
-      const ew = Math.round((outW * z.scale) / 2) * 2;
-      const eh = Math.round((outH * z.scale) / 2) * 2;
-      parts.push(`[zsrc${i}]scale=${ew}:${eh},crop=${outW}:${outH}[zc${i}]`);
-      parts.push(`[${zlast}][zc${i}]overlay=eof_action=pass:enable='between(t,${sec(z.os)},${sec(z.oe)})'[zo${i}]`);
-      zlast = `zo${i}`;
-    });
-    last = zlast;
+    // Animated push-in via zoompan (z is evaluated per output frame, so it can ramp).
+    const fps = Math.max(1, Math.round(project.fps));
+    const wins: ZoomWindow[] = zoomWins.map((z) => ({ startSec: z.os, endSec: z.oe, scale: z.scale, rampSec: z.ramp }));
+    const zexpr = buildZoompanZExpr(wins, fps);
+    parts.push(
+      `[${last}]zoompan=z='${zexpr}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=${outW}x${outH}:fps=${fps}[vz]`,
+    );
+    last = "vz";
   }
 
   for (const pl of plans) {
@@ -135,8 +147,16 @@ export async function exportCut(
     last = "vig";
   }
 
-  if (assPath) parts.push(`[${last}]subtitles='${escapeAssPath(assPath)}'[vout]`);
-  else parts.push(`[${last}]null[vout]`);
+  let vlabel = last;
+  if (assPath) {
+    parts.push(`[${vlabel}]subtitles='${escapeAssPath(assPath)}'[vcap]`);
+    vlabel = "vcap";
+  }
+  if (titlesAssPath) {
+    parts.push(`[${vlabel}]subtitles='${escapeAssPath(titlesAssPath)}'[vtit]`);
+    vlabel = "vtit";
+  }
+  parts.push(`[${vlabel}]null[vout]`);
   parts.push(`[0:a]aselect='${selectExpr}',asetpts=N/SR/TB[aout]`);
 
   const inputs = ["-i", project.source, ...plans.flatMap((pl) => ["-i", pl.srcPath])];
@@ -163,6 +183,7 @@ export async function exportCut(
     captions: captionsOn && assPath !== null,
     broll: plans.length,
     zooms: zoomWins.length,
+    titles: titleItems.length,
     vignette,
     height: outH,
   };
