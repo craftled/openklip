@@ -26,6 +26,7 @@ interface Project {
   sampleRate: number;
   padMs: number;
   durationSamples: number;
+  mediaVersion?: number;
   captions?: { enabled: boolean; maxWords?: number };
   assets: Asset[];
   broll: BrollItem[];
@@ -127,8 +128,8 @@ export function App() {
       if (!v.paused) v.pause();
       return;
     }
-    const url = `/media/asset/${activeBroll.assetId}`;
-    if (!v.src.endsWith(url)) v.src = url;
+    const url = `/media/asset/${activeBroll.assetId}?v=${projectRef.current?.mediaVersion ?? 0}`;
+    if (v.getAttribute("src") !== url) v.src = url;
     const want = activeBroll.srcInSample / sr + (curSample - activeBroll.startSample) / sr;
     if (Number.isFinite(want) && Math.abs(v.currentTime - want) > 0.25) v.currentTime = Math.max(0, want);
     if (playing && v.paused) void v.play().catch(() => {});
@@ -246,7 +247,7 @@ export function App() {
         <section className="stage">
           <div className="videoWrap">
             {/* biome-ignore lint/a11y/useMediaCaption: editor preview; transcript is the caption source */}
-            <video ref={videoRef} src="/media/proxy.mp4" playsInline />
+            <video ref={videoRef} src={`/media/proxy.mp4?v=${project.mediaVersion ?? 0}`} playsInline />
             {/* biome-ignore lint/a11y/useMediaCaption: b-roll overlay, muted */}
             <video ref={brollRef} className={`brollVideo${activeBroll ? " on" : ""}`} muted playsInline />
             {activeGroup && (

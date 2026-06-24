@@ -30,7 +30,7 @@ function serveRange(req: Request, path: string, type: string): Response {
   const range = req.headers.get("range");
   if (!range) {
     return new Response(file, {
-      headers: { "Content-Type": type, "Accept-Ranges": "bytes", "Content-Length": String(size) },
+      headers: { "Content-Type": type, "Accept-Ranges": "bytes", "Content-Length": String(size), "Cache-Control": "no-store" },
     });
   }
   const m = /bytes=(\d*)-(\d*)/.exec(range);
@@ -46,6 +46,7 @@ function serveRange(req: Request, path: string, type: string): Response {
       "Accept-Ranges": "bytes",
       "Content-Range": `bytes ${start}-${end}/${size}`,
       "Content-Length": String(end - start + 1),
+      "Cache-Control": "no-store",
     },
   });
 }
@@ -63,7 +64,9 @@ export async function serve(slugArg?: string, port = 4399): Promise<void> {
       "/": index,
       "/api/project": {
         async GET() {
-          return Response.json(await loadProject(slug));
+          const project = await loadProject(slug);
+          const mediaVersion = Math.round(statSync(projectPaths(slug).proxy).mtimeMs);
+          return Response.json({ ...project, mediaVersion });
         },
         async POST(req: Request) {
           const body = (await req.json()) as {
