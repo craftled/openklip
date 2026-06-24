@@ -67,7 +67,7 @@ export interface AssOptions {
 export function buildAss(groups: CaptionGroup[], opts: AssOptions): string {
   const fontSize = Math.max(18, Math.round(opts.height * 0.055));
   const marginV = Math.round(opts.height * 0.07);
-  const accent = toAssColor(opts.accent ?? "#b9b8ff");
+  const accent = toAssColor(opts.accent ?? "#94ccff");
   const header = [
     "[Script Info]",
     "ScriptType: v4.00+",
