@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type CaptionWord, groupCaptions } from "../src/captions.ts";
 import { CutScheduler, type Range } from "./scheduler.ts";
 
 interface Word {
@@ -14,6 +15,7 @@ interface Project {
   sampleRate: number;
   padMs: number;
   durationSamples: number;
+  captions?: { enabled: boolean; maxWords?: number };
   words: Word[];
 }
 
@@ -55,6 +57,7 @@ export function App() {
   const [project, setProject] = useState<Project | null>(null);
   const [playing, setPlaying] = useState(false);
   const [curSample, setCurSample] = useState(0);
+  const [captionsOn, setCaptionsOn] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [exportMsg, setExportMsg] = useState<string | null>(null);
 
@@ -66,7 +69,10 @@ export function App() {
   useEffect(() => {
     fetch("/api/project")
       .then((r) => r.json())
-      .then(setProject)
+      .then((p: Project) => {
+        setProject(p);
+        setCaptionsOn(p.captions?.enabled ?? true);
+      })
       .catch(() => setExportMsg("could not load project"));
   }, []);
 
@@ -81,6 +87,19 @@ export function App() {
   const ranges = useMemo(() => (project ? survivingRanges(project) : []), [project]);
   const keptDuration = ranges.reduce((a, r) => a + (r.endSec - r.startSec), 0);
 
+  const captionGroups = useMemo(() => {
+    if (!project) return [];
+    const kept: CaptionWord[] = project.words
+      .filter((w) => !w.deleted)
+      .map((w) => ({ text: w.text, startSec: w.startSample / project.sampleRate, endSec: w.endSample / project.sampleRate }));
+    return groupCaptions(kept, project.captions?.maxWords ?? 6);
+  }, [project]);
+
+  const curSec = project ? curSample / project.sampleRate : 0;
+  const activeGroup = captionsOn
+    ? captionGroups.find((g) => curSec >= g.startSec - 0.05 && curSec <= g.endSec + 0.25)
+    : undefined;
+
   const toggleWord = useCallback((id: string) => {
     setProject((prev) => {
       if (!prev) return prev;
@@ -93,6 +112,18 @@ export function App() {
       return { ...prev, words };
     });
   }, []);
+
+  const toggleCaptions = () => {
+    setCaptionsOn((prev) => {
+      const next = !prev;
+      void fetch("/api/project", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ captions: { enabled: next } }),
+      });
+      return next;
+    });
+  };
 
   const onPlay = () => {
     const s = schedRef.current;
@@ -111,7 +142,11 @@ export function App() {
     setExportMsg(null);
     try {
       const r = await fetch("/api/export", { method: "POST" }).then((x) => x.json());
-      setExportMsg(r.ok ? `exported ${r.ranges} cuts (${r.durationSec.toFixed(1)}s)  ->  ${r.out}` : `error: ${r.error}`);
+      setExportMsg(
+        r.ok
+          ? `exported ${r.ranges} cuts${r.captions ? " + captions" : ""} (${r.durationSec.toFixed(1)}s)  ->  ${r.out}`
+          : `error: ${r.error}`,
+      );
     } catch (e) {
       setExportMsg(`error: ${(e as Error).message}`);
     }
@@ -139,12 +174,32 @@ export function App() {
 
       <div className="body">
         <section className="stage">
-          {/* biome-ignore lint/a11y/useMediaCaption: editor preview, captions are the content being edited */}
-          <video ref={videoRef} src="/media/proxy.mp4" playsInline />
+          <div className="videoWrap">
+            {/* biome-ignore lint/a11y/useMediaCaption: editor preview; the transcript is the caption source being edited */}
+            <video ref={videoRef} src="/media/proxy.mp4" playsInline />
+            {activeGroup && (
+              <div className="captions">
+                <div className="capbox">
+                  {activeGroup.words.map((w, i) => {
+                    const next = activeGroup.words[i + 1]?.startSec ?? activeGroup.endSec;
+                    const on = curSec >= w.startSec - 0.02 && curSec < next;
+                    return (
+                      <span key={`${w.text}-${i}`} className={`capw${on ? " on" : ""}`}>
+                        {w.text}{" "}
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
           <div className="controls">
             <button type="button" onClick={onPlay}>
               {playing ? "Pause" : "Play cut"}
             </button>
+            <label className="cap-toggle">
+              <input type="checkbox" checked={captionsOn} onChange={toggleCaptions} /> Captions
+            </label>
             <span className="muted small">strike words on the right to cut them</span>
           </div>
           {exportMsg && <div className="exportmsg">{exportMsg}</div>}

@@ -88,17 +88,60 @@ body {
   gap: 12px;
   min-width: 0;
 }
+.videoWrap {
+  position: relative;
+  width: 100%;
+}
 .stage video {
+  display: block;
   width: 100%;
   background: #000;
   border-radius: 10px;
   border: 1px solid var(--line);
   aspect-ratio: 16 / 9;
 }
+.captions {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 8%;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+.capbox {
+  background: rgba(0, 0, 0, 0.58);
+  border-radius: 8px;
+  padding: 6px 14px;
+  max-width: 82%;
+  text-align: center;
+  font-weight: 700;
+  font-size: clamp(15px, 2.3vw, 30px);
+  line-height: 1.25;
+  color: #fff;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.55);
+}
+.capw {
+  color: #e8eaed;
+}
+.capw.on {
+  color: #b9b8ff;
+}
 .controls {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
+}
+.cap-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+.cap-toggle input {
+  accent-color: var(--accent);
 }
 .controls button {
   background: #1d2025;

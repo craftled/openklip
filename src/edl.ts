@@ -24,6 +24,12 @@ export const ProjectSchema = z.object({
   height: z.number().int().positive(),
   durationSamples: z.number().int().nonnegative(),
   padMs: z.number().nonnegative().default(50),
+  captions: z
+    .object({
+      enabled: z.boolean().default(true),
+      maxWords: z.number().int().positive().default(6),
+    })
+    .default({ enabled: true, maxWords: 6 }),
   words: z.array(WordSchema),
 });
 export type Project = z.infer<typeof ProjectSchema>;

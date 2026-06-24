@@ -86,8 +86,9 @@ export async function ingest(videoArg: string): Promise<string> {
     height: meta.height,
     durationSamples: Math.round(meta.durationSec * SAMPLE_RATE),
     padMs: 50,
+    captions: { enabled: true, maxWords: 6 },
     words,
-  } satisfies Project);
+  });
 
   await Bun.write(p.project, JSON.stringify(project, null, 2));
   await Bun.write(p.transcript, JSON.stringify({ words }, null, 2));

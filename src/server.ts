@@ -66,10 +66,18 @@ export async function serve(slugArg?: string, port = 4399): Promise<void> {
           return Response.json(await loadProject(slug));
         },
         async POST(req: Request) {
-          const body = (await req.json()) as { words: Array<{ id: string; deleted: boolean }> };
+          const body = (await req.json()) as {
+            words?: Array<{ id: string; deleted: boolean }>;
+            captions?: { enabled?: boolean };
+          };
           const project = await loadProject(slug);
-          const del = new Map(body.words.map((w) => [w.id, w.deleted]));
-          for (const w of project.words) if (del.has(w.id)) w.deleted = Boolean(del.get(w.id));
+          if (body.words) {
+            const del = new Map(body.words.map((w) => [w.id, w.deleted]));
+            for (const w of project.words) if (del.has(w.id)) w.deleted = Boolean(del.get(w.id));
+          }
+          if (typeof body.captions?.enabled === "boolean") {
+            project.captions = { ...project.captions, enabled: body.captions.enabled };
+          }
           await Bun.write(projectPaths(slug).project, JSON.stringify(project, null, 2));
           return Response.json({ ok: true });
         },
