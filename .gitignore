@@ -5,3 +5,12 @@ dist/
 .DS_Store
 .env*
 .openklip-worktrees/
+
+# source media — keep large/private footage out of the repo
+*.mp4
+*.MP4
+*.mov
+*.MOV
+*.aiff
+*.wav
+*.f32

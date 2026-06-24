@@ -1,6 +1,7 @@
 {
   "name": "openklip",
   "version": "0.0.1",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "description": "Agent-native, transcript-driven video editor. Edit by editing text.",
