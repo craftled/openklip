@@ -43,6 +43,16 @@ export const ZoomSchema = z.object({
 });
 export type Zoom = z.infer<typeof ZoomSchema>;
 
+// An editorial title card (lower-third or centered) over a span of the SOURCE timeline.
+export const TitleSchema = z.object({
+  id: z.string(),
+  text: z.string(),
+  startSample: z.number().int().nonnegative(),
+  endSample: z.number().int().nonnegative(),
+  position: z.enum(["lower", "center"]).default("lower"),
+});
+export type Title = z.infer<typeof TitleSchema>;
+
 export const ProjectSchema = z.object({
   version: z.literal(1),
   slug: z.string(),
@@ -64,6 +74,7 @@ export const ProjectSchema = z.object({
   broll: z.array(BrollSchema).default([]),
   look: z.object({ vignette: z.boolean().default(false) }).default({ vignette: false }),
   zooms: z.array(ZoomSchema).default([]),
+  titles: z.array(TitleSchema).default([]),
   words: z.array(WordSchema),
 });
 export type Project = z.infer<typeof ProjectSchema>;

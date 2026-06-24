@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import index from "../web/index.html";
-import { BrollSchema, type Project, ProjectSchema, ZoomSchema } from "./edl.ts";
+import { BrollSchema, type Project, ProjectSchema, TitleSchema, ZoomSchema } from "./edl.ts";
 import { exportCut } from "./exporter.ts";
 import { assetProxyPath, PROJECTS_ROOT, projectPaths } from "./paths.ts";
 
@@ -119,6 +119,24 @@ export async function serve(slugArg?: string, port = 4399): Promise<void> {
           project.zooms = items;
           await Bun.write(projectPaths(slug).project, JSON.stringify(project, null, 2));
           return Response.json({ ok: true, zooms: items });
+        },
+      },
+      "/api/titles": {
+        async POST(req: Request) {
+          const body = (await req.json()) as { titles?: unknown[] };
+          const project = await loadProject(slug);
+          const dur = project.durationSamples;
+          const items = [];
+          for (const raw of body.titles ?? []) {
+            const titleItem = TitleSchema.parse(raw);
+            if (!titleItem.text.trim()) continue;
+            const start = Math.max(0, Math.min(titleItem.startSample, dur));
+            const end = Math.max(start + 1, Math.min(titleItem.endSample, dur));
+            items.push({ ...titleItem, startSample: start, endSample: end });
+          }
+          project.titles = items;
+          await Bun.write(projectPaths(slug).project, JSON.stringify(project, null, 2));
+          return Response.json({ ok: true, titles: items });
         },
       },
       "/api/broll": {

@@ -28,6 +28,13 @@ interface ZoomItem {
   scale: number;
   rampSec: number;
 }
+interface TitleItem {
+  id: string;
+  text: string;
+  startSample: number;
+  endSample: number;
+  position: "lower" | "center";
+}
 interface Project {
   slug: string;
   sampleRate: number;
@@ -37,6 +44,7 @@ interface Project {
   captions?: { enabled: boolean; maxWords?: number };
   look?: { vignette: boolean };
   zooms: ZoomItem[];
+  titles: TitleItem[];
   assets: Asset[];
   broll: BrollItem[];
   words: Word[];
@@ -86,6 +94,8 @@ export function App() {
   const [selAnchor, setSelAnchor] = useState<number | null>(null);
   const [selFocus, setSelFocus] = useState<number | null>(null);
   const [chosenAsset, setChosenAsset] = useState("");
+  const [titleText, setTitleText] = useState("");
+  const [titlePos, setTitlePos] = useState<"lower" | "center">("lower");
   const [exporting, setExporting] = useState(false);
   const [exportMsg, setExportMsg] = useState<string | null>(null);
 
@@ -132,6 +142,7 @@ export function App() {
   const activeBroll = project?.broll?.find((b) => curSample >= b.startSample && curSample < b.endSample);
   const activeZoom = project?.zooms?.find((z) => curSample >= z.startSample && curSample < z.endSample);
   const zoomScale = activeZoom && !activeBroll ? activeZoom.scale : 1;
+  const activeTitle = project?.titles?.find((t) => curSample >= t.startSample && curSample < t.endSample);
   const assetName = (id: string) => project?.assets.find((a) => a.id === id)?.name ?? id;
 
   useEffect(() => {
@@ -212,6 +223,25 @@ export function App() {
     const zooms = (project.zooms ?? []).filter((z) => z.id !== id);
     setProject({ ...project, zooms });
     post("/api/zooms", { zooms });
+  };
+
+  const addTitle = () => {
+    if (!project || !selRange || !titleText.trim()) return;
+    const [a, b] = selRange;
+    const titles = [
+      ...(project.titles ?? []),
+      { id: `t${Date.now()}`, text: titleText.trim(), startSample: project.words[a].startSample, endSample: project.words[b].endSample, position: titlePos },
+    ];
+    setProject({ ...project, titles });
+    post("/api/titles", { titles });
+    setTitleText("");
+    clearSel();
+  };
+  const removeTitle = (id: string) => {
+    if (!project) return;
+    const titles = (project.titles ?? []).filter((t) => t.id !== id);
+    setProject({ ...project, titles });
+    post("/api/titles", { titles });
   };
 
   const toggleCaptions = () => {
@@ -299,6 +329,11 @@ export function App() {
             {/* biome-ignore lint/a11y/useMediaCaption: b-roll overlay, muted */}
             <video ref={brollRef} className={`brollVideo${activeBroll ? " on" : ""}`} muted playsInline />
             {vignetteOn && <div className="vignette" />}
+            {activeTitle && (
+              <div className={`titleOverlay title-${activeTitle.position}`} key={activeTitle.id}>
+                <span>{activeTitle.text}</span>
+              </div>
+            )}
             {activeGroup && (
               <div className="captions">
                 <div className="capbox">
@@ -350,6 +385,21 @@ export function App() {
               ) : (
                 <span className="muted small">no b-roll registered</span>
               )}
+              <span className="bardiv" />
+              <input
+                className="titleinput"
+                type="text"
+                placeholder="title text"
+                value={titleText}
+                onChange={(e) => setTitleText(e.target.value)}
+              />
+              <select value={titlePos} onChange={(e) => setTitlePos(e.target.value as "lower" | "center")}>
+                <option value="lower">lower</option>
+                <option value="center">center</option>
+              </select>
+              <button type="button" onClick={addTitle}>
+                Add title
+              </button>
               <button type="button" className="ghost" onClick={clearSel}>
                 clear
               </button>
@@ -358,8 +408,19 @@ export function App() {
             <div className="hint muted small">click a word to cut · shift-click two words to select a range (then push-in or b-roll)</div>
           )}
 
-          {((project.broll ?? []).length > 0 || (project.zooms ?? []).length > 0) && (
+          {((project.broll ?? []).length > 0 || (project.zooms ?? []).length > 0 || (project.titles ?? []).length > 0) && (
             <div className="brolllist">
+              {(project.titles ?? []).map((t) => (
+                <div key={t.id} className="brollrow">
+                  <span className="tag tag-title">title</span>
+                  <span className="muted small">
+                    "{t.text}" · {t.position} · {fmt(t.startSample / sr)}–{fmt(t.endSample / sr)}
+                  </span>
+                  <button type="button" className="ghost" onClick={() => removeTitle(t.id)}>
+                    ✕
+                  </button>
+                </div>
+              ))}
               {(project.zooms ?? []).map((z) => (
                 <div key={z.id} className="brollrow">
                   <span className="tag tag-zoom">zoom {z.scale.toFixed(2)}x</span>

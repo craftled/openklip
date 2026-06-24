@@ -243,6 +243,68 @@ button.ghost {
 .word.zoomed {
   background: rgba(239, 159, 39, 0.14);
 }
+.tag-title {
+  color: #d4537e;
+  border-color: #3a1f2a;
+  background: #1f0f17;
+}
+.titleinput {
+  background: #1d2025;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 13px;
+  min-width: 130px;
+}
+.bardiv {
+  width: 1px;
+  height: 20px;
+  background: var(--line);
+}
+.titleOverlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 3;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+.title-lower {
+  bottom: 16%;
+}
+.title-center {
+  top: 50%;
+  transform: translateY(-50%);
+}
+.titleOverlay span {
+  background: rgba(0, 0, 0, 0.62);
+  color: #fff;
+  font-weight: 700;
+  padding: 8px 18px;
+  border-radius: 8px;
+  max-width: 80%;
+  text-align: center;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
+  animation: titlein 0.3s ease-out;
+}
+.title-lower span {
+  font-size: clamp(16px, 2.6vw, 32px);
+}
+.title-center span {
+  font-size: clamp(22px, 4vw, 52px);
+}
+@keyframes titlein {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 .controls button {
   background: #1d2025;
   color: var(--text);
