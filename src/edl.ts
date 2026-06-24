@@ -33,6 +33,16 @@ export const BrollSchema = z.object({
 });
 export type Broll = z.infer<typeof BrollSchema>;
 
+// A push-in over a span of the SOURCE timeline: ramp to `scale` over rampSec, then hold.
+export const ZoomSchema = z.object({
+  id: z.string(),
+  startSample: z.number().int().nonnegative(),
+  endSample: z.number().int().nonnegative(),
+  scale: z.number().min(1).max(3).default(1.15),
+  rampSec: z.number().min(0).max(5).default(0.6),
+});
+export type Zoom = z.infer<typeof ZoomSchema>;
+
 export const ProjectSchema = z.object({
   version: z.literal(1),
   slug: z.string(),
@@ -52,6 +62,8 @@ export const ProjectSchema = z.object({
     .default({ enabled: true, maxWords: 6 }),
   assets: z.array(AssetSchema).default([]),
   broll: z.array(BrollSchema).default([]),
+  look: z.object({ vignette: z.boolean().default(false) }).default({ vignette: false }),
+  zooms: z.array(ZoomSchema).default([]),
   words: z.array(WordSchema),
 });
 export type Project = z.infer<typeof ProjectSchema>;

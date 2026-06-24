@@ -12,6 +12,10 @@ import {
 import { FFMPEG, run } from "./ffmpeg.ts";
 import { projectPaths } from "./paths.ts";
 
+export interface ExportOptions {
+  maxHeight?: number; // e.g. 1080 -> downscale output (and speed up filtering/encode)
+}
+
 function keptWordsInOutputTime(project: Project, ranges: Range[]): CaptionWord[] {
   const sr = project.sampleRate;
   const out: CaptionWord[] = [];
@@ -38,24 +42,30 @@ function escapeAssPath(p: string): string {
 }
 
 interface BrollPlan {
-  broll: Broll;
   inputIndex: number;
   srcPath: string;
+  srcInSec: number;
   outStart: number;
   outEnd: number;
 }
 
-export async function exportCut(slug: string): Promise<{ out: string; durationSec: number; ranges: number; captions: boolean; broll: number }> {
+export async function exportCut(
+  slug: string,
+  opts: ExportOptions = {},
+): Promise<{ out: string; durationSec: number; ranges: number; captions: boolean; broll: number; zooms: number; vignette: boolean; height: number }> {
   const p = projectPaths(slug);
   const project = ProjectSchema.parse(JSON.parse(await Bun.file(p.project).text()));
   const ranges = survivingRanges(project);
   if (ranges.length === 0) throw new Error("nothing to export (all words deleted)");
   const sr = project.sampleRate;
-  const { width: W, height: H } = project;
+
+  // output resolution
+  const outH = opts.maxHeight && opts.maxHeight < project.height ? opts.maxHeight : project.height;
+  const outW = outH === project.height ? project.width : Math.round((project.width * outH) / project.height / 2) * 2;
 
   const selectExpr = ranges.map((r) => `between(t,${sec(r.startSec)},${sec(r.endSec)})`).join("+");
 
-  // Resolve b-roll items to source files + output-time windows; drop any that fall in a cut.
+  // b-roll -> output windows
   const assetById = new Map(project.assets.map((a) => [a.id, a]));
   const plans: BrollPlan[] = [];
   for (const b of project.broll ?? []) {
@@ -64,35 +74,67 @@ export async function exportCut(slug: string): Promise<{ out: string; durationSe
     const outStart = sourceToOutputSec(b.startSample / sr, ranges);
     const outEnd = sourceToOutputSec(b.endSample / sr, ranges);
     if (outEnd - outStart < 0.05) continue;
-    plans.push({ broll: b, inputIndex: plans.length + 1, srcPath: asset.src, outStart, outEnd });
+    plans.push({ inputIndex: plans.length + 1, srcPath: asset.src, srcInSec: b.srcInSample / sr, outStart, outEnd });
   }
 
-  // Captions (burned after the overlays so timing matches the output stream).
+  // zooms -> output windows
+  const zoomWins = (project.zooms ?? [])
+    .map((z) => ({
+      os: sourceToOutputSec(z.startSample / sr, ranges),
+      oe: sourceToOutputSec(z.endSample / sr, ranges),
+      scale: z.scale,
+      ramp: Math.max(0.05, z.rampSec),
+    }))
+    .filter((z) => z.oe - z.os > 0.05);
+
+  // captions
   let assPath: string | null = null;
   const captionsOn = project.captions?.enabled !== false;
   if (captionsOn) {
     const groups = groupCaptions(keptWordsInOutputTime(project, ranges), project.captions?.maxWords ?? 6);
     if (groups.length > 0) {
       assPath = `${p.dir}/captions.ass`;
-      await Bun.write(assPath, buildAss(groups, { width: W, height: H }));
+      await Bun.write(assPath, buildAss(groups, { width: outW, height: outH }));
     }
   }
 
-  // Build the filtergraph.
-  const parts: string[] = [`[0:v]select='${selectExpr}',setpts=N/FRAME_RATE/TB[base]`];
-  let last = "base";
-  for (const pl of plans) {
-    const srcIn = pl.broll.srcInSample / sr;
-    const dur = pl.outEnd - pl.outStart;
-    parts.push(
-      `[${pl.inputIndex}:v]trim=start=${sec(srcIn)}:duration=${sec(dur)},setpts=PTS-STARTPTS+${sec(pl.outStart)}/TB,scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1[bv${pl.inputIndex}]`,
-    );
-    const next = `ov${pl.inputIndex}`;
-    parts.push(
-      `[${last}][bv${pl.inputIndex}]overlay=eof_action=pass:enable='between(t,${sec(pl.outStart)},${sec(pl.outEnd)})'[${next}]`,
-    );
-    last = next;
+  // ---- filtergraph ----
+  const parts: string[] = [];
+  let base = `[0:v]select='${selectExpr}',setpts=N/FRAME_RATE/TB`;
+  if (outH !== project.height) base += `,scale=${outW}:${outH}`;
+  parts.push(`${base}[v0]`);
+  let last = "v0";
+
+  if (zoomWins.length > 0) {
+    // crop w/h can't vary per frame in ffmpeg, so each zoom is a static punch-in:
+    // scale a copy up by `scale`, center-crop back to frame, overlay during the window.
+    const splitLabels = zoomWins.map((_, i) => `[zsrc${i}]`).join("");
+    parts.push(`[${last}]split=${zoomWins.length + 1}[zbase]${splitLabels}`);
+    let zlast = "zbase";
+    zoomWins.forEach((z, i) => {
+      const ew = Math.round((outW * z.scale) / 2) * 2;
+      const eh = Math.round((outH * z.scale) / 2) * 2;
+      parts.push(`[zsrc${i}]scale=${ew}:${eh},crop=${outW}:${outH}[zc${i}]`);
+      parts.push(`[${zlast}][zc${i}]overlay=eof_action=pass:enable='between(t,${sec(z.os)},${sec(z.oe)})'[zo${i}]`);
+      zlast = `zo${i}`;
+    });
+    last = zlast;
   }
+
+  for (const pl of plans) {
+    parts.push(
+      `[${pl.inputIndex}:v]trim=start=${sec(pl.srcInSec)}:duration=${sec(pl.outEnd - pl.outStart)},setpts=PTS-STARTPTS+${sec(pl.outStart)}/TB,scale=${outW}:${outH}:force_original_aspect_ratio=increase,crop=${outW}:${outH},setsar=1[bv${pl.inputIndex}]`,
+    );
+    parts.push(`[${last}][bv${pl.inputIndex}]overlay=eof_action=pass:enable='between(t,${sec(pl.outStart)},${sec(pl.outEnd)})'[ov${pl.inputIndex}]`);
+    last = `ov${pl.inputIndex}`;
+  }
+
+  const vignette = Boolean(project.look?.vignette);
+  if (vignette) {
+    parts.push(`[${last}]vignette[vig]`);
+    last = "vig";
+  }
+
   if (assPath) parts.push(`[${last}]subtitles='${escapeAssPath(assPath)}'[vout]`);
   else parts.push(`[${last}]null[vout]`);
   parts.push(`[0:a]aselect='${selectExpr}',asetpts=N/SR/TB[aout]`);
@@ -120,5 +162,8 @@ export async function exportCut(slug: string): Promise<{ out: string; durationSe
     ranges: ranges.length,
     captions: captionsOn && assPath !== null,
     broll: plans.length,
+    zooms: zoomWins.length,
+    vignette,
+    height: outH,
   };
 }

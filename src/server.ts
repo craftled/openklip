@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import index from "../web/index.html";
-import { BrollSchema, type Project, ProjectSchema } from "./edl.ts";
+import { BrollSchema, type Project, ProjectSchema, ZoomSchema } from "./edl.ts";
 import { exportCut } from "./exporter.ts";
 import { assetProxyPath, PROJECTS_ROOT, projectPaths } from "./paths.ts";
 
@@ -86,12 +86,39 @@ export async function serve(slugArg?: string, port = 4399): Promise<void> {
         },
       },
       "/api/export": {
-        async POST() {
+        async POST(req: Request) {
           try {
-            return Response.json({ ok: true, ...(await exportCut(slug)) });
+            const body = (await req.json().catch(() => ({}))) as { maxHeight?: number };
+            return Response.json({ ok: true, ...(await exportCut(slug, { maxHeight: body.maxHeight })) });
           } catch (e) {
             return Response.json({ ok: false, error: (e as Error).message }, { status: 400 });
           }
+        },
+      },
+      "/api/look": {
+        async POST(req: Request) {
+          const body = (await req.json()) as { vignette?: boolean };
+          const project = await loadProject(slug);
+          if (typeof body.vignette === "boolean") project.look = { ...project.look, vignette: body.vignette };
+          await Bun.write(projectPaths(slug).project, JSON.stringify(project, null, 2));
+          return Response.json({ ok: true });
+        },
+      },
+      "/api/zooms": {
+        async POST(req: Request) {
+          const body = (await req.json()) as { zooms?: unknown[] };
+          const project = await loadProject(slug);
+          const dur = project.durationSamples;
+          const items = [];
+          for (const raw of body.zooms ?? []) {
+            const z = ZoomSchema.parse(raw);
+            const start = Math.max(0, Math.min(z.startSample, dur));
+            const end = Math.max(start + 1, Math.min(z.endSample, dur));
+            items.push({ ...z, startSample: start, endSample: end });
+          }
+          project.zooms = items;
+          await Bun.write(projectPaths(slug).project, JSON.stringify(project, null, 2));
+          return Response.json({ ok: true, zooms: items });
         },
       },
       "/api/broll": {
