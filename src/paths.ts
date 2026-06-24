@@ -1,0 +1,34 @@
+import { basename, extname, join, resolve } from "node:path";
+
+export const PROJECTS_ROOT = resolve(import.meta.dir, "..", "projects");
+
+export function slugify(name: string): string {
+  return (
+    name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "")
+      .slice(0, 60) || "project"
+  );
+}
+
+export function slugFromVideo(videoPath: string): string {
+  return slugify(basename(videoPath, extname(videoPath)));
+}
+
+export function projectDir(slug: string): string {
+  return join(PROJECTS_ROOT, slug);
+}
+
+export function projectPaths(slug: string) {
+  const dir = projectDir(slug);
+  return {
+    dir,
+    project: join(dir, "project.json"),
+    transcript: join(dir, "transcript.json"),
+    proxy: join(dir, "proxy.mp4"),
+    audioRaw: join(dir, "audio16k.f32"),
+    frames: join(dir, "frames"),
+    out: join(dir, "out.mp4"),
+  };
+}
