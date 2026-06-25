@@ -32,6 +32,43 @@
   --r-md: 12px;
   --font: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --btn-primary-bg: #171717;
+  --btn-primary-fg: #ffffff;
+  --btn-primary-hover: #383838;
+}
+[data-theme="dark"] {
+  /* Geist Dark tokens (same names, dark values) */
+  --bg-100: #0a0a0a;
+  --bg-200: #1a1a1a;
+  --gray-100: #1f1f1f;
+  --gray-200: #2e2e2e;
+  --gray-600: #6e6e6e;
+  --gray-700: #7d7d7d;
+  --gray-900: #a1a1a1;
+  --gray-1000: #ededed;
+  --border: rgba(255, 255, 255, 0.12);
+  --border-hover: rgba(255, 255, 255, 0.22);
+  --hover: rgba(255, 255, 255, 0.07);
+  --accent: #3b9eff;
+  --blue-100: #10243d;
+  --blue-200: #102a47;
+  --blue-800: #8cc2ff;
+  --teal-100: #06231f;
+  --teal-300: #0c3c34;
+  --teal-700: #00bfa5;
+  --teal-900: #5af0db;
+  --amber-100: #241a05;
+  --amber-300: #3a2c0a;
+  --amber-900: #ffce6b;
+  --pink-100: #2a0a1c;
+  --pink-300: #401230;
+  --pink-900: #ffa6c8;
+  --text: #ededed;
+  --muted: #7d7d7d;
+  --muted-2: #a1a1a1;
+  --btn-primary-bg: #ededed;
+  --btn-primary-fg: #0a0a0a;
+  --btn-primary-hover: #cfcfcf;
 }
 * {
   box-sizing: border-box;
@@ -102,9 +139,9 @@ body {
 
 /* buttons */
 .export {
-  background: var(--gray-1000);
-  color: #fff;
-  border: 1px solid var(--gray-1000);
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-fg);
+  border: 1px solid var(--btn-primary-bg);
   height: 40px;
   padding: 0 12px;
   border-radius: var(--r-sm);
@@ -113,8 +150,13 @@ body {
   transition: background 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.1);
 }
 .export:hover {
-  background: #383838;
-  border-color: #383838;
+  background: var(--btn-primary-hover);
+  border-color: var(--btn-primary-hover);
+}
+.theme-toggle {
+  min-width: 46px;
+  text-align: center;
+  font-size: 13px;
 }
 .export:disabled {
   background: var(--gray-100);

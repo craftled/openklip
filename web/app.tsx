@@ -98,6 +98,22 @@ export function App() {
   const [titlePos, setTitlePos] = useState<"lower" | "center">("lower");
   const [exporting, setExporting] = useState(false);
   const [exportMsg, setExportMsg] = useState<string | null>(null);
+  const [theme, setTheme] = useState<"light" | "dark">(() =>
+    typeof document !== "undefined" && document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light",
+  );
+  const themeMounted = useRef(false);
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    if (themeMounted.current) {
+      try {
+        localStorage.setItem("openklip-theme", theme);
+      } catch {
+        // ignore unavailable storage
+      }
+    }
+    themeMounted.current = true;
+  }, [theme]);
+  const toggleTheme = useCallback(() => setTheme((prev) => (prev === "dark" ? "light" : "dark")), []);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const brollRef = useRef<HTMLVideoElement>(null);
@@ -307,6 +323,9 @@ export function App() {
           {ranges.length} cuts · {(project.broll ?? []).length} b-roll · {(project.zooms ?? []).length} zoom · {fmt(keptDuration)} / {fmt(fullDur)}
         </div>
         <div className="exportgroup">
+          <button type="button" className="ghost theme-toggle" onClick={toggleTheme} aria-label="Toggle dark mode" title="Toggle theme">
+            {theme === "dark" ? "Light" : "Dark"}
+          </button>
           <label className="cap-toggle">
             <input type="checkbox" checked={export1080} onChange={(e) => setExport1080(e.target.checked)} /> 1080p
           </label>
