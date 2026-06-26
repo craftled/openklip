@@ -9,7 +9,7 @@ import {
   SAMPLE_RATE,
 } from "./edl.ts";
 import { FFMPEG, probe, probeAudio, run } from "./ffmpeg.ts";
-import { projectPaths, slugify } from "./paths.ts";
+import { assetProxyRelative, projectPaths, slugify } from "./paths.ts";
 
 const IMAGE_EXT = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif"]);
 const AUDIO_EXT = new Set([".mp3", ".wav", ".aac", ".m4a", ".flac", ".ogg"]);
@@ -57,7 +57,7 @@ async function buildVideoProxy(
   id: string,
   src: string
 ): Promise<{ proxy: string; durationSamples: number }> {
-  const proxyRel = `assets/${id}.mp4`;
+  const proxyRel = assetProxyRelative(`${id}.mp4`);
   const out = resolve(projectPaths(slug).dir, proxyRel);
   await run(
     FFMPEG,
@@ -105,7 +105,7 @@ async function buildMusicProxy(
   id: string,
   src: string
 ): Promise<{ proxy: string; durationSamples: number }> {
-  const proxyRel = `assets/${id}.aac`;
+  const proxyRel = assetProxyRelative(`${id}.aac`);
   const out = resolve(projectPaths(slug).dir, proxyRel);
   await run(
     FFMPEG,
@@ -136,7 +136,7 @@ async function buildStillProxy(
   src: string
 ): Promise<{ proxy: string; durationSamples: number }> {
   const ext = extname(src).toLowerCase() || ".png";
-  const proxyRel = `assets/${id}${ext}`;
+  const proxyRel = assetProxyRelative(`${id}${ext}`);
   const out = resolve(projectPaths(slug).dir, proxyRel);
   await copyFile(src, out);
   return {

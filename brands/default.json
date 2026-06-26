@@ -1,0 +1,6 @@
+{
+  "name": "default",
+  "captions": { "enabled": true, "maxWords": 6 },
+  "look": { "vignette": false },
+  "padMs": 50
+}

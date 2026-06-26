@@ -1,15 +1,21 @@
 #!/usr/bin/env bun
 import { existsSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import {
   addBroll,
+  addStill,
   addTitle,
   addZoom,
   cutAllByText,
   cutByText,
   cutWords,
   removeBroll,
+  removeStill,
   removeTitle,
   removeZoom,
+  reorderBroll,
+  reorderTitle,
+  reorderZoom,
   restoreAll,
   setCaptionMaxWords,
   setCaptions,
@@ -21,10 +27,22 @@ import {
   updateZoom,
 } from "./actions.ts";
 import { registerAsset } from "./assets.ts";
+import { applyBrand, loadBrand } from "./brands.ts";
 import { registerBroll } from "./broll.ts";
+import { runDoctor } from "./doctor.ts";
 import { type Project, ProjectSchema, samplesToSec } from "./edl.ts";
 import { exportCut } from "./exporter.ts";
+import { FFMPEG, FFPROBE } from "./ffmpeg.ts";
 import { ingest } from "./ingest.ts";
+import { loadIngesters } from "./ingesters.ts";
+import {
+  buildPackageArgv,
+  checkPackagePreflight,
+  listPackagePasses,
+  resolveCliPath,
+  resolveHyperframesCli,
+  resolvePackagePass,
+} from "./package-pass.ts";
 import { projectPaths } from "./paths.ts";
 import { latestProject, listProjects } from "./projectStore.ts";
 
@@ -39,6 +57,7 @@ Discovery
 
 Setup
   openklip ingest <video>            transcribe + build a project
+                                       --brand <name>  apply a brand preset
   openklip serve [slug]              open the local editor (default: latest)
   openklip asset-add <slug> <file>   register b-roll, music, or still (auto-detect)
                                        --kind broll|music|still
@@ -68,17 +87,32 @@ Overlays
                                        --ramp <sec>    (default 0.6)
   openklip zoom-set <slug> <zoomId>  patch zoom (--scale --ramp --from --to)
   openklip zoom-rm <slug> <zoomId>   remove a push-in zoom
+  openklip still-add <slug> <assetId> <fromSec> <toSec>
+                                     overlay a still image with a Ken Burns push-in
+                                       --scale <1-3>  --focus-x <0-1>  --focus-y <0-1>
+  openklip still-rm <slug> <stillId> remove a still overlay
+  openklip reorder <slug> <broll|title|zoom> <id> <toIndex>
+                                     restack an overlay (paint order)
 
 Look & captions
   openklip captions <slug> <on|off>    toggle burned captions for export
   openklip captions-max <slug> <n>       words per caption line (1-12)
   openklip look <slug> vignette <on|off> toggle vignette
   openklip pad <slug> <ms>               cut boundary padding (0-500 ms)
+  openklip brand <slug> <name>           apply a brand preset (look defaults)
 
 Review & export
   openklip status <slug>             summarize the current edit
   openklip export <slug>             render the current cut to out.mp4
                                        --height <px>  max output height (e.g. 1080)
+
+Diagnostics
+  openklip doctor [slug]             check ffmpeg, whisper, and project health
+
+Post-export (optional, external)
+  openklip package <slug> <pass>     run a HyperFrames finishing pass on out.mp4
+                                       passes: remove-background, transcribe
+                                       requires the HyperFrames CLI (bun add -d hyperframes)
 `);
 }
 
@@ -212,12 +246,26 @@ try {
       console.log(`\n${project.assets.length} asset(s)`);
       break;
     }
-    case "ingest":
+    case "ingest": {
       if (!rest[0]) {
-        throw new Error("usage: openklip ingest <video>");
+        throw new Error("usage: openklip ingest <video> [--brand <name>]");
       }
-      await ingest(rest[0]);
+      const brandName = flagValue(rest, "--brand");
+      const videoArg = rest.filter(
+        (a) => a !== "--brand" && a !== brandName
+      )[0];
+      if (!videoArg) {
+        throw new Error("usage: openklip ingest <video> [--brand <name>]");
+      }
+      const ingestedSlug = await ingest(videoArg);
+      if (brandName) {
+        const project = await loadProject(ingestedSlug);
+        applyBrand(project, await loadBrand(brandName));
+        await saveProject(ingestedSlug, project);
+        console.log(`[ingest] applied brand "${brandName}"`);
+      }
       break;
+    }
     case "serve":
     case "dev": {
       // Launch the Next.js editor, pinned to this project via OPENKLIP_SLUG.
@@ -227,6 +275,13 @@ try {
       }
       if (!existsSync(projectPaths(slug).project)) {
         throw new Error(`project not found: ${slug}`);
+      }
+      // Surface a broken ffmpeg / whisper / proxy before the editor opens, so a
+      // failed edit loop isn't the first signal something is wrong.
+      const health = await runDoctor(slug);
+      for (const c of health.checks.filter((x) => x.status !== "ok")) {
+        const sigil = c.status === "fail" ? "✗" : "!";
+        console.log(`[serve] ${sigil} ${c.name}: ${c.detail}`);
       }
       const port = process.env.PORT ?? "4399";
       console.log(
@@ -430,6 +485,48 @@ try {
       console.log(
         `updated b-roll ${item.id} (asset "${item.assetId}", ${secSpan(item.startSample, item.endSample)})`
       );
+      break;
+    }
+    case "still-add": {
+      if (!(rest[0] && rest[1] && rest[2] && rest[3])) {
+        throw new Error(
+          "usage: openklip still-add <slug> <assetId> <fromSec> <toSec> [--scale N] [--focus-x N] [--focus-y N]"
+        );
+      }
+      const slug = rest[0];
+      const args = rest.slice(1);
+      const fromSec = Number(rest[2]);
+      const toSec = Number(rest[3]);
+      if (!(Number.isFinite(fromSec) && Number.isFinite(toSec))) {
+        throw new Error("fromSec and toSec must be numbers (seconds)");
+      }
+      const project = await loadProject(slug);
+      const item = addStill(project, {
+        assetId: rest[1],
+        fromSec,
+        toSec,
+        scale: flagNumber(args, "--scale"),
+        focusX: flagNumber(args, "--focus-x"),
+        focusY: flagNumber(args, "--focus-y"),
+      });
+      await saveProject(slug, project);
+      console.log(
+        `added still ${item.id} (asset "${item.assetId}", ${fromSec}s-${toSec}s, ${item.scale}x focus ${item.focusX},${item.focusY})`
+      );
+      break;
+    }
+    case "still-rm": {
+      if (!(rest[0] && rest[1])) {
+        throw new Error("usage: openklip still-rm <slug> <stillId>");
+      }
+      const project = await loadProject(rest[0]);
+      const removed = removeStill(project, rest[1]);
+      if (!removed) {
+        console.log(`no still overlay with id "${rest[1]}"`);
+        break;
+      }
+      await saveProject(rest[0], project);
+      console.log(`removed still ${rest[1]}`);
       break;
     }
     case "title-add": {
@@ -711,6 +808,129 @@ try {
       console.log(
         `exported ${r.ranges} ranges, ${r.durationSec.toFixed(1)}s (${r.height}p) -> ${r.out}`
       );
+      break;
+    }
+    case "brand": {
+      if (!(rest[0] && rest[1])) {
+        throw new Error("usage: openklip brand <slug> <name>");
+      }
+      const project = await loadProject(rest[0]);
+      applyBrand(project, await loadBrand(rest[1]));
+      await saveProject(rest[0], project);
+      console.log(
+        `applied brand "${rest[1]}": captions ${project.captions.enabled ? "on" : "off"} (max ${project.captions.maxWords}), vignette ${project.look?.vignette ? "on" : "off"}, pad ${project.padMs}ms`
+      );
+      break;
+    }
+    case "reorder": {
+      if (!(rest[0] && rest[1] && rest[2] && rest[3] !== undefined)) {
+        throw new Error(
+          "usage: openklip reorder <slug> <broll|title|zoom> <id> <toIndex>"
+        );
+      }
+      const [slug, kind, id] = rest;
+      const toIndex = Number(rest[3]);
+      if (!Number.isFinite(toIndex)) {
+        throw new Error("toIndex must be a number");
+      }
+      const project = await loadProject(slug);
+      if (kind === "broll") {
+        reorderBroll(project, id, toIndex);
+      } else if (kind === "title") {
+        reorderTitle(project, id, toIndex);
+      } else if (kind === "zoom") {
+        reorderZoom(project, id, toIndex);
+      } else {
+        throw new Error("kind must be broll, title, or zoom");
+      }
+      await saveProject(slug, project);
+      console.log(`reordered ${kind} ${id} -> index ${toIndex}`);
+      break;
+    }
+    case "package": {
+      if (!(rest[0] && rest[1])) {
+        const passes = listPackagePasses()
+          .map((p) => p.id)
+          .join(", ");
+        throw new Error(
+          `usage: openklip package <slug> <pass>\n  passes: ${passes}`
+        );
+      }
+      const slug = rest[0];
+      const pass = resolvePackagePass(rest[1]);
+      const p = projectPaths(slug);
+      const input = p.out;
+      const output = `${p.output}/out-${pass.id}.${pass.outExt}`;
+      // Prefer the locally-installed hyperframes bin, else env override, else PATH.
+      const localBin = resolve(process.cwd(), "node_modules/.bin/hyperframes");
+      const cliRaw = process.env.HYPERFRAMES_CLI
+        ? resolveHyperframesCli()
+        : existsSync(localBin)
+          ? localBin
+          : resolveHyperframesCli();
+      const cliPath = resolveCliPath(cliRaw);
+      const preflight = checkPackagePreflight({
+        outExists: existsSync(input),
+        cli: cliPath,
+      });
+      if (!preflight.ok) {
+        console.error(`\ncannot run package pass "${pass.id}":`);
+        for (const e of preflight.errors) {
+          console.error(`  - ${e}`);
+        }
+        if (pass.requires) {
+          console.error(`  - this pass also needs: ${pass.requires}`);
+        }
+        process.exit(1);
+      }
+      const argv = buildPackageArgv(pass, input, output, cliPath as string);
+      console.log(`[package] ${pass.label}`);
+      console.log(`[package] ${argv.join(" ")}`);
+      // HyperFrames shells out to ffmpeg/ffprobe by name; put our static binaries
+      // on PATH so it doesn't require a system ffmpeg install.
+      const proc = Bun.spawn(argv, {
+        stdio: ["inherit", "inherit", "inherit"],
+        env: {
+          ...process.env,
+          PATH: `${dirname(FFMPEG)}:${dirname(FFPROBE)}:${process.env.PATH ?? ""}`,
+        },
+      });
+      if ((await proc.exited) !== 0) {
+        throw new Error(`package pass "${pass.id}" failed`);
+      }
+      console.log(`[package] done -> ${output}`);
+      break;
+    }
+    case "ingesters": {
+      const list = await loadIngesters();
+      if (list.length === 0) {
+        console.log("no ingester plugins in ingesters/");
+        break;
+      }
+      for (const m of list) {
+        const required = m.fields
+          .filter((f) => f.required)
+          .map((f) => f.name)
+          .join(", ");
+        console.log(
+          `${m.id.padEnd(16)}  ${m.label}${required ? `  (needs: ${required})` : ""}`
+        );
+      }
+      console.log(`\n${list.length} ingester(s)`);
+      break;
+    }
+    case "doctor": {
+      const report = await runDoctor(rest[0]);
+      const mark = { ok: "✓", warn: "!", fail: "✗" } as const;
+      for (const c of report.checks) {
+        console.log(`  ${mark[c.status]} ${c.name.padEnd(18)} ${c.detail}`);
+      }
+      console.log(
+        `\n${report.ok ? "healthy" : "problems found"} (${report.checks.length} checks)`
+      );
+      if (!report.ok) {
+        process.exit(1);
+      }
       break;
     }
     default:

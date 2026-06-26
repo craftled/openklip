@@ -6,6 +6,7 @@ import {
   type Broll,
   type Project,
   SAMPLE_RATE,
+  type Still,
   survivingRanges,
   type Title,
   type Zoom,
@@ -250,6 +251,83 @@ export function updateBroll(
   item.endSample = Math.round(endSec * SAMPLE_RATE);
   item.srcInSample = Math.round(srcInSec * SAMPLE_RATE);
   return item;
+}
+
+// Add a still-image overlay with a Ken Burns push-in over a span of the source
+// timeline. Requires a registered asset of kind "still".
+export function addStill(
+  project: Project,
+  input: {
+    assetId: string;
+    fromSec: number;
+    toSec: number;
+    scale?: number;
+    focusX?: number;
+    focusY?: number;
+  }
+): Still {
+  const {
+    assetId,
+    fromSec,
+    toSec,
+    scale = 1.2,
+    focusX = 0.5,
+    focusY = 0.5,
+  } = input;
+  if (![fromSec, toSec, scale, focusX, focusY].every(Number.isFinite)) {
+    throw new Error("still timing/look values must be finite numbers");
+  }
+  if (fromSec < 0 || toSec < 0) {
+    throw new Error("still timing values must be non-negative");
+  }
+  if (scale < 1 || scale > 3) {
+    throw new Error("still scale must be between 1 and 3");
+  }
+  if (focusX < 0 || focusX > 1 || focusY < 0 || focusY > 1) {
+    throw new Error("still focus must be between 0 and 1");
+  }
+  const asset = project.assets.find((a) => a.id === assetId);
+  if (!asset) {
+    const known = project.assets.map((a) => a.id).join(", ") || "(none)";
+    throw new Error(`unknown asset "${assetId}". Registered assets: ${known}`);
+  }
+  if (asset.kind !== "still") {
+    throw new Error(
+      `asset "${assetId}" is ${asset.kind}; still overlays require kind still`
+    );
+  }
+  if (toSec <= fromSec) {
+    throw new Error(
+      `still span is empty: toSec (${toSec}) must be greater than fromSec (${fromSec})`
+    );
+  }
+  const projectDurationSec = project.durationSamples / SAMPLE_RATE;
+  if (fromSec >= projectDurationSec) {
+    throw new Error("still span starts after the project ends");
+  }
+  const endSec = Math.min(toSec, projectDurationSec);
+  const item: Still = {
+    id: `s${Date.now()}`,
+    assetId,
+    startSample: Math.round(fromSec * SAMPLE_RATE),
+    endSample: Math.round(endSec * SAMPLE_RATE),
+    scale,
+    focusX,
+    focusY,
+  };
+  if (!project.stills) {
+    project.stills = [];
+  }
+  project.stills.push(item);
+  return item;
+}
+
+// Remove a still overlay by id. Returns whether one was removed.
+export function removeStill(project: Project, id: string): boolean {
+  const stills = project.stills ?? [];
+  const before = stills.length;
+  project.stills = stills.filter((s) => s.id !== id);
+  return project.stills.length < before;
 }
 
 // Add a title card over a span of the source timeline. Converts seconds to
@@ -507,6 +585,52 @@ export function updateZoom(
   item.startSample = Math.round(fromSec * SAMPLE_RATE);
   item.endSample = Math.round(endSec * SAMPLE_RATE);
   return item;
+}
+
+// Move an item to a new index within its track, preserving the others' order.
+// Overlay paint order is array order (later items paint on top), so this is how
+// a dnd-kit track — or the CLI — restacks b-roll covers, titles, or zooms.
+function reorderById<T extends { id: string }>(
+  list: T[],
+  id: string,
+  toIndex: number
+): T[] {
+  const from = list.findIndex((x) => x.id === id);
+  if (from === -1) {
+    throw new Error(`unknown id "${id}"`);
+  }
+  const next = list.slice();
+  const [item] = next.splice(from, 1);
+  const clamped = Math.max(0, Math.min(next.length, Math.trunc(toIndex)));
+  next.splice(clamped, 0, item);
+  return next;
+}
+
+export function reorderBroll(
+  project: Project,
+  id: string,
+  toIndex: number
+): Broll[] {
+  project.broll = reorderById(project.broll, id, toIndex);
+  return project.broll;
+}
+
+export function reorderTitle(
+  project: Project,
+  id: string,
+  toIndex: number
+): Title[] {
+  project.titles = reorderById(project.titles ?? [], id, toIndex);
+  return project.titles;
+}
+
+export function reorderZoom(
+  project: Project,
+  id: string,
+  toIndex: number
+): Zoom[] {
+  project.zooms = reorderById(project.zooms ?? [], id, toIndex);
+  return project.zooms;
 }
 
 export interface ProjectSummary {

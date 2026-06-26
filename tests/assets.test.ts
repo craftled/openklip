@@ -79,7 +79,7 @@ test("registerAsset copies a still into the project asset bin", async () => {
     writeFileSync(stillPath, Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
     const asset = await registerAsset(slug, stillPath, "still");
     assert.equal(asset.kind, "still");
-    assert.match(asset.proxy, /^assets\/.+\.png$/);
+    assert.match(asset.proxy, /^working\/assets\/.+\.png$/);
     const raw = readFileSync(`projects/${slug}/project.json`, "utf8");
     const project = ProjectSchema.parse(JSON.parse(raw));
     assert.equal(project.assets.length, 1);

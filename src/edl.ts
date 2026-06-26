@@ -47,6 +47,20 @@ export const ZoomSchema = z.object({
 });
 export type Zoom = z.infer<typeof ZoomSchema>;
 
+// A still image overlaid over a span of the SOURCE timeline with a Ken Burns
+// push-in: ease from 1.0 toward `scale` over the span, centered on (focusX,
+// focusY) in [0,1] image coordinates. Distinct from Broll (which is video).
+export const StillSchema = z.object({
+  id: z.string(),
+  assetId: z.string(),
+  startSample: z.number().int().nonnegative(),
+  endSample: z.number().int().nonnegative(),
+  scale: z.number().min(1).max(3).default(1.2),
+  focusX: z.number().min(0).max(1).default(0.5),
+  focusY: z.number().min(0).max(1).default(0.5),
+});
+export type Still = z.infer<typeof StillSchema>;
+
 // An editorial title card (lower-third or centered) over a span of the SOURCE timeline.
 export const TitleSchema = z.object({
   id: z.string(),
@@ -81,6 +95,7 @@ export const ProjectSchema = z.object({
     .default({ vignette: false }),
   zooms: z.array(ZoomSchema).default([]),
   titles: z.array(TitleSchema).default([]),
+  stills: z.array(StillSchema).default([]),
   words: z.array(WordSchema),
 });
 export type Project = z.infer<typeof ProjectSchema>;
