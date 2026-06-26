@@ -9,9 +9,8 @@ const noFlash = `(function(){try{var t=localStorage.getItem("openklip-theme")||"
 export const metadata: Metadata = {
   title: "OpenKlip",
   description: "Edit video by editing text.",
-  icons: {
-    icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%2310b981'/%3E%3C/svg%3E",
-  },
+  // Favicon is supplied by the app/icon.svg file convention (theme-adaptive,
+  // black/white via an embedded prefers-color-scheme media query).
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
