@@ -14,7 +14,7 @@ export type { AgentStatus } from "@engine/agent-driver";
 
 // Probe which agent CLIs are installed + signed in, for the selector badges.
 export async function getAgentStatuses() {
-  return detectAgents();
+  return await detectAgents();
 }
 
 export type AgentResult =

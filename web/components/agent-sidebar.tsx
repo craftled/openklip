@@ -130,6 +130,7 @@ function StatusDot({
     <span
       aria-label={s.title}
       className={cn("size-1.5 shrink-0 rounded-full", s.dot, className)}
+      role="img"
       title={s.title}
     />
   );
