@@ -20,7 +20,6 @@
       "react",
       "react-dom"
     ],
-    "baseUrl": ".",
     "plugins": [
       {
         "name": "next"
