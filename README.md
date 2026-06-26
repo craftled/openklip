@@ -1,4 +1,4 @@
-# openklip
+# OpenKlip
 
 Edit video by editing text. A lean, local-first, agent-native editor for talking-head + b-roll content.
 

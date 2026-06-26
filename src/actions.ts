@@ -1,4 +1,4 @@
-// Pure edit primitives over a Project (the EDL). No file IO, no ffmpeg — every
+// Pure edit primitives over a Project (the EDL). No file IO, no ffmpeg; every
 // function here mutates the passed Project and returns it (or a small result),
 // so the CLI and the GUI operate on the SAME project.json shape (parity). These
 // are the operations an external coding agent drives from the terminal.
