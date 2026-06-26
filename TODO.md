@@ -25,6 +25,8 @@ Preview cuts now get a Glimm WebGL sweep in the browser; exported MP4s still har
 - [x] **Title cards** (lower-third + centered, slide-up/fade entrance; ASS builder `titles.ts` + preview overlay + burn-in)
 - [x] **MVP reliability pass** (proxy media route, save/export sequencing, source/proxy export fallback, b-roll gap splitting, caption/title collision handling, ASS timestamp rounding)
 - [x] **Agent peer (M2 foundation) - CLI primitives** (`transcript`, `cut`, `cut --text`, `restore`, `broll-add`, `broll-rm`, `captions`, `status`, `export`)
+- [x] **Agent peer - full GUI parity CLI** (`list`, `assets`, zoom/title/broll set commands, look, pad, captions-max)
+- [x] **Agent peer - agent-loop demo** (`bun run agent-demo`, composes primitives from a phrase list)
 - [x] **Agent peer - CLAUDE.md agent skill + pure `actions.ts`** (full GUI/agent parity on the same `project.json`)
 - [x] **Design system: Geist (Vercel)** (light theme + light/dark toggle; dark mode shipped alongside this roadmap)
 - [x] **TDD test suite** (`bun test`: actions, captions, EDL, exporter, range streaming, titles, zoom-ramp)
@@ -70,7 +72,7 @@ Preview cuts now get a Glimm WebGL sweep in the browser; exported MP4s still har
 
 ### Agent
 
-- [ ] End-to-end agent-loop demo (point Claude Code at a project, cut from a prompt).
+- [x] End-to-end agent-loop demo (`bun run agent-demo` — phrase list → cut → status → export).
 - [ ] Optional MCP server exposing the editing tools.
 
 ### Infra

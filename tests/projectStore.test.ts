@@ -1,12 +1,26 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { loadProject, resolveSlug, saveProject } from "../src/projectStore.ts";
+import {
+  listProjects,
+  loadProject,
+  resolveSlug,
+  saveProject,
+} from "../src/projectStore.ts";
 import {
   makeProject,
   withTempProjectsRoot,
   writeFixtureProject,
 } from "./helpers/projectFixture.ts";
+
+test("listProjects returns slugs sorted by mtime descending", async () => {
+  await withTempProjectsRoot(({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const listed = listProjects();
+    assert.equal(listed.length, 1);
+    assert.equal(listed[0]?.slug, slug);
+  });
+});
 
 test("loadProject and saveProject round-trip project.json", async () => {
   await withTempProjectsRoot(async ({ slug }) => {

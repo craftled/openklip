@@ -54,20 +54,32 @@ frames/           sampled frames for future agent workflows
 
 ## CLI
 
+Full reference: see [CLAUDE.md](./CLAUDE.md) (agent skill). Common commands:
+
 ```bash
+bun run src/cli.ts list
 bun run src/cli.ts transcript <slug>
 bun run src/cli.ts cut <slug> w12-w20
-bun run src/cli.ts cut <slug> --text "phrase to remove"
+bun run src/cli.ts cut <slug> --text "phrase to remove" --all
 bun run src/cli.ts restore <slug>
 bun run src/cli.ts broll <slug> /path/to/b-roll.mp4
+bun run src/cli.ts assets <slug>
 bun run src/cli.ts broll-add <slug> <assetId> <fromSec> <toSec>
-bun run src/cli.ts broll-rm <slug> <brollId>
+bun run src/cli.ts broll-set <slug> <brollId> --asset <id> --from 1 --to 4
 bun run src/cli.ts title-add <slug> <fromSec> <toSec> "Title text"
-bun run src/cli.ts title-add <slug> <fromSec> <toSec> "$90,000\nSubtitle" --position hero
-bun run src/cli.ts title-rm <slug> <titleId>
+bun run src/cli.ts title-set <slug> <titleId> --text "New text"
+bun run src/cli.ts zoom-add <slug> <fromSec> <toSec> --scale 1.2
+bun run src/cli.ts zoom-set <slug> <zoomId> --scale 1.25
 bun run src/cli.ts captions <slug> on
+bun run src/cli.ts look <slug> vignette on
 bun run src/cli.ts status <slug>
-bun run src/cli.ts export <slug>
+bun run src/cli.ts export <slug> --height 1080
+```
+
+Agent-loop demo (phrase list → cut → status → optional export):
+
+```bash
+bun run agent-demo <slug> --phrases scripts/example-phrases.txt --export
 ```
 
 ## How It Works
@@ -95,4 +107,4 @@ GitHub Actions runs the same gates on pushes and pull requests.
 - Word-boundary cuts can still clip phonemes; VAD snap-to-silence and equal-power crossfades are next.
 - Glimm transitions are preview-only; exported MP4 transitions need an ffmpeg-side transition graph.
 - 4K export can be slow because the current ffmpeg path decodes the selected stream.
-- Vertical shorts, automatic highlight detection, and MCP/server automation are post-MVP work.
+- Vertical shorts, automatic highlight detection, and MCP server automation are post-MVP work.

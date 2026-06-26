@@ -3,13 +3,22 @@ import { test } from "node:test";
 import {
   addBroll,
   addTitle,
+  addZoom,
+  cutAllByText,
   cutByText,
   cutWords,
   removeBroll,
   removeTitle,
+  removeZoom,
   restoreAll,
+  setCaptionMaxWords,
   setCaptions,
+  setLook,
+  setPadMs,
   summarize,
+  updateBroll,
+  updateTitle,
+  updateZoom,
 } from "../src/actions.ts";
 import type { Project } from "../src/edl.ts";
 import { SAMPLE_RATE } from "../src/edl.ts";
@@ -229,6 +238,63 @@ test("removeTitle removes a title by id", () => {
   assert.equal(removeTitle(p, "missing"), false);
 });
 
+test("cutByText skips already-deleted words", () => {
+  const p = makeProject();
+  cutWords(p, ["w1"]);
+  const result = cutByText(p, "Hello there");
+  assert.equal(result.matched, false);
+});
+
+test("cutAllByText cuts every matching run among kept words", () => {
+  const p = makeProject();
+  p.words.push(
+    {
+      id: "w6",
+      text: "hello",
+      startSample: 6 * SAMPLE_RATE,
+      endSample: 7 * SAMPLE_RATE,
+      deleted: false,
+    },
+    {
+      id: "w7",
+      text: "again",
+      startSample: 7 * SAMPLE_RATE,
+      endSample: 8 * SAMPLE_RATE,
+      deleted: false,
+    }
+  );
+  p.durationSamples = 8 * SAMPLE_RATE;
+  const result = cutAllByText(p, "hello");
+  assert.equal(result.matches, 2);
+  assert.equal(result.ids.length, 2);
+  assert.equal(p.words.find((w) => w.id === "w0")?.deleted, true);
+  assert.equal(p.words.find((w) => w.id === "w6")?.deleted, true);
+});
+
+test("updateBroll patches asset and timing", () => {
+  const p = makeProject();
+  const item = addBroll(p, { assetId: "broll-1", fromSec: 1, toSec: 2 });
+  updateBroll(p, item.id, { fromSec: 0.5, toSec: 2.5 });
+  assert.equal(p.broll[0].startSample, Math.round(0.5 * SAMPLE_RATE));
+  assert.equal(p.broll[0].endSample, Math.round(2.5 * SAMPLE_RATE));
+});
+
+test("updateTitle patches text and position", () => {
+  const p = makeProject();
+  const item = addTitle(p, { fromSec: 0, toSec: 1, text: "Old" });
+  updateTitle(p, item.id, { text: "New", position: "hero" });
+  assert.equal(p.titles?.[0].text, "New");
+  assert.equal(p.titles?.[0].position, "hero");
+});
+
+test("updateZoom patches scale and ramp", () => {
+  const p = makeProject();
+  const item = addZoom(p, { fromSec: 0, toSec: 1 });
+  updateZoom(p, item.id, { scale: 1.5, rampSec: 1.2 });
+  assert.equal(p.zooms?.[0].scale, 1.5);
+  assert.equal(p.zooms?.[0].rampSec, 1.2);
+});
+
 test("setCaptions toggles the captions.enabled flag without dropping maxWords", () => {
   const p = makeProject();
   setCaptions(p, false);
@@ -236,6 +302,52 @@ test("setCaptions toggles the captions.enabled flag without dropping maxWords", 
   assert.equal(p.captions.maxWords, 6); // preserved
   setCaptions(p, true);
   assert.equal(p.captions.enabled, true);
+});
+
+test("setCaptionMaxWords clamps to 1-12", () => {
+  const p = makeProject();
+  setCaptionMaxWords(p, 99);
+  assert.equal(p.captions.maxWords, 12);
+  setCaptionMaxWords(p, 0);
+  assert.equal(p.captions.maxWords, 1);
+});
+
+test("setPadMs clamps to 0-500", () => {
+  const p = makeProject();
+  setPadMs(p, 999);
+  assert.equal(p.padMs, 500);
+  setPadMs(p, -10);
+  assert.equal(p.padMs, 0);
+});
+
+test("setLook toggles vignette", () => {
+  const p = makeProject();
+  setLook(p, { vignette: true });
+  assert.equal(p.look.vignette, true);
+  setLook(p, { vignette: false });
+  assert.equal(p.look.vignette, false);
+});
+
+test("addZoom stores scale and rampSec", () => {
+  const p = makeProject();
+  const item = addZoom(p, {
+    fromSec: 1,
+    toSec: 3,
+    scale: 1.25,
+    rampSec: 0.8,
+  });
+  assert.equal(item.scale, 1.25);
+  assert.equal(item.rampSec, 0.8);
+  assert.match(item.id, /^z\d+$/);
+  assert.equal(p.zooms?.length, 1);
+});
+
+test("removeZoom removes a zoom by id", () => {
+  const p = makeProject();
+  const item = addZoom(p, { fromSec: 0, toSec: 1 });
+  assert.equal(removeZoom(p, item.id), true);
+  assert.equal(p.zooms?.length, 0);
+  assert.equal(removeZoom(p, "missing"), false);
 });
 
 test("summarize counts words, cuts, ranges, broll, and kept duration", () => {
@@ -247,6 +359,9 @@ test("summarize counts words, cuts, ranges, broll, and kept duration", () => {
   assert.equal(s.deleted, 0);
   assert.equal(s.cuts, 1);
   assert.equal(s.brollCount, 0);
+  assert.equal(s.assetCount, 1);
+  assert.equal(s.titleCount, 0);
+  assert.equal(s.zoomCount, 0);
   assert.ok(Math.abs(s.keptDurationSec - 6) < 1e-6);
 
   // Cut w2 + w3 (the middle): splits the run into two ranges (w0-w1, w4-w5).

@@ -8,6 +8,7 @@ import {
   SAMPLE_RATE,
   survivingRanges,
   type Title,
+  type Zoom,
 } from "./edl.ts";
 
 // Normalize text for phrase matching: lowercase, strip anything that isn't a
@@ -52,6 +53,9 @@ export function cutByText(
   const targetTokens = target.split(" ");
 
   for (let i = 0; i < project.words.length; i++) {
+    if (project.words[i].deleted) {
+      continue;
+    }
     // Walk forward accumulating non-empty normalized tokens until they equal
     // the target token sequence. Tokens that normalize to "" (pure punctuation)
     // are skipped so they don't break an otherwise-contiguous phrase.
@@ -59,6 +63,9 @@ export function cutByText(
     let cursor = 0; // index into targetTokens
     let j = i;
     while (j < project.words.length && cursor < targetTokens.length) {
+      if (project.words[j].deleted) {
+        break;
+      }
       const tok = tokens[j];
       if (tok === "") {
         matchedIdx.push(j);
@@ -86,6 +93,25 @@ export function cutByText(
     }
   }
   return { matched: false, ids: [] };
+}
+
+// Cut every contiguous run matching the phrase (kept words only). Returns how
+// many runs were cut and the combined word ids.
+export function cutAllByText(
+  project: Project,
+  phrase: string
+): { matches: number; ids: string[] } {
+  const ids: string[] = [];
+  let matches = 0;
+  while (true) {
+    const result = cutByText(project, phrase);
+    if (!result.matched) {
+      break;
+    }
+    ids.push(...result.ids);
+    matches++;
+  }
+  return { matches, ids };
 }
 
 // Restore every word (clear all cuts).
@@ -153,6 +179,69 @@ export function removeBroll(project: Project, id: string): boolean {
   return project.broll.length < before;
 }
 
+function findBroll(project: Project, id: string): Broll {
+  const item = project.broll.find((b) => b.id === id);
+  if (!item) {
+    throw new Error(`unknown b-roll clip "${id}"`);
+  }
+  return item;
+}
+
+// Patch an existing b-roll clip. Omitted fields are unchanged.
+export function updateBroll(
+  project: Project,
+  id: string,
+  patch: {
+    assetId?: string;
+    fromSec?: number;
+    toSec?: number;
+    srcInSec?: number;
+  }
+): Broll {
+  const item = findBroll(project, id);
+  const assetId = patch.assetId ?? item.assetId;
+  const fromSec = patch.fromSec ?? item.startSample / SAMPLE_RATE;
+  const toSec = patch.toSec ?? item.endSample / SAMPLE_RATE;
+  const srcInSec = patch.srcInSec ?? item.srcInSample / SAMPLE_RATE;
+  if (![fromSec, toSec, srcInSec].every(Number.isFinite)) {
+    throw new Error("b-roll timing values must be finite numbers");
+  }
+  if (fromSec < 0 || toSec < 0 || srcInSec < 0) {
+    throw new Error("b-roll timing values must be non-negative");
+  }
+  const asset = project.assets.find((a) => a.id === assetId);
+  if (!asset) {
+    const known = project.assets.map((a) => a.id).join(", ") || "(none)";
+    throw new Error(`unknown asset "${assetId}". Registered assets: ${known}`);
+  }
+  if (toSec <= fromSec) {
+    throw new Error(
+      `b-roll span is empty: toSec (${toSec}) must be greater than fromSec (${fromSec})`
+    );
+  }
+  const projectDurationSec = project.durationSamples / SAMPLE_RATE;
+  const assetDurationSec = asset.durationSamples / SAMPLE_RATE;
+  if (fromSec >= projectDurationSec) {
+    throw new Error("b-roll span starts after the project ends");
+  }
+  if (srcInSec >= assetDurationSec) {
+    throw new Error("b-roll source in-point starts after the asset ends");
+  }
+  const endSec = Math.min(
+    toSec,
+    projectDurationSec,
+    fromSec + (assetDurationSec - srcInSec)
+  );
+  if (endSec <= fromSec) {
+    throw new Error("b-roll span is empty after clamping to media duration");
+  }
+  item.assetId = assetId;
+  item.startSample = Math.round(fromSec * SAMPLE_RATE);
+  item.endSample = Math.round(endSec * SAMPLE_RATE);
+  item.srcInSample = Math.round(srcInSec * SAMPLE_RATE);
+  return item;
+}
+
 // Add a title card over a span of the source timeline. Converts seconds to
 // samples on the canonical 48 kHz grid; clamps end to project duration.
 export function addTitle(
@@ -210,19 +299,216 @@ export function removeTitle(project: Project, id: string): boolean {
   return project.titles.length < before;
 }
 
+function findTitle(project: Project, id: string): Title {
+  const item = (project.titles ?? []).find((t) => t.id === id);
+  if (!item) {
+    throw new Error(`unknown title "${id}"`);
+  }
+  return item;
+}
+
+// Patch an existing title card. Omitted fields are unchanged.
+export function updateTitle(
+  project: Project,
+  id: string,
+  patch: {
+    text?: string;
+    position?: Title["position"];
+    fromSec?: number;
+    toSec?: number;
+  }
+): Title {
+  const item = findTitle(project, id);
+  const text = patch.text === undefined ? item.text : patch.text.trim();
+  if (!text) {
+    throw new Error("title text must be non-empty");
+  }
+  const position = patch.position ?? item.position;
+  const fromSec = patch.fromSec ?? item.startSample / SAMPLE_RATE;
+  const toSec = patch.toSec ?? item.endSample / SAMPLE_RATE;
+  if (![fromSec, toSec].every(Number.isFinite)) {
+    throw new Error("title timing values must be finite numbers");
+  }
+  if (fromSec < 0 || toSec < 0) {
+    throw new Error("title timing values must be non-negative");
+  }
+  if (toSec <= fromSec) {
+    throw new Error(
+      `title span is empty: toSec (${toSec}) must be greater than fromSec (${fromSec})`
+    );
+  }
+  const projectDurationSec = project.durationSamples / SAMPLE_RATE;
+  if (fromSec >= projectDurationSec) {
+    throw new Error("title span starts after the project ends");
+  }
+  const endSec = Math.min(toSec, projectDurationSec);
+  if (endSec <= fromSec) {
+    throw new Error("title span is empty after clamping to project duration");
+  }
+  item.text = text;
+  item.position = position;
+  item.startSample = Math.round(fromSec * SAMPLE_RATE);
+  item.endSample = Math.round(endSec * SAMPLE_RATE);
+  return item;
+}
+
 // Toggle burned captions on/off for the export.
 export function setCaptions(project: Project, enabled: boolean): Project {
   project.captions = { ...project.captions, enabled };
   return project;
 }
 
+// Set how many words appear per caption line (1–12).
+export function setCaptionMaxWords(
+  project: Project,
+  maxWords: number
+): Project {
+  const mw = Math.max(1, Math.min(12, Math.round(maxWords)));
+  project.captions = { ...project.captions, maxWords: mw };
+  return project;
+}
+
+// Set symmetric padding around kept word ranges (0–500 ms).
+export function setPadMs(project: Project, padMs: number): Project {
+  project.padMs = Math.max(0, Math.min(500, Math.round(padMs)));
+  return project;
+}
+
+// Toggle cinematic look flags (vignette).
+export function setLook(
+  project: Project,
+  input: { vignette?: boolean }
+): Project {
+  if (typeof input.vignette === "boolean") {
+    project.look = { ...project.look, vignette: input.vignette };
+  }
+  return project;
+}
+
+// Add a push-in zoom over a span of the source timeline.
+export function addZoom(
+  project: Project,
+  input: {
+    fromSec: number;
+    toSec: number;
+    scale?: number;
+    rampSec?: number;
+  }
+): Zoom {
+  const { fromSec, toSec, scale = 1.15, rampSec = 0.6 } = input;
+  if (![fromSec, toSec, scale, rampSec].every(Number.isFinite)) {
+    throw new Error("zoom timing values must be finite numbers");
+  }
+  if (fromSec < 0 || toSec < 0) {
+    throw new Error("zoom timing values must be non-negative");
+  }
+  if (scale < 1 || scale > 3) {
+    throw new Error("zoom scale must be between 1 and 3");
+  }
+  if (rampSec < 0 || rampSec > 5) {
+    throw new Error("zoom rampSec must be between 0 and 5");
+  }
+  if (toSec <= fromSec) {
+    throw new Error(
+      `zoom span is empty: toSec (${toSec}) must be greater than fromSec (${fromSec})`
+    );
+  }
+  const projectDurationSec = project.durationSamples / SAMPLE_RATE;
+  if (fromSec >= projectDurationSec) {
+    throw new Error("zoom span starts after the project ends");
+  }
+  const endSec = Math.min(toSec, projectDurationSec);
+  if (endSec <= fromSec) {
+    throw new Error("zoom span is empty after clamping to project duration");
+  }
+  const item: Zoom = {
+    id: `z${Date.now()}`,
+    startSample: Math.round(fromSec * SAMPLE_RATE),
+    endSample: Math.round(endSec * SAMPLE_RATE),
+    scale,
+    rampSec,
+  };
+  if (!project.zooms) {
+    project.zooms = [];
+  }
+  project.zooms.push(item);
+  return item;
+}
+
+// Remove a zoom by id. Returns whether one was removed.
+export function removeZoom(project: Project, id: string): boolean {
+  const zooms = project.zooms ?? [];
+  const before = zooms.length;
+  project.zooms = zooms.filter((z) => z.id !== id);
+  return project.zooms.length < before;
+}
+
+function findZoom(project: Project, id: string): Zoom {
+  const item = (project.zooms ?? []).find((z) => z.id === id);
+  if (!item) {
+    throw new Error(`unknown zoom "${id}"`);
+  }
+  return item;
+}
+
+// Patch an existing push-in zoom. Omitted fields are unchanged.
+export function updateZoom(
+  project: Project,
+  id: string,
+  patch: {
+    scale?: number;
+    rampSec?: number;
+    fromSec?: number;
+    toSec?: number;
+  }
+): Zoom {
+  const item = findZoom(project, id);
+  const scale = patch.scale ?? item.scale;
+  const rampSec = patch.rampSec ?? item.rampSec;
+  const fromSec = patch.fromSec ?? item.startSample / SAMPLE_RATE;
+  const toSec = patch.toSec ?? item.endSample / SAMPLE_RATE;
+  if (![fromSec, toSec, scale, rampSec].every(Number.isFinite)) {
+    throw new Error("zoom timing values must be finite numbers");
+  }
+  if (fromSec < 0 || toSec < 0) {
+    throw new Error("zoom timing values must be non-negative");
+  }
+  if (scale < 1 || scale > 3) {
+    throw new Error("zoom scale must be between 1 and 3");
+  }
+  if (rampSec < 0 || rampSec > 5) {
+    throw new Error("zoom rampSec must be between 0 and 5");
+  }
+  if (toSec <= fromSec) {
+    throw new Error(
+      `zoom span is empty: toSec (${toSec}) must be greater than fromSec (${fromSec})`
+    );
+  }
+  const projectDurationSec = project.durationSamples / SAMPLE_RATE;
+  if (fromSec >= projectDurationSec) {
+    throw new Error("zoom span starts after the project ends");
+  }
+  const endSec = Math.min(toSec, projectDurationSec);
+  if (endSec <= fromSec) {
+    throw new Error("zoom span is empty after clamping to project duration");
+  }
+  item.scale = scale;
+  item.rampSec = rampSec;
+  item.startSample = Math.round(fromSec * SAMPLE_RATE);
+  item.endSample = Math.round(endSec * SAMPLE_RATE);
+  return item;
+}
+
 export interface ProjectSummary {
+  assetCount: number;
   brollCount: number;
   cuts: number;
   deleted: number;
   kept: number;
   keptDurationSec: number;
+  titleCount: number;
   words: number;
+  zoomCount: number;
 }
 
 // A quick health read of the edit: word counts, number of surviving ranges, and
@@ -240,6 +526,9 @@ export function summarize(project: Project): ProjectSummary {
     kept: project.words.length - deleted,
     cuts: ranges.length,
     brollCount: project.broll.length,
+    titleCount: project.titles?.length ?? 0,
+    zoomCount: project.zooms?.length ?? 0,
+    assetCount: project.assets.length,
     keptDurationSec,
   };
 }

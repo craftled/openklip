@@ -20,6 +20,7 @@
     "serve": "bun run src/cli.ts serve",
     "ingest": "bun run src/cli.ts ingest",
     "export": "bun run src/cli.ts export",
+    "agent-demo": "bun run scripts/agent-demo.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "check": "ultracite check",

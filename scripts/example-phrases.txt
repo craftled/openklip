@@ -1,0 +1,6 @@
+# Example phrase list for agent-demo.
+# One phrase per line; matched against contiguous transcript runs.
+
+you know
+sort of
+um

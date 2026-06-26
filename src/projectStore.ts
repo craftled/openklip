@@ -6,12 +6,17 @@ import { join } from "node:path";
 import { type Project, ProjectSchema } from "./edl.ts";
 import { projectPaths, projectsRoot } from "./paths.ts";
 
-export function latestProject(): string | null {
+export interface ProjectListing {
+  mtimeMs: number;
+  slug: string;
+}
+
+export function listProjects(): ProjectListing[] {
   const root = projectsRoot();
   if (!existsSync(root)) {
-    return null;
+    return [];
   }
-  const dirs = readdirSync(root)
+  return readdirSync(root)
     .map((n) => ({ n, p: join(root, n) }))
     .filter((d) => {
       try {
@@ -22,8 +27,12 @@ export function latestProject(): string | null {
         return false;
       }
     })
-    .sort((a, b) => statSync(b.p).mtimeMs - statSync(a.p).mtimeMs);
-  return dirs[0]?.n ?? null;
+    .map((d) => ({ slug: d.n, mtimeMs: statSync(d.p).mtimeMs }))
+    .sort((a, b) => b.mtimeMs - a.mtimeMs);
+}
+
+export function latestProject(): string | null {
+  return listProjects()[0]?.slug ?? null;
 }
 
 // Which project a request targets: explicit ?slug=, else the slug the CLI
