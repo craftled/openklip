@@ -30,6 +30,7 @@ bun run export <slug>
 
 - Transcript editing: click words to cut/restore them.
 - Fast preview: the browser plays only surviving ranges from an all-intra proxy.
+- Preview cut transitions: Glimm WebGL sweeps punctuate jumps between kept ranges.
 - Captions: live preview and ASS/libass burn-in on export.
 - B-roll cover clips: register assets, place them over selected word spans, preview and export them.
 - Cinematic look: vignette, smooth push-in zooms, lower-third and centered titles.
@@ -70,6 +71,7 @@ bun run src/cli.ts export <slug>
 - Time base: every edit is stored on a canonical 48 kHz integer-sample grid.
 - Cut spine: deleted words split the transcript into surviving source-time ranges.
 - Preview: a native `<video>` scheduler jumps across those ranges on the all-intra proxy.
+- Preview transitions: Glimm's framework-agnostic WebGL shader runs over the preview frame at each cut boundary; reduced-motion users get the normal hard jump.
 - Export: ffmpeg re-encodes surviving ranges, overlays b-roll, applies zoom/vignette, and burns captions/titles.
 - Fallbacks: export prefers original media, but can fall back to project proxies when original files moved.
 
@@ -87,5 +89,6 @@ GitHub Actions runs the same gates on pushes and pull requests.
 ## Current Limits
 
 - Word-boundary cuts can still clip phonemes; VAD snap-to-silence and equal-power crossfades are next.
+- Glimm transitions are preview-only; exported MP4 transitions need an ffmpeg-side transition graph.
 - 4K export can be slow because the current ffmpeg path decodes the selected stream.
 - Vertical shorts, automatic highlight detection, and MCP/server automation are post-MVP work.

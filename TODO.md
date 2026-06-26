@@ -5,6 +5,7 @@
 OpenKlip is a lean, local-first, **agent-native** video editor: you **edit video by editing text** (Descript-style). The stack is Bun + TypeScript + React 19 + Next.js 16, with `ffmpeg-static` invoked as a subprocess and local Whisper running via Transformers.js. The project is files-on-disk: `project.json` **is** the edit (an EDL of every word with a `deleted` flag): no database. There are no API keys and no bundled LLM; the "agent" is Claude Code / Codex driven from the terminal, reading and writing the same project files the GUI does, so GUI and agent stay at full parity. Primary output is full-screen YouTube (16:9); the secondary target is vertical shorts (9:16, for TikTok / LinkedIn / X). Public on GitHub at `craftled/openklip` (MIT).
 
 **Current state:** working local editor; cut → captions → b-roll → vignette → push-in zoom → titles → export all functional; open-sourced MIT.
+Preview cuts now get a Glimm WebGL sweep in the browser; exported MP4s still hard-cut until the ffmpeg transition graph lands.
 
 ## Completed
 
@@ -49,7 +50,8 @@ OpenKlip is a lean, local-first, **agent-native** video editor: you **edit video
 
 ### Look & Effects
 
-- [ ] Page transitions between shots (shader / whoosh cut).
+- [x] Preview cut transitions via Glimm WebGL sweep.
+- [ ] Exported MP4 transitions between shots (ffmpeg shader / whoosh cut).
 - [x] Match the preview zoom curve to the export smoothstep ramp.
 - [x] Fix title/caption overlap when both are active on the same span.
 - [ ] B-roll PiP mode (not just full-cover) + b-roll audio ducking; more title styles.

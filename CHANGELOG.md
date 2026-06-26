@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- Added Glimm-powered WebGL sweeps over the editor preview when playback jumps between kept transcript ranges.
+- Added a scheduler cut-boundary hook so preview transitions can pause, jump at the sweep midpoint, then resume playback.
+
+### Notes
+- Glimm transitions are browser preview-only; exported MP4s still hard-cut until an ffmpeg-side transition graph is added.
+
 ## 0.1.0 - 2026-06-26
 
 Migrated the web editor to a Next.js + Tailwind + shadcn stack and gave it a clean, Paper-inspired look.
