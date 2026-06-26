@@ -42,6 +42,7 @@ Time is integer audio samples at 48 kHz. The CLI takes seconds where a human num
 | Review edit | `openklip status <slug>` |
 | Check environment / project health | `openklip doctor [slug]` |
 | List ingester plugins | `openklip ingesters` |
+| List the action registry (capability manifest) | `openklip actions` |
 | Export MP4 | `openklip export <slug>` |
 | Post-export packaging (HyperFrames) | `openklip package <slug> <pass>` |
 
@@ -103,6 +104,7 @@ Run as `bun run src/cli.ts <command>` (or the `openklip` bin).
 | `openklip export <slug>` | Render the current cut to `out.mp4`. `--height 1080` for max output height. |
 | `openklip doctor [slug]` | Health check: ffmpeg/ffprobe binaries, Whisper script, and (with a slug) the project's `project.json`, source/proxy media, and asset proxies. Exits non-zero if any check fails. Run it when the agent loop fails deep inside a subprocess. |
 | `openklip ingesters` | List ingester plugins (`ingesters/<id>/ingester.json`) — declarative seams for non-file media import (URL, batch, etc.). |
+| `openklip actions` | Print the unified action registry — every `project.json` mutation (cut, broll, title, zoom, still, captions, look, pad, reorder) as one named, Zod-schema'd entry. `--json` emits a machine-readable manifest (schemas render to JSON Schema — the MCP `inputSchema` shape); `--surface cli\|gui\|mcp` filters by surface. The CLI routes every edit command through this same registry, so the manifest is exactly what runs. |
 | `openklip package <slug> <pass>` | Optional post-export pass on `output/out.mp4` via the HyperFrames CLI: `remove-background` (→ transparent `.webm`, the matte primitive for embed-behind-subject) or `transcribe` (→ `.srt`). Uses the local `node_modules/.bin/hyperframes` if installed (`bun add -d hyperframes`); runs Chrome + our bundled ffmpeg. Fails with install instructions if absent. |
 
 ## Recommended workflow

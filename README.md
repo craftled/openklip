@@ -73,6 +73,7 @@ bun run src/cli.ts zoom-set <slug> <zoomId> --scale 1.25
 bun run src/cli.ts captions <slug> on
 bun run src/cli.ts look <slug> vignette on
 bun run src/cli.ts status <slug>
+bun run src/cli.ts actions --json          # capability manifest (every edit action, as JSON Schema)
 bun run src/cli.ts export <slug> --height 1080
 ```
 

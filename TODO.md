@@ -28,6 +28,7 @@ Preview cuts now get a Glimm WebGL sweep in the browser; exported MP4s still har
 - [x] **Agent peer - full GUI parity CLI** (`list`, `assets`, zoom/title/broll set commands, look, pad, captions-max)
 - [x] **Agent peer - agent-loop demo** (`bun run agent-demo`, composes primitives from a phrase list)
 - [x] **Agent peer - CLAUDE.md agent skill + pure `actions.ts`** (full GUI/agent parity on the same `project.json`)
+- [x] **Unified action registry** (`src/registry.ts`: one Zod-schema'd definition per `project.json` mutation; the CLI routes every edit command through a single `runAction`; `openklip actions [--json] [--surface]` prints the capability manifest — schemas render to JSON Schema, the MCP `inputSchema` shape, so the optional MCP server below is now mostly wiring)
 - [x] **Design system: Geist (Vercel)** (light theme + light/dark toggle; dark mode shipped alongside this roadmap)
 - [x] **TDD test suite** (`bun test`: actions, captions, EDL, exporter, range streaming, titles, zoom-ramp)
 - [x] **GitHub Actions CI** (`check`, `typecheck`, `test`, `build`)
