@@ -3,7 +3,9 @@ import { basename, extname, join, resolve } from "node:path";
 // projects/ lives at the repo root. Resolve against cwd (the dir Next/the CLI
 // runs from) so this works under both Bun and Node and isn't affected by
 // bundler rewrites of import.meta.
-export const PROJECTS_ROOT = resolve(process.cwd(), "projects");
+export function projectsRoot(): string {
+  return resolve(process.cwd(), "projects");
+}
 
 export function slugify(name: string): string {
   return (
@@ -20,7 +22,7 @@ export function slugFromVideo(videoPath: string): string {
 }
 
 export function projectDir(slug: string): string {
-  return join(PROJECTS_ROOT, slug);
+  return join(projectsRoot(), slug);
 }
 
 export function projectPaths(slug: string) {

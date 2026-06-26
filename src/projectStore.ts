@@ -4,14 +4,15 @@ import { existsSync, readdirSync, statSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { type Project, ProjectSchema } from "./edl.ts";
-import { PROJECTS_ROOT, projectPaths } from "./paths.ts";
+import { projectPaths, projectsRoot } from "./paths.ts";
 
 export function latestProject(): string | null {
-  if (!existsSync(PROJECTS_ROOT)) {
+  const root = projectsRoot();
+  if (!existsSync(root)) {
     return null;
   }
-  const dirs = readdirSync(PROJECTS_ROOT)
-    .map((n) => ({ n, p: join(PROJECTS_ROOT, n) }))
+  const dirs = readdirSync(root)
+    .map((n) => ({ n, p: join(root, n) }))
     .filter((d) => {
       try {
         return (
@@ -39,9 +40,11 @@ export function resolveSlug(slugParam?: string | null): string {
 }
 
 export async function loadProject(slug: string): Promise<Project> {
-  return ProjectSchema.parse(
-    JSON.parse(await readFile(projectPaths(slug).project, "utf8"))
-  );
+  const fp = projectPaths(slug).project;
+  if (!existsSync(fp)) {
+    throw new Error(`project not found: ${slug}`);
+  }
+  return ProjectSchema.parse(JSON.parse(await readFile(fp, "utf8")));
 }
 
 export async function saveProject(

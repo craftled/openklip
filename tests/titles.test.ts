@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { TitleItem } from "../src/titles.ts";
-import { buildTitlesAss } from "../src/titles.ts";
+import { buildTitlesAss, parseHeroLines } from "../src/titles.ts";
 
 const OPTS = { width: 1920, height: 1080 } as const;
 
@@ -48,7 +48,19 @@ test("a lower title emits one Dialogue with fade + upward slide and exact times"
   );
 });
 
-// 3. One center title -> center positioning (\an5), fades but does NOT slide; exact times.
+// 3b. parseHeroLines splits headline and subtitle on first newline.
+test("parseHeroLines splits headline and subtitle", () => {
+  assert.deepEqual(parseHeroLines("$90,000\nCheapest Program"), {
+    headline: "$90,000",
+    subtitle: "Cheapest Program",
+  });
+  assert.deepEqual(parseHeroLines("Only headline"), {
+    headline: "Only headline",
+    subtitle: "",
+  });
+});
+
+// 4. One center title -> center positioning (\an5), fades but does NOT slide; exact times.
 test("a center title is centered, fades, and does not slide", () => {
   const items: TitleItem[] = [
     { text: "Centered", startSec: 0, endSec: 2, position: "center" },
@@ -68,6 +80,25 @@ test("a center title is centered, fades, and does not slide", () => {
     line.includes("0:00:02.00"),
     "End matches 2s formatted as 0:00:02.00"
   );
+});
+
+// 8. Hero title -> serif headline + optional subtitle, longer fade, no slide.
+test("a hero title uses Georgia, headline/subtitle split, and longer fade", () => {
+  const items: TitleItem[] = [
+    {
+      text: "$90,000\nCheapest Citizenship Program",
+      startSec: 1,
+      endSec: 4,
+      position: "hero",
+    },
+  ];
+  const ass = buildTitlesAss(items, OPTS);
+  const line = dialogueLines(ass)[0];
+  assert.ok(line.includes("$90,000"), "contains headline");
+  assert.ok(line.includes("Cheapest Citizenship Program"), "contains subtitle");
+  assert.ok(line.includes("\\fad(320,320)"), "uses longer hero fade");
+  assert.ok(line.includes("\\N"), "subtitle on second line");
+  assert.ok(!line.includes("\\move"), "hero does not slide");
 });
 
 // 4. Text with braces/backslashes is escaped: no raw user braces survive.

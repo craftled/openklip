@@ -37,6 +37,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { HeroTitleOverlay } from "@/components/hero-title-overlay";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -116,7 +117,7 @@ interface ZoomItem {
 interface TitleItem {
   endSample: number;
   id: string;
-  position: "lower" | "center";
+  position: "lower" | "center" | "hero";
   startSample: number;
   text: string;
 }
@@ -238,7 +239,9 @@ export function App({ initialProject }: { initialProject: Project }) {
     initialProject.assets?.[0]?.id ?? ""
   );
   const [titleText, setTitleText] = useState("");
-  const [titlePos, setTitlePos] = useState<"lower" | "center">("lower");
+  const [titlePos, setTitlePos] = useState<"lower" | "center" | "hero">(
+    "lower"
+  );
   const [exporting, setExporting] = useState(false);
   const [exportMsg, setExportMsg] = useState<string | null>(null);
   const [pendingSaves, setPendingSaves] = useState(0);
@@ -390,7 +393,10 @@ export function App({ initialProject }: { initialProject: Project }) {
   const activeTitle = project?.titles?.find(
     (t) => curSample >= t.startSample && curSample < t.endSample
   );
-  const captionsRaised = activeTitle?.position === "lower";
+  const heroTitle = activeTitle?.position === "hero" ? activeTitle : null;
+  const standardTitle =
+    activeTitle && activeTitle.position !== "hero" ? activeTitle : null;
+  const captionsRaised = standardTitle?.position === "lower";
   const assetName = (id: string) =>
     project?.assets.find((a) => a.id === id)?.name ?? id;
 
@@ -1059,29 +1065,30 @@ export function App({ initialProject }: { initialProject: Project }) {
                       }}
                     />
                   )}
-                  {activeTitle && (
+                  <HeroTitleOverlay title={heroTitle} />
+                  {standardTitle && (
                     <div
                       className={cn(
                         "pointer-events-none absolute inset-x-0 z-[3] flex justify-center",
-                        activeTitle.position === "center"
+                        standardTitle.position === "center"
                           ? "top-1/2 -translate-y-1/2"
                           : "bottom-[16%]"
                       )}
-                      key={activeTitle.id}
+                      key={standardTitle.id}
                     >
                       <span
                         className={cn(
                           "max-w-[80%] rounded-md bg-black/60 px-4 py-2 text-center font-semibold text-white backdrop-blur",
-                          activeTitle.position === "center"
+                          standardTitle.position === "center"
                             ? "text-[clamp(22px,4vw,52px)]"
                             : "text-[clamp(16px,2.6vw,32px)]"
                         )}
                       >
-                        {activeTitle.text}
+                        {standardTitle.text}
                       </span>
                     </div>
                   )}
-                  {activeGroup && (
+                  {activeGroup && !heroTitle && (
                     <div
                       className={cn(
                         "pointer-events-none absolute inset-x-0 z-[3] flex justify-center",
@@ -1363,18 +1370,32 @@ export function App({ initialProject }: { initialProject: Project }) {
 
                     {selTitle && (
                       <Section title="Title">
-                        <Input
-                          onChange={(e) =>
-                            updateTitle(selTitle.id, { text: e.target.value })
-                          }
-                          placeholder="Title text"
-                          value={selTitle.text}
-                        />
+                        {selTitle.position === "hero" ? (
+                          <textarea
+                            className="field-sizing-content min-h-16 w-full resize-y rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                            onChange={(e) =>
+                              updateTitle(selTitle.id, { text: e.target.value })
+                            }
+                            placeholder={
+                              "Headline\nSubtitle (optional second line)"
+                            }
+                            rows={3}
+                            value={selTitle.text}
+                          />
+                        ) : (
+                          <Input
+                            onChange={(e) =>
+                              updateTitle(selTitle.id, { text: e.target.value })
+                            }
+                            placeholder="Title text"
+                            value={selTitle.text}
+                          />
+                        )}
                         <div className="mt-2">
                           <Select
                             onValueChange={(v) =>
                               updateTitle(selTitle.id, {
-                                position: v as "lower" | "center",
+                                position: v as "lower" | "center" | "hero",
                               })
                             }
                             value={selTitle.position}
@@ -1385,6 +1406,7 @@ export function App({ initialProject }: { initialProject: Project }) {
                             <SelectContent>
                               <SelectItem value="lower">Lower third</SelectItem>
                               <SelectItem value="center">Centered</SelectItem>
+                              <SelectItem value="hero">Hero card</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -1472,15 +1494,27 @@ export function App({ initialProject }: { initialProject: Project }) {
                       </div>
                     </Section>
                     <Section title="Title">
-                      <Input
-                        onChange={(e) => setTitleText(e.target.value)}
-                        placeholder="Title text"
-                        value={titleText}
-                      />
+                      {titlePos === "hero" ? (
+                        <textarea
+                          className="field-sizing-content min-h-16 w-full resize-y rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                          onChange={(e) => setTitleText(e.target.value)}
+                          placeholder={
+                            "Headline\nSubtitle (optional second line)"
+                          }
+                          rows={3}
+                          value={titleText}
+                        />
+                      ) : (
+                        <Input
+                          onChange={(e) => setTitleText(e.target.value)}
+                          placeholder="Title text"
+                          value={titleText}
+                        />
+                      )}
                       <div className="mt-2 flex gap-2">
                         <Select
                           onValueChange={(v) =>
-                            setTitlePos(v as "lower" | "center")
+                            setTitlePos(v as "lower" | "center" | "hero")
                           }
                           value={titlePos}
                         >
@@ -1490,6 +1524,7 @@ export function App({ initialProject }: { initialProject: Project }) {
                           <SelectContent>
                             <SelectItem value="lower">Lower third</SelectItem>
                             <SelectItem value="center">Centered</SelectItem>
+                            <SelectItem value="hero">Hero card</SelectItem>
                           </SelectContent>
                         </Select>
                         <Button

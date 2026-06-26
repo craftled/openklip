@@ -128,6 +128,68 @@
   }
 }
 
+/* Hero title card — dimmed full-frame backdrop */
+.hero-bg-fade {
+  background: linear-gradient(
+    to bottom,
+    rgb(0 0 0 / 28%) 0%,
+    rgb(0 0 0 / 42%) 45%,
+    rgb(0 0 0 / 52%) 100%
+  );
+  opacity: 0;
+  backdrop-filter: blur(0);
+  transition:
+    opacity 400ms ease-in-out,
+    backdrop-filter 400ms ease-in-out;
+  will-change: opacity;
+}
+.hero-bg-fade.is-visible {
+  opacity: 1;
+  backdrop-filter: blur(1.5px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-bg-fade {
+    transition: none !important;
+  }
+}
+
+/* Transitions.dev — text states swap */
+:root {
+  --text-swap-dur: 150ms;
+  --text-swap-translate-y: 4px;
+  --text-swap-blur: 2px;
+  --text-swap-ease: ease-in-out;
+}
+
+.t-text-swap {
+  display: inline-block;
+  opacity: 1;
+  filter: blur(0);
+  transform: translateY(0);
+  transition:
+    transform var(--text-swap-dur) var(--text-swap-ease),
+    filter var(--text-swap-dur) var(--text-swap-ease),
+    opacity var(--text-swap-dur) var(--text-swap-ease);
+  will-change: transform, filter, opacity;
+}
+.t-text-swap.is-exit {
+  opacity: 0;
+  filter: blur(var(--text-swap-blur));
+  transform: translateY(calc(var(--text-swap-translate-y) * -1));
+}
+.t-text-swap.is-enter-start {
+  opacity: 0;
+  filter: blur(var(--text-swap-blur));
+  transform: translateY(var(--text-swap-translate-y));
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .t-text-swap {
+    transition: none !important;
+  }
+}
+
 /* OpenKlip semantic tokens layered on the shadcn olive/emerald preset.
    `live` = the preset's emerald (chart-2), used for playback/active state.
    broll/zoom/title = distinct effect-type accents for tags + transcript marks. */

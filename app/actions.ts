@@ -1,14 +1,16 @@
 "use server";
 
-import {
-  type Broll,
-  BrollSchema,
-  type Title,
-  TitleSchema,
-  type Zoom,
-  ZoomSchema,
-} from "@engine/edl";
 import { exportCut } from "@engine/exporter";
+import {
+  applyBroll,
+  applyLook,
+  applyProjectEdits,
+  applyTitles,
+  applyZooms,
+  type clampBrollItems,
+  type clampTitleItems,
+  type clampZoomItems,
+} from "@engine/projectMutations";
 import { loadProject, saveProject } from "@engine/projectStore";
 
 export type ActionResult<T = void> =
@@ -29,27 +31,7 @@ export async function saveProjectEdits(
 ): Promise<ActionResult> {
   try {
     const project = await loadProject(slug);
-    if (body.words) {
-      const del = new Map(body.words.map((w) => [w.id, w.deleted]));
-      for (const w of project.words) {
-        if (del.has(w.id)) {
-          w.deleted = Boolean(del.get(w.id));
-        }
-      }
-    }
-    if (typeof body.captions?.enabled === "boolean") {
-      project.captions = {
-        ...project.captions,
-        enabled: body.captions.enabled,
-      };
-    }
-    if (typeof body.captions?.maxWords === "number") {
-      const mw = Math.max(1, Math.min(12, Math.round(body.captions.maxWords)));
-      project.captions = { ...project.captions, maxWords: mw };
-    }
-    if (typeof body.padMs === "number") {
-      project.padMs = Math.max(0, Math.min(500, Math.round(body.padMs)));
-    }
+    applyProjectEdits(project, body);
     await saveProject(slug, project);
     return { ok: true };
   } catch (e) {
@@ -63,9 +45,7 @@ export async function saveLook(
 ): Promise<ActionResult> {
   try {
     const project = await loadProject(slug);
-    if (typeof body.vignette === "boolean") {
-      project.look = { ...project.look, vignette: body.vignette };
-    }
+    applyLook(project, body);
     await saveProject(slug, project);
     return { ok: true };
   } catch (e) {
@@ -76,18 +56,11 @@ export async function saveLook(
 export async function saveZooms(
   slug: string,
   zooms: unknown[]
-): Promise<ActionResult<{ zooms: Zoom[] }>> {
+): Promise<ActionResult<{ zooms: ReturnType<typeof clampZoomItems> }>> {
   try {
     const project = await loadProject(slug);
-    const dur = project.durationSamples;
-    const items: Zoom[] = [];
-    for (const raw of zooms) {
-      const z = ZoomSchema.parse(raw);
-      const start = Math.max(0, Math.min(z.startSample, dur));
-      const end = Math.max(start + 1, Math.min(z.endSample, dur));
-      items.push({ ...z, startSample: start, endSample: end });
-    }
-    project.zooms = items;
+    applyZooms(project, zooms);
+    const items = project.zooms;
     await saveProject(slug, project);
     return { ok: true, data: { zooms: items } };
   } catch (e) {
@@ -98,22 +71,11 @@ export async function saveZooms(
 export async function saveBroll(
   slug: string,
   broll: unknown[]
-): Promise<ActionResult<{ broll: Broll[] }>> {
+): Promise<ActionResult<{ broll: ReturnType<typeof clampBrollItems> }>> {
   try {
     const project = await loadProject(slug);
-    const assetIds = new Set(project.assets.map((a) => a.id));
-    const dur = project.durationSamples;
-    const items: Broll[] = [];
-    for (const raw of broll) {
-      const b = BrollSchema.parse(raw);
-      if (!assetIds.has(b.assetId)) {
-        continue;
-      }
-      const start = Math.max(0, Math.min(b.startSample, dur));
-      const end = Math.max(start + 1, Math.min(b.endSample, dur));
-      items.push({ ...b, startSample: start, endSample: end });
-    }
-    project.broll = items;
+    applyBroll(project, broll);
+    const items = project.broll;
     await saveProject(slug, project);
     return { ok: true, data: { broll: items } };
   } catch (e) {
@@ -124,21 +86,11 @@ export async function saveBroll(
 export async function saveTitles(
   slug: string,
   titles: unknown[]
-): Promise<ActionResult<{ titles: Title[] }>> {
+): Promise<ActionResult<{ titles: ReturnType<typeof clampTitleItems> }>> {
   try {
     const project = await loadProject(slug);
-    const dur = project.durationSamples;
-    const items: Title[] = [];
-    for (const raw of titles) {
-      const titleItem = TitleSchema.parse(raw);
-      if (!titleItem.text.trim()) {
-        continue;
-      }
-      const start = Math.max(0, Math.min(titleItem.startSample, dur));
-      const end = Math.max(start + 1, Math.min(titleItem.endSample, dur));
-      items.push({ ...titleItem, startSample: start, endSample: end });
-    }
-    project.titles = items;
+    applyTitles(project, titles);
+    const items = project.titles;
     await saveProject(slug, project);
     return { ok: true, data: { titles: items } };
   } catch (e) {

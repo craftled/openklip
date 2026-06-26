@@ -6,9 +6,20 @@
 export interface TitleItem {
   endSec: number;
   id?: string;
-  position?: "lower" | "center";
+  position?: "lower" | "center" | "hero";
   startSec: number;
   text: string;
+}
+
+export function parseHeroLines(text: string): {
+  headline: string;
+  subtitle: string;
+} {
+  const parts = text.split("\n");
+  return {
+    headline: parts[0]?.trim() ?? "",
+    subtitle: parts.slice(1).join("\n").trim(),
+  };
 }
 
 const WHITE = "&H00FFFFFF&";
@@ -52,6 +63,8 @@ export function buildTitlesAss(
   // Two style sizes: lower-thirds read smaller, centered cards are the hero.
   const lowerFont = Math.max(20, Math.round(opts.height * 0.05));
   const centerFont = Math.max(28, Math.round(opts.height * 0.07));
+  const heroHeadFont = Math.max(40, Math.round(opts.height * 0.075));
+  const heroSubFont = Math.max(18, Math.round(opts.height * 0.028));
   const marginV = Math.round(opts.height * 0.08);
   const accent = toAssColor(opts.accent ?? "#b9b8ff");
 
@@ -71,12 +84,16 @@ export function buildTitlesAss(
     `Style: TitleLower,Arial,${lowerFont},${WHITE},${accent},&H00000000&,&HA0000000&,1,0,0,0,100,100,0,0,3,0,0,2,120,120,${marginV},1`,
     // Center: middle-center (Alignment 5 / \an5), no special margin.
     `Style: TitleCenter,Arial,${centerFont},${WHITE},${accent},&H00000000&,&HA0000000&,1,0,0,0,100,100,0,0,3,0,0,5,120,120,0,1`,
+    // Hero: serif headline + subtitle, light shadow, no box.
+    `Style: TitleHeroHead,Georgia,${heroHeadFont},${WHITE},${WHITE},&H00000000&,&H80000000&,1,0,0,0,100,100,0,0,1,0,2,5,120,120,0,1`,
+    `Style: TitleHeroSub,Georgia,${heroSubFont},${WHITE},${WHITE},&H00000000&,&H80000000&,0,0,0,0,100,100,0,0,1,0,2,5,120,120,0,1`,
     "",
     "[Events]",
     "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
   ];
 
   const fadeMs = 180;
+  const heroFadeMs = 320;
   const slidePx = Math.max(16, Math.round(opts.height * 0.04));
   // Lower titles anchor at bottom-center; the slide-up baseline is MarginV above the floor.
   const baseY = opts.height - marginV;
@@ -91,10 +108,29 @@ export function buildTitlesAss(
 
     const start = item.startSec;
     const end = Math.max(item.endSec, start + 0.05);
+    const isHero = item.position === "hero";
     const isCenter = item.position === "center";
 
     let override: string;
     let style: string;
+    let payload: string;
+    if (isHero) {
+      const { headline, subtitle } = parseHeroLines(item.text ?? "");
+      if (!headline) {
+        continue;
+      }
+      style = "TitleHeroHead";
+      override = `{\\an5\\fad(${heroFadeMs},${heroFadeMs})}`;
+      payload = assEscape(headline);
+      if (subtitle) {
+        payload += `{\\r}\\N{\\fs${heroSubFont}}${assEscape(subtitle)}`;
+      }
+      events.push(
+        `Dialogue: 0,${assTime(start)},${assTime(end)},${style},,0,0,0,,${override}${payload}`
+      );
+      continue;
+    }
+    payload = text;
     if (isCenter) {
       // Centered hero card: fade only, no slide. \an5 = middle-center.
       style = "TitleCenter";
@@ -107,7 +143,7 @@ export function buildTitlesAss(
     }
 
     events.push(
-      `Dialogue: 0,${assTime(start)},${assTime(end)},${style},,0,0,0,,${override}${text}`
+      `Dialogue: 0,${assTime(start)},${assTime(end)},${style},,0,0,0,,${override}${payload}`
     );
   }
 

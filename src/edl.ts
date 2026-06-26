@@ -49,7 +49,7 @@ export const TitleSchema = z.object({
   text: z.string(),
   startSample: z.number().int().nonnegative(),
   endSample: z.number().int().nonnegative(),
-  position: z.enum(["lower", "center"]).default("lower"),
+  position: z.enum(["lower", "center", "hero"]).default("lower"),
 });
 export type Title = z.infer<typeof TitleSchema>;
 

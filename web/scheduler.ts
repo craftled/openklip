@@ -1,13 +1,18 @@
-export interface Range {
-  endSec: number;
-  startSec: number;
-}
+import type { Range as TimelineRange } from "../src/edl.ts";
+import {
+  findPlayingRangeIndex,
+  nextRangeIndex,
+  playbackStartIndex,
+  shouldJumpToNextRange,
+} from "../src/schedulerLogic.ts";
+
+export type Range = TimelineRange;
 
 export interface CutBoundaryTransition {
-  from: Range;
+  from: TimelineRange;
   jump: () => void;
   resume: () => void;
-  to: Range;
+  to: TimelineRange;
 }
 
 // Plays only the surviving ranges of the source proxy back to back. Because the
@@ -15,7 +20,7 @@ export interface CutBoundaryTransition {
 // A short gain duck masks the audio click at the jump.
 export class CutScheduler {
   private video: HTMLVideoElement;
-  private getRanges: () => Range[];
+  private getRanges: () => TimelineRange[];
   private raf = 0;
   private idx = 0;
   private playing = false;
@@ -26,7 +31,7 @@ export class CutScheduler {
   onTick?: (sourceSec: number) => void;
   onEnd?: () => void;
 
-  constructor(video: HTMLVideoElement, getRanges: () => Range[]) {
+  constructor(video: HTMLVideoElement, getRanges: () => TimelineRange[]) {
     this.video = video;
     this.getRanges = getRanges;
   }
@@ -74,12 +79,10 @@ export class CutScheduler {
     }
 
     const t = this.video.currentTime;
-    const inside = ranges.findIndex(
-      (r) => t >= r.startSec - 0.05 && t <= r.endSec
-    );
+    const inside = findPlayingRangeIndex(ranges, t);
     if (inside === -1) {
-      this.idx = 0;
-      this.video.currentTime = ranges[0].startSec;
+      this.idx = playbackStartIndex(ranges, t);
+      this.video.currentTime = ranges[this.idx].startSec;
     } else {
       this.idx = inside;
     }
@@ -114,7 +117,7 @@ export class CutScheduler {
       });
   };
 
-  private jumpToRange(range: Range): void {
+  private jumpToRange(range: TimelineRange): void {
     this.duck();
     this.video.currentTime = range.startSec;
     this.onTick?.(this.video.currentTime);
@@ -131,14 +134,15 @@ export class CutScheduler {
       this.onEnd?.();
       return;
     }
-    if (this.video.currentTime >= r.endSec - 0.02) {
-      this.idx += 1;
-      const next = ranges[this.idx];
-      if (!next) {
+    if (shouldJumpToNextRange(this.video.currentTime, r.endSec)) {
+      const nextIdx = nextRangeIndex(this.idx, ranges.length);
+      if (nextIdx === null) {
         this.pause();
         this.onEnd?.();
         return;
       }
+      this.idx = nextIdx;
+      const next = ranges[this.idx];
       const jump = () => this.jumpToRange(next);
       if (this.onCutBoundary) {
         this.transitioning = true;
