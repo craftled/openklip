@@ -1,36 +1,20 @@
 #!/usr/bin/env bun
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import {
-  addBroll,
-  addStill,
-  addTitle,
-  addZoom,
-  cutAllByText,
-  cutByText,
-  cutWords,
-  removeBroll,
-  removeStill,
-  removeTitle,
-  removeZoom,
-  reorderBroll,
-  reorderTitle,
-  reorderZoom,
-  restoreAll,
-  setCaptionMaxWords,
-  setCaptions,
-  setLook,
-  setPadMs,
-  summarize,
-  updateBroll,
-  updateTitle,
-  updateZoom,
-} from "./actions.ts";
+import { summarize } from "./actions.ts";
 import { registerAsset } from "./assets.ts";
 import { applyBrand, loadBrand } from "./brands.ts";
 import { registerBroll } from "./broll.ts";
 import { runDoctor } from "./doctor.ts";
-import { type Project, ProjectSchema, samplesToSec } from "./edl.ts";
+import {
+  type Broll,
+  type Project,
+  ProjectSchema,
+  type Still,
+  samplesToSec,
+  type Title,
+  type Zoom,
+} from "./edl.ts";
 import { exportCut } from "./exporter.ts";
 import { FFMPEG, FFPROBE } from "./ffmpeg.ts";
 import { ingest } from "./ingest.ts";
@@ -45,6 +29,12 @@ import {
 } from "./package-pass.ts";
 import { projectPaths } from "./paths.ts";
 import { latestProject, listProjects } from "./projectStore.ts";
+import {
+  actionManifest,
+  actionTable,
+  runAction,
+  type Surface,
+} from "./registry.ts";
 
 const [cmd, ...rest] = process.argv.slice(2);
 
@@ -108,6 +98,9 @@ Review & export
 
 Diagnostics
   openklip doctor [slug]             check ffmpeg, whisper, and project health
+  openklip actions                   print the action registry (capability manifest)
+                                       --json            machine-readable manifest
+                                       --surface mcp     filter by cli|gui|mcp
 
 Post-export (optional, external)
   openklip package <slug> <pass>     run a HyperFrames finishing pass on out.mp4
@@ -387,7 +380,10 @@ try {
           throw new Error("--restore is not supported with --text");
         }
         if (cutAll) {
-          const result = cutAllByText(project, phrase);
+          const result = runAction("cut-text", project, {
+            phrase,
+            all: true,
+          }) as { matches: number; ids: string[] };
           if (result.matches === 0) {
             console.log(`no contiguous runs matched: "${phrase}"`);
             break;
@@ -398,7 +394,10 @@ try {
           );
           break;
         }
-        const result = cutByText(project, phrase);
+        const result = runAction("cut-text", project, {
+          phrase,
+          all: false,
+        }) as { matched: boolean; ids: string[] };
         if (!result.matched) {
           console.log(`no contiguous run of words matched: "${phrase}"`);
           break;
@@ -415,7 +414,7 @@ try {
         );
       }
       const ids = resolveCutIds(project, tokens);
-      cutWords(project, ids, !restore);
+      runAction("cut", project, { ids, deleted: !restore });
       await saveProject(slug, project);
       console.log(
         `${restore ? "restored" : "cut"} ${ids.length} words: ${ids.join(", ")}`
@@ -427,7 +426,7 @@ try {
         throw new Error("usage: openklip restore <slug>");
       }
       const project = await loadProject(rest[0]);
-      restoreAll(project);
+      runAction("restore-all", project, {});
       await saveProject(rest[0], project);
       console.log("restored all words");
       break;
@@ -445,7 +444,11 @@ try {
         throw new Error("fromSec and toSec must be numbers (seconds)");
       }
       const project = await loadProject(slug);
-      const item = addBroll(project, { assetId: rest[1], fromSec, toSec });
+      const item = runAction("broll-add", project, {
+        assetId: rest[1],
+        fromSec,
+        toSec,
+      }) as Broll;
       await saveProject(slug, project);
       console.log(
         `added b-roll ${item.id} (asset "${item.assetId}", ${fromSec}s-${toSec}s)`
@@ -457,7 +460,9 @@ try {
         throw new Error("usage: openklip broll-rm <slug> <brollId>");
       }
       const project = await loadProject(rest[0]);
-      const removed = removeBroll(project, rest[1]);
+      const { removed } = runAction("broll-rm", project, { id: rest[1] }) as {
+        removed: boolean;
+      };
       if (!removed) {
         console.log(`no b-roll clip with id "${rest[1]}"`);
         break;
@@ -475,12 +480,13 @@ try {
       const slug = rest[0];
       const args = rest.slice(2);
       const project = await loadProject(slug);
-      const item = updateBroll(project, rest[1], {
+      const item = runAction("broll-set", project, {
+        id: rest[1],
         assetId: flagValue(args, "--asset"),
         fromSec: flagNumber(args, "--from"),
         toSec: flagNumber(args, "--to"),
         srcInSec: flagNumber(args, "--src-in"),
-      });
+      }) as Broll;
       await saveProject(slug, project);
       console.log(
         `updated b-roll ${item.id} (asset "${item.assetId}", ${secSpan(item.startSample, item.endSample)})`
@@ -501,14 +507,14 @@ try {
         throw new Error("fromSec and toSec must be numbers (seconds)");
       }
       const project = await loadProject(slug);
-      const item = addStill(project, {
+      const item = runAction("still-add", project, {
         assetId: rest[1],
         fromSec,
         toSec,
         scale: flagNumber(args, "--scale"),
         focusX: flagNumber(args, "--focus-x"),
         focusY: flagNumber(args, "--focus-y"),
-      });
+      }) as Still;
       await saveProject(slug, project);
       console.log(
         `added still ${item.id} (asset "${item.assetId}", ${fromSec}s-${toSec}s, ${item.scale}x focus ${item.focusX},${item.focusY})`
@@ -520,7 +526,9 @@ try {
         throw new Error("usage: openklip still-rm <slug> <stillId>");
       }
       const project = await loadProject(rest[0]);
-      const removed = removeStill(project, rest[1]);
+      const { removed } = runAction("still-rm", project, { id: rest[1] }) as {
+        removed: boolean;
+      };
       if (!removed) {
         console.log(`no still overlay with id "${rest[1]}"`);
         break;
@@ -562,7 +570,12 @@ try {
       }
       const text = timingAndText.slice(2).join(" ").replace(/\\n/g, "\n");
       const project = await loadProject(slug);
-      const item = addTitle(project, { fromSec, toSec, text, position });
+      const item = runAction("title-add", project, {
+        fromSec,
+        toSec,
+        text,
+        position,
+      }) as Title;
       await saveProject(slug, project);
       console.log(
         `added title ${item.id} (${fromSec}s-${toSec}s, ${position}): "${item.text}"`
@@ -574,7 +587,9 @@ try {
         throw new Error("usage: openklip title-rm <slug> <titleId>");
       }
       const project = await loadProject(rest[0]);
-      const removed = removeTitle(project, rest[1]);
+      const { removed } = runAction("title-rm", project, { id: rest[1] }) as {
+        removed: boolean;
+      };
       if (!removed) {
         console.log(`no title card with id "${rest[1]}"`);
         break;
@@ -602,12 +617,13 @@ try {
       }
       const textRaw = flagValue(args, "--text");
       const project = await loadProject(slug);
-      const item = updateTitle(project, rest[1], {
+      const item = runAction("title-set", project, {
+        id: rest[1],
         text: textRaw?.replace(/\\n/g, "\n"),
-        position: pos as "lower" | "center" | "hero" | undefined,
+        position: pos,
         fromSec: flagNumber(args, "--from"),
         toSec: flagNumber(args, "--to"),
-      });
+      }) as Title;
       await saveProject(slug, project);
       console.log(
         `updated title ${item.id} (${item.position}): "${item.text.replace(/\n/g, "\\n")}"`
@@ -656,7 +672,12 @@ try {
         throw new Error("fromSec and toSec must be numbers (seconds)");
       }
       const project = await loadProject(slug);
-      const item = addZoom(project, { fromSec, toSec, scale, rampSec });
+      const item = runAction("zoom-add", project, {
+        fromSec,
+        toSec,
+        scale,
+        rampSec,
+      }) as Zoom;
       await saveProject(slug, project);
       console.log(
         `added zoom ${item.id} (${fromSec}s-${toSec}s, ${item.scale}x, ramp ${item.rampSec}s)`
@@ -668,7 +689,9 @@ try {
         throw new Error("usage: openklip zoom-rm <slug> <zoomId>");
       }
       const project = await loadProject(rest[0]);
-      const removed = removeZoom(project, rest[1]);
+      const { removed } = runAction("zoom-rm", project, { id: rest[1] }) as {
+        removed: boolean;
+      };
       if (!removed) {
         console.log(`no zoom with id "${rest[1]}"`);
         break;
@@ -686,12 +709,13 @@ try {
       const slug = rest[0];
       const args = rest.slice(2);
       const project = await loadProject(slug);
-      const item = updateZoom(project, rest[1], {
+      const item = runAction("zoom-set", project, {
+        id: rest[1],
         scale: flagNumber(args, "--scale"),
         rampSec: flagNumber(args, "--ramp"),
         fromSec: flagNumber(args, "--from"),
         toSec: flagNumber(args, "--to"),
-      });
+      }) as Zoom;
       await saveProject(slug, project);
       console.log(
         `updated zoom ${item.id} (${item.scale}x, ramp ${item.rampSec}s, ${secSpan(item.startSample, item.endSample)})`
@@ -704,7 +728,7 @@ try {
       }
       const enabled = parseOnOff(rest[1], "openklip captions <slug>");
       const project = await loadProject(rest[0]);
-      setCaptions(project, enabled);
+      runAction("captions", project, { enabled });
       await saveProject(rest[0], project);
       console.log(`captions ${enabled ? "on" : "off"}`);
       break;
@@ -718,7 +742,7 @@ try {
         throw new Error("n must be a number between 1 and 12");
       }
       const project = await loadProject(rest[0]);
-      setCaptionMaxWords(project, n);
+      runAction("captions-max", project, { maxWords: n });
       await saveProject(rest[0], project);
       console.log(`captions max words: ${project.captions.maxWords}`);
       break;
@@ -732,7 +756,7 @@ try {
       }
       const vignette = parseOnOff(rest[2], "openklip look <slug> vignette");
       const project = await loadProject(rest[0]);
-      setLook(project, { vignette });
+      runAction("look-vignette", project, { vignette });
       await saveProject(rest[0], project);
       console.log(`vignette ${vignette ? "on" : "off"}`);
       break;
@@ -746,7 +770,7 @@ try {
         throw new Error("ms must be a number between 0 and 500");
       }
       const project = await loadProject(rest[0]);
-      setPadMs(project, ms);
+      runAction("pad", project, { padMs: ms });
       await saveProject(rest[0], project);
       console.log(`pad: ${project.padMs}ms`);
       break;
@@ -834,15 +858,7 @@ try {
         throw new Error("toIndex must be a number");
       }
       const project = await loadProject(slug);
-      if (kind === "broll") {
-        reorderBroll(project, id, toIndex);
-      } else if (kind === "title") {
-        reorderTitle(project, id, toIndex);
-      } else if (kind === "zoom") {
-        reorderZoom(project, id, toIndex);
-      } else {
-        throw new Error("kind must be broll, title, or zoom");
-      }
+      runAction("reorder", project, { track: kind, id, toIndex });
       await saveProject(slug, project);
       console.log(`reordered ${kind} ${id} -> index ${toIndex}`);
       break;
@@ -899,6 +915,27 @@ try {
         throw new Error(`package pass "${pass.id}" failed`);
       }
       console.log(`[package] done -> ${output}`);
+      break;
+    }
+    case "actions": {
+      // Emit the unified action registry — the machine-readable capability
+      // manifest an external agent can read whole (--json), or a Markdown table
+      // that mirrors the CLAUDE.md capability map. Optionally filter by surface.
+      const surfaceArg = flagValue(rest, "--surface");
+      if (
+        surfaceArg !== undefined &&
+        surfaceArg !== "cli" &&
+        surfaceArg !== "gui" &&
+        surfaceArg !== "mcp"
+      ) {
+        throw new Error("--surface must be cli, gui, or mcp");
+      }
+      const surface = surfaceArg as Surface | undefined;
+      if (rest.includes("--json")) {
+        console.log(JSON.stringify(actionManifest(surface), null, 2));
+        break;
+      }
+      console.log(actionTable(surface));
       break;
     }
     case "ingesters": {
