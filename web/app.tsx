@@ -38,6 +38,7 @@ import { AgentSidebar, type ProjectListing } from "@/components/agent-sidebar";
 import { AssetBin } from "@/components/asset-bin";
 import { EditTimeline } from "@/components/edit-timeline";
 import { HeroTitleOverlay } from "@/components/hero-title-overlay";
+import { OverlaySortable } from "@/components/overlay-sortable";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -72,6 +73,12 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import {
+  clampLoopRegion,
+  ORIENTATION_LABEL,
+  ORIENTATION_RATIO,
+  type Orientation,
+} from "@/lib/preview-layout";
 import { cn } from "@/lib/utils";
 import type { ActionResult } from "../app/actions.ts";
 import {
@@ -251,6 +258,17 @@ export function App({
   );
   const [exporting, setExporting] = useState(false);
   const [exportMsg, setExportMsg] = useState<string | null>(null);
+  const [orientation, setOrientation] = useState<Orientation>("landscape");
+  // In/out work area: when set, playback loops within [inSec, outSec] (source
+  // time) so a single b-roll span or transition can be tightened on repeat.
+  const [loop, setLoop] = useState<{ inSec: number; outSec: number } | null>(
+    null
+  );
+  const [loopInPending, setLoopInPending] = useState<number | null>(null);
+  const loopRef = useRef<{ inSec: number; outSec: number } | null>(null);
+  useEffect(() => {
+    loopRef.current = loop;
+  }, [loop]);
   const [pendingSaves, setPendingSaves] = useState(0);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [theme, setTheme] = useState<"light" | "dark">(() =>
@@ -345,8 +363,15 @@ export function App({
       survivingRanges(projectRef.current as Project)
     );
     sched.onCutBoundary = playCutSweep;
-    sched.onTick = (sourceSec) =>
+    sched.onTick = (sourceSec) => {
+      const lr = loopRef.current;
+      if (lr && videoRef.current && sourceSec >= lr.outSec - 0.03) {
+        videoRef.current.currentTime = lr.inSec;
+        setCurSample(Math.round(lr.inSec * project.sampleRate));
+        return;
+      }
       setCurSample(Math.round(sourceSec * project.sampleRate));
+    };
     sched.onEnd = () => setPlaying(false);
     schedRef.current = sched;
   }, [playCutSweep, project]);
@@ -591,6 +616,16 @@ export function App({
     const broll = (project.broll ?? []).map((b) =>
       b.id === id ? { ...b, ...patch } : b
     );
+    setProject({ ...project, broll });
+    enqueueSave(() => saveBroll(project.slug, broll));
+  };
+  // Reorder b-roll covers in paint order from a drag (array order = paint order;
+  // a later index paints on top when covers overlap). Mirrors `openklip reorder`.
+  const reorderBrollOrder = (orderedIds: string[]) => {
+    const map = new Map((project.broll ?? []).map((b) => [b.id, b]));
+    const broll = orderedIds
+      .map((id) => map.get(id))
+      .filter((b): b is BrollItem => Boolean(b));
     setProject({ ...project, broll });
     enqueueSave(() => saveBroll(project.slug, broll));
   };
@@ -936,93 +971,134 @@ export function App({
                     {ranges.length} cuts · {fmt(keptDuration)} / {fmt(fullDur)}
                   </div>
                 </div>
-                <RightSidebarTrigger className="ml-auto" />
+                <div className="ml-auto flex items-center gap-0.5 rounded-md border border-border p-0.5">
+                  {(["landscape", "portrait", "square"] as Orientation[]).map(
+                    (o) => (
+                      <Button
+                        aria-label={`Preview ${ORIENTATION_LABEL[o]}`}
+                        aria-pressed={orientation === o}
+                        key={o}
+                        onClick={() => setOrientation(o)}
+                        size="sm"
+                        variant={orientation === o ? "secondary" : "ghost"}
+                      >
+                        {ORIENTATION_LABEL[o]}
+                      </Button>
+                    )
+                  )}
+                </div>
+                <RightSidebarTrigger />
               </div>
               <div className="flex flex-col gap-3 p-4">
-                <div className="relative aspect-video w-full overflow-hidden rounded-lg border border-border bg-black">
-                  {/* biome-ignore lint/a11y/useMediaCaption: editor preview; transcript is the caption source */}
-                  <video
-                    className="block h-full w-full bg-black"
-                    playsInline
-                    ref={videoRef}
-                    src={`/media/proxy.mp4?v=${project.mediaVersion ?? 0}`}
-                    style={{
-                      transform: `scale(${zoomScale})`,
-                      transformOrigin: "center",
-                      transition: "transform 0.25s ease-out",
-                    }}
-                  />
-                  <video
-                    className={cn(
-                      "absolute inset-0 z-[1] h-full w-full bg-black object-cover",
-                      activeBroll ? "block" : "hidden"
-                    )}
-                    muted
-                    playsInline
-                    ref={brollRef}
-                  />
-                  {vignetteOn && (
-                    <div
-                      className="pointer-events-none absolute inset-0 z-[2]"
+                <div className="flex w-full justify-center">
+                  <div
+                    className="relative overflow-hidden rounded-lg border border-border bg-black"
+                    style={
+                      orientation === "landscape"
+                        ? {
+                            width: "100%",
+                            aspectRatio: String(ORIENTATION_RATIO.landscape),
+                          }
+                        : {
+                            height: "min(58vh, 70vw)",
+                            aspectRatio: String(ORIENTATION_RATIO[orientation]),
+                          }
+                    }
+                  >
+                    {/* biome-ignore lint/a11y/useMediaCaption: editor preview; transcript is the caption source */}
+                    <video
+                      className="block h-full w-full bg-black object-cover"
+                      playsInline
+                      ref={videoRef}
+                      src={`/media/proxy.mp4?v=${project.mediaVersion ?? 0}`}
                       style={{
-                        background:
-                          "radial-gradient(ellipse at center, transparent 42%, rgba(0,0,0,0.62) 100%)",
+                        transform: `scale(${zoomScale})`,
+                        transformOrigin: "center",
+                        transition: "transform 0.25s ease-out",
                       }}
                     />
-                  )}
-                  <HeroTitleOverlay title={heroTitle} />
-                  {standardTitle && (
-                    <div
+                    <video
                       className={cn(
-                        "pointer-events-none absolute inset-x-0 z-[3] flex justify-center",
-                        standardTitle.position === "center"
-                          ? "top-1/2 -translate-y-1/2"
-                          : "bottom-[16%]"
+                        "absolute inset-0 z-[1] h-full w-full bg-black object-cover",
+                        activeBroll ? "block" : "hidden"
                       )}
-                      key={standardTitle.id}
-                    >
-                      <span
+                      muted
+                      playsInline
+                      ref={brollRef}
+                    />
+                    {vignetteOn && (
+                      <div
+                        className="pointer-events-none absolute inset-0 z-[2]"
+                        style={{
+                          background:
+                            "radial-gradient(ellipse at center, transparent 42%, rgba(0,0,0,0.62) 100%)",
+                        }}
+                      />
+                    )}
+                    <HeroTitleOverlay title={heroTitle} />
+                    {standardTitle && (
+                      <div
                         className={cn(
-                          "max-w-[80%] rounded-md bg-black/60 px-4 py-2 text-center font-semibold text-white backdrop-blur",
+                          "pointer-events-none absolute inset-x-0 z-[3] flex justify-center",
                           standardTitle.position === "center"
-                            ? "text-[clamp(22px,4vw,52px)]"
-                            : "text-[clamp(16px,2.6vw,32px)]"
+                            ? "top-1/2 -translate-y-1/2"
+                            : "bottom-[16%]"
+                        )}
+                        key={standardTitle.id}
+                      >
+                        <span
+                          className={cn(
+                            "max-w-[80%] rounded-md bg-black/60 px-4 py-2 text-center font-semibold text-white backdrop-blur",
+                            standardTitle.position === "center"
+                              ? "text-[clamp(22px,4vw,52px)]"
+                              : "text-[clamp(16px,2.6vw,32px)]"
+                          )}
+                        >
+                          {standardTitle.text}
+                        </span>
+                      </div>
+                    )}
+                    {activeGroup && !heroTitle && (
+                      <div
+                        className={cn(
+                          "pointer-events-none absolute inset-x-0 z-[3] flex justify-center",
+                          captionsRaised ? "bottom-[28%]" : "bottom-[9%]"
                         )}
                       >
-                        {standardTitle.text}
-                      </span>
-                    </div>
-                  )}
-                  {activeGroup && !heroTitle && (
-                    <div
-                      className={cn(
-                        "pointer-events-none absolute inset-x-0 z-[3] flex justify-center",
-                        captionsRaised ? "bottom-[28%]" : "bottom-[9%]"
-                      )}
-                    >
-                      <div className="max-w-[82%] rounded-md bg-black/55 px-3.5 py-1.5 text-center font-semibold text-[clamp(15px,2.3vw,30px)] text-white leading-tight backdrop-blur">
-                        {activeGroup.words.map((w, i) => {
-                          const next =
-                            activeGroup.words[i + 1]?.startSec ??
-                            activeGroup.endSec;
-                          const on =
-                            curSec >= w.startSec - 0.02 && curSec < next;
-                          return (
-                            <span
-                              className={cn(on ? "text-live" : "text-zinc-100")}
-                              key={`${w.text}-${i}`}
-                            >
-                              {w.text}{" "}
-                            </span>
-                          );
-                        })}
+                        <div className="max-w-[82%] rounded-md bg-black/55 px-3.5 py-1.5 text-center font-semibold text-[clamp(15px,2.3vw,30px)] text-white leading-tight backdrop-blur">
+                          {activeGroup.words.map((w, i) => {
+                            const next =
+                              activeGroup.words[i + 1]?.startSec ??
+                              activeGroup.endSec;
+                            const on =
+                              curSec >= w.startSec - 0.02 && curSec < next;
+                            return (
+                              <span
+                                className={cn(
+                                  on ? "text-live" : "text-zinc-100"
+                                )}
+                                key={`${w.text}-${i}`}
+                              >
+                                {w.text}{" "}
+                              </span>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  )}
-                  <canvas
-                    className="pointer-events-none absolute inset-0 z-[4] h-full w-full"
-                    ref={transitionCanvasRef}
-                  />
+                    )}
+                    <canvas
+                      className="pointer-events-none absolute inset-0 z-[4] h-full w-full"
+                      ref={transitionCanvasRef}
+                    />
+                    {(exporting || pendingSaves > 0) && (
+                      <div className="pointer-events-none absolute top-2 right-2 z-[5] flex items-center gap-1.5 rounded-md bg-black/70 px-2 py-1 font-medium text-[11px] text-white backdrop-blur">
+                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
+                        {exporting
+                          ? (exportMsg ?? "Exporting…")
+                          : "Rebuilding…"}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2 md:flex-nowrap md:gap-3">
@@ -1045,6 +1121,47 @@ export function App({
                   <span className="shrink-0 text-muted-foreground text-xs tabular-nums">
                     {fmt(outPos)} / {fmt(keptDuration)}
                   </span>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <Button
+                      aria-label="Set loop in-point"
+                      onClick={() => setLoopInPending(curSec)}
+                      size="sm"
+                      variant="outline"
+                    >
+                      In
+                    </Button>
+                    <Button
+                      aria-label="Set loop out-point"
+                      onClick={() => {
+                        const r = clampLoopRegion(
+                          loopInPending ?? 0,
+                          curSec,
+                          fullDur
+                        );
+                        if (r) {
+                          setLoop(r);
+                        }
+                      }}
+                      size="sm"
+                      variant="outline"
+                    >
+                      Out
+                    </Button>
+                    {loop && (
+                      <Button
+                        aria-label="Clear loop region"
+                        className="text-[11px] text-muted-foreground"
+                        onClick={() => {
+                          setLoop(null);
+                          setLoopInPending(null);
+                        }}
+                        size="sm"
+                        variant="ghost"
+                      >
+                        Loop {fmt(loop.inSec)}–{fmt(loop.outSec)} ✕
+                      </Button>
+                    )}
+                  </div>
                   <Toggle
                     aria-label="Captions"
                     onPressedChange={toggleCaptions}
@@ -1369,6 +1486,26 @@ export function App({
                             ))}
                           </SelectContent>
                         </Select>
+                        {(project.broll ?? []).length > 1 && (
+                          <div className="mt-3">
+                            <span className="text-[11px] text-muted-foreground">
+                              Paint order — drag to restack
+                            </span>
+                            <div className="mt-1.5">
+                              <OverlaySortable
+                                onReorder={reorderBrollOrder}
+                                onSelect={(id) =>
+                                  setSelected({ kind: "broll", id })
+                                }
+                                rows={(project.broll ?? []).map((b) => ({
+                                  id: b.id,
+                                  label: assetName(b.assetId),
+                                }))}
+                                selectedId={selected?.id}
+                              />
+                            </div>
+                          </div>
+                        )}
                       </Section>
                     )}
 

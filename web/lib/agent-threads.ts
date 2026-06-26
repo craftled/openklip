@@ -1,3 +1,5 @@
+import { routeIntent } from "./skill-router.ts";
+
 export interface ThreadMessage {
   content: string;
   createdAt: number;
@@ -98,18 +100,8 @@ export function deleteThread(threadId: string): void {
 }
 
 export function assistantHint(slug: string, userText: string): string {
-  const lower = userText.toLowerCase();
-  if (lower.includes("transcript") || lower.includes("read")) {
-    return `Read the edit with:\n\nopenklip transcript ${slug}`;
-  }
-  if (lower.includes("cut") || lower.includes("remove")) {
-    return `Cut by phrase:\n\nopenklip cut ${slug} --text "phrase here"\n\nOr cut every match:\n\nopenklip cut ${slug} --text "um" --all`;
-  }
-  if (lower.includes("status") || lower.includes("summary")) {
-    return `Review the edit:\n\nopenklip status ${slug}`;
-  }
-  if (lower.includes("export")) {
-    return `Render the cut:\n\nopenklip export ${slug}`;
-  }
-  return `OpenKlip agents edit via CLI on the same project.json as this editor. Try:\n\nopenklip transcript ${slug}\nopenklip status ${slug}\nopenklip cut ${slug} --text "filler phrase"\nopenklip export ${slug}`;
+  const match = routeIntent(userText, slug);
+  return `**${match.title}** — run this loop on the same project.json:\n\n${match.steps
+    .map((s) => `  ${s}`)
+    .join("\n")}`;
 }
