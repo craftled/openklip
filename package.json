@@ -34,6 +34,7 @@
     "clsx": "^2.1.1",
     "ffmpeg-static": "^5.2.0",
     "ffprobe-static": "^3.1.0",
+    "glimm": "0.1.4",
     "lucide-react": "^1.21.0",
     "next": "^16.2.9",
     "radix-ui": "^1.6.0",

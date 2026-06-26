@@ -1,12 +1,27 @@
 "use client";
 
 import {
+  createShader,
+  playSweep,
+  type ShaderController,
+  type SweepHandle,
+  type SweepOptions,
+} from "glimm";
+import {
+  Captions,
+  ChevronRight,
+  Clock3,
   Download,
   Film,
   Moon,
+  PanelLeft,
+  PanelRight,
   Pause,
   Play,
   Plus,
+  Scissors,
+  Settings2,
+  Sparkles,
   Sun,
   Trash2,
   Type,
@@ -14,6 +29,7 @@ import {
 } from "lucide-react";
 import {
   type ComponentType,
+  type CSSProperties,
   type ReactNode,
   useCallback,
   useEffect,
@@ -31,6 +47,28 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupAction,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuBadge,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarMenuSkeleton,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
+  SidebarProvider,
+  SidebarRail,
+  useSidebar,
+} from "@/components/ui/sidebar";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Toggle } from "@/components/ui/toggle";
@@ -99,6 +137,22 @@ const ZOOM_PRESETS: Record<string, { scale: number; rampSec: number }> = {
 // Thin Paper-style slider: short track, small thumb, soft gray fill.
 const SLIDER =
   "[&_[data-slot=slider-track]]:h-1 [&_[data-slot=slider-thumb]]:size-3 [&_[data-slot=slider-range]]:bg-foreground/35";
+
+const CUT_SWEEP_OPTIONS = {
+  bandTight: 18,
+  brightness: 0.9,
+  direction: "ltr",
+  easing: "easeOutCubic",
+  midpoint: 0.42,
+  outroMs: 170,
+  palette: "azure",
+  peakAlpha: 0.92,
+  rippleAmount: 0.65,
+  swellAmount: 0.55,
+  sweepMs: 260,
+  waveAmount: 0.7,
+  waveSpeed: 1.2,
+} satisfies SweepOptions;
 
 function survivingRanges(project: Project): Range[] {
   const pad = (project.padMs ?? 50) / 1000;
@@ -181,6 +235,7 @@ export function App() {
       ? "dark"
       : "light"
   );
+  const projectLoaded = project !== null;
   const themeMounted = useRef(false);
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
@@ -200,6 +255,9 @@ export function App() {
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const brollRef = useRef<HTMLVideoElement>(null);
+  const transitionCanvasRef = useRef<HTMLCanvasElement>(null);
+  const transitionShaderRef = useRef<ShaderController | null>(null);
+  const transitionSweepRef = useRef<SweepHandle | null>(null);
   const schedRef = useRef<CutScheduler | null>(null);
   const projectRef = useRef<Project | null>(null);
   const saveChainRef = useRef<Promise<void>>(Promise.resolve());
@@ -225,17 +283,67 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    if (!projectLoaded) {
+      return;
+    }
+    const canvas = transitionCanvasRef.current;
+    if (!canvas) {
+      return;
+    }
+    const shader = createShader({
+      canvas,
+      bandTight: CUT_SWEEP_OPTIONS.bandTight,
+      direction: CUT_SWEEP_OPTIONS.direction,
+    });
+    transitionShaderRef.current = shader;
+    return () => {
+      transitionSweepRef.current?.cancel();
+      shader?.destroy();
+      transitionShaderRef.current = null;
+      transitionSweepRef.current = null;
+    };
+  }, [projectLoaded]);
+
+  const playCutSweep = useCallback(
+    ({ jump, resume }: { jump: () => void; resume: () => void }) => {
+      const shader = transitionShaderRef.current;
+      const reduceMotion =
+        window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ??
+        false;
+      if (reduceMotion || !shader) {
+        jump();
+        resume();
+        return;
+      }
+      transitionSweepRef.current?.cancel();
+      const handle = playSweep(shader, {
+        ...CUT_SWEEP_OPTIONS,
+        onMidpoint: jump,
+      });
+      transitionSweepRef.current = handle;
+      void handle.done.finally(() => {
+        if (transitionSweepRef.current === handle) {
+          transitionSweepRef.current = null;
+        }
+        resume();
+      });
+    },
+    []
+  );
+
+  useEffect(() => {
     if (!(videoRef.current && project) || schedRef.current) {
       return;
     }
     const sched = new CutScheduler(videoRef.current, () =>
       survivingRanges(projectRef.current as Project)
     );
+    sched.onCutBoundary = playCutSweep;
     sched.onTick = (sourceSec) =>
       setCurSample(Math.round(sourceSec * project.sampleRate));
     sched.onEnd = () => setPlaying(false);
     schedRef.current = sched;
-  }, [project]);
+  }, [playCutSweep, project]);
 
   const ranges = useMemo(
     () => (project ? survivingRanges(project) : []),
@@ -626,577 +734,872 @@ export function App() {
     : pendingSaves > 0
       ? "Saving…"
       : "Export";
+  const InspectorIcon = selZoom
+    ? ZoomIn
+    : selTitle
+      ? Type
+      : selBroll
+        ? Film
+        : selRange
+          ? Sparkles
+          : Captions;
+  const inspectorLabel = selZoom
+    ? "Push-in"
+    : selTitle
+      ? "Title card"
+      : selBroll
+        ? "B-roll"
+        : selRange
+          ? "Selection"
+          : "Captions";
+  const inspectorBadge = selZoom
+    ? fmt(selZoom.startSample / sr)
+    : selTitle
+      ? fmt(selTitle.startSample / sr)
+      : selBroll
+        ? fmt(selBroll.startSample / sr)
+        : selRange
+          ? `${selRange[1] - selRange[0] + 1}`
+          : captionsOn
+            ? "On"
+            : "Off";
+  const inspectorMeta = selZoom
+    ? [
+        { icon: ZoomIn, label: "Scale", value: `${selZoom.scale.toFixed(2)}x` },
+        {
+          icon: Clock3,
+          label: "Ramp",
+          value: `${selZoom.rampSec.toFixed(1)}s`,
+        },
+      ]
+    : selTitle
+      ? [
+          { icon: Type, label: "Position", value: selTitle.position },
+          {
+            icon: Clock3,
+            label: "Starts",
+            value: fmt(selTitle.startSample / sr),
+          },
+        ]
+      : selBroll
+        ? [
+            { icon: Film, label: "Source", value: assetName(selBroll.assetId) },
+            {
+              icon: Clock3,
+              label: "Starts",
+              value: fmt(selBroll.startSample / sr),
+            },
+          ]
+        : selRange
+          ? [
+              {
+                icon: Sparkles,
+                label: "Words",
+                value: `${selRange[1] - selRange[0] + 1}`,
+              },
+              {
+                icon: Clock3,
+                label: "Start",
+                value: fmt(project.words[selRange[0]].startSample / sr),
+              },
+            ]
+          : [
+              {
+                icon: Captions,
+                label: "Per line",
+                value: String(project.captions?.maxWords ?? 6),
+              },
+              { icon: Clock3, label: "Pad", value: `${project.padMs ?? 50}ms` },
+            ];
 
   return (
-    <div className="grid h-screen min-h-0 grid-cols-[15rem_1fr_17rem] bg-background text-foreground">
+    <SidebarProvider
+      className="min-h-screen flex-col overflow-auto bg-background text-foreground md:h-screen md:min-h-0 md:flex-row md:overflow-hidden"
+      style={
+        {
+          "--sidebar-width": "15rem",
+          "--sidebar-width-icon": "3.25rem",
+        } as CSSProperties
+      }
+    >
       {/* LEFT — sources + effects (Paper "layers" sidebar) */}
-      <aside className="flex min-h-0 flex-col border-border border-r">
-        <div className="flex h-12 shrink-0 items-center gap-2 px-3">
-          <span className="size-2 rounded-full bg-live" />
-          <span className="font-semibold text-[13px] tracking-tight">
-            OpenKlip
-          </span>
-          <span className="ml-auto truncate text-muted-foreground text-xs">
-            {project.slug}
-          </span>
-        </div>
-        <ScrollArea className="min-h-0 flex-1">
-          <div className="px-2 pb-3">
-            <SidebarHead
-              action={<Plus className="size-3.5 text-muted-foreground/70" />}
-              title="Sources"
-            />
-            {project.assets.length === 0 && <Empty>No b-roll registered</Empty>}
-            {project.assets.map((a) => (
-              <LayerRow
-                icon={Film}
-                key={a.id}
-                label={a.name}
-                time={fmt(a.durationSamples / sr)}
-              />
-            ))}
-
-            <SidebarHead title="Effects" />
-            {effectCount === 0 && (
-              <Empty>Select words, then add an effect</Empty>
-            )}
-            {project.zooms?.map((z) => (
-              <LayerRow
-                active={selected?.kind === "zoom" && selected.id === z.id}
-                icon={ZoomIn}
-                key={z.id}
-                label={`Push-in ${z.scale.toFixed(2)}×`}
-                onClick={() => {
-                  clearSel();
-                  setSelected({ kind: "zoom", id: z.id });
-                }}
-                time={fmt(z.startSample / sr)}
-              />
-            ))}
-            {project.broll?.map((b) => (
-              <LayerRow
-                active={selected?.kind === "broll" && selected.id === b.id}
-                icon={Film}
-                key={b.id}
-                label={assetName(b.assetId)}
-                onClick={() => {
-                  clearSel();
-                  setSelected({ kind: "broll", id: b.id });
-                }}
-                time={fmt(b.startSample / sr)}
-              />
-            ))}
-            {project.titles?.map((t) => (
-              <LayerRow
-                active={selected?.kind === "title" && selected.id === t.id}
-                icon={Type}
-                key={t.id}
-                label={t.text}
-                onClick={() => {
-                  clearSel();
-                  setSelected({ kind: "title", id: t.id });
-                }}
-                time={fmt(t.startSample / sr)}
-              />
-            ))}
-          </div>
-        </ScrollArea>
-        <div className="flex shrink-0 items-center gap-1.5 border-border border-t px-3 py-2 text-[11px] text-muted-foreground tabular-nums">
-          {ranges.length} cuts
-          <span className="text-muted-foreground/40">·</span>
-          {fmt(keptDuration)} / {fmt(fullDur)}
-        </div>
-      </aside>
-
-      {/* CENTER — preview + transcript */}
-      <main className="flex min-h-0 min-w-0 flex-col">
-        <div className="flex flex-col gap-3 p-4">
-          <div className="relative aspect-video w-full overflow-hidden rounded-lg border border-border bg-black">
-            {/* biome-ignore lint/a11y/useMediaCaption: editor preview; transcript is the caption source */}
-            <video
-              className="block h-full w-full bg-black"
-              playsInline
-              ref={videoRef}
-              src={`/media/proxy.mp4?v=${project.mediaVersion ?? 0}`}
-              style={{
-                transform: `scale(${zoomScale})`,
-                transformOrigin: "center",
-                transition: "transform 0.25s ease-out",
-              }}
-            />
-            <video
-              className={cn(
-                "absolute inset-0 z-[1] h-full w-full bg-black object-cover",
-                activeBroll ? "block" : "hidden"
-              )}
-              muted
-              playsInline
-              ref={brollRef}
-            />
-            {vignetteOn && (
-              <div
-                className="pointer-events-none absolute inset-0 z-[2]"
-                style={{
-                  background:
-                    "radial-gradient(ellipse at center, transparent 42%, rgba(0,0,0,0.62) 100%)",
-                }}
-              />
-            )}
-            {activeTitle && (
-              <div
-                className={cn(
-                  "pointer-events-none absolute inset-x-0 z-[3] flex justify-center",
-                  activeTitle.position === "center"
-                    ? "top-1/2 -translate-y-1/2"
-                    : "bottom-[16%]"
-                )}
-                key={activeTitle.id}
-              >
-                <span
-                  className={cn(
-                    "max-w-[80%] rounded-md bg-black/60 px-4 py-2 text-center font-semibold text-white backdrop-blur",
-                    activeTitle.position === "center"
-                      ? "text-[clamp(22px,4vw,52px)]"
-                      : "text-[clamp(16px,2.6vw,32px)]"
-                  )}
-                >
-                  {activeTitle.text}
+      <Sidebar className="border-border" collapsible="icon">
+        <SidebarHeader className="border-border border-b">
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton className="h-10" size="lg" tooltip="OpenKlip">
+                <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-live/15 text-live">
+                  <Scissors className="size-3.5" />
                 </span>
-              </div>
-            )}
-            {activeGroup && (
-              <div
-                className={cn(
-                  "pointer-events-none absolute inset-x-0 z-[3] flex justify-center",
-                  captionsRaised ? "bottom-[28%]" : "bottom-[9%]"
-                )}
-              >
-                <div className="max-w-[82%] rounded-md bg-black/55 px-3.5 py-1.5 text-center font-semibold text-[clamp(15px,2.3vw,30px)] text-white leading-tight backdrop-blur">
-                  {activeGroup.words.map((w, i) => {
-                    const next =
-                      activeGroup.words[i + 1]?.startSec ?? activeGroup.endSec;
-                    const on = curSec >= w.startSec - 0.02 && curSec < next;
-                    return (
-                      <span
-                        className={cn(on ? "text-live" : "text-zinc-100")}
-                        key={`${w.text}-${i}`}
-                      >
-                        {w.text}{" "}
-                      </span>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Button
-              aria-label={playing ? "Pause" : "Play cut"}
-              onClick={onPlay}
-              size="icon"
-              variant="secondary"
-            >
-              {playing ? <Pause /> : <Play />}
-            </Button>
-            <div className="relative h-1 flex-1 overflow-hidden rounded-full bg-muted">
-              <div
-                className="absolute inset-y-0 left-0 rounded-full bg-foreground/40"
-                style={{
-                  width: `${keptDuration ? Math.min(100, (outPos / keptDuration) * 100) : 0}%`,
-                }}
-              />
-            </div>
-            <span className="shrink-0 text-muted-foreground text-xs tabular-nums">
-              {fmt(outPos)} / {fmt(keptDuration)}
-            </span>
-            <Toggle
-              aria-label="Captions"
-              onPressedChange={toggleCaptions}
-              pressed={captionsOn}
-              size="sm"
-              variant="outline"
-            >
-              Captions
-            </Toggle>
-            <Toggle
-              aria-label="Vignette"
-              onPressedChange={toggleVignette}
-              pressed={vignetteOn}
-              size="sm"
-              variant="outline"
-            >
-              Vignette
-            </Toggle>
-          </div>
-        </div>
-
-        <div className="min-h-0 flex-1 border-border border-t">
-          <ScrollArea className="h-full">
-            <div className="px-6 pt-4 pb-12">
-              <div className="mb-3 flex items-center gap-2">
-                <span className="font-medium text-muted-foreground text-xs">
-                  Transcript
-                </span>
-                <span className="ml-auto text-[11px] text-muted-foreground/70">
-                  Click to cut · shift-click to select
-                </span>
-              </div>
-              <p className="max-w-[60ch] text-[15px] leading-[1.95]">
-                {project.words.map((w, i) => {
-                  const active =
-                    curSample >= w.startSample &&
-                    curSample < w.endSample &&
-                    !w.deleted;
-                  const isSel =
-                    selRange != null && i >= selRange[0] && i <= selRange[1];
-                  return (
-                    <span
-                      className={cn(
-                        "cursor-pointer rounded px-0.5 py-px transition-colors hover:bg-muted",
-                        w.deleted &&
-                          "text-muted-foreground/60 line-through decoration-1",
-                        active && "bg-live/15 text-live",
-                        inBroll(w) &&
-                          "underline decoration-2 decoration-broll/70 underline-offset-4",
-                        inZoom(w) && "bg-zoom/10",
-                        isSel && "bg-live/10 ring-1 ring-live/40 ring-inset"
-                      )}
-                      key={w.id}
-                      onClick={(e) => onWordClick(i, e)}
-                    >
-                      {w.text}{" "}
-                    </span>
-                  );
-                })}
-              </p>
-              {exportMsg && (
-                <p className="mt-6 max-w-[60ch] break-words border-border border-t pt-3 text-muted-foreground text-xs">
-                  {exportMsg}
-                </p>
-              )}
-              {saveError && (
-                <p className="mt-2 max-w-[60ch] break-words text-destructive text-xs">
-                  Save failed: {saveError}
-                </p>
-              )}
-            </div>
-          </ScrollArea>
-        </div>
-      </main>
-
-      {/* RIGHT — actions + inspector (Paper "properties" panel) */}
-      <aside className="flex min-h-0 flex-col border-border border-l">
-        <div className="flex shrink-0 flex-col gap-2 border-border border-b p-3">
-          <Button
-            className="w-full"
-            disabled={exportDisabled}
-            onClick={onExport}
-          >
-            <Download /> {exportLabel}
-          </Button>
-          <div className="flex items-center justify-between">
-            <label className="flex cursor-pointer items-center gap-2 text-muted-foreground text-xs">
-              <Switch checked={export1080} onCheckedChange={setExport1080} />{" "}
-              1080p
-            </label>
-            <Button
-              aria-label="Toggle theme"
-              onClick={toggleTheme}
-              size="icon-sm"
-              variant="ghost"
-            >
-              {theme === "dark" ? <Sun /> : <Moon />}
-            </Button>
-          </div>
-        </div>
-
-        <ScrollArea className="min-h-0 flex-1">
-          {selected && (selZoom || selTitle || selBroll) ? (
-            <div>
-              <div className="px-3 py-3">
-                <div className="flex items-center gap-2 font-medium text-[13px]">
-                  {selZoom ? (
-                    <ZoomIn className="size-3.5 text-muted-foreground" />
-                  ) : selTitle ? (
-                    <Type className="size-3.5 text-muted-foreground" />
-                  ) : (
-                    <Film className="size-3.5 text-muted-foreground" />
-                  )}
-                  {selZoom ? "Push-in" : selTitle ? "Title card" : "B-roll"}
-                  <span className="ml-auto text-[11px] text-muted-foreground tabular-nums">
-                    {selZoom &&
-                      `${fmt(selZoom.startSample / sr)}–${fmt(selZoom.endSample / sr)}`}
-                    {selTitle &&
-                      `${fmt(selTitle.startSample / sr)}–${fmt(selTitle.endSample / sr)}`}
-                    {selBroll &&
-                      `${fmt(selBroll.startSample / sr)}–${fmt(selBroll.endSample / sr)}`}
+                <span className="grid min-w-0 flex-1 text-left leading-tight">
+                  <span className="truncate font-semibold text-[13px]">
+                    OpenKlip
                   </span>
-                </div>
-              </div>
-
-              {selZoom && (
-                <>
-                  <Section title="Parameters">
-                    <PropRow
-                      label="Scale"
-                      value={`${selZoom.scale.toFixed(2)}×`}
-                    >
-                      <Slider
-                        className={SLIDER}
-                        max={3}
-                        min={1}
-                        onValueChange={([v]) =>
-                          updateZoom(selZoom.id, { scale: v })
-                        }
-                        step={0.05}
-                        value={[selZoom.scale]}
-                      />
-                    </PropRow>
-                    <PropRow
-                      label="Ramp"
-                      value={`${selZoom.rampSec.toFixed(1)}s`}
-                    >
-                      <Slider
-                        className={SLIDER}
-                        max={5}
-                        min={0}
-                        onValueChange={([v]) =>
-                          updateZoom(selZoom.id, { rampSec: v })
-                        }
-                        step={0.1}
-                        value={[selZoom.rampSec]}
-                      />
-                    </PropRow>
-                  </Section>
-                  <Section title="Preset">
-                    <ToggleGroup
-                      className="w-full"
-                      onValueChange={(v) =>
-                        v && updateZoom(selZoom.id, ZOOM_PRESETS[v])
-                      }
-                      spacing={0}
-                      type="single"
-                      value={presetOf(selZoom)}
-                      variant="outline"
-                    >
-                      {Object.keys(ZOOM_PRESETS).map((k) => (
-                        <ToggleGroupItem
-                          className="h-7 flex-1 text-xs"
-                          key={k}
-                          value={k}
-                        >
-                          {k}
-                        </ToggleGroupItem>
-                      ))}
-                    </ToggleGroup>
-                  </Section>
-                </>
-              )}
-
-              {selTitle && (
-                <Section title="Title">
-                  <Input
-                    onChange={(e) =>
-                      updateTitle(selTitle.id, { text: e.target.value })
-                    }
-                    placeholder="Title text"
-                    value={selTitle.text}
-                  />
-                  <div className="mt-2">
-                    <Select
-                      onValueChange={(v) =>
-                        updateTitle(selTitle.id, {
-                          position: v as "lower" | "center",
-                        })
-                      }
-                      value={selTitle.position}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="lower">Lower third</SelectItem>
-                        <SelectItem value="center">Centered</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </Section>
-              )}
-
-              {selBroll && project.assets.length > 0 && (
-                <Section title="Source">
-                  <Select
-                    onValueChange={(v) =>
-                      updateBroll(selBroll.id, { assetId: v })
-                    }
-                    value={selBroll.assetId}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {project.assets.map((a) => (
-                        <SelectItem key={a.id} value={a.id}>
-                          {a.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Section>
-              )}
-
-              <div className="p-3">
-                <Button
-                  className="w-full"
-                  onClick={removeSelected}
-                  size="sm"
-                  variant="destructive"
-                >
-                  <Trash2 /> Remove effect
-                </Button>
-              </div>
-            </div>
-          ) : selRange ? (
-            <div>
-              <div className="px-3 py-3 font-medium text-[13px]">
-                Selection
-                <span className="ml-2 font-normal text-[11px] text-muted-foreground">
-                  {selRange[1] - selRange[0] + 1} words
+                  <span className="truncate text-muted-foreground text-xs">
+                    {project.slug}
+                  </span>
                 </span>
-              </div>
-              <Section title="Add effect">
-                <Button
-                  className="w-full justify-start"
-                  onClick={addZoom}
-                  size="sm"
-                  variant="secondary"
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarHeader>
+
+        <SidebarContent>
+          <SidebarGroup>
+            <SidebarGroupLabel>Project</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    isActive={!(selected || selRange)}
+                    tooltip="Cut plan"
+                  >
+                    <Scissors />
+                    <span>Cut plan</span>
+                  </SidebarMenuButton>
+                  <SidebarMenuBadge>{ranges.length}</SidebarMenuBadge>
+                  <SidebarMenuSub>
+                    <InfoSubItem
+                      icon={Clock3}
+                      label="Kept duration"
+                      value={`${fmt(keptDuration)} / ${fmt(fullDur)}`}
+                    />
+                    <InfoSubItem
+                      icon={Captions}
+                      label="Captions"
+                      value={captionsOn ? "On" : "Off"}
+                    />
+                    <InfoSubItem
+                      icon={Settings2}
+                      label="Export"
+                      value={export1080 ? "1080p" : "Source"}
+                    />
+                  </SidebarMenuSub>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton tooltip="Placeholders">
+                    <Sparkles />
+                    <span>Placeholders</span>
+                    <ChevronRight className="ml-auto size-3 text-muted-foreground group-data-[collapsible=icon]:hidden" />
+                  </SidebarMenuButton>
+                  <SidebarMenuSub>
+                    <PlaceholderSubItem label="Select transcript words" />
+                    <PlaceholderSubItem label="Add b-roll, push-in, or title" />
+                  </SidebarMenuSub>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+
+          <SidebarGroup>
+            <SidebarGroupLabel>Sources</SidebarGroupLabel>
+            <SidebarGroupAction aria-label="Add source placeholder">
+              <Plus />
+            </SidebarGroupAction>
+            <SidebarGroupContent>
+              {project.assets.length === 0 && (
+                <SidebarMenu>
+                  <SidebarMenuItem>
+                    <SidebarMenuSkeleton showIcon />
+                  </SidebarMenuItem>
+                  <PlaceholderMenuItem
+                    icon={Film}
+                    label="No b-roll registered"
+                  />
+                </SidebarMenu>
+              )}
+              <SidebarMenu>
+                {project.assets.map((a) => (
+                  <LayerRow
+                    icon={Film}
+                    key={a.id}
+                    label={a.name}
+                    time={fmt(a.durationSamples / sr)}
+                  />
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+
+          <SidebarGroup>
+            <SidebarGroupLabel>Effects</SidebarGroupLabel>
+            <SidebarGroupContent>
+              {effectCount === 0 && (
+                <SidebarMenu>
+                  <PlaceholderMenuItem
+                    icon={Sparkles}
+                    label="Select words, then add an effect"
+                  />
+                </SidebarMenu>
+              )}
+              <SidebarMenu>
+                <CategoryMenu
+                  count={project.zooms?.length ?? 0}
+                  icon={ZoomIn}
+                  label="Push-ins"
                 >
-                  <ZoomIn /> Push in
-                </Button>
-                <div className="mt-2 flex gap-2">
-                  <Select onValueChange={setChosenAsset} value={chosenAsset}>
-                    <SelectTrigger
-                      className="flex-1"
-                      disabled={project.assets.length === 0}
-                    >
-                      <SelectValue placeholder="No b-roll" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {project.assets.map((a) => (
-                        <SelectItem key={a.id} value={a.id}>
-                          {a.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    aria-label="Add b-roll"
-                    disabled={project.assets.length === 0}
-                    onClick={addBroll}
-                    size="sm"
-                    variant="secondary"
-                  >
-                    <Film />
-                  </Button>
-                </div>
-              </Section>
-              <Section title="Title">
-                <Input
-                  onChange={(e) => setTitleText(e.target.value)}
-                  placeholder="Title text"
-                  value={titleText}
-                />
-                <div className="mt-2 flex gap-2">
-                  <Select
-                    onValueChange={(v) => setTitlePos(v as "lower" | "center")}
-                    value={titlePos}
-                  >
-                    <SelectTrigger className="flex-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="lower">Lower third</SelectItem>
-                      <SelectItem value="center">Centered</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    aria-label="Add title"
-                    disabled={!titleText.trim()}
-                    onClick={addTitle}
-                    size="sm"
-                    variant="secondary"
-                  >
-                    <Type />
-                  </Button>
-                </div>
-              </Section>
-              <div className="p-3">
+                  {project.zooms?.length ? (
+                    project.zooms.map((z) => (
+                      <LayerSubRow
+                        active={
+                          selected?.kind === "zoom" && selected.id === z.id
+                        }
+                        icon={ZoomIn}
+                        key={z.id}
+                        label={`${z.scale.toFixed(2)}x zoom`}
+                        onClick={() => {
+                          clearSel();
+                          setSelected({ kind: "zoom", id: z.id });
+                        }}
+                        time={fmt(z.startSample / sr)}
+                      />
+                    ))
+                  ) : (
+                    <PlaceholderSubItem label="No push-ins yet" />
+                  )}
+                </CategoryMenu>
+                <CategoryMenu
+                  count={project.broll?.length ?? 0}
+                  icon={Film}
+                  label="B-roll"
+                >
+                  {project.broll?.length ? (
+                    project.broll.map((b) => (
+                      <LayerSubRow
+                        active={
+                          selected?.kind === "broll" && selected.id === b.id
+                        }
+                        icon={Film}
+                        key={b.id}
+                        label={assetName(b.assetId)}
+                        onClick={() => {
+                          clearSel();
+                          setSelected({ kind: "broll", id: b.id });
+                        }}
+                        time={fmt(b.startSample / sr)}
+                      />
+                    ))
+                  ) : (
+                    <PlaceholderSubItem label="No b-roll overlays yet" />
+                  )}
+                </CategoryMenu>
+                <CategoryMenu
+                  count={project.titles?.length ?? 0}
+                  icon={Type}
+                  label="Titles"
+                >
+                  {project.titles?.length ? (
+                    project.titles.map((t) => (
+                      <LayerSubRow
+                        active={
+                          selected?.kind === "title" && selected.id === t.id
+                        }
+                        icon={Type}
+                        key={t.id}
+                        label={t.text}
+                        onClick={() => {
+                          clearSel();
+                          setSelected({ kind: "title", id: t.id });
+                        }}
+                        time={fmt(t.startSample / sr)}
+                      />
+                    ))
+                  ) : (
+                    <PlaceholderSubItem label="No titles yet" />
+                  )}
+                </CategoryMenu>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        </SidebarContent>
+
+        <SidebarFooter className="border-border border-t">
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton tooltip="Timing summary">
+                <Clock3 />
+                <span>Timing</span>
+              </SidebarMenuButton>
+              <SidebarMenuBadge>{fmt(keptDuration)}</SidebarMenuBadge>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarFooter>
+        <SidebarRail />
+      </Sidebar>
+
+      <SidebarContextBridge>
+        {({ toggleSidebar: toggleLeftSidebar }) => (
+          <SidebarProvider
+            className="min-h-screen flex-1 flex-col overflow-auto bg-background text-foreground md:h-screen md:min-h-0 md:flex-row md:overflow-hidden"
+            style={
+              {
+                "--sidebar-width": "17rem",
+                "--sidebar-width-icon": "3.25rem",
+              } as CSSProperties
+            }
+          >
+            {/* CENTER — preview + transcript */}
+            <SidebarInset className="min-h-[28rem] min-w-0 md:min-h-0">
+              <div className="flex h-12 shrink-0 items-center gap-2 border-border border-b px-3">
                 <Button
-                  className="text-muted-foreground"
-                  onClick={clearSel}
-                  size="sm"
+                  aria-label="Toggle project sidebar"
+                  onClick={toggleLeftSidebar}
+                  size="icon-sm"
                   variant="ghost"
                 >
-                  Clear selection
+                  <PanelLeft />
                 </Button>
+                <div className="h-4 w-px bg-border" />
+                <div className="min-w-0">
+                  <div className="font-medium text-[13px]">Editor</div>
+                  <div className="truncate text-[11px] text-muted-foreground">
+                    {ranges.length} cuts · {fmt(keptDuration)} / {fmt(fullDur)}
+                  </div>
+                </div>
+                <RightSidebarTrigger className="ml-auto" />
               </div>
-            </div>
-          ) : (
-            <div>
-              <Section title="Captions">
-                <PropRow
-                  label="Per line"
-                  value={String(project.captions?.maxWords ?? 6)}
-                >
-                  <Slider
-                    className={SLIDER}
-                    max={12}
-                    min={1}
-                    onValueChange={([v]) => setMaxWords(v)}
-                    step={1}
-                    value={[project.captions?.maxWords ?? 6]}
+              <div className="flex flex-col gap-3 p-4">
+                <div className="relative aspect-video w-full overflow-hidden rounded-lg border border-border bg-black">
+                  {/* biome-ignore lint/a11y/useMediaCaption: editor preview; transcript is the caption source */}
+                  <video
+                    className="block h-full w-full bg-black"
+                    playsInline
+                    ref={videoRef}
+                    src={`/media/proxy.mp4?v=${project.mediaVersion ?? 0}`}
+                    style={{
+                      transform: `scale(${zoomScale})`,
+                      transformOrigin: "center",
+                      transition: "transform 0.25s ease-out",
+                    }}
                   />
-                </PropRow>
-              </Section>
-              <Section title="Timing">
-                <PropRow label="Pad" value={`${project.padMs ?? 50}ms`}>
-                  <Slider
-                    className={SLIDER}
-                    max={200}
-                    min={0}
-                    onValueChange={([v]) => setPad(v)}
-                    step={5}
-                    value={[project.padMs ?? 50]}
+                  <video
+                    className={cn(
+                      "absolute inset-0 z-[1] h-full w-full bg-black object-cover",
+                      activeBroll ? "block" : "hidden"
+                    )}
+                    muted
+                    playsInline
+                    ref={brollRef}
                   />
-                </PropRow>
-              </Section>
-              <p className="px-3 py-3 text-muted-foreground text-xs leading-relaxed">
-                Select a word range in the transcript to add a push-in, b-roll,
-                or title. Click an effect to edit it here.
-              </p>
-            </div>
-          )}
-        </ScrollArea>
-      </aside>
-    </div>
-  );
-}
+                  {vignetteOn && (
+                    <div
+                      className="pointer-events-none absolute inset-0 z-[2]"
+                      style={{
+                        background:
+                          "radial-gradient(ellipse at center, transparent 42%, rgba(0,0,0,0.62) 100%)",
+                      }}
+                    />
+                  )}
+                  {activeTitle && (
+                    <div
+                      className={cn(
+                        "pointer-events-none absolute inset-x-0 z-[3] flex justify-center",
+                        activeTitle.position === "center"
+                          ? "top-1/2 -translate-y-1/2"
+                          : "bottom-[16%]"
+                      )}
+                      key={activeTitle.id}
+                    >
+                      <span
+                        className={cn(
+                          "max-w-[80%] rounded-md bg-black/60 px-4 py-2 text-center font-semibold text-white backdrop-blur",
+                          activeTitle.position === "center"
+                            ? "text-[clamp(22px,4vw,52px)]"
+                            : "text-[clamp(16px,2.6vw,32px)]"
+                        )}
+                      >
+                        {activeTitle.text}
+                      </span>
+                    </div>
+                  )}
+                  {activeGroup && (
+                    <div
+                      className={cn(
+                        "pointer-events-none absolute inset-x-0 z-[3] flex justify-center",
+                        captionsRaised ? "bottom-[28%]" : "bottom-[9%]"
+                      )}
+                    >
+                      <div className="max-w-[82%] rounded-md bg-black/55 px-3.5 py-1.5 text-center font-semibold text-[clamp(15px,2.3vw,30px)] text-white leading-tight backdrop-blur">
+                        {activeGroup.words.map((w, i) => {
+                          const next =
+                            activeGroup.words[i + 1]?.startSec ??
+                            activeGroup.endSec;
+                          const on =
+                            curSec >= w.startSec - 0.02 && curSec < next;
+                          return (
+                            <span
+                              className={cn(on ? "text-live" : "text-zinc-100")}
+                              key={`${w.text}-${i}`}
+                            >
+                              {w.text}{" "}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  <canvas
+                    className="pointer-events-none absolute inset-0 z-[4] h-full w-full"
+                    ref={transitionCanvasRef}
+                  />
+                </div>
 
-function SidebarHead({ title, action }: { title: string; action?: ReactNode }) {
-  return (
-    <div className="flex h-7 items-center justify-between px-2 pt-3">
-      <span className="font-medium text-muted-foreground text-xs">{title}</span>
-      {action}
-    </div>
-  );
-}
+                <div className="flex flex-wrap items-center gap-2 md:flex-nowrap md:gap-3">
+                  <Button
+                    aria-label={playing ? "Pause" : "Play cut"}
+                    onClick={onPlay}
+                    size="icon"
+                    variant="secondary"
+                  >
+                    {playing ? <Pause /> : <Play />}
+                  </Button>
+                  <div className="relative h-1 min-w-32 flex-1 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="absolute inset-y-0 left-0 rounded-full bg-foreground/40"
+                      style={{
+                        width: `${keptDuration ? Math.min(100, (outPos / keptDuration) * 100) : 0}%`,
+                      }}
+                    />
+                  </div>
+                  <span className="shrink-0 text-muted-foreground text-xs tabular-nums">
+                    {fmt(outPos)} / {fmt(keptDuration)}
+                  </span>
+                  <Toggle
+                    aria-label="Captions"
+                    onPressedChange={toggleCaptions}
+                    pressed={captionsOn}
+                    size="sm"
+                    variant="outline"
+                  >
+                    Captions
+                  </Toggle>
+                  <Toggle
+                    aria-label="Vignette"
+                    onPressedChange={toggleVignette}
+                    pressed={vignetteOn}
+                    size="sm"
+                    variant="outline"
+                  >
+                    Vignette
+                  </Toggle>
+                </div>
+              </div>
 
-function Empty({ children }: { children: ReactNode }) {
-  return (
-    <div className="px-2 py-1.5 text-muted-foreground/70 text-xs">
-      {children}
-    </div>
+              <div className="min-h-0 flex-1 border-border border-t">
+                <ScrollArea className="h-full">
+                  <div className="px-6 pt-4 pb-12">
+                    <div className="mb-3 flex items-center gap-2">
+                      <span className="font-medium text-muted-foreground text-xs">
+                        Transcript
+                      </span>
+                      <span className="ml-auto text-[11px] text-muted-foreground/70">
+                        Click to cut · shift-click to select
+                      </span>
+                    </div>
+                    <p className="max-w-[60ch] text-[15px] leading-[1.95]">
+                      {project.words.map((w, i) => {
+                        const active =
+                          curSample >= w.startSample &&
+                          curSample < w.endSample &&
+                          !w.deleted;
+                        const isSel =
+                          selRange != null &&
+                          i >= selRange[0] &&
+                          i <= selRange[1];
+                        return (
+                          <span
+                            className={cn(
+                              "cursor-pointer rounded px-0.5 py-px transition-colors hover:bg-muted",
+                              w.deleted &&
+                                "text-muted-foreground/60 line-through decoration-1",
+                              active && "bg-live/15 text-live",
+                              inBroll(w) &&
+                                "underline decoration-2 decoration-broll/70 underline-offset-4",
+                              inZoom(w) && "bg-zoom/10",
+                              isSel &&
+                                "bg-live/10 ring-1 ring-live/40 ring-inset"
+                            )}
+                            key={w.id}
+                            onClick={(e) => onWordClick(i, e)}
+                          >
+                            {w.text}{" "}
+                          </span>
+                        );
+                      })}
+                    </p>
+                    {exportMsg && (
+                      <p className="mt-6 max-w-[60ch] break-words border-border border-t pt-3 text-muted-foreground text-xs">
+                        {exportMsg}
+                      </p>
+                    )}
+                    {saveError && (
+                      <p className="mt-2 max-w-[60ch] break-words text-destructive text-xs">
+                        Save failed: {saveError}
+                      </p>
+                    )}
+                  </div>
+                </ScrollArea>
+              </div>
+            </SidebarInset>
+
+            {/* RIGHT — actions + inspector (Paper "properties" panel) */}
+            <Sidebar className="border-border" collapsible="icon" side="right">
+              <SidebarHeader className="border-border border-b">
+                <SidebarMenu>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      disabled={exportDisabled}
+                      onClick={onExport}
+                      tooltip={exportLabel}
+                    >
+                      <Download />
+                      <span>{exportLabel}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton tooltip="Output quality">
+                      <Settings2 />
+                      <span>Output quality</span>
+                    </SidebarMenuButton>
+                    <SidebarMenuBadge>
+                      {export1080 ? "1080p" : "Auto"}
+                    </SidebarMenuBadge>
+                    <SidebarMenuSub>
+                      <SidebarMenuSubItem>
+                        <SidebarMenuSubButton asChild>
+                          <label className="cursor-pointer">
+                            <Switch
+                              checked={export1080}
+                              onCheckedChange={setExport1080}
+                            />
+                            <span>Limit to 1080p</span>
+                          </label>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+                    </SidebarMenuSub>
+                  </SidebarMenuItem>
+                </SidebarMenu>
+              </SidebarHeader>
+
+              <SidebarContent>
+                <SidebarGroup>
+                  <SidebarGroupLabel>Inspector</SidebarGroupLabel>
+                  <SidebarGroupContent>
+                    <SidebarMenu>
+                      <SidebarMenuItem>
+                        <SidebarMenuButton tooltip={inspectorLabel}>
+                          <InspectorIcon />
+                          <span>{inspectorLabel}</span>
+                        </SidebarMenuButton>
+                        <SidebarMenuBadge>{inspectorBadge}</SidebarMenuBadge>
+                        <SidebarMenuSub>
+                          {inspectorMeta.map((item) => (
+                            <InfoSubItem
+                              icon={item.icon}
+                              key={item.label}
+                              label={item.label}
+                              value={item.value}
+                            />
+                          ))}
+                        </SidebarMenuSub>
+                      </SidebarMenuItem>
+                    </SidebarMenu>
+                  </SidebarGroupContent>
+                </SidebarGroup>
+                {selected && (selZoom || selTitle || selBroll) ? (
+                  <div className="group-data-[collapsible=icon]:hidden">
+                    <div className="px-3 py-3">
+                      <div className="flex items-center gap-2 font-medium text-[13px]">
+                        {selZoom ? (
+                          <ZoomIn className="size-3.5 text-muted-foreground" />
+                        ) : selTitle ? (
+                          <Type className="size-3.5 text-muted-foreground" />
+                        ) : (
+                          <Film className="size-3.5 text-muted-foreground" />
+                        )}
+                        {selZoom
+                          ? "Push-in"
+                          : selTitle
+                            ? "Title card"
+                            : "B-roll"}
+                        <span className="ml-auto text-[11px] text-muted-foreground tabular-nums">
+                          {selZoom &&
+                            `${fmt(selZoom.startSample / sr)}–${fmt(selZoom.endSample / sr)}`}
+                          {selTitle &&
+                            `${fmt(selTitle.startSample / sr)}–${fmt(selTitle.endSample / sr)}`}
+                          {selBroll &&
+                            `${fmt(selBroll.startSample / sr)}–${fmt(selBroll.endSample / sr)}`}
+                        </span>
+                      </div>
+                    </div>
+
+                    {selZoom && (
+                      <>
+                        <Section title="Parameters">
+                          <PropRow
+                            label="Scale"
+                            value={`${selZoom.scale.toFixed(2)}×`}
+                          >
+                            <Slider
+                              className={SLIDER}
+                              max={3}
+                              min={1}
+                              onValueChange={([v]) =>
+                                updateZoom(selZoom.id, { scale: v })
+                              }
+                              step={0.05}
+                              value={[selZoom.scale]}
+                            />
+                          </PropRow>
+                          <PropRow
+                            label="Ramp"
+                            value={`${selZoom.rampSec.toFixed(1)}s`}
+                          >
+                            <Slider
+                              className={SLIDER}
+                              max={5}
+                              min={0}
+                              onValueChange={([v]) =>
+                                updateZoom(selZoom.id, { rampSec: v })
+                              }
+                              step={0.1}
+                              value={[selZoom.rampSec]}
+                            />
+                          </PropRow>
+                        </Section>
+                        <Section title="Preset">
+                          <ToggleGroup
+                            className="w-full"
+                            onValueChange={(v) =>
+                              v && updateZoom(selZoom.id, ZOOM_PRESETS[v])
+                            }
+                            spacing={0}
+                            type="single"
+                            value={presetOf(selZoom)}
+                            variant="outline"
+                          >
+                            {Object.keys(ZOOM_PRESETS).map((k) => (
+                              <ToggleGroupItem
+                                className="h-7 flex-1 text-xs"
+                                key={k}
+                                value={k}
+                              >
+                                {k}
+                              </ToggleGroupItem>
+                            ))}
+                          </ToggleGroup>
+                        </Section>
+                      </>
+                    )}
+
+                    {selTitle && (
+                      <Section title="Title">
+                        <Input
+                          onChange={(e) =>
+                            updateTitle(selTitle.id, { text: e.target.value })
+                          }
+                          placeholder="Title text"
+                          value={selTitle.text}
+                        />
+                        <div className="mt-2">
+                          <Select
+                            onValueChange={(v) =>
+                              updateTitle(selTitle.id, {
+                                position: v as "lower" | "center",
+                              })
+                            }
+                            value={selTitle.position}
+                          >
+                            <SelectTrigger className="w-full">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="lower">Lower third</SelectItem>
+                              <SelectItem value="center">Centered</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </Section>
+                    )}
+
+                    {selBroll && project.assets.length > 0 && (
+                      <Section title="Source">
+                        <Select
+                          onValueChange={(v) =>
+                            updateBroll(selBroll.id, { assetId: v })
+                          }
+                          value={selBroll.assetId}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {project.assets.map((a) => (
+                              <SelectItem key={a.id} value={a.id}>
+                                {a.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </Section>
+                    )}
+
+                    <div className="p-3">
+                      <Button
+                        className="w-full"
+                        onClick={removeSelected}
+                        size="sm"
+                        variant="destructive"
+                      >
+                        <Trash2 /> Remove effect
+                      </Button>
+                    </div>
+                  </div>
+                ) : selRange ? (
+                  <div className="group-data-[collapsible=icon]:hidden">
+                    <div className="px-3 py-3 font-medium text-[13px]">
+                      Selection
+                      <span className="ml-2 font-normal text-[11px] text-muted-foreground">
+                        {selRange[1] - selRange[0] + 1} words
+                      </span>
+                    </div>
+                    <Section title="Add effect">
+                      <Button
+                        className="w-full justify-start"
+                        onClick={addZoom}
+                        size="sm"
+                        variant="secondary"
+                      >
+                        <ZoomIn /> Push in
+                      </Button>
+                      <div className="mt-2 flex gap-2">
+                        <Select
+                          onValueChange={setChosenAsset}
+                          value={chosenAsset}
+                        >
+                          <SelectTrigger
+                            className="flex-1"
+                            disabled={project.assets.length === 0}
+                          >
+                            <SelectValue placeholder="No b-roll" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {project.assets.map((a) => (
+                              <SelectItem key={a.id} value={a.id}>
+                                {a.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          aria-label="Add b-roll"
+                          disabled={project.assets.length === 0}
+                          onClick={addBroll}
+                          size="sm"
+                          variant="secondary"
+                        >
+                          <Film />
+                        </Button>
+                      </div>
+                    </Section>
+                    <Section title="Title">
+                      <Input
+                        onChange={(e) => setTitleText(e.target.value)}
+                        placeholder="Title text"
+                        value={titleText}
+                      />
+                      <div className="mt-2 flex gap-2">
+                        <Select
+                          onValueChange={(v) =>
+                            setTitlePos(v as "lower" | "center")
+                          }
+                          value={titlePos}
+                        >
+                          <SelectTrigger className="flex-1">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="lower">Lower third</SelectItem>
+                            <SelectItem value="center">Centered</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          aria-label="Add title"
+                          disabled={!titleText.trim()}
+                          onClick={addTitle}
+                          size="sm"
+                          variant="secondary"
+                        >
+                          <Type />
+                        </Button>
+                      </div>
+                    </Section>
+                    <div className="p-3">
+                      <Button
+                        className="text-muted-foreground"
+                        onClick={clearSel}
+                        size="sm"
+                        variant="ghost"
+                      >
+                        Clear selection
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="group-data-[collapsible=icon]:hidden">
+                    <Section title="Captions">
+                      <PropRow
+                        label="Per line"
+                        value={String(project.captions?.maxWords ?? 6)}
+                      >
+                        <Slider
+                          className={SLIDER}
+                          max={12}
+                          min={1}
+                          onValueChange={([v]) => setMaxWords(v)}
+                          step={1}
+                          value={[project.captions?.maxWords ?? 6]}
+                        />
+                      </PropRow>
+                    </Section>
+                    <Section title="Timing">
+                      <PropRow label="Pad" value={`${project.padMs ?? 50}ms`}>
+                        <Slider
+                          className={SLIDER}
+                          max={200}
+                          min={0}
+                          onValueChange={([v]) => setPad(v)}
+                          step={5}
+                          value={[project.padMs ?? 50]}
+                        />
+                      </PropRow>
+                    </Section>
+                    <p className="px-3 py-3 text-muted-foreground text-xs leading-relaxed">
+                      Select a word range in the transcript to add a push-in,
+                      b-roll, or title. Click an effect to edit it here.
+                    </p>
+                  </div>
+                )}
+              </SidebarContent>
+              <SidebarFooter className="border-border border-t">
+                <SidebarMenu>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      onClick={toggleTheme}
+                      tooltip="Toggle theme"
+                    >
+                      {theme === "dark" ? <Sun /> : <Moon />}
+                      <span>Theme</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </SidebarMenu>
+              </SidebarFooter>
+              <SidebarRail />
+            </Sidebar>
+          </SidebarProvider>
+        )}
+      </SidebarContextBridge>
+    </SidebarProvider>
   );
 }
 
@@ -1214,39 +1617,173 @@ function LayerRow({
   onClick?: () => void;
 }) {
   return (
-    <button
-      className={cn(
-        "flex h-7 w-full items-center gap-2 rounded-md px-2 text-left transition-colors",
-        onClick && "hover:bg-muted",
-        active && "bg-muted"
-      )}
-      onClick={onClick}
-      type="button"
-    >
-      <Icon className="size-3.5 shrink-0 text-muted-foreground" />
-      <span
+    <SidebarMenuItem>
+      <SidebarMenuButton
         className={cn(
-          "truncate text-[13px]",
-          active ? "text-foreground" : "text-foreground/90"
+          "h-7 px-2 text-[13px]",
+          !onClick && "pointer-events-none hover:bg-transparent"
         )}
+        isActive={active}
+        onClick={onClick}
+        tooltip={label}
+        type="button"
       >
-        {label}
-      </span>
-      <span className="ml-auto shrink-0 text-[11px] text-muted-foreground/70 tabular-nums">
-        {time}
-      </span>
-    </button>
+        <Icon className="size-3.5 shrink-0 text-muted-foreground" />
+        <span
+          className={cn(
+            "min-w-0 flex-1 truncate",
+            active ? "text-foreground" : "text-foreground/90"
+          )}
+        >
+          {label}
+        </span>
+      </SidebarMenuButton>
+      <SidebarMenuBadge>{time}</SidebarMenuBadge>
+    </SidebarMenuItem>
+  );
+}
+
+function CategoryMenu({
+  icon: Icon,
+  label,
+  count,
+  children,
+}: {
+  icon: ComponentType<{ className?: string }>;
+  label: string;
+  count: number;
+  children: ReactNode;
+}) {
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton tooltip={label}>
+        <Icon />
+        <span>{label}</span>
+      </SidebarMenuButton>
+      <SidebarMenuBadge>{count}</SidebarMenuBadge>
+      <SidebarMenuSub>{children}</SidebarMenuSub>
+    </SidebarMenuItem>
+  );
+}
+
+function LayerSubRow({
+  icon: Icon,
+  label,
+  time,
+  active,
+  onClick,
+}: {
+  icon: ComponentType<{ className?: string }>;
+  label: string;
+  time: string;
+  active?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <SidebarMenuSubItem>
+      <SidebarMenuSubButton asChild isActive={active}>
+        <button className="w-full" onClick={onClick} type="button">
+          <Icon className="size-3.5 shrink-0 text-muted-foreground" />
+          <span className="min-w-0 flex-1 truncate text-left">{label}</span>
+          <span className="ml-auto shrink-0 text-[11px] text-muted-foreground/70 tabular-nums">
+            {time}
+          </span>
+        </button>
+      </SidebarMenuSubButton>
+    </SidebarMenuSubItem>
+  );
+}
+
+function InfoSubItem({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: ComponentType<{ className?: string }>;
+  label: string;
+  value: string;
+}) {
+  return (
+    <SidebarMenuSubItem>
+      <SidebarMenuSubButton asChild>
+        <span>
+          <Icon className="size-3.5 shrink-0 text-muted-foreground" />
+          <span className="min-w-0 flex-1 truncate">{label}</span>
+          <span className="ml-auto shrink-0 text-[11px] text-muted-foreground/70 tabular-nums">
+            {value}
+          </span>
+        </span>
+      </SidebarMenuSubButton>
+    </SidebarMenuSubItem>
+  );
+}
+
+function PlaceholderMenuItem({
+  icon: Icon,
+  label,
+}: {
+  icon: ComponentType<{ className?: string }>;
+  label: string;
+}) {
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton
+        className="pointer-events-none text-muted-foreground/70 hover:bg-transparent"
+        tooltip={label}
+        type="button"
+      >
+        <Icon />
+        <span>{label}</span>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
+}
+
+function PlaceholderSubItem({ label }: { label: string }) {
+  return (
+    <SidebarMenuSubItem>
+      <SidebarMenuSubButton
+        asChild
+        className="pointer-events-none text-muted-foreground/70"
+      >
+        <span aria-disabled="true">{label}</span>
+      </SidebarMenuSubButton>
+    </SidebarMenuSubItem>
+  );
+}
+
+function SidebarContextBridge({
+  children,
+}: {
+  children: (context: ReturnType<typeof useSidebar>) => ReactNode;
+}) {
+  return children(useSidebar());
+}
+
+function RightSidebarTrigger({ className }: { className?: string }) {
+  const { toggleSidebar } = useSidebar();
+
+  return (
+    <Button
+      aria-label="Toggle inspector sidebar"
+      className={className}
+      onClick={toggleSidebar}
+      size="icon-sm"
+      variant="ghost"
+    >
+      <PanelRight />
+    </Button>
   );
 }
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="border-border border-t px-3 py-3">
-      <h4 className="mb-2.5 font-medium text-muted-foreground text-xs">
+    <SidebarGroup className="border-border border-t px-3 py-3">
+      <SidebarGroupLabel className="mb-2.5 h-auto px-0 font-medium text-muted-foreground">
         {title}
-      </h4>
-      {children}
-    </div>
+      </SidebarGroupLabel>
+      <SidebarGroupContent>{children}</SidebarGroupContent>
+    </SidebarGroup>
   );
 }
 

@@ -3,6 +3,13 @@ export interface Range {
   startSec: number;
 }
 
+export interface CutBoundaryTransition {
+  from: Range;
+  jump: () => void;
+  resume: () => void;
+  to: Range;
+}
+
 // Plays only the surviving ranges of the source proxy back to back. Because the
 // proxy is all-intra, the currentTime jump at each cut boundary is a fast seek.
 // A short gain duck masks the audio click at the jump.
@@ -12,8 +19,10 @@ export class CutScheduler {
   private raf = 0;
   private idx = 0;
   private playing = false;
+  private transitioning = false;
   private ctx?: AudioContext;
   private gain?: GainNode;
+  onCutBoundary?: (transition: CutBoundaryTransition) => void;
   onTick?: (sourceSec: number) => void;
   onEnd?: () => void;
 
@@ -82,12 +91,37 @@ export class CutScheduler {
 
   pause(): void {
     this.playing = false;
+    this.transitioning = false;
     cancelAnimationFrame(this.raf);
     this.video.pause();
   }
 
-  private loop = (): void => {
+  private resumeAfterTransition = (): void => {
+    this.transitioning = false;
     if (!this.playing) {
+      return;
+    }
+    void this.video
+      .play()
+      .then(() => {
+        if (this.playing) {
+          this.raf = requestAnimationFrame(this.loop);
+        }
+      })
+      .catch(() => {
+        this.playing = false;
+        this.onEnd?.();
+      });
+  };
+
+  private jumpToRange(range: Range): void {
+    this.duck();
+    this.video.currentTime = range.startSec;
+    this.onTick?.(this.video.currentTime);
+  }
+
+  private loop = (): void => {
+    if (!(this.playing && !this.transitioning)) {
       return;
     }
     const ranges = this.getRanges();
@@ -105,8 +139,24 @@ export class CutScheduler {
         this.onEnd?.();
         return;
       }
-      this.duck();
-      this.video.currentTime = next.startSec;
+      const jump = () => this.jumpToRange(next);
+      if (this.onCutBoundary) {
+        this.transitioning = true;
+        this.video.pause();
+        try {
+          this.onCutBoundary({
+            from: r,
+            jump,
+            resume: this.resumeAfterTransition,
+            to: next,
+          });
+        } catch {
+          jump();
+          this.resumeAfterTransition();
+        }
+        return;
+      }
+      jump();
       r = next;
     }
     this.onTick?.(this.video.currentTime);
