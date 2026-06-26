@@ -1,9 +1,5 @@
-import {
-  type AssetKind,
-  AssetKindSchema,
-  type Asset,
-} from "@engine/edl";
 import { listAssetsByKind, registerAssetBytes } from "@engine/assets";
+import { type Asset, type AssetKind, AssetKindSchema } from "@engine/edl";
 import { loadProject } from "@engine/projectStore";
 import type { NextRequest } from "next/server";
 
