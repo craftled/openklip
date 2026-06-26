@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+import { existsSync } from "node:fs";
 import {
   addBroll,
   cutByText,
@@ -13,12 +14,12 @@ import { type Project, ProjectSchema, samplesToSec } from "./edl.ts";
 import { exportCut } from "./exporter.ts";
 import { ingest } from "./ingest.ts";
 import { projectPaths } from "./paths.ts";
-import { serve } from "./server.ts";
+import { latestProject } from "./projectStore.ts";
 
 const [cmd, ...rest] = process.argv.slice(2);
 
 function help(): void {
-  console.log(`openklip — edit video by editing text
+  console.log(`OpenKlip - edit video by editing text
 
   openklip ingest <video>          transcribe + build a project
   openklip serve [slug]            open the local editor (default: latest project)
@@ -91,9 +92,21 @@ try {
       await ingest(rest[0]);
       break;
     case "serve":
-    case "dev":
-      await serve(rest[0]);
+    case "dev": {
+      // Launch the Next.js editor, pinned to this project via OPENKLIP_SLUG.
+      const slug = rest[0] ?? latestProject();
+      if (!slug) throw new Error("no projects found. Run: openklip ingest <video>");
+      if (!existsSync(projectPaths(slug).project)) throw new Error(`project not found: ${slug}`);
+      const port = process.env.PORT ?? "4399";
+      console.log(`[serve] project: ${slug}\n\n  OpenKlip ready  ->  http://localhost:${port}\n`);
+      const proc = Bun.spawn([process.execPath, "--bun", "node_modules/next/dist/bin/next", "dev", "-p", String(port)], {
+        cwd: process.cwd(),
+        env: { ...process.env, OPENKLIP_SLUG: slug },
+        stdio: ["inherit", "inherit", "inherit"],
+      });
+      await proc.exited;
       break;
+    }
     case "broll": {
       if (!(rest[0] && rest[1])) throw new Error("usage: openklip broll <slug> <file>");
       await registerBroll(rest[0], rest[1]);

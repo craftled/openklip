@@ -1,12 +1,15 @@
 node_modules/
 projects/
 dist/
+.next/
+next-env.d.ts
+*.tsbuildinfo
 *.log
 .DS_Store
 .env*
 .openklip-worktrees/
 
-# source media — keep large/private footage out of the repo
+# source media: keep large/private footage out of the repo
 *.mp4
 *.MP4
 *.mov
@@ -14,3 +17,4 @@ dist/
 *.aiff
 *.wav
 *.f32
+.gstack/

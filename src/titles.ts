@@ -1,4 +1,4 @@
-// Pure, dependency-free. Editorial TITLE cards (lower-third / centered) — distinct
+// Pure, dependency-free. Editorial TITLE cards (lower-third / centered), distinct
 // from spoken-word captions in captions.ts. Emits a complete ASS file (libass) that
 // matches the captions ASS conventions: V4+ Styles header, H:MM:SS.cs Dialogue times,
 // brace-stripping escape, and a hex->&HBBGGRR& colour helper.
