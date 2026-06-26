@@ -7,12 +7,16 @@ import { type Project, ProjectSchema } from "./edl.ts";
 import { PROJECTS_ROOT, projectPaths } from "./paths.ts";
 
 export function latestProject(): string | null {
-  if (!existsSync(PROJECTS_ROOT)) return null;
+  if (!existsSync(PROJECTS_ROOT)) {
+    return null;
+  }
   const dirs = readdirSync(PROJECTS_ROOT)
     .map((n) => ({ n, p: join(PROJECTS_ROOT, n) }))
     .filter((d) => {
       try {
-        return statSync(d.p).isDirectory() && existsSync(join(d.p, "project.json"));
+        return (
+          statSync(d.p).isDirectory() && existsSync(join(d.p, "project.json"))
+        );
       } catch {
         return false;
       }
@@ -25,15 +29,24 @@ export function latestProject(): string | null {
 // pinned via OPENKLIP_SLUG when it launched the server, else the most recent.
 export function resolveSlug(slugParam?: string | null): string {
   const slug = slugParam || process.env.OPENKLIP_SLUG || latestProject();
-  if (!slug) throw new Error("no projects found. Run: bun run ingest <video>");
-  if (!existsSync(projectPaths(slug).project)) throw new Error(`project not found: ${slug}`);
+  if (!slug) {
+    throw new Error("no projects found. Run: bun run ingest <video>");
+  }
+  if (!existsSync(projectPaths(slug).project)) {
+    throw new Error(`project not found: ${slug}`);
+  }
   return slug;
 }
 
 export async function loadProject(slug: string): Promise<Project> {
-  return ProjectSchema.parse(JSON.parse(await readFile(projectPaths(slug).project, "utf8")));
+  return ProjectSchema.parse(
+    JSON.parse(await readFile(projectPaths(slug).project, "utf8"))
+  );
 }
 
-export async function saveProject(slug: string, project: Project): Promise<void> {
+export async function saveProject(
+  slug: string,
+  project: Project
+): Promise<void> {
   await writeFile(projectPaths(slug).project, JSON.stringify(project, null, 2));
 }

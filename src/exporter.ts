@@ -1,8 +1,5 @@
 import { buildAss, type CaptionWord, groupCaptions } from "./captions.ts";
-import { buildTitlesAss, type TitleItem } from "./titles.ts";
-import { buildZoompanZExpr, type ZoomWindow } from "./zoom-ramp.ts";
 import {
-  type Broll,
   type Project,
   ProjectSchema,
   type Range,
@@ -13,16 +10,23 @@ import {
 } from "./edl.ts";
 import { FFMPEG, run } from "./ffmpeg.ts";
 import { projectPaths } from "./paths.ts";
+import { buildTitlesAss, type TitleItem } from "./titles.ts";
+import { buildZoompanZExpr, type ZoomWindow } from "./zoom-ramp.ts";
 
 export interface ExportOptions {
   maxHeight?: number; // e.g. 1080 -> downscale output (and speed up filtering/encode)
 }
 
-function keptWordsInOutputTime(project: Project, ranges: Range[]): CaptionWord[] {
+function keptWordsInOutputTime(
+  project: Project,
+  ranges: Range[]
+): CaptionWord[] {
   const sr = project.sampleRate;
   const out: CaptionWord[] = [];
   for (const w of project.words) {
-    if (w.deleted) continue;
+    if (w.deleted) {
+      continue;
+    }
     const ws = w.startSample / sr;
     const we = w.endSample / sr;
     let cum = 0;
@@ -45,38 +49,70 @@ function escapeAssPath(p: string): string {
 
 interface BrollPlan {
   inputIndex: number;
-  srcPath: string;
-  srcInSec: number;
-  outStart: number;
   outEnd: number;
+  outStart: number;
+  srcInSec: number;
+  srcPath: string;
 }
 
 export async function exportCut(
   slug: string,
-  opts: ExportOptions = {},
-): Promise<{ out: string; durationSec: number; ranges: number; captions: boolean; broll: number; zooms: number; titles: number; vignette: boolean; height: number }> {
+  opts: ExportOptions = {}
+): Promise<{
+  out: string;
+  durationSec: number;
+  ranges: number;
+  captions: boolean;
+  broll: number;
+  zooms: number;
+  titles: number;
+  vignette: boolean;
+  height: number;
+}> {
   const p = projectPaths(slug);
-  const project = ProjectSchema.parse(JSON.parse(await Bun.file(p.project).text()));
+  const project = ProjectSchema.parse(
+    JSON.parse(await Bun.file(p.project).text())
+  );
   const ranges = survivingRanges(project);
-  if (ranges.length === 0) throw new Error("nothing to export (all words deleted)");
+  if (ranges.length === 0) {
+    throw new Error("nothing to export (all words deleted)");
+  }
   const sr = project.sampleRate;
 
   // output resolution
-  const outH = opts.maxHeight && opts.maxHeight < project.height ? opts.maxHeight : project.height;
-  const outW = outH === project.height ? project.width : Math.round((project.width * outH) / project.height / 2) * 2;
+  const outH =
+    opts.maxHeight && opts.maxHeight < project.height
+      ? opts.maxHeight
+      : project.height;
+  const outW =
+    outH === project.height
+      ? project.width
+      : Math.round((project.width * outH) / project.height / 2) * 2;
 
-  const selectExpr = ranges.map((r) => `between(t,${sec(r.startSec)},${sec(r.endSec)})`).join("+");
+  const selectExpr = ranges
+    .map((r) => `between(t,${sec(r.startSec)},${sec(r.endSec)})`)
+    .join("+");
 
   // b-roll -> output windows
   const assetById = new Map(project.assets.map((a) => [a.id, a]));
   const plans: BrollPlan[] = [];
   for (const b of project.broll ?? []) {
     const asset = assetById.get(b.assetId);
-    if (!asset) continue;
+    if (!asset) {
+      continue;
+    }
     const outStart = sourceToOutputSec(b.startSample / sr, ranges);
     const outEnd = sourceToOutputSec(b.endSample / sr, ranges);
-    if (outEnd - outStart < 0.05) continue;
-    plans.push({ inputIndex: plans.length + 1, srcPath: asset.src, srcInSec: b.srcInSample / sr, outStart, outEnd });
+    if (outEnd - outStart < 0.05) {
+      continue;
+    }
+    plans.push({
+      inputIndex: plans.length + 1,
+      srcPath: asset.src,
+      srcInSec: b.srcInSample / sr,
+      outStart,
+      outEnd,
+    });
   }
 
   // zooms -> output windows
@@ -93,7 +129,10 @@ export async function exportCut(
   let assPath: string | null = null;
   const captionsOn = project.captions?.enabled !== false;
   if (captionsOn) {
-    const groups = groupCaptions(keptWordsInOutputTime(project, ranges), project.captions?.maxWords ?? 6);
+    const groups = groupCaptions(
+      keptWordsInOutputTime(project, ranges),
+      project.captions?.maxWords ?? 6
+    );
     if (groups.length > 0) {
       assPath = `${p.dir}/captions.ass`;
       await Bun.write(assPath, buildAss(groups, { width: outW, height: outH }));
@@ -112,32 +151,44 @@ export async function exportCut(
     .filter((t) => t.text.trim().length > 0 && t.endSec - t.startSec > 0.05);
   if (titleItems.length > 0) {
     titlesAssPath = `${p.dir}/titles.ass`;
-    await Bun.write(titlesAssPath, buildTitlesAss(titleItems, { width: outW, height: outH }));
+    await Bun.write(
+      titlesAssPath,
+      buildTitlesAss(titleItems, { width: outW, height: outH })
+    );
   }
 
   // ---- filtergraph ----
   const parts: string[] = [];
   let base = `[0:v]select='${selectExpr}',setpts=N/FRAME_RATE/TB`;
-  if (outH !== project.height) base += `,scale=${outW}:${outH}`;
+  if (outH !== project.height) {
+    base += `,scale=${outW}:${outH}`;
+  }
   parts.push(`${base}[v0]`);
   let last = "v0";
 
   if (zoomWins.length > 0) {
     // Animated push-in via zoompan (z is evaluated per output frame, so it can ramp).
     const fps = Math.max(1, Math.round(project.fps));
-    const wins: ZoomWindow[] = zoomWins.map((z) => ({ startSec: z.os, endSec: z.oe, scale: z.scale, rampSec: z.ramp }));
+    const wins: ZoomWindow[] = zoomWins.map((z) => ({
+      startSec: z.os,
+      endSec: z.oe,
+      scale: z.scale,
+      rampSec: z.ramp,
+    }));
     const zexpr = buildZoompanZExpr(wins, fps);
     parts.push(
-      `[${last}]zoompan=z='${zexpr}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=${outW}x${outH}:fps=${fps}[vz]`,
+      `[${last}]zoompan=z='${zexpr}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=${outW}x${outH}:fps=${fps}[vz]`
     );
     last = "vz";
   }
 
   for (const pl of plans) {
     parts.push(
-      `[${pl.inputIndex}:v]trim=start=${sec(pl.srcInSec)}:duration=${sec(pl.outEnd - pl.outStart)},setpts=PTS-STARTPTS+${sec(pl.outStart)}/TB,scale=${outW}:${outH}:force_original_aspect_ratio=increase,crop=${outW}:${outH},setsar=1[bv${pl.inputIndex}]`,
+      `[${pl.inputIndex}:v]trim=start=${sec(pl.srcInSec)}:duration=${sec(pl.outEnd - pl.outStart)},setpts=PTS-STARTPTS+${sec(pl.outStart)}/TB,scale=${outW}:${outH}:force_original_aspect_ratio=increase,crop=${outW}:${outH},setsar=1[bv${pl.inputIndex}]`
     );
-    parts.push(`[${last}][bv${pl.inputIndex}]overlay=eof_action=pass:enable='between(t,${sec(pl.outStart)},${sec(pl.outEnd)})'[ov${pl.inputIndex}]`);
+    parts.push(
+      `[${last}][bv${pl.inputIndex}]overlay=eof_action=pass:enable='between(t,${sec(pl.outStart)},${sec(pl.outEnd)})'[ov${pl.inputIndex}]`
+    );
     last = `ov${pl.inputIndex}`;
   }
 
@@ -159,21 +210,39 @@ export async function exportCut(
   parts.push(`[${vlabel}]null[vout]`);
   parts.push(`[0:a]aselect='${selectExpr}',asetpts=N/SR/TB[aout]`);
 
-  const inputs = ["-i", project.source, ...plans.flatMap((pl) => ["-i", pl.srcPath])];
+  const inputs = [
+    "-i",
+    project.source,
+    ...plans.flatMap((pl) => ["-i", pl.srcPath]),
+  ];
   await run(
     FFMPEG,
     [
       "-y",
       ...inputs,
-      "-filter_complex", parts.join(";"),
-      "-map", "[vout]", "-map", "[aout]",
-      "-c:v", "libx264", "-preset", "medium", "-crf", "18",
-      "-pix_fmt", "yuv420p",
-      "-c:a", "aac", "-b:a", "192k",
-      "-movflags", "+faststart",
+      "-filter_complex",
+      parts.join(";"),
+      "-map",
+      "[vout]",
+      "-map",
+      "[aout]",
+      "-c:v",
+      "libx264",
+      "-preset",
+      "medium",
+      "-crf",
+      "18",
+      "-pix_fmt",
+      "yuv420p",
+      "-c:a",
+      "aac",
+      "-b:a",
+      "192k",
+      "-movflags",
+      "+faststart",
       p.out,
     ],
-    "ffmpeg(export)",
+    "ffmpeg(export)"
   );
 
   return {

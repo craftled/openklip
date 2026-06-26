@@ -3,30 +3,41 @@
 // the preview (source-time) and export (output-time) produce identical lines.
 
 export interface CaptionWord {
-  text: string;
-  startSec: number;
   endSec: number;
+  startSec: number;
+  text: string;
 }
 
 export interface CaptionGroup {
-  startSec: number;
   endSec: number;
+  startSec: number;
   words: CaptionWord[];
 }
 
 const SENTENCE_END = /[.!?]["')\]]?$/;
 
-export function groupCaptions(words: CaptionWord[], maxWords = 6): CaptionGroup[] {
+export function groupCaptions(
+  words: CaptionWord[],
+  maxWords = 6
+): CaptionGroup[] {
   const groups: CaptionGroup[] = [];
   let cur: CaptionWord[] = [];
   const flush = () => {
-    if (cur.length === 0) return;
-    groups.push({ startSec: cur[0].startSec, endSec: cur[cur.length - 1].endSec, words: cur });
+    if (cur.length === 0) {
+      return;
+    }
+    groups.push({
+      startSec: cur[0].startSec,
+      endSec: cur[cur.length - 1].endSec,
+      words: cur,
+    });
     cur = [];
   };
   for (const w of words) {
     cur.push(w);
-    if (cur.length >= maxWords || SENTENCE_END.test(w.text.trim())) flush();
+    if (cur.length >= maxWords || SENTENCE_END.test(w.text.trim())) {
+      flush();
+    }
   }
   flush();
   return groups;
@@ -38,7 +49,9 @@ const WHITE = "&H00FFFFFF&";
 
 function toAssColor(hex: string): string {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex);
-  if (!m) return "&H00F77B7C&";
+  if (!m) {
+    return "&H00F77B7C&";
+  }
   const r = m[1].slice(0, 2);
   const g = m[1].slice(2, 4);
   const b = m[1].slice(4, 6);
@@ -59,9 +72,9 @@ function assEscape(s: string): string {
 }
 
 export interface AssOptions {
-  width: number;
-  height: number;
   accent?: string;
+  height: number;
+  width: number;
 }
 
 export function buildAss(groups: CaptionGroup[], opts: AssOptions): string {
@@ -89,9 +102,15 @@ export function buildAss(groups: CaptionGroup[], opts: AssOptions): string {
       const start = w.startSec;
       const end = i < g.words.length - 1 ? g.words[i + 1].startSec : g.endSec;
       const line = g.words
-        .map((ww, j) => (j === i ? `{\\c${accent}}${assEscape(ww.text)}{\\c${WHITE}}` : assEscape(ww.text)))
+        .map((ww, j) =>
+          j === i
+            ? `{\\c${accent}}${assEscape(ww.text)}{\\c${WHITE}}`
+            : assEscape(ww.text)
+        )
         .join(" ");
-      events.push(`Dialogue: 0,${assTime(start)},${assTime(Math.max(end, start + 0.05))},Cap,,0,0,0,,${line}`);
+      events.push(
+        `Dialogue: 0,${assTime(start)},${assTime(Math.max(end, start + 0.05))},Cap,,0,0,0,,${line}`
+      );
     });
   }
   return `${[...header, ...events].join("\n")}\n`;

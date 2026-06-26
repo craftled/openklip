@@ -1,4 +1,4 @@
-import assert from "node:assert";
+import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   addBroll,
@@ -28,15 +28,59 @@ function makeProject(): Project {
     durationSamples: sec(6),
     padMs: 0, // no padding so range math stays exact
     captions: { enabled: true, maxWords: 6 },
-    assets: [{ id: "broll-1", name: "broll.mp4", src: "/tmp/broll.mp4", proxy: "assets/broll-1.mp4", durationSamples: sec(10) }],
+    assets: [
+      {
+        id: "broll-1",
+        name: "broll.mp4",
+        src: "/tmp/broll.mp4",
+        proxy: "assets/broll-1.mp4",
+        durationSamples: sec(10),
+      },
+    ],
     broll: [],
     words: [
-      { id: "w0", text: "Hello", startSample: sec(0), endSample: sec(1), deleted: false },
-      { id: "w1", text: "there,", startSample: sec(1), endSample: sec(2), deleted: false },
-      { id: "w2", text: "world", startSample: sec(2), endSample: sec(3), deleted: false },
-      { id: "w3", text: "this", startSample: sec(3), endSample: sec(4), deleted: false },
-      { id: "w4", text: "is", startSample: sec(4), endSample: sec(5), deleted: false },
-      { id: "w5", text: "openklip", startSample: sec(5), endSample: sec(6), deleted: false },
+      {
+        id: "w0",
+        text: "Hello",
+        startSample: sec(0),
+        endSample: sec(1),
+        deleted: false,
+      },
+      {
+        id: "w1",
+        text: "there,",
+        startSample: sec(1),
+        endSample: sec(2),
+        deleted: false,
+      },
+      {
+        id: "w2",
+        text: "world",
+        startSample: sec(2),
+        endSample: sec(3),
+        deleted: false,
+      },
+      {
+        id: "w3",
+        text: "this",
+        startSample: sec(3),
+        endSample: sec(4),
+        deleted: false,
+      },
+      {
+        id: "w4",
+        text: "is",
+        startSample: sec(4),
+        endSample: sec(5),
+        deleted: false,
+      },
+      {
+        id: "w5",
+        text: "openklip",
+        startSample: sec(5),
+        endSample: sec(6),
+        deleted: false,
+      },
     ],
   };
 }
@@ -76,30 +120,47 @@ test("cutByText returns matched=false when no contiguous run matches", () => {
   const result = cutByText(p, "not in the transcript");
   assert.equal(result.matched, false);
   assert.deepEqual(result.ids, []);
-  assert.equal(p.words.every((w) => !w.deleted), true);
+  assert.equal(
+    p.words.every((w) => !w.deleted),
+    true
+  );
 });
 
 test("restoreAll clears every cut", () => {
   const p = makeProject();
   cutWords(p, ["w0", "w2", "w4"]);
   restoreAll(p);
-  assert.equal(p.words.every((w) => !w.deleted), true);
+  assert.equal(
+    p.words.every((w) => !w.deleted),
+    true
+  );
 });
 
 test("addBroll throws on an unknown asset id", () => {
   const p = makeProject();
-  assert.throws(() => addBroll(p, { assetId: "nope", fromSec: 1, toSec: 2 }), /unknown asset/);
+  assert.throws(
+    () => addBroll(p, { assetId: "nope", fromSec: 1, toSec: 2 }),
+    /unknown asset/
+  );
   assert.equal(p.broll.length, 0);
 });
 
 test("addBroll throws on an empty span", () => {
   const p = makeProject();
-  assert.throws(() => addBroll(p, { assetId: "broll-1", fromSec: 3, toSec: 3 }), /empty/);
+  assert.throws(
+    () => addBroll(p, { assetId: "broll-1", fromSec: 3, toSec: 3 }),
+    /empty/
+  );
 });
 
 test("addBroll succeeds on a known asset, converting seconds to samples", () => {
   const p = makeProject();
-  const item = addBroll(p, { assetId: "broll-1", fromSec: 1, toSec: 3, srcInSec: 0.5 });
+  const item = addBroll(p, {
+    assetId: "broll-1",
+    fromSec: 1,
+    toSec: 3,
+    srcInSec: 0.5,
+  });
   assert.equal(item.assetId, "broll-1");
   assert.equal(item.startSample, 1 * SAMPLE_RATE);
   assert.equal(item.endSample, 3 * SAMPLE_RATE);

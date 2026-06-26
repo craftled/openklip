@@ -2,7 +2,7 @@ import { z } from "zod";
 
 // Canonical time base: integer audio samples at 48 kHz. Preview and export both
 // derive seconds from this one grid via samplesToSec() so they cannot drift.
-export const SAMPLE_RATE = 48000;
+export const SAMPLE_RATE = 48_000;
 
 export const WordSchema = z.object({
   id: z.string(),
@@ -72,7 +72,9 @@ export const ProjectSchema = z.object({
     .default({ enabled: true, maxWords: 6 }),
   assets: z.array(AssetSchema).default([]),
   broll: z.array(BrollSchema).default([]),
-  look: z.object({ vignette: z.boolean().default(false) }).default({ vignette: false }),
+  look: z
+    .object({ vignette: z.boolean().default(false) })
+    .default({ vignette: false }),
   zooms: z.array(ZoomSchema).default([]),
   titles: z.array(TitleSchema).default([]),
   words: z.array(WordSchema),
@@ -80,8 +82,8 @@ export const ProjectSchema = z.object({
 export type Project = z.infer<typeof ProjectSchema>;
 
 export interface Range {
-  startSec: number;
   endSec: number;
+  startSec: number;
 }
 
 export function samplesToSec(samples: number): number {
@@ -104,10 +106,15 @@ export function survivingRanges(project: Project): Range[] {
     }
     const s = samplesToSec(w.startSample);
     const e = samplesToSec(w.endSample);
-    if (!cur) cur = { start: s, end: e };
-    else cur.end = Math.max(cur.end, e);
+    if (cur) {
+      cur.end = Math.max(cur.end, e);
+    } else {
+      cur = { start: s, end: e };
+    }
   }
-  if (cur) raw.push(cur);
+  if (cur) {
+    raw.push(cur);
+  }
 
   const padded: Range[] = raw.map((r) => ({
     startSec: Math.max(0, r.start - pad),
@@ -117,8 +124,11 @@ export function survivingRanges(project: Project): Range[] {
   const merged: Range[] = [];
   for (const r of padded) {
     const last = merged[merged.length - 1];
-    if (last && r.startSec <= last.endSec) last.endSec = Math.max(last.endSec, r.endSec);
-    else merged.push({ ...r });
+    if (last && r.startSec <= last.endSec) {
+      last.endSec = Math.max(last.endSec, r.endSec);
+    } else {
+      merged.push({ ...r });
+    }
   }
   return merged.filter((r) => r.endSec - r.startSec > 0.01);
 }
@@ -133,8 +143,12 @@ export function totalDurationSec(ranges: Range[]): number {
 export function sourceToOutputSec(sourceSec: number, ranges: Range[]): number {
   let cum = 0;
   for (const r of ranges) {
-    if (sourceSec < r.startSec) return cum;
-    if (sourceSec <= r.endSec) return cum + (sourceSec - r.startSec);
+    if (sourceSec < r.startSec) {
+      return cum;
+    }
+    if (sourceSec <= r.endSec) {
+      return cum + (sourceSec - r.startSec);
+    }
     cum += r.endSec - r.startSec;
   }
   return cum;

@@ -2,7 +2,12 @@
 // function here mutates the passed Project and returns it (or a small result),
 // so the CLI and the GUI operate on the SAME project.json shape (parity). These
 // are the operations an external coding agent drives from the terminal.
-import { type Broll, type Project, SAMPLE_RATE, survivingRanges } from "./edl.ts";
+import {
+  type Broll,
+  type Project,
+  SAMPLE_RATE,
+  survivingRanges,
+} from "./edl.ts";
 
 // Normalize text for phrase matching: lowercase, strip anything that isn't a
 // letter/number/space, collapse whitespace. Used by cutByText so "Hello, world!"
@@ -16,10 +21,16 @@ function normalizeText(s: string): string {
 }
 
 // Mark words (by id) deleted (or, with deleted=false, restored).
-export function cutWords(project: Project, ids: string[], deleted = true): Project {
+export function cutWords(
+  project: Project,
+  ids: string[],
+  deleted = true
+): Project {
   const set = new Set(ids);
   for (const w of project.words) {
-    if (set.has(w.id)) w.deleted = deleted;
+    if (set.has(w.id)) {
+      w.deleted = deleted;
+    }
   }
   return project;
 }
@@ -29,10 +40,12 @@ export function cutWords(project: Project, ids: string[], deleted = true): Proje
 // match was found and which word ids were cut.
 export function cutByText(
   project: Project,
-  phrase: string,
+  phrase: string
 ): { matched: boolean; ids: string[] } {
   const target = normalizeText(phrase);
-  if (!target) return { matched: false, ids: [] };
+  if (!target) {
+    return { matched: false, ids: [] };
+  }
 
   const tokens = project.words.map((w) => normalizeText(w.text));
   const targetTokens = target.split(" ");
@@ -51,14 +64,19 @@ export function cutByText(
         j++;
         continue;
       }
-      if (tok !== targetTokens[cursor]) break;
+      if (tok !== targetTokens[cursor]) {
+        break;
+      }
       matchedIdx.push(j);
       cursor++;
       j++;
     }
     if (cursor === targetTokens.length) {
       // Trim trailing empty-token words from the run (they belong to the gap).
-      while (matchedIdx.length > 0 && tokens[matchedIdx[matchedIdx.length - 1]] === "") {
+      while (
+        matchedIdx.length > 0 &&
+        tokens[matchedIdx[matchedIdx.length - 1]] === ""
+      ) {
         matchedIdx.pop();
       }
       const ids = matchedIdx.map((k) => project.words[k].id);
@@ -71,7 +89,9 @@ export function cutByText(
 
 // Restore every word (clear all cuts).
 export function restoreAll(project: Project): Project {
-  for (const w of project.words) w.deleted = false;
+  for (const w of project.words) {
+    w.deleted = false;
+  }
   return project;
 }
 
@@ -79,7 +99,7 @@ export function restoreAll(project: Project): Project {
 // asset exists; converts seconds to samples on the canonical 48 kHz grid.
 export function addBroll(
   project: Project,
-  input: { assetId: string; fromSec: number; toSec: number; srcInSec?: number },
+  input: { assetId: string; fromSec: number; toSec: number; srcInSec?: number }
 ): Broll {
   const { assetId, fromSec, toSec, srcInSec = 0 } = input;
   const asset = project.assets.find((a) => a.id === assetId);
@@ -88,7 +108,9 @@ export function addBroll(
     throw new Error(`unknown asset "${assetId}". Registered assets: ${known}`);
   }
   if (toSec <= fromSec) {
-    throw new Error(`b-roll span is empty: toSec (${toSec}) must be greater than fromSec (${fromSec})`);
+    throw new Error(
+      `b-roll span is empty: toSec (${toSec}) must be greater than fromSec (${fromSec})`
+    );
   }
   const item: Broll = {
     id: `br${Date.now()}`,
@@ -115,12 +137,12 @@ export function setCaptions(project: Project, enabled: boolean): Project {
 }
 
 export interface ProjectSummary {
-  words: number;
+  brollCount: number;
+  cuts: number;
   deleted: number;
   kept: number;
-  cuts: number;
-  brollCount: number;
   keptDurationSec: number;
+  words: number;
 }
 
 // A quick health read of the edit: word counts, number of surviving ranges, and
@@ -128,7 +150,10 @@ export interface ProjectSummary {
 export function summarize(project: Project): ProjectSummary {
   const deleted = project.words.filter((w) => w.deleted).length;
   const ranges = survivingRanges(project);
-  const keptDurationSec = ranges.reduce((a, r) => a + (r.endSec - r.startSec), 0);
+  const keptDurationSec = ranges.reduce(
+    (a, r) => a + (r.endSec - r.startSec),
+    0
+  );
   return {
     words: project.words.length,
     deleted,

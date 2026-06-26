@@ -1,6 +1,6 @@
-import { type NextRequest, NextResponse } from "next/server";
 import { ZoomSchema } from "@engine/edl";
 import { loadProject, resolveSlug, saveProject } from "@engine/projectStore";
+import { type NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,8 +20,14 @@ export async function POST(req: NextRequest) {
     }
     project.zooms = items;
     await saveProject(slug, project);
-    return NextResponse.json({ ok: true, zooms: items }, { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json(
+      { ok: true, zooms: items },
+      { headers: { "Cache-Control": "no-store" } }
+    );
   } catch (e) {
-    return NextResponse.json({ ok: false, error: (e as Error).message }, { status: 400 });
+    return NextResponse.json(
+      { ok: false, error: (e as Error).message },
+      { status: 400 }
+    );
   }
 }

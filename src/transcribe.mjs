@@ -6,7 +6,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 const [, , rawPath, outPath, modelArg] = process.argv;
 const MODEL = modelArg || "Xenova/whisper-base.en";
 
-if (!rawPath || !outPath) {
+if (!(rawPath && outPath)) {
   console.error("usage: node transcribe.mjs <audio16k.f32> <out.json> [model]");
   process.exit(2);
 }
@@ -15,8 +15,14 @@ const { pipeline, env } = await import("@huggingface/transformers");
 env.allowLocalModels = false;
 
 const buf = readFileSync(rawPath);
-const audio = new Float32Array(buf.buffer, buf.byteOffset, Math.floor(buf.byteLength / 4));
-console.error(`[transcribe] model=${MODEL} ~${(audio.length / 16000).toFixed(1)}s of audio`);
+const audio = new Float32Array(
+  buf.buffer,
+  buf.byteOffset,
+  Math.floor(buf.byteLength / 4)
+);
+console.error(
+  `[transcribe] model=${MODEL} ~${(audio.length / 16_000).toFixed(1)}s of audio`
+);
 
 const transcriber = await pipeline("automatic-speech-recognition", MODEL);
 const result = await transcriber(audio, {
@@ -33,5 +39,8 @@ const chunks = (result.chunks || [])
   }))
   .filter((c) => c.text.length > 0);
 
-writeFileSync(outPath, JSON.stringify({ text: result.text || "", chunks }, null, 2));
+writeFileSync(
+  outPath,
+  JSON.stringify({ text: result.text || "", chunks }, null, 2)
+);
 console.error(`[transcribe] ${chunks.length} words -> ${outPath}`);

@@ -1,6 +1,6 @@
 export interface Range {
-  startSec: number;
   endSec: number;
+  startSec: number;
 }
 
 // Plays only the surviving ranges of the source proxy back to back. Because the
@@ -23,9 +23,14 @@ export class CutScheduler {
   }
 
   private ensureAudio(): void {
-    if (this.ctx) return;
+    if (this.ctx) {
+      return;
+    }
     try {
-      const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const Ctx =
+        window.AudioContext ??
+        (window as unknown as { webkitAudioContext: typeof AudioContext })
+          .webkitAudioContext;
       this.ctx = new Ctx();
       const src = this.ctx.createMediaElementSource(this.video);
       this.gain = this.ctx.createGain();
@@ -36,7 +41,9 @@ export class CutScheduler {
   }
 
   private duck(ms = 10): void {
-    if (!this.gain || !this.ctx) return;
+    if (!(this.gain && this.ctx)) {
+      return;
+    }
     const now = this.ctx.currentTime;
     this.gain.gain.cancelScheduledValues(now);
     this.gain.gain.setValueAtTime(0, now);
@@ -49,12 +56,18 @@ export class CutScheduler {
 
   async play(): Promise<void> {
     const ranges = this.getRanges();
-    if (ranges.length === 0) return;
+    if (ranges.length === 0) {
+      return;
+    }
     this.ensureAudio();
-    if (this.ctx?.state === "suspended") await this.ctx.resume();
+    if (this.ctx?.state === "suspended") {
+      await this.ctx.resume();
+    }
 
     const t = this.video.currentTime;
-    const inside = ranges.findIndex((r) => t >= r.startSec - 0.05 && t <= r.endSec);
+    const inside = ranges.findIndex(
+      (r) => t >= r.startSec - 0.05 && t <= r.endSec
+    );
     if (inside === -1) {
       this.idx = 0;
       this.video.currentTime = ranges[0].startSec;
@@ -73,7 +86,9 @@ export class CutScheduler {
   }
 
   private loop = (): void => {
-    if (!this.playing) return;
+    if (!this.playing) {
+      return;
+    }
     const ranges = this.getRanges();
     let r = ranges[this.idx];
     if (!r) {

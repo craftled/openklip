@@ -1,7 +1,7 @@
-import assert from "node:assert";
+import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildZoompanZExpr, zoomFactorAtSec } from "../src/zoom-ramp.ts";
 import type { ZoomWindow } from "../src/zoom-ramp.ts";
+import { buildZoompanZExpr, zoomFactorAtSec } from "../src/zoom-ramp.ts";
 
 // smoothstep easing reference: ease(p) = p*p*(3-2*p), p in [0,1]
 function ease(p: number): number {
@@ -72,8 +72,11 @@ test("buildZoompanZExpr: contains each window time, between, clip, and balanced 
   // balanced parentheses
   let depth = 0;
   for (const ch of expr) {
-    if (ch === "(") depth++;
-    else if (ch === ")") depth--;
+    if (ch === "(") {
+      depth++;
+    } else if (ch === ")") {
+      depth--;
+    }
     assert.ok(depth >= 0, "unbalanced: closing before opening");
   }
   assert.strictEqual(depth, 0, "unbalanced parentheses");

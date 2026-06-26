@@ -4,10 +4,10 @@ import { sec } from "./edl.ts";
 // zoom eases from 1.0 to `scale` over `rampSec` (smoothstep), then HOLDS at
 // `scale` until `endSec`. Windows are assumed non-overlapping.
 export interface ZoomWindow {
-  startSec: number;
   endSec: number;
-  scale: number;
   rampSec: number;
+  scale: number;
+  startSec: number;
 }
 
 function clamp(x: number, min: number, max: number): number {
@@ -24,7 +24,9 @@ function smoothstep(p: number): number {
 // from 1 to `scale` over `rampSec` then hold at `scale` through `endSec`.
 export function zoomFactorAtSec(t: number, windows: ZoomWindow[]): number {
   for (const w of windows) {
-    if (t < w.startSec || t > w.endSec) continue;
+    if (t < w.startSec || t > w.endSec) {
+      continue;
+    }
     // rampSec <= 0 means an instant punch: clamp((t-start)/0,...) would be NaN/Inf.
     const p = w.rampSec > 0 ? clamp((t - w.startSec) / w.rampSec, 0, 1) : 1;
     return 1 + (w.scale - 1) * smoothstep(p);
@@ -46,7 +48,8 @@ export function buildZoompanZExpr(windows: ZoomWindow[], fps: number): string {
     const e = sec(w.endSec);
     const amp = sec(w.scale - 1);
     // p = clip((t - start)/ramp, 0, 1); guard ramp=0 with a 1 so EASE -> 1.
-    const p = w.rampSec > 0 ? `clip((${tExpr}-${s})/${sec(w.rampSec)},0,1)` : `1`;
+    const p =
+      w.rampSec > 0 ? `clip((${tExpr}-${s})/${sec(w.rampSec)},0,1)` : "1";
     // smoothstep: p*p*(3-2*p)
     const ease = `((${p})*(${p})*(3-2*(${p})))`;
     const gate = `between(${tExpr},${s},${e})`;

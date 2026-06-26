@@ -4,7 +4,11 @@ import ffprobeStatic from "ffprobe-static";
 export const FFMPEG = (ffmpegStatic as unknown as string) ?? "ffmpeg";
 export const FFPROBE = (ffprobeStatic as { path: string }).path ?? "ffprobe";
 
-export async function run(bin: string, args: string[], label = "ffmpeg"): Promise<void> {
+export async function run(
+  bin: string,
+  args: string[],
+  label = "ffmpeg"
+): Promise<void> {
   const proc = Bun.spawn([bin, ...args], { stdout: "pipe", stderr: "pipe" });
   const code = await proc.exited;
   if (code !== 0) {
@@ -16,14 +20,23 @@ export async function run(bin: string, args: string[], label = "ffmpeg"): Promis
 export interface ProbeResult {
   durationSec: number;
   fps: number;
-  width: number;
   height: number;
+  width: number;
 }
 
 export async function probe(file: string): Promise<ProbeResult> {
   const proc = Bun.spawn(
-    [FFPROBE, "-v", "quiet", "-print_format", "json", "-show_streams", "-show_format", file],
-    { stdout: "pipe", stderr: "pipe" },
+    [
+      FFPROBE,
+      "-v",
+      "quiet",
+      "-print_format",
+      "json",
+      "-show_streams",
+      "-show_format",
+      file,
+    ],
+    { stdout: "pipe", stderr: "pipe" }
   );
   const out = await new Response(proc.stdout).text();
   await proc.exited;
@@ -32,12 +45,16 @@ export async function probe(file: string): Promise<ProbeResult> {
     format?: { duration?: string };
   };
   const v = (json.streams ?? []).find((s) => s.codec_type === "video");
-  const durationSec = Number(json.format?.duration ?? (v?.duration as string) ?? 0);
+  const durationSec = Number(
+    json.format?.duration ?? (v?.duration as string) ?? 0
+  );
   let fps = 30;
   const rate = v?.r_frame_rate;
   if (typeof rate === "string" && rate.includes("/")) {
     const [n, d] = rate.split("/").map(Number);
-    if (n && d) fps = n / d;
+    if (n && d) {
+      fps = n / d;
+    }
   }
   return {
     durationSec,

@@ -1,7 +1,7 @@
 import { statSync } from "node:fs";
-import { type NextRequest, NextResponse } from "next/server";
 import { projectPaths } from "@engine/paths";
 import { loadProject, resolveSlug, saveProject } from "@engine/projectStore";
+import { type NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,7 +25,11 @@ export async function POST(req: NextRequest) {
   const project = await loadProject(slug);
   if (body.words) {
     const del = new Map(body.words.map((w) => [w.id, w.deleted]));
-    for (const w of project.words) if (del.has(w.id)) w.deleted = Boolean(del.get(w.id));
+    for (const w of project.words) {
+      if (del.has(w.id)) {
+        w.deleted = Boolean(del.get(w.id));
+      }
+    }
   }
   if (typeof body.captions?.enabled === "boolean") {
     project.captions = { ...project.captions, enabled: body.captions.enabled };

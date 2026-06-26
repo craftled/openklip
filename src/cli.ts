@@ -72,12 +72,20 @@ function resolveCutIds(project: Project, tokens: string[]): string[] {
       const to = tok.slice(dash + 1);
       const a = order.get(from);
       const b = order.get(to);
-      if (a === undefined) throw new Error(`unknown word id "${from}"`);
-      if (b === undefined) throw new Error(`unknown word id "${to}"`);
+      if (a === undefined) {
+        throw new Error(`unknown word id "${from}"`);
+      }
+      if (b === undefined) {
+        throw new Error(`unknown word id "${to}"`);
+      }
       const [lo, hi] = a <= b ? [a, b] : [b, a];
-      for (let i = lo; i <= hi; i++) picked.add(project.words[i].id);
+      for (let i = lo; i <= hi; i++) {
+        picked.add(project.words[i].id);
+      }
     } else {
-      if (!order.has(tok)) throw new Error(`unknown word id "${tok}"`);
+      if (!order.has(tok)) {
+        throw new Error(`unknown word id "${tok}"`);
+      }
       picked.add(tok);
     }
   }
@@ -88,42 +96,72 @@ function resolveCutIds(project: Project, tokens: string[]): string[] {
 try {
   switch (cmd) {
     case "ingest":
-      if (!rest[0]) throw new Error("usage: openklip ingest <video>");
+      if (!rest[0]) {
+        throw new Error("usage: openklip ingest <video>");
+      }
       await ingest(rest[0]);
       break;
     case "serve":
     case "dev": {
       // Launch the Next.js editor, pinned to this project via OPENKLIP_SLUG.
       const slug = rest[0] ?? latestProject();
-      if (!slug) throw new Error("no projects found. Run: openklip ingest <video>");
-      if (!existsSync(projectPaths(slug).project)) throw new Error(`project not found: ${slug}`);
+      if (!slug) {
+        throw new Error("no projects found. Run: openklip ingest <video>");
+      }
+      if (!existsSync(projectPaths(slug).project)) {
+        throw new Error(`project not found: ${slug}`);
+      }
       const port = process.env.PORT ?? "4399";
-      console.log(`[serve] project: ${slug}\n\n  OpenKlip ready  ->  http://localhost:${port}\n`);
-      const proc = Bun.spawn([process.execPath, "--bun", "node_modules/next/dist/bin/next", "dev", "-p", String(port)], {
-        cwd: process.cwd(),
-        env: { ...process.env, OPENKLIP_SLUG: slug },
-        stdio: ["inherit", "inherit", "inherit"],
-      });
+      console.log(
+        `[serve] project: ${slug}\n\n  OpenKlip ready  ->  http://localhost:${port}\n`
+      );
+      const proc = Bun.spawn(
+        [
+          process.execPath,
+          "--bun",
+          "node_modules/next/dist/bin/next",
+          "dev",
+          "-p",
+          String(port),
+        ],
+        {
+          cwd: process.cwd(),
+          env: { ...process.env, OPENKLIP_SLUG: slug },
+          stdio: ["inherit", "inherit", "inherit"],
+        }
+      );
       await proc.exited;
       break;
     }
     case "broll": {
-      if (!(rest[0] && rest[1])) throw new Error("usage: openklip broll <slug> <file>");
+      if (!(rest[0] && rest[1])) {
+        throw new Error("usage: openklip broll <slug> <file>");
+      }
       await registerBroll(rest[0], rest[1]);
       break;
     }
     case "transcript": {
-      if (!rest[0]) throw new Error("usage: openklip transcript <slug>");
+      if (!rest[0]) {
+        throw new Error("usage: openklip transcript <slug>");
+      }
       const project = await loadProject(rest[0]);
       project.words.forEach((w, i) => {
         const cut = w.deleted ? "  [cut]" : "";
-        console.log(`${String(i).padStart(4)}  ${w.id.padEnd(6)}  ${mmss(w.startSample)}  ${w.text}${cut}`);
+        console.log(
+          `${String(i).padStart(4)}  ${w.id.padEnd(6)}  ${mmss(w.startSample)}  ${w.text}${cut}`
+        );
       });
-      console.log(`\n${project.words.length} words (${project.words.filter((w) => w.deleted).length} cut)`);
+      console.log(
+        `\n${project.words.length} words (${project.words.filter((w) => w.deleted).length} cut)`
+      );
       break;
     }
     case "cut": {
-      if (!rest[0]) throw new Error('usage: openklip cut <slug> <tokens...> | --text "phrase" [--restore]');
+      if (!rest[0]) {
+        throw new Error(
+          'usage: openklip cut <slug> <tokens...> | --text "phrase" [--restore]'
+        );
+      }
       const slug = rest[0];
       const args = rest.slice(1);
       const restore = args.includes("--restore");
@@ -132,7 +170,9 @@ try {
 
       if (textIdx !== -1) {
         const phrase = args[textIdx + 1];
-        if (!phrase) throw new Error('usage: openklip cut <slug> --text "phrase to cut"');
+        if (!phrase) {
+          throw new Error('usage: openklip cut <slug> --text "phrase to cut"');
+        }
         const result = cutByText(project, phrase);
         if (!result.matched) {
           console.log(`no contiguous run of words matched: "${phrase}"`);
@@ -144,15 +184,23 @@ try {
       }
 
       const tokens = args.filter((a) => a !== "--restore");
-      if (tokens.length === 0) throw new Error("usage: openklip cut <slug> <w12> <w15-w20> [--restore]");
+      if (tokens.length === 0) {
+        throw new Error(
+          "usage: openklip cut <slug> <w12> <w15-w20> [--restore]"
+        );
+      }
       const ids = resolveCutIds(project, tokens);
       cutWords(project, ids, !restore);
       await saveProject(slug, project);
-      console.log(`${restore ? "restored" : "cut"} ${ids.length} words: ${ids.join(", ")}`);
+      console.log(
+        `${restore ? "restored" : "cut"} ${ids.length} words: ${ids.join(", ")}`
+      );
       break;
     }
     case "restore": {
-      if (!rest[0]) throw new Error("usage: openklip restore <slug>");
+      if (!rest[0]) {
+        throw new Error("usage: openklip restore <slug>");
+      }
       const project = await loadProject(rest[0]);
       restoreAll(project);
       await saveProject(rest[0], project);
@@ -161,7 +209,9 @@ try {
     }
     case "broll-add": {
       if (!(rest[0] && rest[1] && rest[2] && rest[3])) {
-        throw new Error("usage: openklip broll-add <slug> <assetId> <fromSec> <toSec>");
+        throw new Error(
+          "usage: openklip broll-add <slug> <assetId> <fromSec> <toSec>"
+        );
       }
       const slug = rest[0];
       const fromSec = Number(rest[2]);
@@ -172,11 +222,15 @@ try {
       const project = await loadProject(slug);
       const item = addBroll(project, { assetId: rest[1], fromSec, toSec });
       await saveProject(slug, project);
-      console.log(`added b-roll ${item.id} (asset "${item.assetId}", ${fromSec}s-${toSec}s)`);
+      console.log(
+        `added b-roll ${item.id} (asset "${item.assetId}", ${fromSec}s-${toSec}s)`
+      );
       break;
     }
     case "broll-rm": {
-      if (!(rest[0] && rest[1])) throw new Error("usage: openklip broll-rm <slug> <brollId>");
+      if (!(rest[0] && rest[1])) {
+        throw new Error("usage: openklip broll-rm <slug> <brollId>");
+      }
       const project = await loadProject(rest[0]);
       const removed = removeBroll(project, rest[1]);
       if (!removed) {
@@ -188,9 +242,13 @@ try {
       break;
     }
     case "captions": {
-      if (!(rest[0] && rest[1])) throw new Error("usage: openklip captions <slug> <on|off>");
+      if (!(rest[0] && rest[1])) {
+        throw new Error("usage: openklip captions <slug> <on|off>");
+      }
       const mode = rest[1].toLowerCase();
-      if (mode !== "on" && mode !== "off") throw new Error("usage: openklip captions <slug> <on|off>");
+      if (mode !== "on" && mode !== "off") {
+        throw new Error("usage: openklip captions <slug> <on|off>");
+      }
       const project = await loadProject(rest[0]);
       setCaptions(project, mode === "on");
       await saveProject(rest[0], project);
@@ -198,11 +256,15 @@ try {
       break;
     }
     case "status": {
-      if (!rest[0]) throw new Error("usage: openklip status <slug>");
+      if (!rest[0]) {
+        throw new Error("usage: openklip status <slug>");
+      }
       const project = await loadProject(rest[0]);
       const s = summarize(project);
       console.log(`project: ${project.slug}`);
-      console.log(`  words:        ${s.words}  (${s.kept} kept, ${s.deleted} cut)`);
+      console.log(
+        `  words:        ${s.words}  (${s.kept} kept, ${s.deleted} cut)`
+      );
       console.log(`  cut ranges:   ${s.cuts}`);
       console.log(`  b-roll:       ${s.brollCount}`);
       console.log(`  captions:     ${project.captions.enabled ? "on" : "off"}`);
@@ -210,9 +272,13 @@ try {
       break;
     }
     case "export": {
-      if (!rest[0]) throw new Error("usage: openklip export <slug>");
+      if (!rest[0]) {
+        throw new Error("usage: openklip export <slug>");
+      }
       const r = await exportCut(rest[0]);
-      console.log(`exported ${r.ranges} ranges, ${r.durationSec.toFixed(1)}s -> ${r.out}`);
+      console.log(
+        `exported ${r.ranges} ranges, ${r.durationSec.toFixed(1)}s -> ${r.out}`
+      );
       break;
     }
     default:

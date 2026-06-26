@@ -4,18 +4,20 @@
 // brace-stripping escape, and a hex->&HBBGGRR& colour helper.
 
 export interface TitleItem {
-  id?: string;
-  text: string;
-  startSec: number;
   endSec: number;
+  id?: string;
   position?: "lower" | "center";
+  startSec: number;
+  text: string;
 }
 
 const WHITE = "&H00FFFFFF&";
 
 function toAssColor(hex: string): string {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex);
-  if (!m) return "&H00F77B7C&";
+  if (!m) {
+    return "&H00F77B7C&";
+  }
   const r = m[1].slice(0, 2);
   const g = m[1].slice(2, 4);
   const b = m[1].slice(4, 6);
@@ -36,12 +38,15 @@ function assEscape(s: string): string {
 }
 
 export interface TitleAssOptions {
-  width: number;
-  height: number;
   accent?: string;
+  height: number;
+  width: number;
 }
 
-export function buildTitlesAss(items: TitleItem[], opts: TitleAssOptions): string {
+export function buildTitlesAss(
+  items: TitleItem[],
+  opts: TitleAssOptions
+): string {
   // Two style sizes: lower-thirds read smaller, centered cards are the hero.
   const lowerFont = Math.max(20, Math.round(opts.height * 0.05));
   const centerFont = Math.max(28, Math.round(opts.height * 0.07));
@@ -78,7 +83,9 @@ export function buildTitlesAss(items: TitleItem[], opts: TitleAssOptions): strin
   const events: string[] = [];
   for (const item of items) {
     const text = assEscape((item.text ?? "").trim());
-    if (text.length === 0) continue; // skip empty / whitespace-only
+    if (text.length === 0) {
+      continue; // skip empty / whitespace-only
+    }
 
     const start = item.startSec;
     const end = Math.max(item.endSec, start + 0.05);
@@ -98,7 +105,7 @@ export function buildTitlesAss(items: TitleItem[], opts: TitleAssOptions): strin
     }
 
     events.push(
-      `Dialogue: 0,${assTime(start)},${assTime(end)},${style},,0,0,0,,${override}${text}`,
+      `Dialogue: 0,${assTime(start)},${assTime(end)},${style},,0,0,0,,${override}${text}`
     );
   }
 
