@@ -4,9 +4,9 @@ import {
   Folder,
   MessageSquarePlus,
   PanelLeft,
-  Scissors,
   Search,
   Send,
+  Sparkles,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
@@ -16,9 +16,19 @@ import {
   useMemo,
   useState,
 } from "react";
+import { OpenklipMark } from "@/components/openklip-mark";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Sidebar,
   SidebarContent,
@@ -33,6 +43,10 @@ import {
   SidebarRail,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { ClaudeAiIcon } from "@/components/ui/svgs/claudeAiIcon";
+import { CursorLight } from "@/components/ui/svgs/cursorLight";
+import { GrokLight } from "@/components/ui/svgs/grokLight";
+import { Openai } from "@/components/ui/svgs/openai";
 import {
   type AgentThread,
   appendMessage,
@@ -41,6 +55,108 @@ import {
   listThreads,
 } from "@/lib/agent-threads";
 import { cn } from "@/lib/utils";
+import {
+  type AgentStatus,
+  getAgentStatuses,
+  suggestFillerCuts,
+} from "../../app/agent-actions.ts";
+
+// Map a selector value to its provider id (the key detectAgents() returns).
+function agentId(value: string): "claude" | "codex" | "cursor" | "grok" {
+  if (value.startsWith("claude")) {
+    return "claude";
+  }
+  if (value.startsWith("gpt")) {
+    return "codex";
+  }
+  if (value.startsWith("composer")) {
+    return "cursor";
+  }
+  return "grok";
+}
+
+// Availability state → dot color + short label. green = signed in, amber =
+// installed but not signed in, gray = not installed / still checking.
+function badgeState(status?: AgentStatus): {
+  dot: string;
+  text: string;
+  label: string;
+  title: string;
+} {
+  if (!status) {
+    return {
+      dot: "bg-muted-foreground/30",
+      text: "text-muted-foreground",
+      label: "Checking…",
+      title: "Checking…",
+    };
+  }
+  if (!status.installed) {
+    return {
+      dot: "bg-muted-foreground/40",
+      text: "text-muted-foreground",
+      label: "Not installed",
+      title: `${status.cli} CLI not found on PATH`,
+    };
+  }
+  if (status.connected) {
+    return {
+      dot: "bg-emerald-500",
+      text: "text-emerald-600 dark:text-emerald-500",
+      label: "Signed in",
+      title: `${status.cli} signed in`,
+    };
+  }
+  return {
+    dot: "bg-amber-500",
+    text: "text-amber-600 dark:text-amber-500",
+    label: "Sign in",
+    title: status.signInCmd
+      ? `Not signed in — run: ${status.signInCmd}`
+      : "Not signed in",
+  };
+}
+
+// Dot only — for the compact trigger.
+function StatusDot({
+  status,
+  className,
+}: {
+  status?: AgentStatus;
+  className?: string;
+}) {
+  const s = badgeState(status);
+  return (
+    <span
+      aria-label={s.title}
+      className={cn("size-1.5 shrink-0 rounded-full", s.dot, className)}
+      title={s.title}
+    />
+  );
+}
+
+// Dot + short text label — for the dropdown group headers.
+function StatusBadge({
+  status,
+  className,
+}: {
+  status?: AgentStatus;
+  className?: string;
+}) {
+  const s = badgeState(status);
+  return (
+    <span
+      className={cn(
+        "flex items-center gap-1 font-medium text-[9px] normal-case tracking-normal",
+        className
+      )}
+      title={s.title}
+    >
+      <span className={cn("size-1.5 shrink-0 rounded-full", s.dot)} />
+      <span className={s.text}>{s.label}</span>
+    </span>
+  );
+}
 
 export interface ProjectListing {
   mtimeMs: number;
@@ -83,6 +199,36 @@ export function AgentSidebar({
   const [expandedSlugs, setExpandedSlugs] = useState<Set<string>>(
     () => new Set([activeSlug])
   );
+  // MOCKUP: static agent selector. OpenKlip ships no LLM — this picks which of
+  // your existing subscription CLIs drives AI edits. Not wired to a backend yet.
+  const [agent, setAgent] = useState("claude-opus-4-8");
+  const [running, setRunning] = useState(false);
+  const [statuses, setStatuses] = useState<Record<string, AgentStatus>>({});
+  useEffect(() => {
+    let alive = true;
+    getAgentStatuses()
+      .then((list) => {
+        if (alive) {
+          setStatuses(Object.fromEntries(list.map((s) => [s.id, s])));
+        }
+      })
+      .catch(() => {
+        // detection is best-effort; selector still works without badges
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const activeStatus = statuses[agentId(agent)];
+  const agentUsable =
+    !activeStatus || (activeStatus.installed && activeStatus.connected);
+  const providerLabel = agent.startsWith("claude")
+    ? "Claude"
+    : agent.startsWith("gpt")
+      ? "Codex"
+      : agent.startsWith("composer")
+        ? "Cursor"
+        : "Grok";
 
   const refreshThreadsForSlug = useCallback((slug: string) => {
     setThreadsBySlug((prev) => ({ ...prev, [slug]: listThreads(slug) }));
@@ -150,6 +296,36 @@ export function AgentSidebar({
     refreshThreadsForSlug(activeSlug);
   };
 
+  // Real wiring: drive the selected Claude model (via `claude -p`) to find and
+  // cut filler words on the live project.json, then refresh the editor.
+  const onFindFiller = async () => {
+    if (running) {
+      return;
+    }
+    setRunning(true);
+    try {
+      const res = await suggestFillerCuts(activeSlug, agent);
+      if (activeThreadId) {
+        appendMessage(activeThreadId, "user", "Find and cut filler words");
+        appendMessage(
+          activeThreadId,
+          "assistant",
+          res.ok
+            ? `${providerLabel} cut ${res.cut} filler word(s)${
+                res.words.length
+                  ? `: ${res.words.map((w) => `${w.id} "${w.text}"`).join(", ")}`
+                  : " — none found"
+              }`
+            : `Error: ${res.error}`
+        );
+        refreshThreadsForSlug(activeSlug);
+      }
+      router.refresh();
+    } finally {
+      setRunning(false);
+    }
+  };
+
   return (
     <Sidebar
       className="border-border bg-sidebar"
@@ -161,7 +337,7 @@ export function AgentSidebar({
           <SidebarMenuItem>
             <SidebarMenuButton className="h-10" size="lg" tooltip="OpenKlip">
               <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-live/15 text-live">
-                <Scissors className="size-4" />
+                <OpenklipMark className="size-4" />
               </span>
               <span className="grid min-w-0 flex-1 text-left leading-tight">
                 <span className="truncate font-semibold text-[13px]">
@@ -289,7 +465,7 @@ export function AgentSidebar({
             <SidebarGroupContent className="min-h-0 flex-1 px-2">
               <ScrollArea className="h-[min(240px,28vh)]">
                 <div className="flex flex-col gap-2 pr-2 pb-2">
-                  {activeThread.messages.map((m) => (
+                  {activeThread.messages.map((m, i) => (
                     <div
                       className={cn(
                         "rounded-lg px-2.5 py-2 text-[12px] leading-relaxed",
@@ -297,7 +473,9 @@ export function AgentSidebar({
                           ? "bg-muted/80 text-foreground"
                           : "bg-transparent text-muted-foreground"
                       )}
-                      key={m.id}
+                      // Composite key: index makes it unique even if old
+                      // localStorage holds messages with colliding ids.
+                      key={`${m.id}-${i}`}
                     >
                       <div className="mb-0.5 font-medium text-[10px] text-muted-foreground uppercase tracking-wide">
                         {m.role === "user" ? "You" : "Agent"}
@@ -315,6 +493,103 @@ export function AgentSidebar({
       </SidebarContent>
 
       <SidebarFooter className="gap-2 border-border border-t p-2">
+        {/* MOCKUP — agent/model selector. Drives AI edits via your own subscription. */}
+        <Select onValueChange={setAgent} value={agent}>
+          <SelectTrigger className="h-8 w-full border-none bg-muted/60 text-[12px] shadow-none [&_svg.size-3\.5]:shrink-0">
+            <SelectValue />
+            <StatusDot className="ml-auto" status={activeStatus} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectLabel className="flex items-center gap-2 text-[10px] uppercase tracking-wide">
+                <span>Claude · Max</span>
+                <StatusBadge className="ml-auto" status={statuses.claude} />
+              </SelectLabel>
+              <SelectItem value="claude-opus-4-8">
+                <span className="flex items-center gap-2">
+                  <ClaudeAiIcon className="size-3.5" /> Opus 4.8
+                </span>
+              </SelectItem>
+              <SelectItem value="claude-sonnet-4-6">
+                <span className="flex items-center gap-2">
+                  <ClaudeAiIcon className="size-3.5" /> Sonnet 4.6
+                </span>
+              </SelectItem>
+              <SelectItem value="claude-haiku-4-5">
+                <span className="flex items-center gap-2">
+                  <ClaudeAiIcon className="size-3.5" /> Haiku 4.5
+                </span>
+              </SelectItem>
+            </SelectGroup>
+            <SelectGroup>
+              <SelectLabel className="flex items-center gap-2 text-[10px] uppercase tracking-wide">
+                <span>Codex · ChatGPT</span>
+                <StatusBadge className="ml-auto" status={statuses.codex} />
+              </SelectLabel>
+              <SelectItem value="gpt-5-5">
+                <span className="flex items-center gap-2">
+                  <Openai className="size-3.5" /> GPT-5.5
+                </span>
+              </SelectItem>
+              <SelectItem value="gpt-5-4">
+                <span className="flex items-center gap-2">
+                  <Openai className="size-3.5" /> GPT-5.4
+                </span>
+              </SelectItem>
+            </SelectGroup>
+            <SelectGroup>
+              <SelectLabel className="flex items-center gap-2 text-[10px] uppercase tracking-wide">
+                <span>Cursor</span>
+                <StatusBadge className="ml-auto" status={statuses.cursor} />
+              </SelectLabel>
+              <SelectItem value="composer-2-5">
+                <span className="flex items-center gap-2">
+                  <CursorLight className="size-3.5" /> Composer 2.5
+                </span>
+              </SelectItem>
+            </SelectGroup>
+            <SelectGroup>
+              <SelectLabel className="flex items-center gap-2 text-[10px] uppercase tracking-wide">
+                <span>xAI · SuperGrok</span>
+                <StatusBadge className="ml-auto" status={statuses.grok} />
+              </SelectLabel>
+              <SelectItem value="grok-build">
+                <span className="flex items-center gap-2">
+                  <GrokLight className="size-3.5" /> Grok Build
+                </span>
+              </SelectItem>
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+        <Button
+          className="h-8 w-full justify-start gap-2 px-2 font-normal text-[12px]"
+          disabled={running || !agentUsable}
+          onClick={onFindFiller}
+          size="sm"
+          title={
+            agentUsable
+              ? undefined
+              : activeStatus?.installed
+                ? `Sign in first — run: ${activeStatus.signInCmd}`
+                : `${providerLabel} CLI is not installed`
+          }
+          variant="ghost"
+        >
+          <Sparkles
+            className={cn("size-3.5 text-live", running && "animate-pulse")}
+          />
+          {(() => {
+            if (running) {
+              return `${providerLabel} is reading…`;
+            }
+            if (!agentUsable) {
+              return activeStatus?.installed
+                ? `Run \`${activeStatus.signInCmd}\` to connect`
+                : `${providerLabel} — not installed`;
+            }
+            return `Find filler with ${providerLabel}`;
+          })()}
+        </Button>
         <form className="flex gap-1.5" onSubmit={onSend}>
           <Input
             className="h-9 flex-1 text-[13px]"
