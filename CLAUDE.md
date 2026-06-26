@@ -4,13 +4,17 @@ OpenKlip is a local-first, agent-native video editor: you **edit video by editin
 
 ## The file model (read this first)
 
-Each project lives as plain files under `projects/<slug>/`. The one that matters is:
+Each project lives as plain files under `projects/<slug>/` in a layered layout:
 
 ```
-projects/<slug>/project.json    the EDL - the edit itself
+projects/<slug>/
+  project.json            the EDL - the edit itself (the only file you edit)
+  working/                derived media + scratch: proxy.mp4, transcript.json,
+                          audio16k.f32, frames/, assets/, captions.ass…
+  output/out.mp4          the rendered export
 ```
 
-**`project.json` IS the edit.** It holds every transcribed word with a `deleted` flag, b-roll overlays, push-in zooms, title cards, captions settings, and look flags. The GUI editor and these CLI commands both read and write this same file; they are **equivalent (parity)**. Edit it through the CLI; the browser editor will show the same result, and vice-versa.
+**`project.json` IS the edit.** It holds every transcribed word with a `deleted` flag, b-roll overlays, still (Ken Burns) overlays, push-in zooms, title cards, captions settings, and look flags. Everything under `working/` and `output/` is regenerated from it. The GUI editor and these CLI commands both read and write this same file; they are **equivalent (parity)**. Edit it through the CLI; the browser editor will show the same result, and vice-versa.
 
 Time is integer audio samples at 48 kHz. The CLI takes seconds where a human number is natural (overlay spans) and converts for you.
 
@@ -26,14 +30,20 @@ Time is integer audio samples at 48 kHz. The CLI takes seconds where a human num
 | Register b-roll file | `openklip broll <slug> <file>` |
 | List b-roll assets | `openklip assets <slug>` |
 | Place / patch / remove b-roll | `openklip broll-add`, `broll-set`, `broll-rm` |
+| Place / remove still (Ken Burns) | `openklip still-add`, `still-rm` |
 | Add / patch / remove title | `openklip title-add`, `title-set`, `title-rm` |
 | Add / patch / remove zoom | `openklip zoom-add`, `zoom-set`, `zoom-rm` |
+| Reorder overlay (paint order) | `openklip reorder <slug> <broll\|title\|zoom> <id> <toIndex>` |
+| Apply brand preset (look defaults) | `openklip brand <slug> <name>` |
 | Toggle captions | `openklip captions <slug> on\|off` |
 | Caption line length | `openklip captions-max <slug> <n>` |
 | Toggle vignette | `openklip look <slug> vignette on\|off` |
 | Cut boundary padding | `openklip pad <slug> <ms>` |
 | Review edit | `openklip status <slug>` |
+| Check environment / project health | `openklip doctor [slug]` |
+| List ingester plugins | `openklip ingesters` |
 | Export MP4 | `openklip export <slug>` |
+| Post-export packaging (HyperFrames) | `openklip package <slug> <pass>` |
 
 ## Commands
 
@@ -71,6 +81,9 @@ Run as `bun run src/cli.ts <command>` (or the `openklip` bin).
 | `openklip zoom-add <slug> <fromSec> <toSec>` | Push-in zoom. `--scale 1.15` (1–3), `--ramp 0.6` (0–5 sec). |
 | `openklip zoom-set <slug> <zoomId>` | Patch zoom: `--scale`, `--ramp`, `--from`, `--to`. |
 | `openklip zoom-rm <slug> <zoomId>` | Remove a push-in zoom. |
+| `openklip still-add <slug> <assetId> <fromSec> <toSec>` | Overlay a registered **still** image with a Ken Burns push-in. `--scale 1.2` (1–3), `--focus-x 0.5` / `--focus-y 0.5` (0–1 image coords). |
+| `openklip still-rm <slug> <stillId>` | Remove a still overlay. |
+| `openklip reorder <slug> <broll\|title\|zoom> <id> <toIndex>` | Restack an overlay within its track. Array order is paint order — a later index paints on top (matters when b-roll covers overlap). |
 
 ### Look & captions
 
@@ -80,6 +93,7 @@ Run as `bun run src/cli.ts <command>` (or the `openklip` bin).
 | `openklip captions-max <slug> <n>` | Words per caption line (1–12). |
 | `openklip look <slug> vignette <on\|off>` | Toggle vignette. |
 | `openklip pad <slug> <ms>` | Symmetric padding around kept ranges (0–500 ms). |
+| `openklip brand <slug> <name>` | Apply a brand preset (`brands/<name>.json`) — sets caption/vignette/pad **defaults** only. `project.json` stays the edit; words and overlays are untouched. Also available at ingest: `openklip ingest <video> --brand <name>`. |
 
 ### Review & export
 
@@ -87,6 +101,9 @@ Run as `bun run src/cli.ts <command>` (or the `openklip` bin).
 | --- | --- |
 | `openklip status <slug>` | Full edit summary: words, ranges, overlays, look, captions, runtime. |
 | `openklip export <slug>` | Render the current cut to `out.mp4`. `--height 1080` for max output height. |
+| `openklip doctor [slug]` | Health check: ffmpeg/ffprobe binaries, Whisper script, and (with a slug) the project's `project.json`, source/proxy media, and asset proxies. Exits non-zero if any check fails. Run it when the agent loop fails deep inside a subprocess. |
+| `openklip ingesters` | List ingester plugins (`ingesters/<id>/ingester.json`) — declarative seams for non-file media import (URL, batch, etc.). |
+| `openklip package <slug> <pass>` | Optional post-export pass on `output/out.mp4` via the HyperFrames CLI: `remove-background` (→ transparent `.webm`, the matte primitive for embed-behind-subject) or `transcribe` (→ `.srt`). Uses the local `node_modules/.bin/hyperframes` if installed (`bun add -d hyperframes`); runs Chrome + our bundled ffmpeg. Fails with install instructions if absent. |
 
 ## Recommended workflow
 

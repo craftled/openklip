@@ -1,13 +1,31 @@
 # Changelog
 
-## Unreleased
+## 0.2.0 - 2026-06-26
+
+External-inspiration buildout: a security fix, a layered project layout, several new editing primitives, and the GUI/agent surfaces to drive them. Distilled from the [External Inspiration steal list](docs/EXTERNAL-INSPIRATION.md) (Videofy Minimal + HyperFrames).
+
+### Security
+- Validate project slugs (`assertValidSlug`) at the `projectDir` chokepoint, closing a path-traversal hole on the `[slug]` API/media routes (a hostile slug could write outside `projects/`).
 
 ### Added
-- Added Glimm-powered WebGL sweeps over the editor preview when playback jumps between kept transcript ranges.
-- Added a scheduler cut-boundary hook so preview transitions can pause, jump at the sweep midpoint, then resume playback.
+- **Ken Burns still overlays** — a `stills` EDL type with an animated `zoompan` push-in (focus point + ramp); `openklip still-add`/`still-rm`, exporter + compiled-timeline support. Verified with a real ffmpeg render.
+- **Brand presets** — `brands/<name>.json` defaults (captions/vignette/pad) applied at `openklip ingest --brand` or `openklip brand <slug> <name>`; `project.json` stays the edit.
+- **Overlay reorder** — `reorderBroll/Title/Zoom` + `openklip reorder`, plus `@dnd-kit` drag-to-restack of b-roll paint order in the inspector.
+- **`openklip doctor`** — ffmpeg/whisper/project health check; also gates `serve`.
+- **Export API route** — `POST /api/projects/[slug]/export` (Zod body, empty-cut + traversal guards).
+- **Ingester plugin manifests** — `ingesters/<id>/ingester.json` + loader + `openklip ingesters`.
+- **HyperFrames post-export seam** — `openklip package <slug> remove-background|transcribe` against the (opt-in, unbundled) `hyperframes` CLI; verified end-to-end.
+- **Derived `CompiledTimeline`** — never-persisted authoring→preview view (kept ranges, overlays in output time, caption groups).
+- **Agent skill router** — maps sidebar intent to CLI command sequences.
+- **GUI**: orientation toggle (16:9/9:16/1:1 preview), rebuilding/saving overlay, in/out loop region, replace-from-bin source dropdown.
+
+### Changed
+- **Layered project folders** — `project.json` stays at the project root; derived media (proxy, transcript, audio, frames, asset proxies, export scratch) live under `working/`, renders under `output/`. Big-bang, no back-compat.
+- `safeAction` failures now carry a dev-only stack trace.
 
 ### Notes
-- Glimm transitions are browser preview-only; exported MP4s still hard-cut until an ffmpeg-side transition graph is added.
+- Glimm preview transitions remain browser-only; exported MP4s still hard-cut until an ffmpeg transition graph lands.
+- HyperFrames is **not** bundled (needs Chrome + the `hyperframes` npm CLI); `openklip package` preflights and prints install instructions when absent.
 
 ## 0.1.0 - 2026-06-26
 

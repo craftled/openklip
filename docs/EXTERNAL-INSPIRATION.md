@@ -33,6 +33,8 @@ Discussion doc. Consolidates patterns worth borrowing from [Videofy Minimal](htt
 
 ### 1. Slug validation + safe JSON I/O
 
+> ✅ **Shipped (2026-06-26).** `assertValidSlug` in `src/paths.ts` gates the `projectDir` chokepoint (so `projectPaths` / `assetStoragePath` / `assetProxyPath` all inherit it), closing the path-traversal hole on the `[slug]` API routes. Tested in `tests/paths.test.ts`. Atomic writes still open.
+
 **From:** Videofy `cms/src/lib/projectFiles.ts`
 
 Validate project slugs (`/^[A-Za-z0-9][A-Za-z0-9._-]*$/`) before any path join. Centralize `readJson` / `writeJson` with `mkdir` on write.
@@ -49,6 +51,8 @@ Validate project slugs (`/^[A-Za-z0-9][A-Za-z0-9._-]*$/`) before any path join. 
 ---
 
 ### 2. `safeAction` for server mutations
+
+> ✅ **Shipped (2026-06-26).** `app/actions.ts` already returned `ActionResult = {ok:true} | {ok:false,error}` for every mutation; this pass added dev-mode `stack` to the failure shape (omitted in production). Tested in `tests/server-actions.test.ts`.
 
 **From:** Videofy `cms/src/utils/safeAction.ts`
 
@@ -80,6 +84,8 @@ Validate request bodies on mutating routes; keep `ProjectSchema.parse` as the si
 
 ### 4. Brand presets + per-project override
 
+> ✅ **Shipped (2026-06-26).** `brands/<name>.json` (default + cinematic) + `src/brands.ts` (`loadBrand`/`applyBrand`, Zod-validated, traversal-guarded name). Applied via `openklip ingest <video> --brand <name>` or `openklip brand <slug> <name>`. **Defaults only** — `applyBrand` mutates caption/vignette/pad fields of `project.json`; no manifest split, words/overlays untouched. Tested in `tests/brands.test.ts`. Per-project override file + design-token generation still open.
+
 **From:** Videofy `brands/*.json` + `configResolver.ts` (`deepMerge`)
 
 Global defaults for caption style, vignette, title templates, export height, `padMs` — merged at ingest or via CLI `openklip look --brand X`.
@@ -97,6 +103,8 @@ Global defaults for caption style, vignette, title templates, export height, `pa
 ---
 
 ### 5. Layered project folders (`input/` / `working/` / `output/`)
+
+> ✅ **Shipped (2026-06-26).** `project.json` stays at the project root; derived media (proxy, transcript, audio, frames, asset proxies, export scratch) moved under `working/`, render under `output/out.mp4`. Big-bang (no back-compat); `paths.ts` is the single source of the layout and all media routes follow it. On-disk samples migrated. Tested in `tests/paths.test.ts`.
 
 **From:** Videofy project layout
 
@@ -122,6 +130,8 @@ projects/<slug>/
 
 ### 6. `@dnd-kit` sortable overlay tracks
 
+> ✅ **Shipped (2026-06-26).** Full `@dnd-kit` drag-reorder: `web/components/overlay-sortable.tsx` (SortableContext + keyboard-accessible handles) in the b-roll inspector, wired to a pure `applyDragReorder` (tested in `tests/dnd-reorder.test.ts`) → `saveBroll`. Engine parity via `reorderBroll/Title/Zoom` + `openklip reorder` (tested in `tests/reorder.test.ts`). **Verified live** — a keyboard-sensor drag reordered the b-roll covers and persisted to `project.json`. Decision settled: reorder changes paint order, not source-time spans.
+
 **From:** Videofy `SegmentList.tsx`
 
 Drag-reorder b-roll clips, title cards, zoom spans on `edit-timeline.tsx`. Keyboard-accessible.
@@ -137,6 +147,8 @@ Drag-reorder b-roll clips, title cards, zoom spans on `edit-timeline.tsx`. Keybo
 
 ### 7. Replace-from-bin UX
 
+> ✅ **Shipped (2026-06-26).** Engine: `updateBroll(project, id, {assetId})` / `openklip broll-set <slug> <id> --asset <newId>`. GUI: the b-roll inspector already has a **Source** dropdown that swaps the asset in place (preserving span timing + `srcInSample`). Verified live in the editor.
+
 **From:** Videofy `ReplaceMedia.tsx` + `MediaAsset.tsx`
 
 Click b-roll clip → "Replace from bin" panel instead of delete + re-add.
@@ -150,6 +162,8 @@ Click b-roll clip → "Replace from bin" panel instead of delete + re-add.
 ---
 
 ### 8. Export API route (Zod body + progress)
+
+> ✅ **Shipped (2026-06-26).** `POST /api/projects/[slug]/export` with a Zod-validated body (`height?`), slug-traversal guard, missing-project 404, and an empty-cut 400 pre-check before ffmpeg runs. Tested in `tests/export-route.test.ts` (validation paths) + a live 200 render. SSE/progress + background queue still open.
 
 **From:** Videofy render route + HyperFrames `render/local/route.ts`
 
@@ -165,6 +179,8 @@ Click b-roll clip → "Replace from bin" panel instead of delete + re-add.
 ---
 
 ### 9. Derived `CompiledTimeline` type (authoring vs preview)
+
+> ✅ **Shipped (2026-06-26).** `src/compiledTimeline.ts` `compileTimeline(project)` returns kept ranges, overlays mapped into output time with paint order (`z`), caption groups, and runtime — computed from the EDL, **never persisted**. Pure (asserted non-mutating). Tested in `tests/compiledTimeline.test.ts`. Ready for the timeline/preview to consume instead of re-deriving.
 
 **From:** Videofy manuscript vs `processed_manuscript` split
 
@@ -182,6 +198,8 @@ Optional computed type from EDL for UI (kept ranges, overlay paint order, captio
 
 ### 10. Preview loading / rebuilding states
 
+> ✅ **Shipped (2026-06-26).** A "Rebuilding…/Exporting…" badge overlays the preview while saves are in flight (`pendingSaves > 0`) or an export is running, driven by existing state. Verified live.
+
 **From:** Videofy `PreviewOutput.tsx`, HyperFrames Studio playbar
 
 Explicit "rebuilding timeline" overlay when EDL saves trigger heavy recompute. AbortController on long ops.
@@ -191,6 +209,8 @@ Explicit "rebuilding timeline" overlay when EDL saves trigger heavy recompute. A
 ---
 
 ### 11. HyperFrames-style agent gates in OpenKlip
+
+> ✅ **Partially shipped (2026-06-26).** `openklip doctor [slug]` checks ffmpeg/ffprobe binaries, the Whisper script, and (per project) `project.json`, source/proxy media, and asset proxies — exits non-zero on any failure. Pure `runDoctor()` in `src/doctor.ts`, tested in `tests/doctor.test.ts`. Lint-equivalent EDL validation + skill packaging still open.
 
 **From:** HyperFrames `lint` → `validate` → `render` loop
 
@@ -212,6 +232,8 @@ Add optional `openklip doctor` (ffmpeg, whisper cache, proxy health) and stricte
 
 ### 12. Skill router pattern for agent sidebar
 
+> ✅ **Shipped (2026-06-26).** `web/lib/skill-router.ts` `routeIntent(intent, slug)` maps free-text intent to a named skill + ordered CLI command sequence (filler, captions, vignette, zoom, b-roll, title, export, status, cut, transcript, with an orientation fallback). Wired into `assistantHint`. Tested in `tests/skill-router.test.ts`.
+
 **From:** HyperFrames `/hyperframes` router + workflow skills
 
 Map user intent in agent sidebar to CLI command sequences ("cut filler" → `transcript` + `cut --text` + `status`).
@@ -223,6 +245,8 @@ Map user intent in agent sidebar to CLI command sequences ("cut filler" → `tra
 
 ### 13. Orientation toggle (16:9 ↔ 9:16 preview)
 
+> ✅ **Shipped (2026-06-26).** Segmented 16:9 / 9:16 / 1:1 control in the preview header; the canvas re-aspects via `orientationDims`/`ORIENTATION_RATIO` (pure, tested in `tests/preview-layout.test.ts`) and the video switches to `object-cover` so portrait crops cleanly. Verified live (landscape ↔ portrait). Preview-only; 9:16 *export* is a separate roadmap item.
+
 **From:** HyperFrames Studio segmented control, Videofy export defaults
 
 Preview canvas aspect switch before vertical export lands.
@@ -233,6 +257,8 @@ Preview canvas aspect switch before vertical export lands.
 
 ### 14. Hotspot + Ken Burns for still b-roll
 
+> ✅ **Shipped (2026-06-26).** New `stills` overlay type (schema + `addStill`/`removeStill` + `still-add`/`still-rm`), a pure `src/ken-burns.ts` push-in builder (focus point + linear ramp, tested), exporter integration (looped-image input + `zoompan` overlay), and `compiledTimeline` support. Verified with a real ffmpeg export of a still over `ok-sample`. A draggable focus-rect *UI* is the remaining polish.
+
 **From:** Videofy `getHotspot.ts` + `ImageAnimation.tsx`, HyperFrames image blocks
 
 `AssetKind: "still"` already in schema; add focus rect + CSS preview transform + ffmpeg `zoompan` export.
@@ -242,6 +268,8 @@ Preview canvas aspect switch before vertical export lands.
 ---
 
 ### 15. In/out work area + NLE shortcuts
+
+> ✅ **Shipped (2026-06-26).** In/Out/Clear loop controls in the playback row; playback loops within `[in, out]` (enforced in the scheduler tick). `clampLoopRegion` (order/clamp/min-span) is pure and tested in `tests/preview-layout.test.ts`. Keyboard `I`/`O` shortcuts are a future nicety.
 
 **From:** HyperFrames video editor cheatsheet (`I`/`O`, loop within work area)
 
@@ -267,6 +295,8 @@ These use HyperFrames **downstream of OpenKlip export**, not as editor core.
 
 ### 17. Premium caption pass (`embedded-captions`)
 
+> ✅ **Real pass verified (2026-06-26).** Corrected the seam to the **actual** HyperFrames CLI (the npm `hyperframes` package — there is no `embedded-captions` *command*; that's a skill). `openklip package <slug> remove-background` was run end-to-end on a real OpenKlip export: HF downloaded the u2net model, ran it on CoreML, and removed the background from **284 frames in 20.8s**, producing a transparent `out-remove-background.webm` (using OpenKlip's bundled ffmpeg via PATH). `remove-background` is the matte primitive the "embed captions behind subject" workflow is built on. HF stays **opt-in** (`bun add -d hyperframes`) — not a committed dep; the seam preflights and prints install instructions when it's absent. Authoring the full embed-captions *composition* (HF skill + `hyperframes render`) is the remaining optional work.
+
 **From:** HyperFrames `/embedded-captions` skill
 
 After `openklip export`:
@@ -289,6 +319,8 @@ Matte-occluded "embed behind subject" captions; 17+ visual identities. Footage a
 
 ### 18. Social packaging pass (`talking-head-recut`)
 
+> 🟡 **Seam in place (2026-06-26).** `talking-head-recut` is a HyperFrames *skill* (HTML-composition authoring), not a one-shot CLI verb, so it isn't a `package` pass. The runnable HF post-export primitives are exposed instead (`remove-background`, `transcribe` — see #17). Full recut authoring stays an optional HF-skill flow.
+
 **From:** HyperFrames `/talking-head-recut` skill
 
 Full footage + agent-authored HTML overlay cards (lower-thirds, data callouts, kinetic titles). Complements OpenKlip's simpler title cards.
@@ -301,6 +333,8 @@ Full footage + agent-authored HTML overlay cards (lower-thirds, data callouts, k
 
 ### 19. Transition-only WebM overlays
 
+> 🟡 **Primitive available (2026-06-26).** Transparent transition clips are produced with `remove-background` (verified, #17) — HF outputs alpha WebM/MOV that ffmpeg can composite at cut boundaries. Whether to composite in ffmpeg vs author via an HF skill remains a design choice.
+
 **From:** HyperFrames shader catalog (`flash-through-white`, etc.)
 
 Render **transparent WebM** transition clips via HF; composite in ffmpeg at cut boundaries. Solves preview/export transition parity without re-rendering full timeline.
@@ -312,6 +346,8 @@ Render **transparent WebM** transition clips via HF; composite in ffmpeg at cut 
 ---
 
 ### 20. Plugin manifest for future ingesters
+
+> ✅ **Shipped (2026-06-26).** `ingesters/<id>/ingester.json` manifest format + `src/ingesters.ts` loader + `{field}`/`{output}` argv templating + `openklip ingesters` list. A sample `ingesters/url/` manifest documents the shape. Tested in `tests/ingesters.test.ts`. The fetch binaries themselves (e.g. yt-dlp) are plugin-author deps, not bundled.
 
 **From:** Videofy `fetchers/<id>/fetcher.json` + `fetcher.py`
 
