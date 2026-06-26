@@ -154,7 +154,7 @@ export interface AgentStatus {
 // a PATH lookup plus, for status-based CLIs, one short `… status` spawn (no model
 // call, browser disabled, 6s cap). Safe to call on GUI mount.
 export async function detectAgents(): Promise<AgentStatus[]> {
-  return Promise.all(
+  return await Promise.all(
     AGENTS.map(async (spec) => {
       const cli = Bun.which(spec.cli);
       const signInCmd = signInCommand(spec);
@@ -290,17 +290,16 @@ export function stripBunNodeOptions(
   env: Record<string, string | undefined>
 ): Record<string, string | undefined> {
   const opts = env.NODE_OPTIONS;
-  if (!(opts && opts.includes("--bun"))) {
+  if (!opts?.includes("--bun")) {
     return env;
   }
   const cleaned = opts.replace(/--bun/g, "").replace(/\s+/g, " ").trim();
-  const next = { ...env };
   if (cleaned) {
-    next.NODE_OPTIONS = cleaned;
-  } else {
-    delete next.NODE_OPTIONS;
+    return { ...env, NODE_OPTIONS: cleaned };
   }
-  return next;
+  // Omit NODE_OPTIONS entirely when nothing else was set.
+  const { NODE_OPTIONS: _omit, ...rest } = env;
+  return rest;
 }
 
 function sanitizedEnv(): Record<string, string | undefined> {
