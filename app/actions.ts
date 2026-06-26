@@ -15,10 +15,18 @@ import { loadProject, saveProject } from "@engine/projectStore";
 
 export type ActionResult<T = void> =
   | ({ ok: true } & (T extends void ? object : { data: T }))
-  | { ok: false; error: string };
+  | { ok: false; error: string; stack?: string };
 
-function fail(error: unknown): { ok: false; error: string } {
-  return { ok: false, error: (error as Error).message };
+// Next sanitizes thrown server-action errors in production, so we return a
+// structured failure instead. The stack is attached only outside production so
+// it never leaks to end users but is there when debugging the dev server.
+function fail(error: unknown): { ok: false; error: string; stack?: string } {
+  const e = error as Error;
+  const base = { ok: false as const, error: e?.message ?? String(error) };
+  if (process.env.NODE_ENV === "production") {
+    return base;
+  }
+  return { ...base, stack: e?.stack };
 }
 
 export async function saveProjectEdits(

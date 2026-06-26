@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs";
+import { mkdir } from "node:fs/promises";
 import { isAbsolute, join } from "node:path";
 import {
   buildAss,
@@ -19,6 +20,7 @@ import {
   totalDurationSec,
 } from "./edl.ts";
 import { FFMPEG, probe, run } from "./ffmpeg.ts";
+import { buildStillZoompan } from "./ken-burns.ts";
 import { projectPaths } from "./paths.ts";
 import { buildTitlesAss, type TitleItem } from "./titles.ts";
 import { buildZoompanZExpr, type ZoomWindow } from "./zoom-ramp.ts";
@@ -146,12 +148,15 @@ export async function exportCut(
   ranges: number;
   captions: boolean;
   broll: number;
+  stills: number;
   zooms: number;
   titles: number;
   vignette: boolean;
   height: number;
 }> {
   const p = projectPaths(slug);
+  await mkdir(p.working, { recursive: true });
+  await mkdir(p.output, { recursive: true });
   const project = ProjectSchema.parse(
     JSON.parse(await Bun.file(p.project).text())
   );
@@ -203,6 +208,31 @@ export async function exportCut(
     );
   }
 
+  // stills -> output windows (Ken Burns push-in over a held image). Each still
+  // becomes one extra looped-image input after the b-roll inputs.
+  const outFps = Math.max(1, Math.round(sourceMeta.fps));
+  const stillPlans = (project.stills ?? [])
+    .map((s) => {
+      const asset = assetById.get(s.assetId);
+      if (asset?.kind !== "still") {
+        return null;
+      }
+      const outStart = sourceToOutputSec(s.startSample / sr, ranges);
+      const outEnd = sourceToOutputSec(s.endSample / sr, ranges);
+      if (outEnd - outStart <= 0.05) {
+        return null;
+      }
+      return {
+        outStart,
+        outEnd,
+        still: s,
+        srcPath: chooseAssetInput(p.dir, asset).path,
+      };
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null)
+    // Still inputs follow the source (0) and all b-roll plan inputs.
+    .map((sp, i) => ({ ...sp, inputIndex: 1 + plans.length + i }));
+
   // zooms -> output windows
   const zoomWins = (project.zooms ?? [])
     .map((z) => ({
@@ -231,7 +261,7 @@ export async function exportCut(
     })
   );
   if (titleItems.length > 0) {
-    titlesAssPath = `${p.dir}/titles.ass`;
+    titlesAssPath = `${p.working}/titles.ass`;
     await Bun.write(
       titlesAssPath,
       buildTitlesAss(titleItems, { width: outW, height: outH })
@@ -247,7 +277,7 @@ export async function exportCut(
       project.captions?.maxWords ?? 6
     );
     if (groups.length > 0) {
-      assPath = `${p.dir}/captions.ass`;
+      assPath = `${p.working}/captions.ass`;
       await Bun.write(
         assPath,
         buildAss(groups, {
@@ -295,6 +325,26 @@ export async function exportCut(
     last = `ov${pl.inputIndex}`;
   }
 
+  for (const sp of stillPlans) {
+    const dur = sp.outEnd - sp.outStart;
+    const zp = buildStillZoompan(
+      {
+        durationSec: dur,
+        scale: sp.still.scale,
+        focusX: sp.still.focusX,
+        focusY: sp.still.focusY,
+      },
+      { width: outW, height: outH, fps: outFps }
+    );
+    parts.push(
+      `[${sp.inputIndex}:v]${zp},setpts=PTS-STARTPTS+${sec(sp.outStart)}/TB[sv${sp.inputIndex}]`
+    );
+    parts.push(
+      `[${last}][sv${sp.inputIndex}]overlay=eof_action=pass:enable='between(t,${sec(sp.outStart)},${sec(sp.outEnd)})'[sov${sp.inputIndex}]`
+    );
+    last = `sov${sp.inputIndex}`;
+  }
+
   const vignette = Boolean(project.look?.vignette);
   if (vignette) {
     parts.push(`[${last}]vignette[vig]`);
@@ -317,6 +367,15 @@ export async function exportCut(
     "-i",
     sourceInput.path,
     ...plans.flatMap((pl) => ["-i", pl.srcPath]),
+    // Stills are single images looped for the overlay duration.
+    ...stillPlans.flatMap((sp) => [
+      "-loop",
+      "1",
+      "-t",
+      sec(sp.outEnd - sp.outStart),
+      "-i",
+      sp.srcPath,
+    ]),
   ];
   await run(
     FFMPEG,
@@ -354,6 +413,7 @@ export async function exportCut(
     ranges: ranges.length,
     captions: captionsOn && assPath !== null,
     broll: plans.length,
+    stills: stillPlans.length,
     zooms: zoomWins.length,
     titles: titleItems.length,
     vignette,

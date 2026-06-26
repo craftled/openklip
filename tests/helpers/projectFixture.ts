@@ -10,7 +10,7 @@ export function makeProject(overrides: Partial<Project> = {}): Project {
     version: 1,
     slug: "test-fixture",
     source: "/tmp/source.mp4",
-    proxy: "proxy.mp4",
+    proxy: "working/proxy.mp4",
     sampleRate: SAMPLE_RATE,
     fps: 30,
     width: 1280,
@@ -24,7 +24,7 @@ export function makeProject(overrides: Partial<Project> = {}): Project {
         kind: "broll",
         name: "b-roll.mp4",
         src: "/tmp/b-roll.mp4",
-        proxy: "assets/broll-a.mp4",
+        proxy: "working/assets/broll-a.mp4",
         durationSamples: sec(30),
       },
     ],
@@ -78,7 +78,8 @@ export async function withTempProjectsRoot<T>(
 
 export function writeFixtureProject(slug: string, project: Project): void {
   const dir = join(process.cwd(), "projects", slug);
-  mkdirSync(dir, { recursive: true });
+  mkdirSync(join(dir, "working"), { recursive: true });
   writeFileSync(join(dir, "project.json"), JSON.stringify(project, null, 2));
-  writeFileSync(join(dir, "proxy.mp4"), "fake-proxy-bytes");
+  // Canonical proxy lives under working/ in the layered layout.
+  writeFileSync(join(dir, "working", "proxy.mp4"), "fake-proxy-bytes");
 }

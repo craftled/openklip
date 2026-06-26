@@ -110,7 +110,7 @@ export async function ingest(videoArg: string): Promise<string> {
   console.log(
     "[ingest] transcribing (first run downloads the Whisper model)..."
   );
-  const rawJson = `${p.dir}/transcript.raw.json`;
+  const rawJson = `${p.working}/transcript.raw.json`;
   const proc = Bun.spawn(
     ["node", resolve(import.meta.dir, "transcribe.mjs"), p.audioRaw, rawJson],
     {
@@ -144,7 +144,7 @@ export async function ingest(videoArg: string): Promise<string> {
     version: 1,
     slug,
     source,
-    proxy: "proxy.mp4",
+    proxy: "working/proxy.mp4",
     sampleRate: SAMPLE_RATE,
     fps: meta.fps,
     width: meta.width,

@@ -1,0 +1,6 @@
+{
+  "name": "cinematic",
+  "captions": { "enabled": true, "maxWords": 4 },
+  "look": { "vignette": true },
+  "padMs": 80
+}

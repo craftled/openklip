@@ -1,0 +1,10 @@
+{
+  "id": "url",
+  "label": "Download from URL",
+  "description": "Fetch a remote video with yt-dlp, then ingest it. Requires yt-dlp on PATH (not bundled).",
+  "command": "yt-dlp",
+  "args": ["{url}", "-o", "{output}"],
+  "fields": [
+    { "name": "url", "label": "Video URL", "type": "string", "required": true }
+  ]
+}

@@ -107,6 +107,42 @@ test("saveProjectEdits returns ok:false for missing projects", async () => {
   });
 });
 
+test("failed actions include a stack trace outside production", async () => {
+  const prev = process.env.NODE_ENV;
+  process.env.NODE_ENV = "development";
+  try {
+    await withTempProjectsRoot(async () => {
+      const result = await saveProjectEdits("missing", {
+        captions: { enabled: false },
+      });
+      assert.equal(result.ok, false);
+      if (!result.ok) {
+        assert.equal(typeof result.stack, "string");
+      }
+    });
+  } finally {
+    process.env.NODE_ENV = prev;
+  }
+});
+
+test("failed actions omit the stack trace in production", async () => {
+  const prev = process.env.NODE_ENV;
+  process.env.NODE_ENV = "production";
+  try {
+    await withTempProjectsRoot(async () => {
+      const result = await saveProjectEdits("missing", {
+        captions: { enabled: false },
+      });
+      assert.equal(result.ok, false);
+      if (!result.ok) {
+        assert.equal(result.stack, undefined);
+      }
+    });
+  } finally {
+    process.env.NODE_ENV = prev;
+  }
+});
+
 // exportProject delegates to exportCut, which runs ffmpeg on real media. We only
 // cover ok:false paths here; a full success export would need ffmpeg, probe, and
 // valid video inputs and is covered indirectly by exporter unit tests.
