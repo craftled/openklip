@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import type { ReactNode } from "react";
+import { geist, inter } from "./fonts";
 import "./globals.css";
 
-// Set the theme class before first paint (no flash). shadcn convention: the
-// `dark` class on <html>. Defaults to dark unless the user saved "light".
 const noFlash = `(function(){try{var t=localStorage.getItem("openklip-theme")||"light";document.documentElement.classList.toggle("dark",t==="dark");}catch(e){}})();`;
 
 export const metadata: Metadata = {
@@ -16,10 +16,15 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html
+      className={`${inter.variable} ${geist.variable}`}
+      lang="en"
+      suppressHydrationWarning
+    >
       <head>
-        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: static no-flash theme script */}
-        <script dangerouslySetInnerHTML={{ __html: noFlash }} />
+        <Script id="openklip-theme-no-flash" strategy="beforeInteractive">
+          {noFlash}
+        </Script>
       </head>
       <body>{children}</body>
     </html>

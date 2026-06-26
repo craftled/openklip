@@ -74,6 +74,15 @@ import { Switch } from "@/components/ui/switch";
 import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
+import type { ActionResult } from "../app/actions.ts";
+import {
+  exportProject,
+  saveBroll,
+  saveLook,
+  saveProjectEdits,
+  saveTitles,
+  saveZooms,
+} from "../app/actions.ts";
 import { type CaptionWord, groupCaptions } from "../src/captions.ts";
 import { type ZoomWindow, zoomFactorAtSec } from "../src/zoom-ramp.ts";
 import { CutScheduler, type Range } from "./scheduler.ts";
@@ -211,22 +220,27 @@ function outputPos(ranges: Range[], curSec: number): number {
 const fmt = (s: number): string =>
   `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 
-export function App() {
-  const [project, setProject] = useState<Project | null>(null);
+export function App({ initialProject }: { initialProject: Project }) {
+  const [project, setProject] = useState<Project>(initialProject);
   const [playing, setPlaying] = useState(false);
   const [curSample, setCurSample] = useState(0);
-  const [captionsOn, setCaptionsOn] = useState(true);
-  const [vignetteOn, setVignetteOn] = useState(false);
+  const [captionsOn, setCaptionsOn] = useState(
+    initialProject.captions?.enabled ?? true
+  );
+  const [vignetteOn, setVignetteOn] = useState(
+    initialProject.look?.vignette ?? false
+  );
   const [export1080, setExport1080] = useState(true);
   const [selAnchor, setSelAnchor] = useState<number | null>(null);
   const [selFocus, setSelFocus] = useState<number | null>(null);
   const [selected, setSelected] = useState<Selected>(null);
-  const [chosenAsset, setChosenAsset] = useState("");
+  const [chosenAsset, setChosenAsset] = useState(
+    initialProject.assets?.[0]?.id ?? ""
+  );
   const [titleText, setTitleText] = useState("");
   const [titlePos, setTitlePos] = useState<"lower" | "center">("lower");
   const [exporting, setExporting] = useState(false);
   const [exportMsg, setExportMsg] = useState<string | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
   const [pendingSaves, setPendingSaves] = useState(0);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [theme, setTheme] = useState<"light" | "dark">(() =>
@@ -235,7 +249,7 @@ export function App() {
       ? "dark"
       : "light"
   );
-  const projectLoaded = project !== null;
+  const projectLoaded = true;
   const themeMounted = useRef(false);
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
@@ -263,24 +277,6 @@ export function App() {
   const saveChainRef = useRef<Promise<void>>(Promise.resolve());
   const saveErrorRef = useRef<string | null>(null);
   projectRef.current = project;
-
-  useEffect(() => {
-    fetch("/api/project")
-      .then(async (r) => {
-        const data = await r.json();
-        if (!r.ok || data.ok === false) {
-          throw new Error(data.error ?? "could not load project");
-        }
-        return data;
-      })
-      .then((p: Project) => {
-        setProject(p);
-        setCaptionsOn(p.captions?.enabled ?? true);
-        setVignetteOn(p.look?.vignette ?? false);
-        setChosenAsset(p.assets?.[0]?.id ?? "");
-      })
-      .catch((e) => setLoadError((e as Error).message));
-  }, []);
 
   useEffect(() => {
     if (!projectLoaded) {
@@ -428,8 +424,8 @@ export function App() {
     }
   }, [activeBroll, curSample, playing, sr]);
 
-  const post = useCallback((path: string, body: unknown) => {
-    const task = saveChainRef.current
+  const enqueueSave = useCallback((task: () => Promise<ActionResult>) => {
+    const run = saveChainRef.current
       .catch(() => {
         // Keep later saves moving after one failed request.
       })
@@ -438,14 +434,9 @@ export function App() {
         setSaveError(null);
         saveErrorRef.current = null;
         try {
-          const res = await fetch(path, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body),
-          });
-          const data = await res.json().catch(() => null);
-          if (!res.ok || data?.ok === false) {
-            throw new Error(data?.error ?? `save failed (${res.status})`);
+          const data = await task();
+          if (!data.ok) {
+            throw new Error(data.error ?? "save failed");
           }
         } catch (e) {
           const message = (e as Error).message;
@@ -456,30 +447,29 @@ export function App() {
           setPendingSaves((n) => Math.max(0, n - 1));
         }
       });
-    saveChainRef.current = task.catch(() => {
+    saveChainRef.current = run.catch(() => {
       // The visible error state above is the user-facing failure path.
     });
   }, []);
 
-  const toggleWord = useCallback((id: string) => {
-    setProject((prev) => {
-      if (!prev) {
-        return prev;
-      }
-      const words = prev.words.map((w) =>
-        w.id === id ? { ...w, deleted: !w.deleted } : w
-      );
-      post("/api/project", {
-        words: words.map((w) => ({ id: w.id, deleted: w.deleted })),
+  const toggleWord = useCallback(
+    (id: string) => {
+      setProject((prev) => {
+        const words = prev.words.map((w) =>
+          w.id === id ? { ...w, deleted: !w.deleted } : w
+        );
+        enqueueSave(() =>
+          saveProjectEdits(prev.slug, {
+            words: words.map((w) => ({ id: w.id, deleted: w.deleted })),
+          })
+        );
+        return { ...prev, words };
       });
-      return { ...prev, words };
-    });
-  }, []);
+    },
+    [enqueueSave]
+  );
 
   const onWordClick = (i: number, e: React.MouseEvent) => {
-    if (!project) {
-      return;
-    }
     if (e.shiftKey) {
       setSelected(null);
       setSelAnchor((prev) => (prev == null ? i : prev));
@@ -502,7 +492,7 @@ export function App() {
   };
 
   const addZoom = () => {
-    if (!(project && selRange)) {
+    if (!selRange) {
       return;
     }
     const [a, b] = selRange;
@@ -518,12 +508,12 @@ export function App() {
       },
     ];
     setProject({ ...project, zooms });
-    post("/api/zooms", { zooms });
+    enqueueSave(() => saveZooms(project.slug, zooms));
     clearSel();
     setSelected({ kind: "zoom", id });
   };
   const addBroll = () => {
-    if (!(project && selRange && chosenAsset)) {
+    if (!(selRange && chosenAsset)) {
       return;
     }
     const [a, b] = selRange;
@@ -539,12 +529,12 @@ export function App() {
       },
     ];
     setProject({ ...project, broll });
-    post("/api/broll", { broll });
+    enqueueSave(() => saveBroll(project.slug, broll));
     clearSel();
     setSelected({ kind: "broll", id });
   };
   const addTitle = () => {
-    if (!(project && selRange && titleText.trim())) {
+    if (!(selRange && titleText.trim())) {
       return;
     }
     const [a, b] = selRange;
@@ -560,84 +550,75 @@ export function App() {
       },
     ];
     setProject({ ...project, titles });
-    post("/api/titles", { titles });
+    enqueueSave(() => saveTitles(project.slug, titles));
     setTitleText("");
     clearSel();
     setSelected({ kind: "title", id });
   };
 
   const updateZoom = (id: string, patch: Partial<ZoomItem>) => {
-    if (!project) {
-      return;
-    }
     const zooms = (project.zooms ?? []).map((z) =>
       z.id === id ? { ...z, ...patch } : z
     );
     setProject({ ...project, zooms });
-    post("/api/zooms", { zooms });
+    enqueueSave(() => saveZooms(project.slug, zooms));
   };
   const updateTitle = (id: string, patch: Partial<TitleItem>) => {
-    if (!project) {
-      return;
-    }
     const titles = (project.titles ?? []).map((t) =>
       t.id === id ? { ...t, ...patch } : t
     );
     setProject({ ...project, titles });
-    post("/api/titles", { titles });
+    enqueueSave(() => saveTitles(project.slug, titles));
   };
   const updateBroll = (id: string, patch: Partial<BrollItem>) => {
-    if (!project) {
-      return;
-    }
     const broll = (project.broll ?? []).map((b) =>
       b.id === id ? { ...b, ...patch } : b
     );
     setProject({ ...project, broll });
-    post("/api/broll", { broll });
+    enqueueSave(() => saveBroll(project.slug, broll));
   };
   const removeSelected = () => {
-    if (!(project && selected)) {
+    if (!selected) {
       return;
     }
     if (selected.kind === "zoom") {
       const zooms = (project.zooms ?? []).filter((z) => z.id !== selected.id);
       setProject({ ...project, zooms });
-      post("/api/zooms", { zooms });
+      enqueueSave(() => saveZooms(project.slug, zooms));
     } else if (selected.kind === "broll") {
       const broll = (project.broll ?? []).filter((b) => b.id !== selected.id);
       setProject({ ...project, broll });
-      post("/api/broll", { broll });
+      enqueueSave(() => saveBroll(project.slug, broll));
     } else {
       const titles = (project.titles ?? []).filter((t) => t.id !== selected.id);
       setProject({ ...project, titles });
-      post("/api/titles", { titles });
+      enqueueSave(() => saveTitles(project.slug, titles));
     }
     setSelected(null);
   };
 
   const toggleCaptions = (next: boolean) => {
     setCaptionsOn(next);
-    post("/api/project", { captions: { enabled: next } });
+    enqueueSave(() =>
+      saveProjectEdits(project.slug, { captions: { enabled: next } })
+    );
   };
   const toggleVignette = (next: boolean) => {
     setVignetteOn(next);
-    post("/api/look", { vignette: next });
+    enqueueSave(() => saveLook(project.slug, { vignette: next }));
   };
   const setMaxWords = (n: number) => {
-    setProject((p) =>
-      p
-        ? {
-            ...p,
-            captions: { enabled: p.captions?.enabled ?? true, maxWords: n },
-          }
-        : p
+    setProject((p) => ({
+      ...p,
+      captions: { enabled: p.captions?.enabled ?? true, maxWords: n },
+    }));
+    enqueueSave(() =>
+      saveProjectEdits(project.slug, { captions: { maxWords: n } })
     );
-    post("/api/project", { captions: { maxWords: n } });
   };
   const setPad = (n: number) => {
-    setProject((p) => (p ? { ...p, padMs: n } : p));
-    post("/api/project", { padMs: n });
+    setProject((p) => ({ ...p, padMs: n }));
+    enqueueSave(() => saveProjectEdits(project.slug, { padMs: n }));
   };
 
   const onPlay = async () => {
@@ -670,15 +651,13 @@ export function App() {
       if (saveErrorRef.current) {
         throw new Error(`Save failed: ${saveErrorRef.current}`);
       }
-      const res = await fetch("/api/export", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ maxHeight: export1080 ? 1080 : undefined }),
-      });
-      const r = await res.json();
+      const r = await exportProject(
+        project.slug,
+        export1080 ? 1080 : undefined
+      );
       setExportMsg(
-        res.ok && r.ok
-          ? `Exported ${r.ranges} cuts @ ${r.height}p (${r.durationSec.toFixed(1)}s) to ${r.out}`
+        r.ok
+          ? `Exported ${r.data.ranges} cuts @ ${r.data.height}p (${r.data.durationSec.toFixed(1)}s) to ${r.data.out}`
           : `Error: ${r.error}`
       );
     } catch (e) {
@@ -686,16 +665,6 @@ export function App() {
     }
     setExporting(false);
   };
-
-  if (!project) {
-    return (
-      <div className="grid h-screen place-items-center bg-background text-muted-foreground text-sm">
-        {loadError
-          ? `Could not load project: ${loadError}`
-          : "Loading project…"}
-      </div>
-    );
-  }
 
   const fullDur = project.durationSamples / project.sampleRate;
   const inBroll = (w: Word) =>
