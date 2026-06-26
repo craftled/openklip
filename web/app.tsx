@@ -15,8 +15,6 @@ import {
   Moon,
   PanelLeft,
   PanelRight,
-  Pause,
-  Play,
   Settings2,
   Sparkles,
   Sun,
@@ -36,9 +34,11 @@ import {
 } from "react";
 import { AgentSidebar, type ProjectListing } from "@/components/agent-sidebar";
 import { AssetBin } from "@/components/asset-bin";
+import { CinemaPlayer } from "@/components/cinema-player";
 import { EditTimeline } from "@/components/edit-timeline";
 import { HeroTitleOverlay } from "@/components/hero-title-overlay";
 import { OverlaySortable } from "@/components/overlay-sortable";
+import { PLAYER_SPEEDS, PlayerControls } from "@/components/player-controls";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -225,6 +225,19 @@ function outputPos(ranges: Range[], curSec: number): number {
   return cum;
 }
 
+/** Inverse of outputPos: map a cut-space position back to source seconds. */
+function sourceAtOutput(ranges: Range[], outSec: number): number {
+  let cum = 0;
+  for (const r of ranges) {
+    const len = r.endSec - r.startSec;
+    if (outSec <= cum + len) {
+      return r.startSec + (outSec - cum);
+    }
+    cum += len;
+  }
+  return ranges.at(-1)?.endSec ?? 0;
+}
+
 const fmt = (s: number): string =>
   `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 
@@ -245,6 +258,10 @@ export function App({
     initialProject.look?.vignette ?? false
   );
   const [export1080, setExport1080] = useState(true);
+  const [cinema, setCinema] = useState(false);
+  const [previewMuted, setPreviewMuted] = useState(false);
+  const [previewRate, setPreviewRate] = useState(1);
+  const [previewPip, setPreviewPip] = useState(false);
   const [selAnchor, setSelAnchor] = useState<number | null>(null);
   const [selFocus, setSelFocus] = useState<number | null>(null);
   const [selected, setSelected] = useState<Selected>(null);
@@ -709,6 +726,57 @@ export function App({
     [playing]
   );
 
+  const togglePreviewMute = useCallback(() => {
+    const v = videoRef.current;
+    if (!v) {
+      return;
+    }
+    v.muted = !v.muted;
+    setPreviewMuted(v.muted);
+  }, []);
+
+  const cyclePreviewRate = useCallback(() => {
+    setPreviewRate((cur) => {
+      const i = PLAYER_SPEEDS.indexOf(cur as (typeof PLAYER_SPEEDS)[number]);
+      const next = PLAYER_SPEEDS[(i + 1) % PLAYER_SPEEDS.length];
+      if (videoRef.current) {
+        videoRef.current.playbackRate = next;
+      }
+      return next;
+    });
+  }, []);
+
+  const togglePreviewPip = useCallback(async () => {
+    const v = videoRef.current;
+    if (!v) {
+      return;
+    }
+    try {
+      if (document.pictureInPictureElement) {
+        await document.exitPictureInPicture();
+      } else if (document.pictureInPictureEnabled) {
+        await v.requestPictureInPicture();
+      }
+    } catch {
+      // PiP can be blocked; ignore.
+    }
+  }, []);
+
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) {
+      return;
+    }
+    const onEnter = () => setPreviewPip(true);
+    const onLeave = () => setPreviewPip(false);
+    v.addEventListener("enterpictureinpicture", onEnter);
+    v.addEventListener("leavepictureinpicture", onLeave);
+    return () => {
+      v.removeEventListener("enterpictureinpicture", onEnter);
+      v.removeEventListener("leavepictureinpicture", onLeave);
+    };
+  }, []);
+
   const onTimelineSelect = useCallback(
     (kind: "broll" | "title" | "zoom", id: string) => {
       setSelAnchor(null);
@@ -940,6 +1008,18 @@ export function App({
         } as CSSProperties
       }
     >
+      {cinema && (
+        <CinemaPlayer
+          captionsOn={captionsOn}
+          exportDisabled={exportDisabled}
+          exportLabel={exportLabel}
+          onClose={() => setCinema(false)}
+          onExport={onExport}
+          onToggleCaptions={toggleCaptions}
+          projectName={project.slug}
+          src={`/media/proxy.mp4?v=${project.mediaVersion ?? 0}`}
+        />
+      )}
       <AgentSidebar activeSlug={project.slug} initialProjects={projects} />
 
       <SidebarContextBridge>
@@ -992,7 +1072,7 @@ export function App({
               <div className="flex flex-col gap-3 p-4">
                 <div className="flex w-full justify-center">
                   <div
-                    className="relative overflow-hidden rounded-lg border border-border bg-black"
+                    className="group/preview relative overflow-hidden rounded-lg border border-border bg-black"
                     style={
                       orientation === "landscape"
                         ? {
@@ -1098,26 +1178,32 @@ export function App({
                           : "Rebuilding…"}
                       </div>
                     )}
+                    {/* Linear-parity transport, shared with the cinema overlay */}
+                    <PlayerControls
+                      captionsOn={captionsOn}
+                      className="absolute inset-x-0 bottom-0 z-[6] px-3 pb-2 opacity-0 transition-opacity duration-200 focus-within:opacity-100 group-hover/preview:opacity-100"
+                      current={outPos}
+                      duration={keptDuration}
+                      fullscreenLabel="Open cinema player"
+                      muted={previewMuted}
+                      onCycleSpeed={cyclePreviewRate}
+                      onFullscreen={() => setCinema(true)}
+                      onPlayToggle={onPlay}
+                      onSeekFraction={(frac) =>
+                        onSeek(sourceAtOutput(ranges, frac * keptDuration))
+                      }
+                      onToggleCaptions={() => toggleCaptions(!captionsOn)}
+                      onToggleMute={togglePreviewMute}
+                      onTogglePip={togglePreviewPip}
+                      pipOn={previewPip}
+                      playing={playing}
+                      rate={previewRate}
+                    />
                   </div>
                 </div>
 
+                {/* OpenKlip-specific controls (no Linear analogue) */}
                 <div className="flex flex-wrap items-center gap-2 md:flex-nowrap md:gap-3">
-                  <Button
-                    aria-label={playing ? "Pause" : "Play cut"}
-                    onClick={onPlay}
-                    size="icon"
-                    variant="secondary"
-                  >
-                    {playing ? <Pause /> : <Play />}
-                  </Button>
-                  <div className="relative h-1 min-w-32 flex-1 overflow-hidden rounded-full bg-muted">
-                    <div
-                      className="absolute inset-y-0 left-0 rounded-full bg-foreground/40"
-                      style={{
-                        width: `${keptDuration ? Math.min(100, (outPos / keptDuration) * 100) : 0}%`,
-                      }}
-                    />
-                  </div>
                   <span className="shrink-0 text-muted-foreground text-xs tabular-nums">
                     {fmt(outPos)} / {fmt(keptDuration)}
                   </span>
@@ -1163,16 +1249,8 @@ export function App({
                     )}
                   </div>
                   <Toggle
-                    aria-label="Captions"
-                    onPressedChange={toggleCaptions}
-                    pressed={captionsOn}
-                    size="sm"
-                    variant="outline"
-                  >
-                    Captions
-                  </Toggle>
-                  <Toggle
                     aria-label="Vignette"
+                    className="ml-auto"
                     onPressedChange={toggleVignette}
                     pressed={vignetteOn}
                     size="sm"
