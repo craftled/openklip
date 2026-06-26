@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.0 - 2026-06-26
+
+Linear-parity video player: the editor preview and a new fullscreen "cinema" mode now share one transport bar that matches Linear's player chrome — white-on-dark controls over a gradient scrim, a hairline scrubber with a dot handle, and a left-to-right row of play, volume, time, remaining, speed, captions, picture-in-picture, and fullscreen.
+
+### Added
+- **Cinema player** (`web/components/cinema-player.tsx`) — fullscreen overlay with the project name top-left, an Export action top-right (replacing Linear's "Watch on YouTube"), auto-hiding controls, keyboard shortcuts (space/k, arrows, f, m, c, Esc), real fullscreen + picture-in-picture, and a center play affordance.
+- **Shared transport bar** (`web/components/player-controls.tsx`) — the Linear control row, used by both the cinema overlay and the inline preview so the two surfaces look identical. Custom hairline scrubber with buffered fill, drag-to-seek, and a dot handle.
+
+### Changed
+- The inline preview now renders the shared transport bar overlaid on the video (revealed on hover) instead of the old gray control row. Its fullscreen icon opens the cinema overlay; volume, speed, and PiP drive the preview `<video>` directly; scrubbing seeks in cut-space via a new `sourceAtOutput()` inverse of `outputPos()`. Loop in/out and the vignette toggle move to a slim secondary row.
+
 ## 0.4.0 - 2026-06-26
 
 Agent selector: drive AI edits with your existing coding-agent subscription — no API keys, no bundled LLM. Pick Claude Code, Codex, Cursor, or Grok in the editor; OpenKlip shells out to that CLI headless, hands it the transcript, and applies the structured answer to the same `project.json`.
