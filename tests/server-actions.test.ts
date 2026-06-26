@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  exportProject,
   saveBroll,
   saveLook,
   saveProjectEdits,
@@ -102,6 +103,36 @@ test("saveProjectEdits returns ok:false for missing projects", async () => {
     assert.equal(result.ok, false);
     if (!result.ok) {
       assert.match(result.error, /project not found/);
+    }
+  });
+});
+
+// exportProject delegates to exportCut, which runs ffmpeg on real media. We only
+// cover ok:false paths here; a full success export would need ffmpeg, probe, and
+// valid video inputs and is covered indirectly by exporter unit tests.
+test("exportProject returns ok:false for missing projects", async () => {
+  await withTempProjectsRoot(async () => {
+    const result = await exportProject("missing");
+    assert.equal(result.ok, false);
+    if (!result.ok) {
+      assert.match(result.error, /project\.json/);
+    }
+  });
+});
+
+test("exportProject returns ok:false when all words are cut", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(
+      slug,
+      makeProject({
+        slug,
+        words: makeProject().words.map((w) => ({ ...w, deleted: true })),
+      })
+    );
+    const result = await exportProject(slug);
+    assert.equal(result.ok, false);
+    if (!result.ok) {
+      assert.match(result.error, /nothing to export/);
     }
   });
 });

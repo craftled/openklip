@@ -1,6 +1,12 @@
 import { existsSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
-import { buildAss, type CaptionWord, groupCaptions } from "./captions.ts";
+import {
+  buildAss,
+  type CaptionWord,
+  captionPlacementForSpan,
+  groupCaptions,
+  type TitleSpan,
+} from "./captions.ts";
 import {
   type Asset,
   type Broll,
@@ -214,9 +220,16 @@ export async function exportCut(
       text: t.text,
       startSec: sourceToOutputSec(t.startSample / sr, ranges),
       endSec: sourceToOutputSec(t.endSample / sr, ranges),
-      position: t.position,
+      position: t.position ?? "lower",
     }))
     .filter((t) => t.text.trim().length > 0 && t.endSec - t.startSec > 0.05);
+  const titleSpans: TitleSpan[] = titleItems.map(
+    ({ startSec, endSec, position }) => ({
+      startSec,
+      endSec,
+      position: position ?? "lower",
+    })
+  );
   if (titleItems.length > 0) {
     titlesAssPath = `${p.dir}/titles.ass`;
     await Bun.write(
@@ -239,15 +252,8 @@ export async function exportCut(
         assPath,
         buildAss(groups, {
           height: outH,
-          placement: (group) =>
-            titleItems.some(
-              (t) =>
-                t.position !== "center" &&
-                group.startSec < t.endSec &&
-                group.endSec > t.startSec
-            )
-              ? "raised"
-              : "bottom",
+          placement: (_group, span) =>
+            captionPlacementForSpan(span.startSec, span.endSec, titleSpans),
           width: outW,
         })
       );

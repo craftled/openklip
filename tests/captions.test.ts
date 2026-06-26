@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildAss, type CaptionGroup } from "../src/captions.ts";
+import {
+  buildAss,
+  type CaptionGroup,
+  captionPlacementForGroup,
+  captionPlacementForSpan,
+} from "../src/captions.ts";
 
 const GROUPS: CaptionGroup[] = [
   {
@@ -58,7 +63,7 @@ test("buildAss can choose bottom or raised caption placement per group", () => {
     {
       width: 1920,
       height: 1080,
-      placement: (group) => (group.startSec >= 5 ? "raised" : "bottom"),
+      placement: (_group, span) => (span.startSec >= 5 ? "raised" : "bottom"),
     }
   );
 
@@ -66,4 +71,71 @@ test("buildAss can choose bottom or raised caption placement per group", () => {
   assert.match(ass, /Style: CapRaised,Arial,\d+,.+,259,1/);
   assert.match(ass, /Dialogue: 0,0:00:00\.00,0:00:01\.00,CapBottom/);
   assert.match(ass, /Dialogue: 0,0:00:05\.00,0:00:06\.00,CapRaised/);
+});
+
+test("captionPlacementForSpan hides captions during hero titles", () => {
+  const titles = [{ startSec: 2, endSec: 4, position: "hero" as const }];
+
+  assert.equal(captionPlacementForSpan(1, 1.5, titles), "bottom");
+  assert.equal(captionPlacementForSpan(2.5, 3, titles), "hidden");
+});
+
+test("captionPlacementForSpan raises captions for lower-third titles", () => {
+  const titles = [{ startSec: 2, endSec: 4, position: "lower" as const }];
+
+  assert.equal(captionPlacementForSpan(2.5, 3, titles), "raised");
+});
+
+test("captionPlacementForSpan keeps captions at bottom for centered titles", () => {
+  const titles = [{ startSec: 2, endSec: 4, position: "center" as const }];
+
+  assert.equal(captionPlacementForSpan(2.5, 3, titles), "bottom");
+});
+
+test("captionPlacementForSpan prefers hiding over raising when hero overlaps", () => {
+  const titles = [
+    { startSec: 2, endSec: 4, position: "lower" as const },
+    { startSec: 2, endSec: 4, position: "hero" as const },
+  ];
+
+  assert.equal(captionPlacementForSpan(2.5, 3, titles), "hidden");
+});
+
+test("captionPlacementForGroup mirrors span placement for the full group", () => {
+  const group: CaptionGroup = {
+    startSec: 2,
+    endSec: 4,
+    words: [{ text: "Hello", startSec: 2, endSec: 4 }],
+  };
+  const titles = [{ startSec: 2, endSec: 4, position: "hero" as const }];
+
+  assert.equal(captionPlacementForGroup(group, titles), "hidden");
+});
+
+test("buildAss omits dialogue lines hidden by hero title overlap", () => {
+  const ass = buildAss(
+    [
+      {
+        startSec: 0,
+        endSec: 6,
+        words: [
+          { text: "Before", startSec: 0, endSec: 1 },
+          { text: "During", startSec: 2, endSec: 3 },
+          { text: "After", startSec: 5, endSec: 6 },
+        ],
+      },
+    ],
+    {
+      width: 1920,
+      height: 1080,
+      placement: (_group, span) =>
+        captionPlacementForSpan(span.startSec, span.endSec, [
+          { startSec: 2, endSec: 4, position: "hero" },
+        ]),
+    }
+  );
+
+  assert.match(ass, /Dialogue: 0,0:00:00\.00,0:00:02\.00,CapBottom/);
+  assert.doesNotMatch(ass, /Dialogue: 0,0:00:02\.00/);
+  assert.match(ass, /Dialogue: 0,0:00:05\.00,0:00:06\.00,CapBottom/);
 });

@@ -76,11 +76,56 @@ function assEscape(s: string): string {
 export interface AssOptions {
   accent?: string;
   height: number;
-  placement?: CaptionPlacement | ((group: CaptionGroup) => CaptionPlacement);
+  placement?:
+    | CaptionPlacement
+    | ((
+        group: CaptionGroup,
+        span: { endSec: number; startSec: number }
+      ) => CaptionPlacement);
   width: number;
 }
 
-type CaptionPlacement = "bottom" | "raised";
+export type CaptionPlacement = "bottom" | "raised" | "hidden";
+
+export interface TitleSpan {
+  endSec: number;
+  position: "center" | "hero" | "lower";
+  startSec: number;
+}
+
+function spansOverlap(
+  aStart: number,
+  aEnd: number,
+  bStart: number,
+  bEnd: number
+): boolean {
+  return aStart < bEnd && aEnd > bStart;
+}
+
+/** Matches preview: hero titles hide captions; lower-third titles raise them. */
+export function captionPlacementForSpan(
+  startSec: number,
+  endSec: number,
+  titles: TitleSpan[]
+): CaptionPlacement {
+  const overlapping = titles.filter((t) =>
+    spansOverlap(startSec, endSec, t.startSec, t.endSec)
+  );
+  if (overlapping.some((t) => t.position === "hero")) {
+    return "hidden";
+  }
+  if (overlapping.some((t) => t.position === "lower")) {
+    return "raised";
+  }
+  return "bottom";
+}
+
+export function captionPlacementForGroup(
+  group: CaptionGroup,
+  titles: TitleSpan[]
+): CaptionPlacement {
+  return captionPlacementForSpan(group.startSec, group.endSec, titles);
+}
 
 function marginForPlacement(
   height: number,
@@ -136,15 +181,21 @@ export function buildAss(groups: CaptionGroup[], opts: AssOptions): string {
   ];
   const events: string[] = [];
   for (const g of groups) {
-    const style =
-      typeof placement === "function"
-        ? placement(g) === "raised"
-          ? "CapRaised"
-          : "CapBottom"
-        : "Cap";
     g.words.forEach((w, i) => {
       const start = w.startSec;
       const end = i < g.words.length - 1 ? g.words[i + 1].startSec : g.endSec;
+      const span = { startSec: start, endSec: Math.max(end, start + 0.05) };
+      const resolvedPlacement =
+        typeof placement === "function" ? placement(g, span) : placement;
+      if (resolvedPlacement === "hidden") {
+        return;
+      }
+      const style =
+        typeof placement === "function"
+          ? resolvedPlacement === "raised"
+            ? "CapRaised"
+            : "CapBottom"
+          : "Cap";
       const line = g.words
         .map((ww, j) =>
           j === i

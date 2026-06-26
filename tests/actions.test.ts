@@ -2,9 +2,11 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   addBroll,
+  addTitle,
   cutByText,
   cutWords,
   removeBroll,
+  removeTitle,
   restoreAll,
   setCaptions,
   summarize,
@@ -38,6 +40,7 @@ function makeProject(): Project {
       },
     ],
     broll: [],
+    titles: [],
     words: [
       {
         id: "w0",
@@ -198,6 +201,32 @@ test("removeBroll removes a clip by id and reports whether it removed one", () =
   assert.equal(removeBroll(p, item.id), true);
   assert.equal(p.broll.length, 0);
   assert.equal(removeBroll(p, "does-not-exist"), false);
+});
+
+test("addTitle stores hero position and multiline text", () => {
+  const p = makeProject();
+  const item = addTitle(p, {
+    fromSec: 1,
+    toSec: 3,
+    text: "$90,000\nCheapest Program",
+    position: "hero",
+  });
+  assert.equal(item.position, "hero");
+  assert.equal(item.text, "$90,000\nCheapest Program");
+  assert.equal(item.startSample, SAMPLE_RATE);
+  assert.equal(item.endSample, 3 * SAMPLE_RATE);
+});
+
+test("removeTitle removes a title by id", () => {
+  const p = makeProject();
+  const item = addTitle(p, {
+    fromSec: 0,
+    toSec: 1,
+    text: "Intro",
+  });
+  assert.equal(removeTitle(p, item.id), true);
+  assert.equal(p.titles.length, 0);
+  assert.equal(removeTitle(p, "missing"), false);
 });
 
 test("setCaptions toggles the captions.enabled flag without dropping maxWords", () => {

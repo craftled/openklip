@@ -33,7 +33,7 @@ bun run export <slug>
 - Preview cut transitions: Glimm WebGL sweeps punctuate jumps between kept ranges.
 - Captions: live preview and ASS/libass burn-in on export.
 - B-roll cover clips: register assets, place them over selected word spans, preview and export them.
-- Cinematic look: vignette, smooth push-in zooms, lower-third and centered titles.
+- Cinematic look: vignette, smooth push-in zooms, lower-third, centered, and hero card titles.
 - Agent/CLI parity: terminal commands edit the same `project.json` as the GUI.
 - Local-first storage: no database, no API keys, no bundled LLM.
 
@@ -61,6 +61,10 @@ bun run src/cli.ts cut <slug> --text "phrase to remove"
 bun run src/cli.ts restore <slug>
 bun run src/cli.ts broll <slug> /path/to/b-roll.mp4
 bun run src/cli.ts broll-add <slug> <assetId> <fromSec> <toSec>
+bun run src/cli.ts broll-rm <slug> <brollId>
+bun run src/cli.ts title-add <slug> <fromSec> <toSec> "Title text"
+bun run src/cli.ts title-add <slug> <fromSec> <toSec> "$90,000\nSubtitle" --position hero
+bun run src/cli.ts title-rm <slug> <titleId>
 bun run src/cli.ts captions <slug> on
 bun run src/cli.ts status <slug>
 bun run src/cli.ts export <slug>

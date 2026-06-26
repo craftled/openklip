@@ -53,3 +53,12 @@ test("saveProject writes pretty JSON to disk", async () => {
     assert.match(raw, /{\n {2}"version": 1/);
   });
 });
+
+test("saveProject rejects when the project directory is missing", async () => {
+  await withTempProjectsRoot(async () => {
+    await assert.rejects(
+      () => saveProject("missing", makeProject({ slug: "missing" })),
+      /project\.json/
+    );
+  });
+});

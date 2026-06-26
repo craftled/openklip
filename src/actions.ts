@@ -7,6 +7,7 @@ import {
   type Project,
   SAMPLE_RATE,
   survivingRanges,
+  type Title,
 } from "./edl.ts";
 
 // Normalize text for phrase matching: lowercase, strip anything that isn't a
@@ -150,6 +151,63 @@ export function removeBroll(project: Project, id: string): boolean {
   const before = project.broll.length;
   project.broll = project.broll.filter((b) => b.id !== id);
   return project.broll.length < before;
+}
+
+// Add a title card over a span of the source timeline. Converts seconds to
+// samples on the canonical 48 kHz grid; clamps end to project duration.
+export function addTitle(
+  project: Project,
+  input: {
+    fromSec: number;
+    toSec: number;
+    text: string;
+    position?: Title["position"];
+  }
+): Title {
+  const { fromSec, toSec, text, position = "lower" } = input;
+  const trimmed = text.trim();
+  if (!trimmed) {
+    throw new Error("title text must be non-empty");
+  }
+  if (![fromSec, toSec].every(Number.isFinite)) {
+    throw new Error("title timing values must be finite numbers");
+  }
+  if (fromSec < 0 || toSec < 0) {
+    throw new Error("title timing values must be non-negative");
+  }
+  if (toSec <= fromSec) {
+    throw new Error(
+      `title span is empty: toSec (${toSec}) must be greater than fromSec (${fromSec})`
+    );
+  }
+  const projectDurationSec = project.durationSamples / SAMPLE_RATE;
+  if (fromSec >= projectDurationSec) {
+    throw new Error("title span starts after the project ends");
+  }
+  const endSec = Math.min(toSec, projectDurationSec);
+  if (endSec <= fromSec) {
+    throw new Error("title span is empty after clamping to project duration");
+  }
+  const item: Title = {
+    id: `t${Date.now()}`,
+    text: trimmed,
+    startSample: Math.round(fromSec * SAMPLE_RATE),
+    endSample: Math.round(endSec * SAMPLE_RATE),
+    position,
+  };
+  if (!project.titles) {
+    project.titles = [];
+  }
+  project.titles.push(item);
+  return item;
+}
+
+// Remove a title card by id. Returns whether one was removed.
+export function removeTitle(project: Project, id: string): boolean {
+  const titles = project.titles ?? [];
+  const before = titles.length;
+  project.titles = titles.filter((t) => t.id !== id);
+  return project.titles.length < before;
 }
 
 // Toggle burned captions on/off for the export.

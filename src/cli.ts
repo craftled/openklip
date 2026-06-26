@@ -2,9 +2,11 @@
 import { existsSync } from "node:fs";
 import {
   addBroll,
+  addTitle,
   cutByText,
   cutWords,
   removeBroll,
+  removeTitle,
   restoreAll,
   setCaptions,
   summarize,
@@ -33,6 +35,10 @@ function help(): void {
   openklip broll-add <slug> <assetId> <fromSec> <toSec>
                                    cover a source-time span with a registered asset
   openklip broll-rm <slug> <brollId>   remove a b-roll clip
+  openklip title-add <slug> <fromSec> <toSec> <text>
+                                   burn a title card over a source-time span
+                                     --position lower|center|hero  (default lower)
+  openklip title-rm <slug> <titleId>   remove a title card
   openklip captions <slug> <on|off>    toggle burned captions for export
   openklip status <slug>           summarize the current edit
 
@@ -239,6 +245,60 @@ try {
       }
       await saveProject(rest[0], project);
       console.log(`removed b-roll ${rest[1]}`);
+      break;
+    }
+    case "title-add": {
+      if (!rest[0]) {
+        throw new Error(
+          "usage: openklip title-add <slug> <fromSec> <toSec> <text> [--position lower|center|hero]"
+        );
+      }
+      const slug = rest[0];
+      const args = rest.slice(1);
+      const posIdx = args.indexOf("--position");
+      let position: "lower" | "center" | "hero" = "lower";
+      if (posIdx !== -1) {
+        const pos = args[posIdx + 1]?.toLowerCase();
+        if (pos !== "lower" && pos !== "center" && pos !== "hero") {
+          throw new Error("--position must be lower, center, or hero");
+        }
+        position = pos;
+      }
+      const timingAndText =
+        posIdx === -1
+          ? args
+          : args.filter((_, i) => i !== posIdx && i !== posIdx + 1);
+      if (timingAndText.length < 3) {
+        throw new Error(
+          "usage: openklip title-add <slug> <fromSec> <toSec> <text> [--position lower|center|hero]"
+        );
+      }
+      const fromSec = Number(timingAndText[0]);
+      const toSec = Number(timingAndText[1]);
+      if (!(Number.isFinite(fromSec) && Number.isFinite(toSec))) {
+        throw new Error("fromSec and toSec must be numbers (seconds)");
+      }
+      const text = timingAndText.slice(2).join(" ").replace(/\\n/g, "\n");
+      const project = await loadProject(slug);
+      const item = addTitle(project, { fromSec, toSec, text, position });
+      await saveProject(slug, project);
+      console.log(
+        `added title ${item.id} (${fromSec}s-${toSec}s, ${position}): "${item.text}"`
+      );
+      break;
+    }
+    case "title-rm": {
+      if (!(rest[0] && rest[1])) {
+        throw new Error("usage: openklip title-rm <slug> <titleId>");
+      }
+      const project = await loadProject(rest[0]);
+      const removed = removeTitle(project, rest[1]);
+      if (!removed) {
+        console.log(`no title card with id "${rest[1]}"`);
+        break;
+      }
+      await saveProject(rest[0], project);
+      console.log(`removed title ${rest[1]}`);
       break;
     }
     case "captions": {
