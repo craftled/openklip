@@ -42,6 +42,7 @@ function makeProject(): Project {
     assets: [
       {
         id: "broll-1",
+        kind: "broll",
         name: "broll.mp4",
         src: "/tmp/broll.mp4",
         proxy: "assets/broll-1.mp4",

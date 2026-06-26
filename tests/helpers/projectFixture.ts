@@ -21,6 +21,7 @@ export function makeProject(overrides: Partial<Project> = {}): Project {
     assets: [
       {
         id: "broll-a",
+        kind: "broll",
         name: "b-roll.mp4",
         src: "/tmp/b-roll.mp4",
         proxy: "assets/broll-a.mp4",

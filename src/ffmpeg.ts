@@ -24,6 +24,16 @@ export interface ProbeResult {
   width: number;
 }
 
+function parseProbeJson(out: string): {
+  streams?: Array<Record<string, unknown>>;
+  format?: { duration?: string };
+} {
+  return JSON.parse(out) as {
+    streams?: Array<Record<string, unknown>>;
+    format?: { duration?: string };
+  };
+}
+
 export async function probe(file: string): Promise<ProbeResult> {
   const proc = Bun.spawn(
     [
@@ -40,13 +50,14 @@ export async function probe(file: string): Promise<ProbeResult> {
   );
   const out = await new Response(proc.stdout).text();
   await proc.exited;
-  const json = JSON.parse(out) as {
-    streams?: Array<Record<string, unknown>>;
-    format?: { duration?: string };
-  };
+  const json = parseProbeJson(out);
   const v = (json.streams ?? []).find((s) => s.codec_type === "video");
+  const a = (json.streams ?? []).find((s) => s.codec_type === "audio");
   const durationSec = Number(
-    json.format?.duration ?? (v?.duration as string) ?? 0
+    json.format?.duration ??
+      (v?.duration as string) ??
+      (a?.duration as string) ??
+      0
   );
   let fps = 30;
   const rate = v?.r_frame_rate;
@@ -62,4 +73,18 @@ export async function probe(file: string): Promise<ProbeResult> {
     width: Number(v?.width ?? 1920),
     height: Number(v?.height ?? 1080),
   };
+}
+
+/** Duration-only probe for audio files (no video stream required). */
+export async function probeAudio(
+  file: string
+): Promise<{ durationSec: number }> {
+  const proc = Bun.spawn(
+    [FFPROBE, "-v", "quiet", "-print_format", "json", "-show_format", file],
+    { stdout: "pipe", stderr: "pipe" }
+  );
+  const out = await new Response(proc.stdout).text();
+  await proc.exited;
+  const json = parseProbeJson(out);
+  return { durationSec: Number(json.format?.duration ?? 0) };
 }

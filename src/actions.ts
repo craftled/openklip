@@ -140,6 +140,11 @@ export function addBroll(
     const known = project.assets.map((a) => a.id).join(", ") || "(none)";
     throw new Error(`unknown asset "${assetId}". Registered assets: ${known}`);
   }
+  if ((asset.kind ?? "broll") !== "broll") {
+    throw new Error(
+      `asset "${assetId}" is ${asset.kind}; b-roll overlays require kind broll`
+    );
+  }
   if (toSec <= fromSec) {
     throw new Error(
       `b-roll span is empty: toSec (${toSec}) must be greater than fromSec (${fromSec})`
@@ -213,6 +218,11 @@ export function updateBroll(
   if (!asset) {
     const known = project.assets.map((a) => a.id).join(", ") || "(none)";
     throw new Error(`unknown asset "${assetId}". Registered assets: ${known}`);
+  }
+  if ((asset.kind ?? "broll") !== "broll") {
+    throw new Error(
+      `asset "${assetId}" is ${asset.kind}; b-roll overlays require kind broll`
+    );
   }
   if (toSec <= fromSec) {
     throw new Error(

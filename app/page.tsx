@@ -1,3 +1,4 @@
+import { listProjects } from "@engine/projectStore";
 import { App } from "@/app";
 import { loadEditorProject } from "./lib/project-data";
 
@@ -10,5 +11,6 @@ interface Props {
 export default async function Page({ searchParams }: Props) {
   const { slug } = await searchParams;
   const project = await loadEditorProject(slug ?? null);
-  return <App initialProject={project} />;
+  const projects = listProjects();
+  return <App initialProject={project} projects={projects} />;
 }

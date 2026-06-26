@@ -13,8 +13,12 @@ export const WordSchema = z.object({
 });
 export type Word = z.infer<typeof WordSchema>;
 
+export const AssetKindSchema = z.enum(["broll", "music", "still"]);
+export type AssetKind = z.infer<typeof AssetKindSchema>;
+
 export const AssetSchema = z.object({
   id: z.string(),
+  kind: AssetKindSchema.default("broll"),
   name: z.string(),
   src: z.string(),
   proxy: z.string(),

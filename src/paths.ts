@@ -39,6 +39,12 @@ export function projectPaths(slug: string) {
   };
 }
 
+/** Absolute path to a registered asset proxy (proxy field is relative to project dir). */
+export function assetStoragePath(slug: string, proxyRelative: string): string {
+  return join(projectDir(slug), proxyRelative);
+}
+
+/** @deprecated Prefer assetStoragePath(slug, asset.proxy). Kept for legacy .mp4 ids. */
 export function assetProxyPath(slug: string, assetId: string): string {
   return join(projectDir(slug), "assets", `${assetId}.mp4`);
 }

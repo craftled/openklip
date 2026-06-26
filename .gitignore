@@ -1,5 +1,5 @@
 node_modules/
-projects/
+/projects/
 dist/
 .next/
 next-env.d.ts

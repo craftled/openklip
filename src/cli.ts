@@ -20,6 +20,7 @@ import {
   updateTitle,
   updateZoom,
 } from "./actions.ts";
+import { registerAsset } from "./assets.ts";
 import { registerBroll } from "./broll.ts";
 import { type Project, ProjectSchema, samplesToSec } from "./edl.ts";
 import { exportCut } from "./exporter.ts";
@@ -34,12 +35,14 @@ function help(): void {
 
 Discovery
   openklip list                      list projects (most recent first)
-  openklip assets <slug>             list registered b-roll assets
+  openklip assets <slug>             list registered media assets
 
 Setup
   openklip ingest <video>            transcribe + build a project
   openklip serve [slug]              open the local editor (default: latest)
-  openklip broll <slug> <file>       register a b-roll clip on a project
+  openklip asset-add <slug> <file>   register b-roll, music, or still (auto-detect)
+                                       --kind broll|music|still
+  openklip broll <slug> <file>       register b-roll video (alias for asset-add)
 
 Transcript edits
   openklip transcript <slug>         print every word with id, time, cut state
@@ -194,12 +197,17 @@ try {
       }
       const project = await loadProject(rest[0]);
       if (project.assets.length === 0) {
-        console.log("no assets registered. Run: openklip broll <slug> <file>");
+        console.log(
+          "no assets registered. Run: openklip asset-add <slug> <file>"
+        );
         break;
       }
       for (const a of project.assets) {
         const dur = samplesToSec(a.durationSamples).toFixed(1);
-        console.log(`${a.id.padEnd(16)}  ${`${dur}s`.padStart(7)}  ${a.name}`);
+        const kind = (a.kind ?? "broll").padEnd(6);
+        console.log(
+          `${a.id.padEnd(16)}  ${kind}  ${`${dur}s`.padStart(7)}  ${a.name}`
+        );
       }
       console.log(`\n${project.assets.length} asset(s)`);
       break;
@@ -240,6 +248,41 @@ try {
         }
       );
       await proc.exited;
+      break;
+    }
+    case "asset-add":
+    case "asset": {
+      if (!(rest[0] && rest[1])) {
+        throw new Error(
+          "usage: openklip asset-add <slug> <file> [--kind broll|music|still]"
+        );
+      }
+      const slug = rest[0];
+      const args = rest.slice(1);
+      const kindIdx = args.indexOf("--kind");
+      let fileArg: string;
+      let kind: "broll" | "music" | "still" | undefined;
+      if (kindIdx === -1) {
+        fileArg = args.join(" ");
+      } else {
+        const k = args[kindIdx + 1];
+        if (k !== "broll" && k !== "music" && k !== "still") {
+          throw new Error("--kind must be broll, music, or still");
+        }
+        kind = k;
+        fileArg = args
+          .filter((_, i) => i !== kindIdx && i !== kindIdx + 1)
+          .join(" ");
+      }
+      if (!fileArg) {
+        throw new Error(
+          "usage: openklip asset-add <slug> <file> [--kind broll|music|still]"
+        );
+      }
+      const asset = await registerAsset(slug, fileArg, kind);
+      console.log(
+        `registered ${asset.kind} "${asset.id}" (${asset.name}, ${samplesToSec(asset.durationSamples).toFixed(1)}s)`
+      );
       break;
     }
     case "broll": {

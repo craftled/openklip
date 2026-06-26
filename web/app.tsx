@@ -9,7 +9,6 @@ import {
 } from "glimm";
 import {
   Captions,
-  ChevronRight,
   Clock3,
   Download,
   Film,
@@ -18,8 +17,6 @@ import {
   PanelRight,
   Pause,
   Play,
-  Plus,
-  Scissors,
   Settings2,
   Sparkles,
   Sun,
@@ -37,6 +34,9 @@ import {
   useRef,
   useState,
 } from "react";
+import { AgentSidebar, type ProjectListing } from "@/components/agent-sidebar";
+import { AssetBin } from "@/components/asset-bin";
+import { EditTimeline } from "@/components/edit-timeline";
 import { HeroTitleOverlay } from "@/components/hero-title-overlay";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,7 +53,6 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
-  SidebarGroupAction,
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarHeader,
@@ -62,7 +61,6 @@ import {
   SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSkeleton,
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
@@ -98,7 +96,9 @@ interface Word {
 interface Asset {
   durationSamples: number;
   id: string;
+  kind?: "broll" | "music" | "still";
   name: string;
+  proxy: string;
 }
 interface BrollItem {
   assetId: string;
@@ -221,7 +221,13 @@ function outputPos(ranges: Range[], curSec: number): number {
 const fmt = (s: number): string =>
   `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 
-export function App({ initialProject }: { initialProject: Project }) {
+export function App({
+  initialProject,
+  projects,
+}: {
+  initialProject: Project;
+  projects: ProjectListing[];
+}) {
   const [project, setProject] = useState<Project>(initialProject);
   const [playing, setPlaying] = useState(false);
   const [curSample, setCurSample] = useState(0);
@@ -236,7 +242,8 @@ export function App({ initialProject }: { initialProject: Project }) {
   const [selFocus, setSelFocus] = useState<number | null>(null);
   const [selected, setSelected] = useState<Selected>(null);
   const [chosenAsset, setChosenAsset] = useState(
-    initialProject.assets?.[0]?.id ?? ""
+    initialProject.assets?.find((a) => (a.kind ?? "broll") === "broll")?.id ??
+      ""
   );
   const [titleText, setTitleText] = useState("");
   const [titlePos, setTitlePos] = useState<"lower" | "center" | "hero">(
@@ -399,6 +406,10 @@ export function App({ initialProject }: { initialProject: Project }) {
   const captionsRaised = standardTitle?.position === "lower";
   const assetName = (id: string) =>
     project?.assets.find((a) => a.id === id)?.name ?? id;
+  const brollAssets = useMemo(
+    () => project?.assets.filter((a) => (a.kind ?? "broll") === "broll") ?? [],
+    [project?.assets]
+  );
 
   useEffect(() => {
     const v = brollRef.current;
@@ -649,6 +660,41 @@ export function App({ initialProject }: { initialProject: Project }) {
     }
   };
 
+  const onSeek = useCallback(
+    (sourceSec: number) => {
+      schedRef.current?.seek(sourceSec);
+      setCurSample(
+        Math.round(sourceSec * (projectRef.current?.sampleRate ?? 48_000))
+      );
+      if (playing) {
+        schedRef.current?.pause();
+        setPlaying(false);
+      }
+    },
+    [playing]
+  );
+
+  const onTimelineSelect = useCallback(
+    (kind: "broll" | "title" | "zoom", id: string) => {
+      setSelAnchor(null);
+      setSelFocus(null);
+      setSelected({ kind, id });
+      const item =
+        kind === "broll"
+          ? projectRef.current?.broll.find((b) => b.id === id)
+          : kind === "zoom"
+            ? projectRef.current?.zooms.find((z) => z.id === id)
+            : projectRef.current?.titles.find((t) => t.id === id);
+      if (item) {
+        schedRef.current?.seek(
+          item.startSample / (projectRef.current?.sampleRate ?? 48_000)
+        );
+        setCurSample(item.startSample);
+      }
+    },
+    []
+  );
+
   const onExport = async () => {
     setExporting(true);
     setExportMsg(null);
@@ -699,10 +745,6 @@ export function App({ initialProject }: { initialProject: Project }) {
         Math.abs(z.scale - v.scale) < 0.001 &&
         Math.abs(z.rampSec - v.rampSec) < 0.001
     )?.[0] ?? "";
-  const effectCount =
-    (project.broll?.length ?? 0) +
-    (project.zooms?.length ?? 0) +
-    (project.titles?.length ?? 0);
   const exportDisabled = exporting || pendingSaves > 0 || saveError !== null;
   const exportLabel = exporting
     ? "Exporting…"
@@ -787,220 +829,83 @@ export function App({ initialProject }: { initialProject: Project }) {
               { icon: Clock3, label: "Pad", value: `${project.padMs ?? 50}ms` },
             ];
 
+  const timelineWords = useMemo(
+    () =>
+      project.words.map((w, index) => ({
+        id: w.id,
+        index,
+        startSec: w.startSample / sr,
+        endSec: w.endSample / sr,
+        deleted: w.deleted,
+      })),
+    [project.words, sr]
+  );
+  const timelineBroll = useMemo(
+    () =>
+      (project.broll ?? []).map((b) => ({
+        id: b.id,
+        startSec: b.startSample / sr,
+        endSec: b.endSample / sr,
+        label: assetName(b.assetId),
+      })),
+    [project.assets, project.broll, sr]
+  );
+  const timelineZooms = useMemo(
+    () =>
+      (project.zooms ?? []).map((z) => ({
+        id: z.id,
+        startSec: z.startSample / sr,
+        endSec: z.endSample / sr,
+        label: `${z.scale.toFixed(2)}x`,
+      })),
+    [project.zooms, sr]
+  );
+  const timelineTitles = useMemo(
+    () =>
+      (project.titles ?? []).map((t) => ({
+        id: t.id,
+        startSec: t.startSample / sr,
+        endSec: t.endSample / sr,
+        label: t.text.replace(/\n/g, " · "),
+      })),
+    [project.titles, sr]
+  );
+  const timelineMusic = useMemo(
+    () =>
+      project.assets
+        .filter((a) => a.kind === "music")
+        .map((a) => ({
+          id: a.id,
+          startSec: 0,
+          endSec: a.durationSamples / sr,
+          label: a.name,
+        })),
+    [project.assets, sr]
+  );
+  const timelineStills = useMemo(
+    () =>
+      project.assets
+        .filter((a) => a.kind === "still")
+        .map((a) => ({
+          id: a.id,
+          startSec: 0,
+          endSec: a.durationSamples / sr,
+          label: a.name,
+        })),
+    [project.assets, sr]
+  );
+
   return (
     <SidebarProvider
       className="min-h-screen flex-col overflow-auto bg-background text-foreground md:h-screen md:min-h-0 md:flex-row md:overflow-hidden"
       style={
         {
-          "--sidebar-width": "15rem",
+          "--sidebar-width": "18rem",
           "--sidebar-width-icon": "3.25rem",
         } as CSSProperties
       }
     >
-      {/* LEFT — sources + effects (Paper "layers" sidebar) */}
-      <Sidebar className="border-border" collapsible="icon">
-        <SidebarHeader className="border-border border-b">
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton className="h-10" size="lg" tooltip="OpenKlip">
-                <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-live/15 text-live">
-                  <Scissors className="size-3.5" />
-                </span>
-                <span className="grid min-w-0 flex-1 text-left leading-tight">
-                  <span className="truncate font-semibold text-[13px]">
-                    OpenKlip
-                  </span>
-                  <span className="truncate text-muted-foreground text-xs">
-                    {project.slug}
-                  </span>
-                </span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarHeader>
-
-        <SidebarContent>
-          <SidebarGroup>
-            <SidebarGroupLabel>Project</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    isActive={!(selected || selRange)}
-                    tooltip="Cut plan"
-                  >
-                    <Scissors />
-                    <span>Cut plan</span>
-                  </SidebarMenuButton>
-                  <SidebarMenuBadge>{ranges.length}</SidebarMenuBadge>
-                  <SidebarMenuSub>
-                    <InfoSubItem
-                      icon={Clock3}
-                      label="Kept duration"
-                      value={`${fmt(keptDuration)} / ${fmt(fullDur)}`}
-                    />
-                    <InfoSubItem
-                      icon={Captions}
-                      label="Captions"
-                      value={captionsOn ? "On" : "Off"}
-                    />
-                    <InfoSubItem
-                      icon={Settings2}
-                      label="Export"
-                      value={export1080 ? "1080p" : "Source"}
-                    />
-                  </SidebarMenuSub>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton tooltip="Placeholders">
-                    <Sparkles />
-                    <span>Placeholders</span>
-                    <ChevronRight className="ml-auto size-3 text-muted-foreground group-data-[collapsible=icon]:hidden" />
-                  </SidebarMenuButton>
-                  <SidebarMenuSub>
-                    <PlaceholderSubItem label="Select transcript words" />
-                    <PlaceholderSubItem label="Add b-roll, push-in, or title" />
-                  </SidebarMenuSub>
-                </SidebarMenuItem>
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-
-          <SidebarGroup>
-            <SidebarGroupLabel>Sources</SidebarGroupLabel>
-            <SidebarGroupAction aria-label="Add source placeholder">
-              <Plus />
-            </SidebarGroupAction>
-            <SidebarGroupContent>
-              {project.assets.length === 0 && (
-                <SidebarMenu>
-                  <SidebarMenuItem>
-                    <SidebarMenuSkeleton showIcon />
-                  </SidebarMenuItem>
-                  <PlaceholderMenuItem
-                    icon={Film}
-                    label="No b-roll registered"
-                  />
-                </SidebarMenu>
-              )}
-              <SidebarMenu>
-                {project.assets.map((a) => (
-                  <LayerRow
-                    icon={Film}
-                    key={a.id}
-                    label={a.name}
-                    time={fmt(a.durationSamples / sr)}
-                  />
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-
-          <SidebarGroup>
-            <SidebarGroupLabel>Effects</SidebarGroupLabel>
-            <SidebarGroupContent>
-              {effectCount === 0 && (
-                <SidebarMenu>
-                  <PlaceholderMenuItem
-                    icon={Sparkles}
-                    label="Select words, then add an effect"
-                  />
-                </SidebarMenu>
-              )}
-              <SidebarMenu>
-                <CategoryMenu
-                  count={project.zooms?.length ?? 0}
-                  icon={ZoomIn}
-                  label="Push-ins"
-                >
-                  {project.zooms?.length ? (
-                    project.zooms.map((z) => (
-                      <LayerSubRow
-                        active={
-                          selected?.kind === "zoom" && selected.id === z.id
-                        }
-                        icon={ZoomIn}
-                        key={z.id}
-                        label={`${z.scale.toFixed(2)}x zoom`}
-                        onClick={() => {
-                          clearSel();
-                          setSelected({ kind: "zoom", id: z.id });
-                        }}
-                        time={fmt(z.startSample / sr)}
-                      />
-                    ))
-                  ) : (
-                    <PlaceholderSubItem label="No push-ins yet" />
-                  )}
-                </CategoryMenu>
-                <CategoryMenu
-                  count={project.broll?.length ?? 0}
-                  icon={Film}
-                  label="B-roll"
-                >
-                  {project.broll?.length ? (
-                    project.broll.map((b) => (
-                      <LayerSubRow
-                        active={
-                          selected?.kind === "broll" && selected.id === b.id
-                        }
-                        icon={Film}
-                        key={b.id}
-                        label={assetName(b.assetId)}
-                        onClick={() => {
-                          clearSel();
-                          setSelected({ kind: "broll", id: b.id });
-                        }}
-                        time={fmt(b.startSample / sr)}
-                      />
-                    ))
-                  ) : (
-                    <PlaceholderSubItem label="No b-roll overlays yet" />
-                  )}
-                </CategoryMenu>
-                <CategoryMenu
-                  count={project.titles?.length ?? 0}
-                  icon={Type}
-                  label="Titles"
-                >
-                  {project.titles?.length ? (
-                    project.titles.map((t) => (
-                      <LayerSubRow
-                        active={
-                          selected?.kind === "title" && selected.id === t.id
-                        }
-                        icon={Type}
-                        key={t.id}
-                        label={t.text}
-                        onClick={() => {
-                          clearSel();
-                          setSelected({ kind: "title", id: t.id });
-                        }}
-                        time={fmt(t.startSample / sr)}
-                      />
-                    ))
-                  ) : (
-                    <PlaceholderSubItem label="No titles yet" />
-                  )}
-                </CategoryMenu>
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        </SidebarContent>
-
-        <SidebarFooter className="border-border border-t">
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton tooltip="Timing summary">
-                <Clock3 />
-                <span>Timing</span>
-              </SidebarMenuButton>
-              <SidebarMenuBadge>{fmt(keptDuration)}</SidebarMenuBadge>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarFooter>
-        <SidebarRail />
-      </Sidebar>
+      <AgentSidebar activeSlug={project.slug} initialProjects={projects} />
 
       <SidebarContextBridge>
         {({ toggleSidebar: toggleLeftSidebar }) => (
@@ -1014,10 +919,10 @@ export function App({ initialProject }: { initialProject: Project }) {
             }
           >
             {/* CENTER — preview + transcript */}
-            <SidebarInset className="min-h-[28rem] min-w-0 md:min-h-0">
+            <SidebarInset className="flex min-h-[28rem] min-w-0 flex-col md:min-h-0">
               <div className="flex h-12 shrink-0 items-center gap-2 border-border border-b px-3">
                 <Button
-                  aria-label="Toggle project sidebar"
+                  aria-label="Toggle agent sidebar"
                   onClick={toggleLeftSidebar}
                   size="icon-sm"
                   variant="ghost"
@@ -1216,6 +1121,38 @@ export function App({ initialProject }: { initialProject: Project }) {
                   </div>
                 </ScrollArea>
               </div>
+              <EditTimeline
+                broll={timelineBroll}
+                curSec={curSec}
+                durationSec={fullDur}
+                libraryMusic={timelineMusic}
+                libraryStills={timelineStills}
+                onSeek={onSeek}
+                onSelect={onTimelineSelect}
+                ranges={ranges}
+                selected={selected}
+                selRange={selRange}
+                titles={timelineTitles}
+                wordSpans={timelineWords}
+                zooms={timelineZooms}
+              />
+              <AssetBin
+                assets={project.assets.map((a) => ({
+                  ...a,
+                  kind: (a.kind ?? "broll") as "broll" | "music" | "still",
+                }))}
+                onAssetsUpdated={(assets) => {
+                  setProject((p) => ({ ...p, assets }));
+                  const nextBroll = assets.find(
+                    (a) => (a.kind ?? "broll") === "broll"
+                  );
+                  if (nextBroll && !assets.some((a) => a.id === chosenAsset)) {
+                    setChosenAsset(nextBroll.id);
+                  }
+                }}
+                sampleRate={sr}
+                slug={project.slug}
+              />
             </SidebarInset>
 
             {/* RIGHT — actions + inspector (Paper "properties" panel) */}
@@ -1413,7 +1350,7 @@ export function App({ initialProject }: { initialProject: Project }) {
                       </Section>
                     )}
 
-                    {selBroll && project.assets.length > 0 && (
+                    {selBroll && brollAssets.length > 0 && (
                       <Section title="Source">
                         <Select
                           onValueChange={(v) =>
@@ -1425,7 +1362,7 @@ export function App({ initialProject }: { initialProject: Project }) {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            {project.assets.map((a) => (
+                            {brollAssets.map((a) => (
                               <SelectItem key={a.id} value={a.id}>
                                 {a.name}
                               </SelectItem>
@@ -1470,12 +1407,12 @@ export function App({ initialProject }: { initialProject: Project }) {
                         >
                           <SelectTrigger
                             className="flex-1"
-                            disabled={project.assets.length === 0}
+                            disabled={brollAssets.length === 0}
                           >
                             <SelectValue placeholder="No b-roll" />
                           </SelectTrigger>
                           <SelectContent>
-                            {project.assets.map((a) => (
+                            {brollAssets.map((a) => (
                               <SelectItem key={a.id} value={a.id}>
                                 {a.name}
                               </SelectItem>
@@ -1484,7 +1421,7 @@ export function App({ initialProject }: { initialProject: Project }) {
                         </Select>
                         <Button
                           aria-label="Add b-roll"
-                          disabled={project.assets.length === 0}
+                          disabled={brollAssets.length === 0}
                           onClick={addBroll}
                           size="sm"
                           variant="secondary"
@@ -1607,97 +1544,6 @@ export function App({ initialProject }: { initialProject: Project }) {
   );
 }
 
-function LayerRow({
-  icon: Icon,
-  label,
-  time,
-  active,
-  onClick,
-}: {
-  icon: ComponentType<{ className?: string }>;
-  label: string;
-  time: string;
-  active?: boolean;
-  onClick?: () => void;
-}) {
-  return (
-    <SidebarMenuItem>
-      <SidebarMenuButton
-        className={cn(
-          "h-7 px-2 text-[13px]",
-          !onClick && "pointer-events-none hover:bg-transparent"
-        )}
-        isActive={active}
-        onClick={onClick}
-        tooltip={label}
-        type="button"
-      >
-        <Icon className="size-3.5 shrink-0 text-muted-foreground" />
-        <span
-          className={cn(
-            "min-w-0 flex-1 truncate",
-            active ? "text-foreground" : "text-foreground/90"
-          )}
-        >
-          {label}
-        </span>
-      </SidebarMenuButton>
-      <SidebarMenuBadge>{time}</SidebarMenuBadge>
-    </SidebarMenuItem>
-  );
-}
-
-function CategoryMenu({
-  icon: Icon,
-  label,
-  count,
-  children,
-}: {
-  icon: ComponentType<{ className?: string }>;
-  label: string;
-  count: number;
-  children: ReactNode;
-}) {
-  return (
-    <SidebarMenuItem>
-      <SidebarMenuButton tooltip={label}>
-        <Icon />
-        <span>{label}</span>
-      </SidebarMenuButton>
-      <SidebarMenuBadge>{count}</SidebarMenuBadge>
-      <SidebarMenuSub>{children}</SidebarMenuSub>
-    </SidebarMenuItem>
-  );
-}
-
-function LayerSubRow({
-  icon: Icon,
-  label,
-  time,
-  active,
-  onClick,
-}: {
-  icon: ComponentType<{ className?: string }>;
-  label: string;
-  time: string;
-  active?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <SidebarMenuSubItem>
-      <SidebarMenuSubButton asChild isActive={active}>
-        <button className="w-full" onClick={onClick} type="button">
-          <Icon className="size-3.5 shrink-0 text-muted-foreground" />
-          <span className="min-w-0 flex-1 truncate text-left">{label}</span>
-          <span className="ml-auto shrink-0 text-[11px] text-muted-foreground/70 tabular-nums">
-            {time}
-          </span>
-        </button>
-      </SidebarMenuSubButton>
-    </SidebarMenuSubItem>
-  );
-}
-
 function InfoSubItem({
   icon: Icon,
   label,
@@ -1717,40 +1563,6 @@ function InfoSubItem({
             {value}
           </span>
         </span>
-      </SidebarMenuSubButton>
-    </SidebarMenuSubItem>
-  );
-}
-
-function PlaceholderMenuItem({
-  icon: Icon,
-  label,
-}: {
-  icon: ComponentType<{ className?: string }>;
-  label: string;
-}) {
-  return (
-    <SidebarMenuItem>
-      <SidebarMenuButton
-        className="pointer-events-none text-muted-foreground/70 hover:bg-transparent"
-        tooltip={label}
-        type="button"
-      >
-        <Icon />
-        <span>{label}</span>
-      </SidebarMenuButton>
-    </SidebarMenuItem>
-  );
-}
-
-function PlaceholderSubItem({ label }: { label: string }) {
-  return (
-    <SidebarMenuSubItem>
-      <SidebarMenuSubButton
-        asChild
-        className="pointer-events-none text-muted-foreground/70"
-      >
-        <span aria-disabled="true">{label}</span>
       </SidebarMenuSubButton>
     </SidebarMenuSubItem>
   );

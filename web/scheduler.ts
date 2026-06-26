@@ -99,6 +99,22 @@ export class CutScheduler {
     this.video.pause();
   }
 
+  seek(sourceSec: number): void {
+    const ranges = this.getRanges();
+    const maxSec = this.video.duration || ranges.at(-1)?.endSec || sourceSec;
+    const t = Math.max(0, Math.min(sourceSec, maxSec));
+    const inside = findPlayingRangeIndex(ranges, t);
+    if (inside === -1) {
+      this.idx = playbackStartIndex(ranges, t);
+      const range = ranges[this.idx];
+      this.video.currentTime = range?.startSec ?? t;
+    } else {
+      this.idx = inside;
+      this.video.currentTime = t;
+    }
+    this.onTick?.(this.video.currentTime);
+  }
+
   private resumeAfterTransition = (): void => {
     this.transitioning = false;
     if (!this.playing) {
