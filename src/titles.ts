@@ -25,11 +25,13 @@ function toAssColor(hex: string): string {
 }
 
 function assTime(t: number): string {
-  const tt = Math.max(0, t);
-  const h = Math.floor(tt / 3600);
-  const m = Math.floor((tt % 3600) / 60);
-  const s = Math.floor(tt % 60);
-  const c = Math.round((tt - Math.floor(tt)) * 100);
+  const totalCentiseconds = Math.max(0, Math.round(t * 100));
+  const h = Math.floor(totalCentiseconds / 360_000);
+  const remAfterHours = totalCentiseconds % 360_000;
+  const m = Math.floor(remAfterHours / 6000);
+  const remAfterMinutes = remAfterHours % 6000;
+  const s = Math.floor(remAfterMinutes / 100);
+  const c = remAfterMinutes % 100;
   return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}.${String(c).padStart(2, "0")}`;
 }
 

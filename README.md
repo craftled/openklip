@@ -1,48 +1,91 @@
 # OpenKlip
 
-Edit video by editing text. A lean, local-first, agent-native editor for talking-head + b-roll content.
-
-This is **M0**: the cut spine. Ingest a video, edit the transcript to cut it, preview the cut instantly, export an MP4. The cinematic look (M1) and the terminal-agent peer (M2) come next. See the design doc for the full plan.
+Edit video by editing text. OpenKlip is a lean, local-first editor for talking-head videos with transcript cuts, captions, b-roll, push-in zooms, titles, and MP4 export.
 
 ## Requirements
 
-- [Bun](https://bun.sh) and Node.js (both already needed; Node runs the transcription step).
-- That's it. ffmpeg is bundled via `ffmpeg-static`; Whisper runs locally via Transformers.js (no API keys, no system installs). The first ingest downloads the Whisper model (~150 MB) once.
+- [Bun](https://bun.sh) 1.3.14+
+- Node.js 24+
 
-## Use
+ffmpeg and ffprobe are bundled through `ffmpeg-static` / `ffprobe-static`. Transcription runs locally with Transformers.js; the first ingest downloads the Whisper model cache.
+
+## Quick Start
 
 ```bash
 bun install
 
-# 1. ingest a video (transcribe + build a fast-seek proxy)
+# 1. Ingest a video: transcribe + create the fast-seek proxy
 bun run ingest /path/to/talking-head.mp4
 
-# 2. open the editor (defaults to the most recent project)
-bun run dev
+# 2. Open the editor for that project
+bun run serve <slug>
 
-# 3. in the browser: click words to strike them out -> "Play cut" -> "Export"
-#    or export headless:
+# 3. Export from the browser, or headless:
 bun run export <slug>
 ```
 
-The project lives as plain files under `projects/<slug>/`:
+`bun run dev` also opens the editor and defaults to the latest project. Use `OPENKLIP_SLUG=<slug> bun run dev` when you want to pin a project without the CLI wrapper.
 
-```
-project.json      the EDL: every word with a `deleted` flag (this is the edit)
+## What Ships In The MVP
+
+- Transcript editing: click words to cut/restore them.
+- Fast preview: the browser plays only surviving ranges from an all-intra proxy.
+- Captions: live preview and ASS/libass burn-in on export.
+- B-roll cover clips: register assets, place them over selected word spans, preview and export them.
+- Cinematic look: vignette, smooth push-in zooms, lower-third and centered titles.
+- Agent/CLI parity: terminal commands edit the same `project.json` as the GUI.
+- Local-first storage: no database, no API keys, no bundled LLM.
+
+## Project Files
+
+Each project lives under `projects/<slug>/`:
+
+```text
+project.json      the EDL: words, cuts, assets, b-roll, zooms, titles, captions
 transcript.json   words + sample-accurate timestamps
-proxy.mp4         all-intra 720p proxy for instant-seek preview
-out.mp4           your exported cut
-frames/           sampled frames (for the agent layer, later)
+proxy.mp4         all-intra 720p preview proxy
+out.mp4           exported cut
+assets/           proxied b-roll assets
+frames/           sampled frames for future agent workflows
 ```
 
-## How it works
+`project.json` is the edit. The GUI and CLI both mutate this same file.
 
-- **Time base:** integer audio samples at 48 kHz. Preview and export derive seconds from the same grid, so what you scrub is what you export.
-- **Cut:** deleting words marks them `deleted`; consecutive kept words merge into ranges (padded slightly), and the preview plays those ranges back to back by seeking the all-intra proxy.
-- **Export:** ffmpeg re-encodes the surviving ranges from the original source (not the proxy) with a `select`/`aselect` filter, frame-accurate.
+## CLI
 
-## Known M0 limitations (next iteration)
+```bash
+bun run src/cli.ts transcript <slug>
+bun run src/cli.ts cut <slug> w12-w20
+bun run src/cli.ts cut <slug> --text "phrase to remove"
+bun run src/cli.ts restore <slug>
+bun run src/cli.ts broll <slug> /path/to/b-roll.mp4
+bun run src/cli.ts broll-add <slug> <assetId> <fromSec> <toSec>
+bun run src/cli.ts captions <slug> on
+bun run src/cli.ts status <slug>
+bun run src/cli.ts export <slug>
+```
 
-- Cuts land on whisper word boundaries; no VAD snap-to-silence yet, so tight cuts can clip a phoneme. A short gain duck masks the audio click at boundaries; a true equal-power crossfade is the next step.
-- No cinematic look yet (vignette, push-ins, lower-thirds, captions): that is M1.
-- No terminal-agent peer yet: that is M2.
+## How It Works
+
+- Time base: every edit is stored on a canonical 48 kHz integer-sample grid.
+- Cut spine: deleted words split the transcript into surviving source-time ranges.
+- Preview: a native `<video>` scheduler jumps across those ranges on the all-intra proxy.
+- Export: ffmpeg re-encodes surviving ranges, overlays b-roll, applies zoom/vignette, and burns captions/titles.
+- Fallbacks: export prefers original media, but can fall back to project proxies when original files moved.
+
+## Quality Gates
+
+```bash
+bun run check
+bun run typecheck
+bun test
+bun run build
+```
+
+GitHub Actions runs the same gates on pushes and pull requests.
+
+## Current Limits
+
+- Word-boundary cuts can still clip phonemes; VAD snap-to-silence and equal-power crossfades are next.
+- 4K export can be slow because the current ffmpeg path decodes the selected stream.
+- Vertical shorts, automatic highlight detection, and MCP/server automation are post-MVP work.

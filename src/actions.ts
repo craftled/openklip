@@ -102,6 +102,12 @@ export function addBroll(
   input: { assetId: string; fromSec: number; toSec: number; srcInSec?: number }
 ): Broll {
   const { assetId, fromSec, toSec, srcInSec = 0 } = input;
+  if (![fromSec, toSec, srcInSec].every(Number.isFinite)) {
+    throw new Error("b-roll timing values must be finite numbers");
+  }
+  if (fromSec < 0 || toSec < 0 || srcInSec < 0) {
+    throw new Error("b-roll timing values must be non-negative");
+  }
   const asset = project.assets.find((a) => a.id === assetId);
   if (!asset) {
     const known = project.assets.map((a) => a.id).join(", ") || "(none)";
@@ -112,11 +118,27 @@ export function addBroll(
       `b-roll span is empty: toSec (${toSec}) must be greater than fromSec (${fromSec})`
     );
   }
+  const projectDurationSec = project.durationSamples / SAMPLE_RATE;
+  const assetDurationSec = asset.durationSamples / SAMPLE_RATE;
+  if (fromSec >= projectDurationSec) {
+    throw new Error("b-roll span starts after the project ends");
+  }
+  if (srcInSec >= assetDurationSec) {
+    throw new Error("b-roll source in-point starts after the asset ends");
+  }
+  const endSec = Math.min(
+    toSec,
+    projectDurationSec,
+    fromSec + (assetDurationSec - srcInSec)
+  );
+  if (endSec <= fromSec) {
+    throw new Error("b-roll span is empty after clamping to media duration");
+  }
   const item: Broll = {
     id: `br${Date.now()}`,
     assetId,
     startSample: Math.round(fromSec * SAMPLE_RATE),
-    endSample: Math.round(toSec * SAMPLE_RATE),
+    endSample: Math.round(endSec * SAMPLE_RATE),
     srcInSample: Math.round(srcInSec * SAMPLE_RATE),
   };
   project.broll.push(item);

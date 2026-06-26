@@ -1,5 +1,9 @@
+import { existsSync } from "node:fs";
+import { isAbsolute, join } from "node:path";
 import { buildAss, type CaptionWord, groupCaptions } from "./captions.ts";
 import {
+  type Asset,
+  type Broll,
   type Project,
   ProjectSchema,
   type Range,
@@ -8,13 +12,55 @@ import {
   survivingRanges,
   totalDurationSec,
 } from "./edl.ts";
-import { FFMPEG, run } from "./ffmpeg.ts";
+import { FFMPEG, probe, run } from "./ffmpeg.ts";
 import { projectPaths } from "./paths.ts";
 import { buildTitlesAss, type TitleItem } from "./titles.ts";
 import { buildZoompanZExpr, type ZoomWindow } from "./zoom-ramp.ts";
 
 export interface ExportOptions {
   maxHeight?: number; // e.g. 1080 -> downscale output (and speed up filtering/encode)
+}
+
+export interface InputChoice {
+  kind: "original" | "proxy";
+  path: string;
+}
+
+function projectRelativePath(projectDir: string, filePath: string): string {
+  return isAbsolute(filePath) ? filePath : join(projectDir, filePath);
+}
+
+export function chooseSourceInput(input: {
+  dir: string;
+  proxy: string;
+  source: string;
+}): InputChoice {
+  if (existsSync(input.source)) {
+    return { kind: "original", path: input.source };
+  }
+  const proxy = projectRelativePath(input.dir, input.proxy);
+  if (existsSync(proxy)) {
+    return { kind: "proxy", path: proxy };
+  }
+  throw new Error(
+    `missing source video: ${input.source}. Also could not find proxy fallback: ${proxy}`
+  );
+}
+
+export function chooseAssetInput(
+  projectDir: string,
+  asset: Asset
+): InputChoice {
+  if (existsSync(asset.src)) {
+    return { kind: "original", path: asset.src };
+  }
+  const proxy = projectRelativePath(projectDir, asset.proxy);
+  if (existsSync(proxy)) {
+    return { kind: "proxy", path: proxy };
+  }
+  throw new Error(
+    `missing b-roll asset "${asset.id}": ${asset.src}. Also could not find proxy fallback: ${proxy}`
+  );
 }
 
 function keptWordsInOutputTime(
@@ -47,12 +93,42 @@ function escapeAssPath(p: string): string {
   return p.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
 }
 
-interface BrollPlan {
+export interface BrollPlan {
   inputIndex: number;
   outEnd: number;
   outStart: number;
   srcInSec: number;
   srcPath: string;
+}
+
+export function planBrollForRanges(input: {
+  broll: Broll;
+  firstInputIndex: number;
+  ranges: Range[];
+  sampleRate: number;
+  srcPath: string;
+}): BrollPlan[] {
+  const startSec = input.broll.startSample / input.sampleRate;
+  const endSec = input.broll.endSample / input.sampleRate;
+  const baseSrcInSec = input.broll.srcInSample / input.sampleRate;
+  const plans: BrollPlan[] = [];
+
+  for (const range of input.ranges) {
+    const segmentStart = Math.max(startSec, range.startSec);
+    const segmentEnd = Math.min(endSec, range.endSec);
+    if (segmentEnd - segmentStart < 0.05) {
+      continue;
+    }
+    plans.push({
+      inputIndex: input.firstInputIndex + plans.length,
+      outStart: sourceToOutputSec(segmentStart, input.ranges),
+      outEnd: sourceToOutputSec(segmentEnd, input.ranges),
+      srcInSec: baseSrcInSec + (segmentStart - startSec),
+      srcPath: input.srcPath,
+    });
+  }
+
+  return plans;
 }
 
 export async function exportCut(
@@ -78,16 +154,25 @@ export async function exportCut(
     throw new Error("nothing to export (all words deleted)");
   }
   const sr = project.sampleRate;
+  const sourceInput = chooseSourceInput({
+    dir: p.dir,
+    proxy: project.proxy,
+    source: project.source,
+  });
+  const sourceMeta =
+    sourceInput.kind === "proxy"
+      ? await probe(sourceInput.path)
+      : { fps: project.fps, height: project.height, width: project.width };
 
   // output resolution
   const outH =
-    opts.maxHeight && opts.maxHeight < project.height
+    opts.maxHeight && opts.maxHeight < sourceMeta.height
       ? opts.maxHeight
-      : project.height;
+      : sourceMeta.height;
   const outW =
-    outH === project.height
-      ? project.width
-      : Math.round((project.width * outH) / project.height / 2) * 2;
+    outH === sourceMeta.height
+      ? sourceMeta.width
+      : Math.round((sourceMeta.width * outH) / sourceMeta.height / 2) * 2;
 
   const selectExpr = ranges
     .map((r) => `between(t,${sec(r.startSec)},${sec(r.endSec)})`)
@@ -101,18 +186,15 @@ export async function exportCut(
     if (!asset) {
       continue;
     }
-    const outStart = sourceToOutputSec(b.startSample / sr, ranges);
-    const outEnd = sourceToOutputSec(b.endSample / sr, ranges);
-    if (outEnd - outStart < 0.05) {
-      continue;
-    }
-    plans.push({
-      inputIndex: plans.length + 1,
-      srcPath: asset.src,
-      srcInSec: b.srcInSample / sr,
-      outStart,
-      outEnd,
-    });
+    plans.push(
+      ...planBrollForRanges({
+        broll: b,
+        firstInputIndex: plans.length + 1,
+        ranges,
+        sampleRate: sr,
+        srcPath: chooseAssetInput(p.dir, asset).path,
+      })
+    );
   }
 
   // zooms -> output windows
@@ -124,20 +206,6 @@ export async function exportCut(
       ramp: Math.max(0.05, z.rampSec),
     }))
     .filter((z) => z.oe - z.os > 0.05);
-
-  // captions
-  let assPath: string | null = null;
-  const captionsOn = project.captions?.enabled !== false;
-  if (captionsOn) {
-    const groups = groupCaptions(
-      keptWordsInOutputTime(project, ranges),
-      project.captions?.maxWords ?? 6
-    );
-    if (groups.length > 0) {
-      assPath = `${p.dir}/captions.ass`;
-      await Bun.write(assPath, buildAss(groups, { width: outW, height: outH }));
-    }
-  }
 
   // titles -> output time
   let titlesAssPath: string | null = null;
@@ -157,10 +225,39 @@ export async function exportCut(
     );
   }
 
+  // captions
+  let assPath: string | null = null;
+  const captionsOn = project.captions?.enabled !== false;
+  if (captionsOn) {
+    const groups = groupCaptions(
+      keptWordsInOutputTime(project, ranges),
+      project.captions?.maxWords ?? 6
+    );
+    if (groups.length > 0) {
+      assPath = `${p.dir}/captions.ass`;
+      await Bun.write(
+        assPath,
+        buildAss(groups, {
+          height: outH,
+          placement: (group) =>
+            titleItems.some(
+              (t) =>
+                t.position !== "center" &&
+                group.startSec < t.endSec &&
+                group.endSec > t.startSec
+            )
+              ? "raised"
+              : "bottom",
+          width: outW,
+        })
+      );
+    }
+  }
+
   // ---- filtergraph ----
   const parts: string[] = [];
   let base = `[0:v]select='${selectExpr}',setpts=N/FRAME_RATE/TB`;
-  if (outH !== project.height) {
+  if (outH !== sourceMeta.height) {
     base += `,scale=${outW}:${outH}`;
   }
   parts.push(`${base}[v0]`);
@@ -168,7 +265,7 @@ export async function exportCut(
 
   if (zoomWins.length > 0) {
     // Animated push-in via zoompan (z is evaluated per output frame, so it can ramp).
-    const fps = Math.max(1, Math.round(project.fps));
+    const fps = Math.max(1, Math.round(sourceMeta.fps));
     const wins: ZoomWindow[] = zoomWins.map((z) => ({
       startSec: z.os,
       endSec: z.oe,
@@ -212,7 +309,7 @@ export async function exportCut(
 
   const inputs = [
     "-i",
-    project.source,
+    sourceInput.path,
     ...plans.flatMap((pl) => ["-i", pl.srcPath]),
   ];
   await run(

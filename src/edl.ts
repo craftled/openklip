@@ -58,7 +58,7 @@ export const ProjectSchema = z.object({
   slug: z.string(),
   source: z.string(),
   proxy: z.string(),
-  sampleRate: z.number().int().positive(),
+  sampleRate: z.literal(SAMPLE_RATE),
   fps: z.number().positive(),
   width: z.number().int().positive(),
   height: z.number().int().positive(),

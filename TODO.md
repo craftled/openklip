@@ -2,7 +2,7 @@
 
 ## Status
 
-OpenKlip is a lean, local-first, **agent-native** video editor: you **edit video by editing text** (Descript-style). The stack is Bun + TypeScript + React 18, with `ffmpeg-static` invoked as a subprocess and local Whisper running in-process via Transformers.js. The project is files-on-disk: `project.json` **is** the edit (an EDL of every word with a `deleted` flag): no database. There are no API keys and no bundled LLM; the "agent" is Claude Code / Codex driven from the terminal, reading and writing the same project files the GUI does, so GUI and agent stay at full parity. Primary output is full-screen YouTube (16:9); the secondary target is vertical shorts (9:16, for TikTok / LinkedIn / X). Public on GitHub at `craftled/openklip` (MIT).
+OpenKlip is a lean, local-first, **agent-native** video editor: you **edit video by editing text** (Descript-style). The stack is Bun + TypeScript + React 19 + Next.js 16, with `ffmpeg-static` invoked as a subprocess and local Whisper running via Transformers.js. The project is files-on-disk: `project.json` **is** the edit (an EDL of every word with a `deleted` flag): no database. There are no API keys and no bundled LLM; the "agent" is Claude Code / Codex driven from the terminal, reading and writing the same project files the GUI does, so GUI and agent stay at full parity. Primary output is full-screen YouTube (16:9); the secondary target is vertical shorts (9:16, for TikTok / LinkedIn / X). Public on GitHub at `craftled/openklip` (MIT).
 
 **Current state:** working local editor; cut → captions → b-roll → vignette → push-in zoom → titles → export all functional; open-sourced MIT.
 
@@ -22,10 +22,12 @@ OpenKlip is a lean, local-first, **agent-native** video editor: you **edit video
 - [x] **Cinematic look - animated push-in zoom** (`zoom-ramp.ts` smoothstep ramp via ffmpeg `zoompan`)
 - [x] **Cinematic look - 1080p export option**
 - [x] **Title cards** (lower-third + centered, slide-up/fade entrance; ASS builder `titles.ts` + preview overlay + burn-in)
+- [x] **MVP reliability pass** (proxy media route, save/export sequencing, source/proxy export fallback, b-roll gap splitting, caption/title collision handling, ASS timestamp rounding)
 - [x] **Agent peer (M2 foundation) - CLI primitives** (`transcript`, `cut`, `cut --text`, `restore`, `broll-add`, `broll-rm`, `captions`, `status`, `export`)
 - [x] **Agent peer - CLAUDE.md agent skill + pure `actions.ts`** (full GUI/agent parity on the same `project.json`)
 - [x] **Design system: Geist (Vercel)** (light theme + light/dark toggle; dark mode shipped alongside this roadmap)
-- [x] **TDD test suite** (`bun test`: actions, titles, zoom-ramp - ~24 tests)
+- [x] **TDD test suite** (`bun test`: actions, captions, EDL, exporter, range streaming, titles, zoom-ramp)
+- [x] **GitHub Actions CI** (`check`, `typecheck`, `test`, `build`)
 - [x] **Open-sourced** (public GitHub repo, MIT license, source media gitignored + purged from history)
 
 ## Architecture & Key Decisions
@@ -43,13 +45,13 @@ OpenKlip is a lean, local-first, **agent-native** video editor: you **edit video
 ### Export
 
 - [ ] Fast 4K export via per-segment input seeking (avoid full-stream `select` decode of the whole source).
-- [ ] Export-from-proxy fallback when the original source file is missing.
+- [x] Export-from-proxy fallback when the original source file is missing.
 
 ### Look & Effects
 
 - [ ] Page transitions between shots (shader / whoosh cut).
-- [ ] Match the preview zoom curve to the export smoothstep ramp (preview is a CSS transition today).
-- [ ] Fix title/caption overlap when both are active on the same span.
+- [x] Match the preview zoom curve to the export smoothstep ramp.
+- [x] Fix title/caption overlap when both are active on the same span.
 - [ ] B-roll PiP mode (not just full-cover) + b-roll audio ducking; more title styles.
 
 ### Editing Intelligence
@@ -71,13 +73,10 @@ OpenKlip is a lean, local-first, **agent-native** video editor: you **edit video
 
 ### Infra
 
-- [ ] GitHub Actions CI (typecheck + `bun test`).
-- [ ] README polish + demo gif + repo topics.
+- [x] GitHub Actions CI (check + typecheck + tests + build).
+- [ ] Demo gif + repo topics.
 
 ## Known Limitations
 
 - 4K export re-decodes the whole source (slow) even for a short cut.
-- Sample footage was deleted locally during the git-history purge; the editor runs on the proxy, but 4K export needs the user to restore `edgaras-raw.mp4` / `b-roll.mp4` into the repo root.
 - Whisper word timestamps are ~100 ms loose; cuts can clip a phoneme until VAD-snapping lands.
-- Preview zoom is a CSS transition; export is the smoothstep `zoompan` ramp (close, not an identical curve).
-- Title and caption can overlap if both are active on the same span.

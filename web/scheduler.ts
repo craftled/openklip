@@ -54,10 +54,10 @@ export class CutScheduler {
     return this.playing;
   }
 
-  async play(): Promise<void> {
+  async play(): Promise<boolean> {
     const ranges = this.getRanges();
     if (ranges.length === 0) {
-      return;
+      return false;
     }
     this.ensureAudio();
     if (this.ctx?.state === "suspended") {
@@ -74,9 +74,10 @@ export class CutScheduler {
     } else {
       this.idx = inside;
     }
-    this.playing = true;
     await this.video.play();
+    this.playing = true;
     this.raf = requestAnimationFrame(this.loop);
+    return true;
   }
 
   pause(): void {

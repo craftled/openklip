@@ -153,6 +153,28 @@ test("addBroll throws on an empty span", () => {
   );
 });
 
+test("addBroll rejects negative and non-finite timing", () => {
+  const p = makeProject();
+  assert.throws(
+    () => addBroll(p, { assetId: "broll-1", fromSec: -1, toSec: 2 }),
+    /non-negative/
+  );
+  assert.throws(
+    () => addBroll(p, { assetId: "broll-1", fromSec: 1, toSec: Number.NaN }),
+    /finite/
+  );
+  assert.throws(
+    () =>
+      addBroll(p, {
+        assetId: "broll-1",
+        fromSec: 1,
+        toSec: 2,
+        srcInSec: -0.5,
+      }),
+    /non-negative/
+  );
+});
+
 test("addBroll succeeds on a known asset, converting seconds to samples", () => {
   const p = makeProject();
   const item = addBroll(p, {

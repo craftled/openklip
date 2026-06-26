@@ -37,6 +37,7 @@ import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
 import { type CaptionWord, groupCaptions } from "../src/captions.ts";
+import { type ZoomWindow, zoomFactorAtSec } from "../src/zoom-ramp.ts";
 import { CutScheduler, type Range } from "./scheduler.ts";
 
 interface Word {
@@ -171,6 +172,9 @@ export function App() {
   const [titlePos, setTitlePos] = useState<"lower" | "center">("lower");
   const [exporting, setExporting] = useState(false);
   const [exportMsg, setExportMsg] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [pendingSaves, setPendingSaves] = useState(0);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [theme, setTheme] = useState<"light" | "dark">(() =>
     typeof document !== "undefined" &&
     document.documentElement.classList.contains("dark")
@@ -198,18 +202,26 @@ export function App() {
   const brollRef = useRef<HTMLVideoElement>(null);
   const schedRef = useRef<CutScheduler | null>(null);
   const projectRef = useRef<Project | null>(null);
+  const saveChainRef = useRef<Promise<void>>(Promise.resolve());
+  const saveErrorRef = useRef<string | null>(null);
   projectRef.current = project;
 
   useEffect(() => {
     fetch("/api/project")
-      .then((r) => r.json())
+      .then(async (r) => {
+        const data = await r.json();
+        if (!r.ok || data.ok === false) {
+          throw new Error(data.error ?? "could not load project");
+        }
+        return data;
+      })
       .then((p: Project) => {
         setProject(p);
         setCaptionsOn(p.captions?.enabled ?? true);
         setVignetteOn(p.look?.vignette ?? false);
         setChosenAsset(p.assets?.[0]?.id ?? "");
       })
-      .catch(() => setExportMsg("could not load project"));
+      .catch((e) => setLoadError((e as Error).message));
   }, []);
 
   useEffect(() => {
@@ -256,13 +268,25 @@ export function App() {
   const activeBroll = project?.broll?.find(
     (b) => curSample >= b.startSample && curSample < b.endSample
   );
-  const activeZoom = project?.zooms?.find(
-    (z) => curSample >= z.startSample && curSample < z.endSample
+  const zoomWindows = useMemo<ZoomWindow[]>(
+    () =>
+      project
+        ? (project.zooms ?? [])
+            .map((z) => ({
+              endSec: outputPos(ranges, z.endSample / sr),
+              rampSec: z.rampSec,
+              scale: z.scale,
+              startSec: outputPos(ranges, z.startSample / sr),
+            }))
+            .filter((z) => z.endSec - z.startSec > 0.05)
+        : [],
+    [project, ranges, sr]
   );
-  const zoomScale = activeZoom && !activeBroll ? activeZoom.scale : 1;
+  const zoomScale = activeBroll ? 1 : zoomFactorAtSec(outPos, zoomWindows);
   const activeTitle = project?.titles?.find(
     (t) => curSample >= t.startSample && curSample < t.endSample
   );
+  const captionsRaised = activeTitle?.position === "lower";
   const assetName = (id: string) =>
     project?.assets.find((a) => a.id === id)?.name ?? id;
 
@@ -296,12 +320,38 @@ export function App() {
     }
   }, [activeBroll, curSample, playing, sr]);
 
-  const post = (path: string, body: unknown) =>
-    void fetch(path, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+  const post = useCallback((path: string, body: unknown) => {
+    const task = saveChainRef.current
+      .catch(() => {
+        // Keep later saves moving after one failed request.
+      })
+      .then(async () => {
+        setPendingSaves((n) => n + 1);
+        setSaveError(null);
+        saveErrorRef.current = null;
+        try {
+          const res = await fetch(path, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          const data = await res.json().catch(() => null);
+          if (!res.ok || data?.ok === false) {
+            throw new Error(data?.error ?? `save failed (${res.status})`);
+          }
+        } catch (e) {
+          const message = (e as Error).message;
+          saveErrorRef.current = message;
+          setSaveError(message);
+          throw e;
+        } finally {
+          setPendingSaves((n) => Math.max(0, n - 1));
+        }
+      });
+    saveChainRef.current = task.catch(() => {
+      // The visible error state above is the user-facing failure path.
     });
+  }, []);
 
   const toggleWord = useCallback((id: string) => {
     setProject((prev) => {
@@ -482,7 +532,7 @@ export function App() {
     post("/api/project", { padMs: n });
   };
 
-  const onPlay = () => {
+  const onPlay = async () => {
     const s = schedRef.current;
     if (!s) {
       return;
@@ -491,8 +541,16 @@ export function App() {
       s.pause();
       setPlaying(false);
     } else {
-      void s.play();
-      setPlaying(true);
+      try {
+        const didStart = await s.play();
+        setPlaying(didStart);
+        if (!didStart) {
+          setExportMsg("Nothing to play: all words are cut.");
+        }
+      } catch (e) {
+        setPlaying(false);
+        setExportMsg(`Playback error: ${(e as Error).message}`);
+      }
     }
   };
 
@@ -500,13 +558,18 @@ export function App() {
     setExporting(true);
     setExportMsg(null);
     try {
-      const r = await fetch("/api/export", {
+      await saveChainRef.current;
+      if (saveErrorRef.current) {
+        throw new Error(`Save failed: ${saveErrorRef.current}`);
+      }
+      const res = await fetch("/api/export", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ maxHeight: export1080 ? 1080 : undefined }),
-      }).then((x) => x.json());
+      });
+      const r = await res.json();
       setExportMsg(
-        r.ok
+        res.ok && r.ok
           ? `Exported ${r.ranges} cuts @ ${r.height}p (${r.durationSec.toFixed(1)}s) to ${r.out}`
           : `Error: ${r.error}`
       );
@@ -519,7 +582,9 @@ export function App() {
   if (!project) {
     return (
       <div className="grid h-screen place-items-center bg-background text-muted-foreground text-sm">
-        Loading project…
+        {loadError
+          ? `Could not load project: ${loadError}`
+          : "Loading project…"}
       </div>
     );
   }
@@ -555,6 +620,12 @@ export function App() {
     (project.broll?.length ?? 0) +
     (project.zooms?.length ?? 0) +
     (project.titles?.length ?? 0);
+  const exportDisabled = exporting || pendingSaves > 0 || saveError !== null;
+  const exportLabel = exporting
+    ? "Exporting…"
+    : pendingSaves > 0
+      ? "Saving…"
+      : "Export";
 
   return (
     <div className="grid h-screen min-h-0 grid-cols-[15rem_1fr_17rem] bg-background text-foreground">
@@ -694,7 +765,12 @@ export function App() {
               </div>
             )}
             {activeGroup && (
-              <div className="pointer-events-none absolute inset-x-0 bottom-[9%] z-[3] flex justify-center">
+              <div
+                className={cn(
+                  "pointer-events-none absolute inset-x-0 z-[3] flex justify-center",
+                  captionsRaised ? "bottom-[28%]" : "bottom-[9%]"
+                )}
+              >
                 <div className="max-w-[82%] rounded-md bg-black/55 px-3.5 py-1.5 text-center font-semibold text-[clamp(15px,2.3vw,30px)] text-white leading-tight backdrop-blur">
                   {activeGroup.words.map((w, i) => {
                     const next =
@@ -799,6 +875,11 @@ export function App() {
                   {exportMsg}
                 </p>
               )}
+              {saveError && (
+                <p className="mt-2 max-w-[60ch] break-words text-destructive text-xs">
+                  Save failed: {saveError}
+                </p>
+              )}
             </div>
           </ScrollArea>
         </div>
@@ -807,8 +888,12 @@ export function App() {
       {/* RIGHT — actions + inspector (Paper "properties" panel) */}
       <aside className="flex min-h-0 flex-col border-border border-l">
         <div className="flex shrink-0 flex-col gap-2 border-border border-b p-3">
-          <Button className="w-full" disabled={exporting} onClick={onExport}>
-            <Download /> {exporting ? "Exporting…" : "Export"}
+          <Button
+            className="w-full"
+            disabled={exportDisabled}
+            onClick={onExport}
+          >
+            <Download /> {exportLabel}
           </Button>
           <div className="flex items-center justify-between">
             <label className="flex cursor-pointer items-center gap-2 text-muted-foreground text-xs">

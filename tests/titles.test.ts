@@ -111,3 +111,22 @@ test("PlayResX/PlayResY reflect opts.width/height", () => {
   assert.ok(ass.includes("PlayResX: 1280"), "PlayResX echoes width");
   assert.ok(ass.includes("PlayResY: 720"), "PlayResY echoes height");
 });
+
+test("title ASS times carry rounded centiseconds across second/minute/hour boundaries", () => {
+  const ass = buildTitlesAss(
+    [
+      { text: "Minute", startSec: 1.999, endSec: 59.999, position: "center" },
+      {
+        text: "Hour",
+        startSec: 3599.999,
+        endSec: 3600.499,
+        position: "center",
+      },
+    ],
+    OPTS
+  );
+
+  const lines = dialogueLines(ass);
+  assert.match(lines[0], /0:00:02\.00,0:01:00\.00/);
+  assert.match(lines[1], /1:00:00\.00,1:00:00\.50/);
+});

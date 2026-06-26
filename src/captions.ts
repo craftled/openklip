@@ -59,11 +59,13 @@ function toAssColor(hex: string): string {
 }
 
 function assTime(t: number): string {
-  const tt = Math.max(0, t);
-  const h = Math.floor(tt / 3600);
-  const m = Math.floor((tt % 3600) / 60);
-  const s = Math.floor(tt % 60);
-  const c = Math.round((tt - Math.floor(tt)) * 100);
+  const totalCentiseconds = Math.max(0, Math.round(t * 100));
+  const h = Math.floor(totalCentiseconds / 360_000);
+  const remAfterHours = totalCentiseconds % 360_000;
+  const m = Math.floor(remAfterHours / 6000);
+  const remAfterMinutes = remAfterHours % 6000;
+  const s = Math.floor(remAfterMinutes / 100);
+  const c = remAfterMinutes % 100;
   return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}.${String(c).padStart(2, "0")}`;
 }
 
@@ -74,13 +76,49 @@ function assEscape(s: string): string {
 export interface AssOptions {
   accent?: string;
   height: number;
+  placement?: CaptionPlacement | ((group: CaptionGroup) => CaptionPlacement);
   width: number;
+}
+
+type CaptionPlacement = "bottom" | "raised";
+
+function marginForPlacement(
+  height: number,
+  placement: CaptionPlacement
+): number {
+  const marginRatio = placement === "raised" ? 0.24 : 0.07;
+  return Math.round(height * marginRatio);
+}
+
+function styleLine(name: string, fontSize: number, marginV: number): string {
+  return `Style: ${name},Arial,${fontSize},${WHITE},${WHITE},&H00000000&,&H64000000&,1,0,0,0,100,100,0,0,3,6,0,2,90,90,${marginV},1`;
 }
 
 export function buildAss(groups: CaptionGroup[], opts: AssOptions): string {
   const fontSize = Math.max(18, Math.round(opts.height * 0.055));
-  const marginV = Math.round(opts.height * 0.07);
+  const placement = opts.placement ?? "bottom";
   const accent = toAssColor(opts.accent ?? "#94ccff");
+  const styles =
+    typeof placement === "function"
+      ? [
+          styleLine(
+            "CapBottom",
+            fontSize,
+            marginForPlacement(opts.height, "bottom")
+          ),
+          styleLine(
+            "CapRaised",
+            fontSize,
+            marginForPlacement(opts.height, "raised")
+          ),
+        ]
+      : [
+          styleLine(
+            "Cap",
+            fontSize,
+            marginForPlacement(opts.height, placement)
+          ),
+        ];
   const header = [
     "[Script Info]",
     "ScriptType: v4.00+",
@@ -91,13 +129,19 @@ export function buildAss(groups: CaptionGroup[], opts: AssOptions): string {
     "",
     "[V4+ Styles]",
     "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-    `Style: Cap,Arial,${fontSize},${WHITE},${WHITE},&H00000000&,&H64000000&,1,0,0,0,100,100,0,0,3,6,0,2,90,90,${marginV},1`,
+    ...styles,
     "",
     "[Events]",
     "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
   ];
   const events: string[] = [];
   for (const g of groups) {
+    const style =
+      typeof placement === "function"
+        ? placement(g) === "raised"
+          ? "CapRaised"
+          : "CapBottom"
+        : "Cap";
     g.words.forEach((w, i) => {
       const start = w.startSec;
       const end = i < g.words.length - 1 ? g.words[i + 1].startSec : g.endSec;
@@ -109,7 +153,7 @@ export function buildAss(groups: CaptionGroup[], opts: AssOptions): string {
         )
         .join(" ");
       events.push(
-        `Dialogue: 0,${assTime(start)},${assTime(Math.max(end, start + 0.05))},Cap,,0,0,0,,${line}`
+        `Dialogue: 0,${assTime(start)},${assTime(Math.max(end, start + 0.05))},${style},,0,0,0,,${line}`
       );
     });
   }

@@ -9,10 +9,20 @@ export const dynamic = "force-dynamic";
 const noStore = { "Cache-Control": "no-store" } as const;
 
 export async function GET(req: NextRequest) {
-  const slug = resolveSlug(req.nextUrl.searchParams.get("slug"));
-  const project = await loadProject(slug);
-  const mediaVersion = Math.round(statSync(projectPaths(slug).proxy).mtimeMs);
-  return NextResponse.json({ ...project, mediaVersion }, { headers: noStore });
+  try {
+    const slug = resolveSlug(req.nextUrl.searchParams.get("slug"));
+    const project = await loadProject(slug);
+    const mediaVersion = Math.round(statSync(projectPaths(slug).proxy).mtimeMs);
+    return NextResponse.json(
+      { ...project, mediaVersion },
+      { headers: noStore }
+    );
+  } catch (e) {
+    return NextResponse.json(
+      { ok: false, error: (e as Error).message },
+      { headers: noStore, status: 400 }
+    );
+  }
 }
 
 export async function POST(req: NextRequest) {

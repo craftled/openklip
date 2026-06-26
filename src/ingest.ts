@@ -160,6 +160,6 @@ export async function ingest(videoArg: string): Promise<string> {
 
   console.log(`[ingest] done: ${words.length} words`);
   console.log(`[ingest] project -> ${p.dir}`);
-  console.log(`\nNext:  bun run dev ${slug}`);
+  console.log(`\nNext:  bun run serve ${slug}`);
   return slug;
 }
