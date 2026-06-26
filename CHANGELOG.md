@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.4.0 - 2026-06-26
+
+Agent selector: drive AI edits with your existing coding-agent subscription — no API keys, no bundled LLM. Pick Claude Code, Codex, Cursor, or Grok in the editor; OpenKlip shells out to that CLI headless, hands it the transcript, and applies the structured answer to the same `project.json`.
+
+### Added
+- **Multi-agent driver** (`src/agent-driver.ts`) — adapters for `claude -p`, `codex exec`, `cursor-agent -p`, `grok -p`, each reading its cleanest structured-output channel (Claude/Cursor JSON envelope, Codex `--output-last-message` file, Grok stdout). Codex runs in a `--sandbox read-only` jail.
+- **"Find filler with <agent>"** — the selected agent reads the transcript and cuts filler words via a server action, applied to the live `project.json`. Verified end-to-end against all four real CLIs (each found the same filler word).
+- **Connection detection + badges** — `detectAgents()` reports installed (PATH) + signed-in (per-CLI `status` subcommand / auth file / host) with a compact "Signed in / Sign in / Not installed" badge per provider. When an agent isn't signed in, the button shows the exact command (e.g. `cursor-agent login`).
+- Provider logos via the svgl shadcn registry; single-logo selector trigger.
+
+### Fixed
+- Strip `--bun` from `NODE_OPTIONS` when spawning agent CLIs so their bundled Node doesn't crash under the `bun --bun` dev server.
+- Unique agent-thread message ids (`nextId`) + composite render keys — eliminates duplicate React key warnings.
+
+### Notes
+- OpenKlip bundles no LLM; agents run on the user's own subscription via their installed CLI. Cursor needs a one-time `cursor-agent login`.
+
 ## 0.3.0 - 2026-06-26
 
 Unified action registry (`src/registry.ts`): one Zod-schema'd definition per `project.json` mutation, dispatched through a single `runAction(name, project, input)`. The CLI now routes all ~20 edit commands through it instead of importing the mutation primitives directly, so what the registry advertises is exactly what the CLI executes. Schemas are shape-only; the primitives in `actions.ts` stay the single owner of value bounds (no duplicated rules to drift).
