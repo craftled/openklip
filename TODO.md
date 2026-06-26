@@ -73,9 +73,23 @@ Preview cuts now get a Glimm WebGL sweep in the browser; exported MP4s still har
 ### Agent
 
 - [x] End-to-end agent-loop demo (`bun run agent-demo` — phrase list → cut → status → export).
+- [x] `openklip doctor` env/project health check (ffmpeg, Whisper, proxy/source/asset media).
 - [ ] Optional MCP server exposing the editing tools.
 
 ### Infra
+
+- [x] Slug validation guard on every path join (`assertValidSlug` in `paths.ts`) — closes a path-traversal hole on the `[slug]` API routes.
+- [x] Export API route (`POST /api/projects/[slug]/export`, Zod-validated body, empty-cut + traversal guarded).
+- [x] Layered project folders (`project.json` at root; derived media under `working/`, render under `output/`).
+- [x] Ken Burns **still** overlays (`still-add`/`still-rm`, `zoompan` push-in in exporter, focus point).
+- [x] Ingester plugin manifest (`ingesters/<id>/ingester.json` + loader + `openklip ingesters`).
+- [x] Post-export HyperFrames seam (`openklip package <slug> remove-background|transcribe`) — corrected to the real `hyperframes` CLI and **verified end-to-end** (real `remove-background` run on an export). HF stays opt-in (not a committed dep).
+- [x] Agent skill router (intent → CLI command sequences) feeding the sidebar.
+- [x] GUI: orientation toggle (16:9/9:16/1:1 preview), rebuilding/saving overlay, `@dnd-kit` drag-reorder of b-roll paint order (verified live), replace-from-bin, in/out loop region.
+- [x] Brand presets (`brands/*.json` + `applyBrand`) — caption/vignette/pad defaults, applied at `ingest --brand` or `openklip brand`. Defaults only; `project.json` stays the edit.
+- [x] Overlay reorder (`reorderBroll/Title/Zoom` + `openklip reorder`) — paint-order control for the b-roll/title/zoom tracks.
+- [x] Derived `CompiledTimeline` (`src/compiledTimeline.ts`) — never-persisted authoring→preview view (kept ranges, overlays in output time + paint order, caption groups, runtime).
+- [x] `safeAction` dev-mode stack traces in server actions; `serve` runs a health gate (`runDoctor`) before opening the editor.
 
 - [x] GitHub Actions CI (check + typecheck + tests + build).
 - [ ] Demo gif + repo topics.
