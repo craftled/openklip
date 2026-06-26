@@ -51,14 +51,22 @@ export function getThread(id: string): AgentThread | undefined {
   return readAll().find((t) => t.id === id);
 }
 
+// Monotonic id generator: Date.now() alone collides when two messages are
+// appended in the same millisecond (e.g. the user + assistant pair in one
+// action), producing duplicate React keys. The counter guarantees uniqueness.
+let idSeq = 0;
+export function nextId(prefix: string): string {
+  idSeq += 1;
+  return `${prefix}${Date.now().toString(36)}-${idSeq.toString(36)}`;
+}
+
 export function createThread(slug: string, title?: string): AgentThread {
-  const now = Date.now();
   const thread: AgentThread = {
-    id: `th${now}`,
+    id: nextId("th"),
     slug,
     title: title ?? "New chat",
     messages: [],
-    updatedAt: now,
+    updatedAt: Date.now(),
   };
   writeAll([thread, ...readAll()]);
   return thread;
@@ -76,7 +84,7 @@ export function appendMessage(
   }
   const thread = threads[idx];
   const message: ThreadMessage = {
-    id: `m${Date.now()}`,
+    id: nextId("m"),
     role,
     content,
     createdAt: Date.now(),
