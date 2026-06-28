@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.8.9.0 - 2026-06-28
+
+Native graphics templates now export pixel-for-pixel and render in fullscreen. The rich render path is first-party (headless Chrome, no third-party engine), so an HTML/CSS template looks identical in the editor preview and the exported video.
+
+### Added
+- **Pixel-faithful rich graphics export**: `kind: "rich"` templates render through headless Chrome (`chrome-headless-shell` via `puppeteer-core`), driven by the SAME `web/lib/graphic-runtime.ts` the live preview uses, so export matches preview frame-for-frame. Frames are captured with a transparent background and encoded to a ProRes 4444 alpha MOV (`src/headless-render.ts`), then composited by ffmpeg as a timed overlay. ffmpeg stays the master compositor. Verified by hand end-to-end: the `title-card` template composites over the source video with real transparency (the automated test covers the missing-Chrome error path and skips real rendering when Chrome is absent).
+- **Graphics, titles, and captions in the fullscreen player**: the overlay stack (`web/components/preview-overlays.tsx`) is now shared by the inline preview and the fullscreen cinema player, aligned to the letterboxed video box and synced to the player's own playback. Previously the cinema player showed the bare video with no live overlays.
+
+### Changed
+- The rich-graphics render seam (`src/graphic-render.ts`) emits a transparent ProRes MOV via the first-party headless renderer instead of a third-party producer. Chrome is an optional, one-time download (`bunx puppeteer browsers install chrome-headless-shell`); the default text/ASS path still needs no browser and runs fully offline.
+
+### Removed
+- **`@hyperframes/producer`** (and its `esbuild` bundling workaround in `next.config.ts`): the rich path no longer depends on it. `puppeteer-core` replaces it as a lightweight dependency; the Chrome binary is downloaded on demand, not bundled.
+
 ## 0.8.8.0 - 2026-06-28
 
 Two features land together, both with full CLI / GUI / MCP parity: a live color grade "control room" and native HTML/CSS graphics templates. This release also unbreaks the editor bundle and carries the v0.8.7.1 typecheck hotfix onto `main` (which had been sitting on the broken v0.8.7.0 build).
