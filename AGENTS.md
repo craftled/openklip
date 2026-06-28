@@ -98,6 +98,11 @@ Write code that is **accessible, performant, type-safe, and maintainable**. Focu
 **Solid/Svelte/Vue/Qwik:**
 - Use `class` and `for` attributes (not `className` or `htmlFor`)
 
+### Documentation
+
+- Add comments for complex logic, but prefer self-documenting code
+- **No em dashes (`:`)** in docs, UI copy, release notes, or user-visible strings. Use a colon, comma, or period instead (see `.cursor/rules/no-em-dash.mdc`)
+
 ---
 
 ## Testing
@@ -117,6 +122,7 @@ Biome's linter will catch most issues automatically. Focus your attention on:
 4. **Edge cases** - Handle boundary conditions and error states
 5. **User experience** - Accessibility, performance, and usability considerations
 6. **Documentation** - Add comments for complex logic, but prefer self-documenting code
+7. **No em dashes** - Do not use `—` in docs, UI copy, or release notes; use colon, comma, or period (see `.cursor/rules/no-em-dash.mdc`)
 
 ---
 

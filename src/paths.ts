@@ -63,7 +63,7 @@ export function projectPaths(slug: string) {
     proxy: join(working, "proxy.mp4"),
     audioRaw: join(working, "audio16k.f32"),
     frames: join(working, "frames"),
-    /** User drop folder — originals only. */
+    /** User drop folder : originals only. */
     assets: join(dir, "assets"),
     /** Generated asset proxies (ffmpeg output). */
     assetProxies: join(working, "assets"),

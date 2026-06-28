@@ -362,7 +362,7 @@ export function AgentSidebar({
             ? `${providerLabel} cut ${res.cut} filler word(s)${
                 res.words.length
                   ? `: ${res.words.map((w) => `${w.id} "${w.text}"`).join(", ")}`
-                  : " — none found"
+                  : " : none found"
               }`
             : `Error: ${res.error}`
         );
@@ -519,7 +519,7 @@ export function AgentSidebar({
             agentUsable
               ? undefined
               : activeStatus?.installed
-                ? `Sign in first — run: ${activeStatus.signInCmd}`
+                ? `Sign in first : run: ${activeStatus.signInCmd}`
                 : `${providerLabel} CLI is not installed`
           }
           variant="ghost"
@@ -534,7 +534,7 @@ export function AgentSidebar({
             if (!agentUsable) {
               return activeStatus?.installed
                 ? `Run \`${activeStatus.signInCmd}\` to connect`
-                : `${providerLabel} — not installed`;
+                : `${providerLabel} : not installed`;
             }
             return `Find filler with ${providerLabel}`;
           })()}

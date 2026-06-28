@@ -1123,7 +1123,7 @@ export function App({
             }
           >
             <EditorSidebarShortcuts agentSidebar={agentSidebar} />
-            {/* CENTER — preview + transcript */}
+            {/* CENTER : preview + transcript */}
             <SidebarInset className="flex min-h-[28rem] min-w-0 flex-col md:min-h-0">
               <div className="flex h-12 shrink-0 items-center gap-2 border-border border-b px-3">
                 <Button
@@ -1445,7 +1445,7 @@ export function App({
               />
             </SidebarInset>
 
-            {/* RIGHT — actions + inspector (Paper "properties" panel) */}
+            {/* RIGHT : actions + inspector (Paper "properties" panel) */}
             <Sidebar className="bg-background" collapsible="icon" side="right">
               <SidebarHeader className="border-border border-b">
                 <SidebarMenu>
@@ -1702,7 +1702,7 @@ export function App({
                         {(project.broll ?? []).length > 1 && (
                           <div className="mt-3">
                             <span className="text-caption text-muted-foreground">
-                              Paint order — drag to restack
+                              Paint order : drag to restack
                             </span>
                             <div className="mt-1.5">
                               <OverlaySortable

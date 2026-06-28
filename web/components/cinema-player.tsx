@@ -251,7 +251,7 @@ export function CinemaPlayer({
       ref={rootRef}
       style={{ cursor: chromeVisible ? "auto" : "none" }}
     >
-      {/* Vignette surround — soft black falloff at the edges, like Linear. */}
+      {/* Vignette surround : soft black falloff at the edges, like Linear. */}
       <div
         className="pointer-events-none absolute inset-0"
         style={{

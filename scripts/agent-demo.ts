@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * Agent-loop demo: composes atomic OpenKlip primitives the way an external
- * agent (Claude Code, Codex) would — discover state, cut from a phrase list,
+ * agent (Claude Code, Codex) would : discover state, cut from a phrase list,
  * verify, optionally export. No LLM bundled; phrases come from argv or a file.
  */
 import { readFileSync } from "node:fs";
@@ -121,7 +121,7 @@ try {
   printStatus("after", slug, project);
 
   if (dryRun) {
-    console.log("\n[agent] dry-run — project.json not saved");
+    console.log("\n[agent] dry-run : project.json not saved");
   } else {
     await saveProject(slug, project);
     console.log("\n[agent] saved project.json");

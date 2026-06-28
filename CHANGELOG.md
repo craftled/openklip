@@ -1,70 +1,74 @@
 # Changelog
 
-## Unreleased
+## 0.6.1 - 2026-06-28
+
+Reliability pass after the 0.6.0 editor shell refresh: serialize server-side writes, harden chats persistence, and fix sidebar layout.
 
 ### Changed
-- **Project-wide write serialization.** All `project.json` mutations from the server (server actions, agent-driven filler cuts, asset sync, upload) now go through one per-slug lock (`src/project-lock.ts`) via a new `mutateProject(slug, fn)` helper, so concurrent tabs / agent sessions can't race the read-modify-write and lose an edit. `chats.json` mutations get a separate per-slug lock (`withChatsLock`) so chat writes stay responsive while an agent run holds the project lock. Replaces the narrower asset-only lock from 0.6.0. Scope: in-process (one running server); concurrent processes still need OS file locking.
+- **Project-wide write serialization.** All `project.json` mutations from the server (server actions, agent-driven filler cuts, asset sync, upload) go through one per-slug lock (`src/project-lock.ts`) via `mutateProject(slug, fn)`, so concurrent tabs or agent sessions cannot race the read-modify-write and lose an edit. `chats.json` mutations use a separate per-slug lock (`withChatsLock`) so chat writes stay responsive while an agent run holds the project lock. Replaces the narrower asset-only lock from early 0.6.0. Scope: in-process (one running server); concurrent processes still need OS file locking.
+
+### Fixed
+- **Sidebar asset overflow.** Long filenames in the asset bin no longer force horizontal scroll (`flex flex-col` + `min-w-0 overflow-hidden` on section rows).
+- **`chats.json` no longer silently wipes on corruption.** `saveProjectChats` writes atomically (tmp + rename); `loadProjectChats` moves a corrupt file to `chats.json.bad-<ts>` and throws instead of returning empty.
+- **Chats API returns 404 for unknown threads.** `append`/`rename`/`archive` respond 404 when `threadId` does not exist; `setActive` validates the thread before pinning.
+- **Stills from outside `assets/` are copied in.** External still originals copy into `assets/` instead of storing a fragile `../../…` relative proxy.
+- **Re-ingest no longer silently wipes an existing project.** `ingest` refuses when `project.json` already exists unless `--force` (CLI) or `?force=1` (upload API returns 409 Conflict).
+- **Folder sync is POST, not a mutating GET.** `POST /api/projects/:slug/assets/sync` registers files dropped into `assets/`; `GET /assets` is read-only.
 
 ## 0.6.0 - 2026-06-26
 
 Editor shell refresh: the asset bin, project chats, and theme picker now live in the left sidebar; the center column is preview, transcript, and timeline only.
 
 ### Added
-- **Asset bin in sidebar** — drag-and-drop upload, grouped b-roll/music/stills, folder sync poll, and hover previews (`AssetBin`, `AssetPreviewRow`).
-- **Project switcher** — switch projects, ingest video from the sidebar, ⌘1–⌘9 shortcuts.
-- **Persisted chats API** — threads stored in `working/chats.json` with archive/rename/delete (`src/chats.ts`, `/api/projects/:slug/chats`).
-- **Theme engine** — swappable presets (OpenKlip, Catppuccin, GitHub, Nord, Dracula, Tokyo Night) with light/dark scheme and no-flash boot script.
-- **Keyboard shortcuts** — ⌘B toggles agent sidebar, ⌘I toggles inspector (`EditorSidebarShortcuts`).
-- **Asset folder scanner** — CLI/GUI parity when files land in `projects/<slug>/assets/` (`src/asset-scanner.ts`).
-- **Folder sync endpoint:** `POST /api/projects/:slug/assets/sync` registers any new files dropped into `assets/`. Sync is POST (not a mutating GET) and serialized per-slug so overlapping polls/tabs never race the `project.json` read-modify-write (`src/asset-lock.ts`).
+- **Asset bin in sidebar**: drag-and-drop upload, grouped b-roll/music/stills, folder sync poll, and hover previews (`AssetBin`, `AssetPreviewRow`).
+- **Project switcher**: switch projects, ingest video from the sidebar, ⌘1–⌘9 shortcuts.
+- **Persisted chats API**: threads stored in `working/chats.json` with archive/rename/delete (`src/chats.ts`, `/api/projects/:slug/chats`).
+- **Theme engine**: swappable presets (OpenKlip, Catppuccin, GitHub, Nord, Dracula, Tokyo Night) with light/dark scheme and no-flash boot script.
+- **Keyboard shortcuts**: ⌘B toggles agent sidebar, ⌘I toggles inspector (`EditorSidebarShortcuts`).
+- **Asset folder scanner**: CLI/GUI parity when files land in `projects/<slug>/assets/` (`src/asset-scanner.ts`).
 
 ### Changed
 - Removed the asset strip below the timeline; assets render only under **Assets** in the agent sidebar.
 - Agent threads moved from browser localStorage to per-project disk via the chats API.
 - Inspector settings grouped under a Paper-style right sidebar with theme and default-agent pickers.
 - Unified `registerAsset` path for b-roll, music, and stills; dropped standalone `src/broll.ts`.
-- `GET /api/projects/:slug/assets` is now read-only (the old `?sync=1` mutation moved to the POST sync endpoint). Upload and sync share a per-slug write lock.
 
 ### Fixed
 - Lint/test hygiene for theme re-exports, vendored agents-ui shader component, and `AgentModelSelect` extraction.
-- **`chats.json` no longer silently wipes on corruption.** `saveProjectChats` now writes atomically (tmp + rename) so a crash mid-write can't leave a half-file; `loadProjectChats` moves a corrupt/unreadable file to `chats.json.bad-<ts>` and throws instead of returning empty (which would have persisted `{}` on the next mutation and destroyed every thread).
-- **Chats API returns 404 for unknown threads.** `append`/`rename`/`archive` now respond 404 when `threadId` doesn't exist (previously 200 with `thread: undefined`); `setActive` validates the thread exists before pinning it.
-- **Stills from outside `assets/` are copied in.** `buildStillProxy` now copies an external still original into `assets/` instead of storing a `../../…` relative proxy that broke portability and leaked absolute structure. Stills already in `assets/` are still referenced in place.
-- **Re-ingest no longer silently wipes an existing project.** `ingest` refuses when the slug's `project.json` already exists unless `--force` is passed (CLI) or `?force=1` is sent (upload API, which returns 409 Conflict).
 
 ## 0.5.0 - 2026-06-26
 
-Linear-parity video player: the editor preview and a new fullscreen "cinema" mode now share one transport bar that matches Linear's player chrome — white-on-dark controls over a gradient scrim, a hairline scrubber with a dot handle, and a left-to-right row of play, volume, time, remaining, speed, captions, picture-in-picture, and fullscreen.
+Linear-parity video player: the editor preview and a new fullscreen "cinema" mode share one transport bar that matches Linear's player chrome: white-on-dark controls over a gradient scrim, a hairline scrubber with a dot handle, and play, volume, time, remaining, speed, captions, picture-in-picture, and fullscreen.
 
 ### Added
-- **Cinema player** (`web/components/cinema-player.tsx`) — fullscreen overlay with the project name top-left, an Export action top-right (replacing Linear's "Watch on YouTube"), auto-hiding controls, keyboard shortcuts (space/k, arrows, f, m, c, Esc), real fullscreen + picture-in-picture, and a center play affordance.
-- **Shared transport bar** (`web/components/player-controls.tsx`) — the Linear control row, used by both the cinema overlay and the inline preview so the two surfaces look identical. Custom hairline scrubber with buffered fill, drag-to-seek, and a dot handle.
+- **Cinema player** (`web/components/cinema-player.tsx`): fullscreen overlay with the project name top-left, Export top-right, auto-hiding controls, keyboard shortcuts (space/k, arrows, f, m, c, Esc), real fullscreen + picture-in-picture, and a center play affordance.
+- **Shared transport bar** (`web/components/player-controls.tsx`): the Linear control row, used by both the cinema overlay and the inline preview. Custom hairline scrubber with buffered fill, drag-to-seek, and a dot handle.
 
 ### Changed
-- The inline preview now renders the shared transport bar overlaid on the video (revealed on hover) instead of the old gray control row. Its fullscreen icon opens the cinema overlay; volume, speed, and PiP drive the preview `<video>` directly; scrubbing seeks in cut-space via a new `sourceAtOutput()` inverse of `outputPos()`. Loop in/out and the vignette toggle move to a slim secondary row.
+- The inline preview renders the shared transport bar overlaid on the video (revealed on hover) instead of the old gray control row. Fullscreen opens the cinema overlay; volume, speed, and PiP drive the preview `<video>` directly; scrubbing seeks in cut-space via `sourceAtOutput()`. Loop in/out and the vignette toggle move to a slim secondary row.
 
 ## 0.4.0 - 2026-06-26
 
-Agent selector: drive AI edits with your existing coding-agent subscription — no API keys, no bundled LLM. Pick Claude Code, Codex, Cursor, or Grok in the editor; OpenKlip shells out to that CLI headless, hands it the transcript, and applies the structured answer to the same `project.json`.
+Agent selector: drive AI edits with your existing coding-agent subscription. No API keys, no bundled LLM. Pick Claude Code, Codex, Cursor, or Grok in the editor; OpenKlip shells out to that CLI headless, hands it the transcript, and applies the structured answer to the same `project.json`.
 
 ### Added
-- **Multi-agent driver** (`src/agent-driver.ts`) — adapters for `claude -p`, `codex exec`, `cursor-agent -p`, `grok -p`, each reading its cleanest structured-output channel (Claude/Cursor JSON envelope, Codex `--output-last-message` file, Grok stdout). Codex runs in a `--sandbox read-only` jail.
-- **"Find filler with <agent>"** — the selected agent reads the transcript and cuts filler words via a server action, applied to the live `project.json`. Verified end-to-end against all four real CLIs (each found the same filler word).
-- **Connection detection + badges** — `detectAgents()` reports installed (PATH) + signed-in (per-CLI `status` subcommand / auth file / host) with a compact "Signed in / Sign in / Not installed" badge per provider. When an agent isn't signed in, the button shows the exact command (e.g. `cursor-agent login`).
+- **Multi-agent driver** (`src/agent-driver.ts`): adapters for `claude -p`, `codex exec`, `cursor-agent -p`, `grok -p`, each reading its cleanest structured-output channel (Claude/Cursor JSON envelope, Codex `--output-last-message` file, Grok stdout). Codex runs in a `--sandbox read-only` jail.
+- **"Find filler with <agent>"**: the selected agent reads the transcript and cuts filler words via a server action, applied to the live `project.json`. Verified end-to-end against all four real CLIs.
+- **Connection detection + badges**: `detectAgents()` reports installed (PATH) + signed-in (per-CLI status subcommand / auth file / host) with a compact "Signed in / Sign in / Not installed" badge per provider.
 - Provider logos via the svgl shadcn registry; single-logo selector trigger.
 
 ### Fixed
-- Strip `--bun` from `NODE_OPTIONS` when spawning agent CLIs so their bundled Node doesn't crash under the `bun --bun` dev server.
-- Unique agent-thread message ids (`nextId`) + composite render keys — eliminates duplicate React key warnings.
+- Strip `--bun` from `NODE_OPTIONS` when spawning agent CLIs so their bundled Node does not crash under the `bun --bun` dev server.
+- Unique agent-thread message ids (`nextId`) + composite render keys: eliminates duplicate React key warnings.
 
 ### Notes
 - OpenKlip bundles no LLM; agents run on the user's own subscription via their installed CLI. Cursor needs a one-time `cursor-agent login`.
 
 ## 0.3.0 - 2026-06-26
 
-Unified action registry (`src/registry.ts`): one Zod-schema'd definition per `project.json` mutation, dispatched through a single `runAction(name, project, input)`. The CLI now routes all ~20 edit commands through it instead of importing the mutation primitives directly, so what the registry advertises is exactly what the CLI executes. Schemas are shape-only; the primitives in `actions.ts` stay the single owner of value bounds (no duplicated rules to drift).
+Unified action registry (`src/registry.ts`): one Zod-schema'd definition per `project.json` mutation, dispatched through a single `runAction(name, project, input)`. The CLI routes all ~20 edit commands through it instead of importing the mutation primitives directly, so what the registry advertises is exactly what the CLI executes. Schemas are shape-only; the primitives in `actions.ts` stay the single owner of value bounds (no duplicated rules to drift).
 
-New `openklip actions [--json] [--surface cli|gui|mcp]` prints the capability manifest — the Zod schemas render to JSON Schema (the MCP `inputSchema` shape), so an external agent can read every editing action from one place without bespoke wiring. Schema failures surface as one concise, field-tagged line instead of a raw validation dump.
+New `openklip actions [--json] [--surface cli|gui|mcp]` prints the capability manifest: the Zod schemas render to JSON Schema (the MCP `inputSchema` shape), so an external agent can read every editing action from one place without bespoke wiring. Schema failures surface as one concise, field-tagged line instead of a raw validation dump.
 
 ## 0.2.0 - 2026-06-26
 
@@ -74,19 +78,19 @@ External-inspiration buildout: a security fix, a layered project layout, several
 - Validate project slugs (`assertValidSlug`) at the `projectDir` chokepoint, closing a path-traversal hole on the `[slug]` API/media routes (a hostile slug could write outside `projects/`).
 
 ### Added
-- **Ken Burns still overlays** — a `stills` EDL type with an animated `zoompan` push-in (focus point + ramp); `openklip still-add`/`still-rm`, exporter + compiled-timeline support. Verified with a real ffmpeg render.
-- **Brand presets** — `brands/<name>.json` defaults (captions/vignette/pad) applied at `openklip ingest --brand` or `openklip brand <slug> <name>`; `project.json` stays the edit.
-- **Overlay reorder** — `reorderBroll/Title/Zoom` + `openklip reorder`, plus `@dnd-kit` drag-to-restack of b-roll paint order in the inspector.
-- **`openklip doctor`** — ffmpeg/whisper/project health check; also gates `serve`.
-- **Export API route** — `POST /api/projects/[slug]/export` (Zod body, empty-cut + traversal guards).
-- **Ingester plugin manifests** — `ingesters/<id>/ingester.json` + loader + `openklip ingesters`.
-- **HyperFrames post-export seam** — `openklip package <slug> remove-background|transcribe` against the (opt-in, unbundled) `hyperframes` CLI; verified end-to-end.
-- **Derived `CompiledTimeline`** — never-persisted authoring→preview view (kept ranges, overlays in output time, caption groups).
-- **Agent skill router** — maps sidebar intent to CLI command sequences.
+- **Ken Burns still overlays**: a `stills` EDL type with an animated `zoompan` push-in (focus point + ramp); `openklip still-add`/`still-rm`, exporter + compiled-timeline support. Verified with a real ffmpeg render.
+- **Brand presets**: `brands/<name>.json` defaults (captions/vignette/pad) applied at `openklip ingest --brand` or `openklip brand <slug> <name>`; `project.json` stays the edit.
+- **Overlay reorder**: `reorderBroll/Title/Zoom` + `openklip reorder`, plus `@dnd-kit` drag-to-restack of b-roll paint order in the inspector.
+- **`openklip doctor`**: ffmpeg/whisper/project health check; also gates `serve`.
+- **Export API route**: `POST /api/projects/[slug]/export` (Zod body, empty-cut + traversal guards).
+- **Ingester plugin manifests**: `ingesters/<id>/ingester.json` + loader + `openklip ingesters`.
+- **HyperFrames post-export seam**: `openklip package <slug> remove-background|transcribe` against the (opt-in, unbundled) `hyperframes` CLI; verified end-to-end.
+- **Derived `CompiledTimeline`**: never-persisted authoring→preview view (kept ranges, overlays in output time, caption groups).
+- **Agent skill router**: maps sidebar intent to CLI command sequences.
 - **GUI**: orientation toggle (16:9/9:16/1:1 preview), rebuilding/saving overlay, in/out loop region, replace-from-bin source dropdown.
 
 ### Changed
-- **Layered project folders** — `project.json` stays at the project root; derived media (proxy, transcript, audio, frames, asset proxies, export scratch) live under `working/`, renders under `output/`. Big-bang, no back-compat.
+- **Layered project folders**: `project.json` stays at the project root; derived media (proxy, transcript, audio, frames, asset proxies, export scratch) live under `working/`, renders under `output/`. Big-bang, no back-compat.
 - `safeAction` failures now carry a dev-only stack trace.
 
 ### Notes

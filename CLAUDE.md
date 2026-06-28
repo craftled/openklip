@@ -9,8 +9,9 @@ Each project lives as plain files under `projects/<slug>/` in a layered layout:
 ```
 projects/<slug>/
   project.json            the EDL - the edit itself (the only file you edit)
+  assets/                 user originals (flat): drop b-roll, music, stills here
   working/                derived media + scratch: proxy.mp4, transcript.json,
-                          audio16k.f32, frames/, assets/, captions.ass…
+                          audio16k.f32, frames/, asset proxies, chats.json…
   output/out.mp4          the rendered export
 ```
 
@@ -23,7 +24,7 @@ Time is integer audio samples at 48 kHz. The CLI takes seconds where a human num
 | User action (GUI) | Agent command |
 | --- | --- |
 | List projects | `openklip list` |
-| Ingest a video | `openklip ingest <video>` |
+| Ingest a video | `openklip ingest <video> [--force]` |
 | Open editor | `openklip serve [slug]` |
 | Read transcript | `openklip transcript <slug>` |
 | Cut / restore words | `openklip cut`, `openklip restore` |
@@ -84,7 +85,7 @@ Run as `bun run src/cli.ts <command>` (or the `openklip` bin).
 | `openklip zoom-rm <slug> <zoomId>` | Remove a push-in zoom. |
 | `openklip still-add <slug> <assetId> <fromSec> <toSec>` | Overlay a registered **still** image with a Ken Burns push-in. `--scale 1.2` (1–3), `--focus-x 0.5` / `--focus-y 0.5` (0–1 image coords). |
 | `openklip still-rm <slug> <stillId>` | Remove a still overlay. |
-| `openklip reorder <slug> <broll\|title\|zoom> <id> <toIndex>` | Restack an overlay within its track. Array order is paint order — a later index paints on top (matters when b-roll covers overlap). |
+| `openklip reorder <slug> <broll\|title\|zoom> <id> <toIndex>` | Restack an overlay within its track. Array order is paint order: a later index paints on top (matters when b-roll covers overlap). |
 
 ### Look & captions
 
@@ -94,7 +95,7 @@ Run as `bun run src/cli.ts <command>` (or the `openklip` bin).
 | `openklip captions-max <slug> <n>` | Words per caption line (1–12). |
 | `openklip look <slug> vignette <on\|off>` | Toggle vignette. |
 | `openklip pad <slug> <ms>` | Symmetric padding around kept ranges (0–500 ms). |
-| `openklip brand <slug> <name>` | Apply a brand preset (`brands/<name>.json`) — sets caption/vignette/pad **defaults** only. `project.json` stays the edit; words and overlays are untouched. Also available at ingest: `openklip ingest <video> --brand <name>`. |
+| `openklip brand <slug> <name>` | Apply a brand preset (`brands/<name>.json`): sets caption/vignette/pad **defaults** only. `project.json` stays the edit; words and overlays are untouched. Also available at ingest: `openklip ingest <video> --brand <name>`. |
 
 ### Review & export
 
@@ -103,13 +104,13 @@ Run as `bun run src/cli.ts <command>` (or the `openklip` bin).
 | `openklip status <slug>` | Full edit summary: words, ranges, overlays, look, captions, runtime. |
 | `openklip export <slug>` | Render the current cut to `out.mp4`. `--height 1080` for max output height. |
 | `openklip doctor [slug]` | Health check: ffmpeg/ffprobe binaries, Whisper script, and (with a slug) the project's `project.json`, source/proxy media, and asset proxies. Exits non-zero if any check fails. Run it when the agent loop fails deep inside a subprocess. |
-| `openklip ingesters` | List ingester plugins (`ingesters/<id>/ingester.json`) — declarative seams for non-file media import (URL, batch, etc.). |
-| `openklip actions` | Print the unified action registry — every `project.json` mutation (cut, broll, title, zoom, still, captions, look, pad, reorder) as one named, Zod-schema'd entry. `--json` emits a machine-readable manifest (schemas render to JSON Schema — the MCP `inputSchema` shape); `--surface cli\|gui\|mcp` filters by surface. The CLI routes every edit command through this same registry, so the manifest is exactly what runs. |
+| `openklip ingesters` | List ingester plugins (`ingesters/<id>/ingester.json`): declarative seams for non-file media import (URL, batch, etc.). |
+| `openklip actions` | Print the unified action registry: every `project.json` mutation (cut, broll, title, zoom, still, captions, look, pad, reorder) as one named, Zod-schema'd entry. `--json` emits a machine-readable manifest (schemas render to JSON Schema, the MCP `inputSchema` shape); `--surface cli\|gui\|mcp` filters by surface. The CLI routes every edit command through this same registry, so the manifest is exactly what runs. |
 | `openklip package <slug> <pass>` | Optional post-export pass on `output/out.mp4` via the HyperFrames CLI: `remove-background` (→ transparent `.webm`, the matte primitive for embed-behind-subject) or `transcribe` (→ `.srt`). Uses the local `node_modules/.bin/hyperframes` if installed (`bun add -d hyperframes`); runs Chrome + our bundled ffmpeg. Fails with install instructions if absent. |
 
 ## Recommended workflow
 
-1. **Discover.** `openklip list` to pick a project, or `openklip ingest <video>` to create one.
+1. **Discover.** `openklip list` to pick a project, or `openklip ingest <video>` to create one. Re-ingest requires `--force` (wipes the project).
 2. **Read first.** `openklip transcript <slug>`: see words, ids, times, and what's already cut.
 3. **Decide cuts.** Identify filler, false starts, and tangents. Prefer cutting whole sentences, not single words.
 4. **Edit.** `openklip cut <slug> w12-w20` (or `--text "the part to remove"`). Add overlays with `broll-add`, `title-add`, `zoom-add`. Patch with `*-set` commands. Toggle look with `look` and `captions`.
@@ -118,7 +119,7 @@ Run as `bun run src/cli.ts <command>` (or the `openklip` bin).
 
 ## Agent loop
 
-OpenKlip ships no LLM. An external agent (Claude Code, Codex, Cursor) drives the loop:
+OpenKlip ships no LLM. An external agent (Claude Code, Codex, Cursor, Grok) drives the loop:
 
 ```
 read  → openklip list / status / transcript
@@ -139,7 +140,7 @@ bun run agent-demo <slug> --phrases phrases.txt --dry-run   # preview only
 ## Guardrails
 
 - **Cut whole sentences, not single words.** Removing one word mid-sentence usually leaves an audible jump; cut the full thought.
-- **Keep b-roll spans short** — roughly 2–6 seconds. Long covers hide the speaker and feel like a different video.
+- **Keep b-roll spans short**: roughly 2–6 seconds. Long covers hide the speaker and feel like a different video.
 - **Captions are on by default.** Only turn them off if the project explicitly shouldn't have them.
 - **Never hand-edit `project.json`** when a command exists for the change. The commands validate the schema and keep the GUI in sync; manual edits can desync or corrupt the file.
 - After cutting, run `openklip status` before `openklip export` so you don't render an empty or near-empty cut.

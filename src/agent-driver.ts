@@ -1,5 +1,5 @@
 // Agent driver: borrow the user's existing coding-agent subscription to do
-// transcript-level reasoning — no API keys, no bundled LLM. This is "Mode B" of
+// transcript-level reasoning : no API keys, no bundled LLM. This is "Mode B" of
 // the agent-native thesis: OpenKlip shells out to whichever agent CLI the user
 // picked in the GUI (Claude Code, Codex, Cursor, Grok), hands it the transcript,
 // and applies the structured answer through the normal EDL mutations.
@@ -135,7 +135,7 @@ export function isConnected(auth: AuthStrategy, signals: AuthSignals): boolean {
 }
 
 // The exact command to sign this agent in, or null for the host (Claude Code is
-// the running session — nothing to sign into).
+// the running session : nothing to sign into).
 export function signInCommand(spec: AgentSpec): string | null {
   return spec.auth.kind === "host" ? null : `${spec.cli} login`;
 }
@@ -150,7 +150,7 @@ export interface AgentStatus {
   signInCmd: string | null;
 }
 
-// Probe every agent: installed (on PATH) and connected (authenticated). Cheap —
+// Probe every agent: installed (on PATH) and connected (authenticated). Cheap :
 // a PATH lookup plus, for status-based CLIs, one short `… status` spawn (no model
 // call, browser disabled, 6s cap). Safe to call on GUI mount.
 export async function detectAgents(): Promise<AgentStatus[]> {
@@ -218,10 +218,10 @@ async function probeStatus(
 }
 
 // Self-contained filler-detection prompt. Everything the agent needs is in the
-// text, so it never has to call a tool — it just reasons and replies JSON.
+// text, so it never has to call a tool : it just reasons and replies JSON.
 export function buildFillerPrompt(words: PromptWord[]): string {
   const tokens = words.map((w) => `${w.id}:${w.text}`).join(" ");
-  return `You are editing a spoken-video transcript. Each token is "id:text". Return ONLY a JSON object {"cut":[ids]} listing the word ids that are filler words or false starts — "um", "uh", "er", "you know", "like", "sort of", "kind of", "I mean". Do NOT cut meaningful content words. Respond with JSON only, no prose.\n\n${tokens}`;
+  return `You are editing a spoken-video transcript. Each token is "id:text". Return ONLY a JSON object {"cut":[ids]} listing the word ids that are filler words or false starts : "um", "uh", "er", "you know", "like", "sort of", "kind of", "I mean". Do NOT cut meaningful content words. Respond with JSON only, no prose.\n\n${tokens}`;
 }
 
 // Recover the model's final text from an agent's output channel.
@@ -240,7 +240,7 @@ export function extractModelText(
         return env.result;
       }
     } catch {
-      // Not an envelope — fall through to the raw text.
+      // Not an envelope : fall through to the raw text.
     }
   }
   return stdout;
@@ -275,7 +275,7 @@ export function parseCutIds(text: string): string[] {
   return [];
 }
 
-// Extraction + parse, composed. Pure — tested against real captured fixtures.
+// Extraction + parse, composed. Pure : tested against real captured fixtures.
 export function parseAgentOutput(
   mode: OutputMode,
   stdout: string,
@@ -322,7 +322,7 @@ export async function runFillerAgent(
   const cli = Bun.which(spec.cli);
   if (!cli) {
     throw new Error(
-      `${spec.label} CLI ("${spec.cli}") not found on PATH — install it to use this agent`
+      `${spec.label} CLI ("${spec.cli}") not found on PATH : install it to use this agent`
     );
   }
   const model = spec.usesModelFlag ? opts.agent : undefined;
@@ -354,7 +354,7 @@ export async function runFillerAgent(
       try {
         fileContent = await Bun.file(lastMessageFile).text();
       } catch {
-        // file missing — extraction falls back to stdout
+        // file missing : extraction falls back to stdout
       }
     }
     const ids = parseAgentOutput(spec.outputMode, stdout, fileContent);

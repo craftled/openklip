@@ -67,7 +67,7 @@ function SidebarProvider({
   onOpenChange?: (open: boolean) => void;
   /** Single key (with ⌘/Ctrl). Set false when shortcuts are handled at app level. */
   keyboardShortcut?: string | false;
-  /** Persisted open state cookie — use a unique name per sidebar instance. */
+  /** Persisted open state cookie : use a unique name per sidebar instance. */
   cookieName?: string;
 }) {
   const isMobile = useIsMobile();

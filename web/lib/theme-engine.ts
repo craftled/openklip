@@ -131,7 +131,7 @@ function themeNoFlashEntry(theme: ThemeFile): {
   return { l: light, d: dark, m: [...theme.supportedModes] };
 }
 
-/** Inline script for layout.tsx — color scheme + preset vars before first paint */
+/** Inline script for layout.tsx : color scheme + preset vars before first paint */
 export function buildThemeNoFlashScript(
   colorSchemeKey: string,
   appThemeKey: string,

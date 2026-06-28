@@ -1,6 +1,6 @@
 // The unified action registry: one named, schema-validated definition per
 // project.json mutation. This is the single source of truth the CLI, the GUI
-// server actions, and a future MCP/HTTP surface all route through — the same
+// server actions, and a future MCP/HTTP surface all route through : the same
 // shape agent-native's defineAction gives (one action → UI + agent + HTTP +
 // MCP). The pure mutation logic still lives in actions.ts; this layer adds the
 // name, the input contract (Zod, which doubles as the agent's JSON-Schema tool
@@ -59,11 +59,11 @@ function defineAction<S extends z.ZodType>(def: {
   return def as ActionDef;
 }
 
-// Schemas describe input *shape* only — field names, types, enums, and which
+// Schemas describe input *shape* only : field names, types, enums, and which
 // fields are required. All value bounds (non-negative seconds, scale 1–3, focus
 // 0–1, maxWords 1–12, pad 0–500, …) and project-relative invariants (span vs.
 // duration, asset existence/kind) are owned by the primitives in actions.ts,
-// which throw or clamp. Keeping bounds in one place — the primitive — is what
+// which throw or clamp. Keeping bounds in one place : the primitive : is what
 // makes this registry DRY rather than a second copy of the rules to drift.
 const sec = z.number();
 const position = z.enum(["lower", "center", "hero"]);
@@ -288,7 +288,7 @@ export function getAction(name: string): ActionDef | undefined {
 }
 
 // Validate `rawInput` against the action's schema, then run the mutation against
-// `project`. Throws on unknown name or invalid input — the one dispatch path
+// `project`. Throws on unknown name or invalid input : the one dispatch path
 // every surface shares.
 export function runAction(
   name: string,
@@ -321,7 +321,7 @@ export function runAction(
 }
 
 export interface ActionManifestEntry {
-  // Zod rendered to JSON Schema — this is exactly the MCP tool inputSchema.
+  // Zod rendered to JSON Schema : this is exactly the MCP tool inputSchema.
   // biome-ignore lint/suspicious/noExplicitAny: JSON Schema is an open shape.
   inputSchema: any;
   name: string;
@@ -329,7 +329,7 @@ export interface ActionManifestEntry {
   surfaces: Surface[];
 }
 
-// A machine-readable capability manifest an external agent can read whole — the
+// A machine-readable capability manifest an external agent can read whole : the
 // "agents read the action list from one place" idea, no per-tool wiring. Filter
 // by surface to get, e.g., just the MCP-exposed actions.
 export function actionManifest(surface?: Surface): ActionManifestEntry[] {
@@ -343,7 +343,7 @@ export function actionManifest(surface?: Surface): ActionManifestEntry[] {
     }));
 }
 
-// Render the registry as a Markdown table — the generatable replacement for the
+// Render the registry as a Markdown table : the generatable replacement for the
 // hand-maintained capability map in CLAUDE.md.
 export function actionTable(surface?: Surface): string {
   const rows = actions

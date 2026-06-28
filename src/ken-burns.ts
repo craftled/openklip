@@ -1,7 +1,7 @@
 // Ken Burns push-in for a still image. A still is a looped single-frame input;
 // ffmpeg `zoompan` evaluates `z` per output frame (`on` = frame index), so the
 // scale can ramp across the held duration. We center the crop on a focus point
-// in [0,1] image coordinates. Pure string/number builders — ffmpeg is never run
+// in [0,1] image coordinates. Pure string/number builders : ffmpeg is never run
 // here, so this is unit-testable.
 import { sec } from "./edl.ts";
 

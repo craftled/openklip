@@ -1,6 +1,6 @@
 // Skill router: map a free-text intent (typed in the agent sidebar) to a named
 // skill and an ordered sequence of OpenKlip CLI commands. The GUI shows these so
-// a human — or an external agent reading the thread — can run the exact loop on
+// a human : or an external agent reading the thread : can run the exact loop on
 // the same project.json the editor edits. Pure + deterministic (unit-testable).
 
 export interface SkillMatch {

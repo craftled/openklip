@@ -1,5 +1,5 @@
 /* =============================================================================
-   OPENKLIP THEME BASE — structure only (palette from themes/*.json)
+   OPENKLIP THEME BASE : structure only (palette from themes/*.json)
 
    Semantic colors are injected by theme-engine (#openklip-theme-vars).
    Derived tokens, typography, and editor track colors live here.

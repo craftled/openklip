@@ -45,7 +45,7 @@ test("runDoctor passes a healthy project (proxy present, no assets)", async () =
 
 test("runDoctor fails a project with no source and no proxy", async () => {
   await withTempProjectsRoot(async ({ slug, root }) => {
-    // Write project.json only — no proxy.mp4 on disk, source path missing too.
+    // Write project.json only : no proxy.mp4 on disk, source path missing too.
     const dir = join(root, "projects", slug);
     mkdirSync(dir, { recursive: true });
     writeFileSync(

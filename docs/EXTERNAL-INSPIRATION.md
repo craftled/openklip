@@ -1,4 +1,4 @@
-# External Inspiration — Steal List
+# External Inspiration : Steal List
 
 Discussion doc. Consolidates patterns worth borrowing from [Videofy Minimal](https://github.com/schibsted/videofy_minimal) and [HyperFrames](https://github.com/heygen-com/hyperframes), scoped to OpenKlip's thesis: **local-first, agent-native, edit video by editing text** (`project.json` EDL, native preview, ffmpeg export).
 
@@ -21,15 +21,15 @@ Discussion doc. Consolidates patterns worth borrowing from [Videofy Minimal](htt
 
 ## Priority Tiers
 
-- **P0** — High value, low risk, fits current architecture
-- **P1** — High value, moderate effort or needs design decision
-- **P2** — Nice polish or future-facing
-- **P3** — Optional spike / post-process only
-- **Avoid** — Conflicts with core thesis
+- **P0** : High value, low risk, fits current architecture
+- **P1** : High value, moderate effort or needs design decision
+- **P2** : Nice polish or future-facing
+- **P3** : Optional spike / post-process only
+- **Avoid** : Conflicts with core thesis
 
 ---
 
-## P0 — Do These First
+## P0 : Do These First
 
 ### 1. Slug validation + safe JSON I/O
 
@@ -80,15 +80,15 @@ Validate request bodies on mutating routes; keep `ProjectSchema.parse` as the si
 
 ---
 
-## P1 — High Value, Needs Design
+## P1 : High Value, Needs Design
 
 ### 4. Brand presets + per-project override
 
-> ✅ **Shipped (2026-06-26).** `brands/<name>.json` (default + cinematic) + `src/brands.ts` (`loadBrand`/`applyBrand`, Zod-validated, traversal-guarded name). Applied via `openklip ingest <video> --brand <name>` or `openklip brand <slug> <name>`. **Defaults only** — `applyBrand` mutates caption/vignette/pad fields of `project.json`; no manifest split, words/overlays untouched. Tested in `tests/brands.test.ts`. Per-project override file + design-token generation still open.
+> ✅ **Shipped (2026-06-26).** `brands/<name>.json` (default + cinematic) + `src/brands.ts` (`loadBrand`/`applyBrand`, Zod-validated, traversal-guarded name). Applied via `openklip ingest <video> --brand <name>` or `openklip brand <slug> <name>`. **Defaults only** : `applyBrand` mutates caption/vignette/pad fields of `project.json`; no manifest split, words/overlays untouched. Tested in `tests/brands.test.ts`. Per-project override file + design-token generation still open.
 
 **From:** Videofy `brands/*.json` + `configResolver.ts` (`deepMerge`)
 
-Global defaults for caption style, vignette, title templates, export height, `padMs` — merged at ingest or via CLI `openklip look --brand X`.
+Global defaults for caption style, vignette, title templates, export height, `padMs` : merged at ingest or via CLI `openklip look --brand X`.
 
 **Constraint:** Defaults only. **`project.json` remains the edit.** Do not split manifest + EDL like Videofy.
 
@@ -130,7 +130,7 @@ projects/<slug>/
 
 ### 6. `@dnd-kit` sortable overlay tracks
 
-> ✅ **Shipped (2026-06-26).** Full `@dnd-kit` drag-reorder: `web/components/overlay-sortable.tsx` (SortableContext + keyboard-accessible handles) in the b-roll inspector, wired to a pure `applyDragReorder` (tested in `tests/dnd-reorder.test.ts`) → `saveBroll`. Engine parity via `reorderBroll/Title/Zoom` + `openklip reorder` (tested in `tests/reorder.test.ts`). **Verified live** — a keyboard-sensor drag reordered the b-roll covers and persisted to `project.json`. Decision settled: reorder changes paint order, not source-time spans.
+> ✅ **Shipped (2026-06-26).** Full `@dnd-kit` drag-reorder: `web/components/overlay-sortable.tsx` (SortableContext + keyboard-accessible handles) in the b-roll inspector, wired to a pure `applyDragReorder` (tested in `tests/dnd-reorder.test.ts`) → `saveBroll`. Engine parity via `reorderBroll/Title/Zoom` + `openklip reorder` (tested in `tests/reorder.test.ts`). **Verified live** : a keyboard-sensor drag reordered the b-roll covers and persisted to `project.json`. Decision settled: reorder changes paint order, not source-time spans.
 
 **From:** Videofy `SegmentList.tsx`
 
@@ -180,11 +180,11 @@ Click b-roll clip → "Replace from bin" panel instead of delete + re-add.
 
 ### 9. Derived `CompiledTimeline` type (authoring vs preview)
 
-> ✅ **Shipped (2026-06-26).** `src/compiledTimeline.ts` `compileTimeline(project)` returns kept ranges, overlays mapped into output time with paint order (`z`), caption groups, and runtime — computed from the EDL, **never persisted**. Pure (asserted non-mutating). Tested in `tests/compiledTimeline.test.ts`. Ready for the timeline/preview to consume instead of re-deriving.
+> ✅ **Shipped (2026-06-26).** `src/compiledTimeline.ts` `compileTimeline(project)` returns kept ranges, overlays mapped into output time with paint order (`z`), caption groups, and runtime : computed from the EDL, **never persisted**. Pure (asserted non-mutating). Tested in `tests/compiledTimeline.test.ts`. Ready for the timeline/preview to consume instead of re-deriving.
 
 **From:** Videofy manuscript vs `processed_manuscript` split
 
-Optional computed type from EDL for UI (kept ranges, overlay paint order, caption groups) — **never persisted**, avoids duplicating stored state.
+Optional computed type from EDL for UI (kept ranges, overlay paint order, caption groups) : **never persisted**, avoids duplicating stored state.
 
 **Effort:** ~1 day  
 **Touches:** new module e.g. `src/compiledTimeline.ts`, timeline + scheduler consumers
@@ -194,7 +194,7 @@ Optional computed type from EDL for UI (kept ranges, overlay paint order, captio
 
 ---
 
-## P2 — Polish & Agent UX
+## P2 : Polish & Agent UX
 
 ### 10. Preview loading / rebuilding states
 
@@ -210,7 +210,7 @@ Explicit "rebuilding timeline" overlay when EDL saves trigger heavy recompute. A
 
 ### 11. HyperFrames-style agent gates in OpenKlip
 
-> ✅ **Partially shipped (2026-06-26).** `openklip doctor [slug]` checks ffmpeg/ffprobe binaries, the Whisper script, and (per project) `project.json`, source/proxy media, and asset proxies — exits non-zero on any failure. Pure `runDoctor()` in `src/doctor.ts`, tested in `tests/doctor.test.ts`. Lint-equivalent EDL validation + skill packaging still open.
+> ✅ **Partially shipped (2026-06-26).** `openklip doctor [slug]` checks ffmpeg/ffprobe binaries, the Whisper script, and (per project) `project.json`, source/proxy media, and asset proxies : exits non-zero on any failure. Pure `runDoctor()` in `src/doctor.ts`, tested in `tests/doctor.test.ts`. Lint-equivalent EDL validation + skill packaging still open.
 
 **From:** HyperFrames `lint` → `validate` → `render` loop
 
@@ -289,13 +289,13 @@ Prewarm ffmpeg path resolution, probe proxy on first `serve`, validate whisper m
 
 ---
 
-## P3 — Optional Spikes (HyperFrames as Post-Process)
+## P3 : Optional Spikes (HyperFrames as Post-Process)
 
 These use HyperFrames **downstream of OpenKlip export**, not as editor core.
 
 ### 17. Premium caption pass (`embedded-captions`)
 
-> ✅ **Real pass verified (2026-06-26).** Corrected the seam to the **actual** HyperFrames CLI (the npm `hyperframes` package — there is no `embedded-captions` *command*; that's a skill). `openklip package <slug> remove-background` was run end-to-end on a real OpenKlip export: HF downloaded the u2net model, ran it on CoreML, and removed the background from **284 frames in 20.8s**, producing a transparent `out-remove-background.webm` (using OpenKlip's bundled ffmpeg via PATH). `remove-background` is the matte primitive the "embed captions behind subject" workflow is built on. HF stays **opt-in** (`bun add -d hyperframes`) — not a committed dep; the seam preflights and prints install instructions when it's absent. Authoring the full embed-captions *composition* (HF skill + `hyperframes render`) is the remaining optional work.
+> ✅ **Real pass verified (2026-06-26).** Corrected the seam to the **actual** HyperFrames CLI (the npm `hyperframes` package : there is no `embedded-captions` *command*; that's a skill). `openklip package <slug> remove-background` was run end-to-end on a real OpenKlip export: HF downloaded the u2net model, ran it on CoreML, and removed the background from **284 frames in 20.8s**, producing a transparent `out-remove-background.webm` (using OpenKlip's bundled ffmpeg via PATH). `remove-background` is the matte primitive the "embed captions behind subject" workflow is built on. HF stays **opt-in** (`bun add -d hyperframes`) : not a committed dep; the seam preflights and prints install instructions when it's absent. Authoring the full embed-captions *composition* (HF skill + `hyperframes render`) is the remaining optional work.
 
 **From:** HyperFrames `/embedded-captions` skill
 
@@ -319,7 +319,7 @@ Matte-occluded "embed behind subject" captions; 17+ visual identities. Footage a
 
 ### 18. Social packaging pass (`talking-head-recut`)
 
-> 🟡 **Seam in place (2026-06-26).** `talking-head-recut` is a HyperFrames *skill* (HTML-composition authoring), not a one-shot CLI verb, so it isn't a `package` pass. The runnable HF post-export primitives are exposed instead (`remove-background`, `transcribe` — see #17). Full recut authoring stays an optional HF-skill flow.
+> 🟡 **Seam in place (2026-06-26).** `talking-head-recut` is a HyperFrames *skill* (HTML-composition authoring), not a one-shot CLI verb, so it isn't a `package` pass. The runnable HF post-export primitives are exposed instead (`remove-background`, `transcribe` : see #17). Full recut authoring stays an optional HF-skill flow.
 
 **From:** HyperFrames `/talking-head-recut` skill
 
@@ -333,7 +333,7 @@ Full footage + agent-authored HTML overlay cards (lower-thirds, data callouts, k
 
 ### 19. Transition-only WebM overlays
 
-> 🟡 **Primitive available (2026-06-26).** Transparent transition clips are produced with `remove-background` (verified, #17) — HF outputs alpha WebM/MOV that ffmpeg can composite at cut boundaries. Whether to composite in ffmpeg vs author via an HF skill remains a design choice.
+> 🟡 **Primitive available (2026-06-26).** Transparent transition clips are produced with `remove-background` (verified, #17) : HF outputs alpha WebM/MOV that ffmpeg can composite at cut boundaries. Whether to composite in ffmpeg vs author via an HF skill remains a design choice.
 
 **From:** HyperFrames shader catalog (`flash-through-white`, etc.)
 
@@ -362,7 +362,7 @@ ingesters/<id>/ingester.ts     # script
 
 ---
 
-## Avoid — Do Not Steal
+## Avoid : Do Not Steal
 
 | Item | Source | Why not |
 |------|--------|---------|
@@ -410,11 +410,11 @@ If we agree to proceed incrementally:
 
 | Phase | Items | Rough effort |
 |-------|-------|--------------|
-| **A — Hygiene** | #1 slug validation, #2 safeAction, #3 Zod boundaries | 1 day |
-| **B — UX** | #6 dnd-kit, #7 replace-from-bin, #10 loading states | 2 days |
-| **C — Platform** | #4 brands, #8 export API, #11 doctor | 3–4 days |
-| **D — Structure** | #5 folder layout, #9 compiled timeline | 2–3 days |
-| **E — Spike** | #17 HF captions post-pass OR #19 transition WebM | 1–2 days each |
+| **A : Hygiene** | #1 slug validation, #2 safeAction, #3 Zod boundaries | 1 day |
+| **B : UX** | #6 dnd-kit, #7 replace-from-bin, #10 loading states | 2 days |
+| **C : Platform** | #4 brands, #8 export API, #11 doctor | 3–4 days |
+| **D : Structure** | #5 folder layout, #9 compiled timeline | 2–3 days |
+| **E : Spike** | #17 HF captions post-pass OR #19 transition WebM | 1–2 days each |
 
 ---
 
@@ -428,4 +428,4 @@ If we agree to proceed incrementally:
 
 ---
 
-*Last updated: 2026-06-26 — from codebase exploration sessions.*
+*Last updated: 2026-06-26 : from codebase exploration sessions.*

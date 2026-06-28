@@ -1,7 +1,7 @@
 // A derived, NEVER-persisted view of a Project for UI consumers (preview canvas,
 // timeline, inspector). The EDL (project.json) stays the single source of truth;
 // this just computes the kept ranges, overlays mapped into OUTPUT time with their
-// paint order, the caption groups, and the runtime — so the GUI doesn't have to
+// paint order, the caption groups, and the runtime : so the GUI doesn't have to
 // re-derive (and risk drifting from) what the exporter does. Pure: reads only.
 import {
   type CaptionGroup,
@@ -22,7 +22,7 @@ export interface CompiledOverlay {
   outEndSec: number;
   outStartSec: number;
   // Paint order: lower paints first (further back). Matches the exporter's
-  // filtergraph stacking — zoom transform, then b-roll covers, then titles on top.
+  // filtergraph stacking : zoom transform, then b-roll covers, then titles on top.
   z: number;
 }
 

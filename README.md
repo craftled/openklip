@@ -1,19 +1,19 @@
 # OpenKlip
 
-**Video editing your agent can drive.**
+**Agent-native video toolchain**
 
-OpenKlip is a local-first, agent-native editor for talking-head video. An external agent (Cursor, Claude Code, Codex, your scripts) runs the edit loop through CLI commands; the browser is where you review the cut, tweak overlays, and export. Every project is plain files — `project.json` is the contract between agent and editor. No bundled LLM, no database, no cloud.
+OpenKlip is a local-first toolchain for programmatic video editing. An external agent (Cursor, Claude Code, Codex, your scripts) runs the edit loop through CLI commands; the browser is where you review, adjust, and export. Every project is plain files on disk: `project.json` is the contract between agent and editor. No bundled LLM, no database, no cloud.
 
-The transcript is how the edit is *represented*: words, timestamps, and a `deleted` flag agents can read and mutate deterministically. That is the mechanism, not the product category.
+Today the edit model is transcript-driven (words, cuts, overlays on a timeline spine). The category is the product; the transcript is the current representation, not the ceiling.
 
 ---
 
 ## Philosophy
 
-Most video tools assume a human at the timeline and bolt on “AI features.” OpenKlip assumes an **agent at the terminal** and a human at the browser — both on the same folder.
+Most video tools assume a human at the timeline and bolt on "AI features." OpenKlip assumes an **agent at the terminal** and a human at the browser: both on the same folder.
 
-- **Agents** read `openklip transcript`, cut filler, place b-roll, check `openklip status`, run `openklip export`. The action registry (`openklip actions --json`) is the capability manifest.
-- **Humans** preview the result, click words to adjust cuts, drag overlays in the inspector, drop assets into `assets/`.
+- **Agents** read state, mutate the edit, verify, export: via named CLI actions and `openklip actions --json`.
+- **Humans** preview the result, refine cuts and overlays in the UI, drop assets into `assets/`.
 
 The GUI is not a walled garden. It is a peer surface on the same `project.json` the CLI writes.
 
@@ -25,15 +25,15 @@ These follow from how the repo is actually built:
 
 **Local-first.** Projects live under `projects/<slug>/` as plain files. Ingest transcribes with Transformers.js (Whisper). Export and proxies use bundled `ffmpeg-static` / `ffprobe-static`.
 
-**One edit, one file.** `project.json` holds words, cuts, the asset registry, b-roll/title/zoom/still overlays, captions, and look flags. Paths under `working/` and `output/` are derived (proxy, transcript, ffmpeg asset proxies, `chats.json`, export).
+**One edit, one file.** `project.json` holds the edit: words, cuts, asset registry, overlays, captions, look flags. Paths under `working/` and `output/` are derived (proxy, transcript, ffmpeg asset proxies, `chats.json`, export).
 
-**Same file, two surfaces.** The CLI applies edits through `runAction()` in `src/registry.ts`. The GUI applies edits through Next.js server actions in `app/actions.ts` (word toggles, overlays, look). Both persist to the same `project.json`. Reload the browser after external CLI edits.
+**Same file, two surfaces.** The CLI applies edits through `runAction()` in `src/registry.ts`. The GUI applies edits through Next.js server actions in `app/actions.ts` (via `mutateProject()` for serialized read-modify-write). Both persist to the same `project.json`. Reload the browser after external CLI edits.
 
-**Agent-native, not agent-bundled.** No in-app LLM. The agent sidebar maps chat text to suggested `openklip …` command sequences (`web/lib/skill-router.ts`). Optional: wire an external agent (Cursor, Claude Code, Codex) or run `bun run agent-demo`.
+**Agent-native, not agent-bundled.** No in-app LLM for the core loop. The agent sidebar can shell out to Claude Code, Codex, Cursor, or Grok for "Find filler" (`src/agent-driver.ts`), or map chat text to suggested `openklip …` command sequences (`web/lib/skill-router.ts`). Or run `bun run agent-demo`.
 
-**Sample-accurate time.** Word and overlay times are stored as integer samples at 48 kHz. CLI commands take seconds for overlay spans and convert internally.
+**Sample-accurate time.** Word and overlay times are stored as integer samples at 48 kHz. CLI commands take seconds for human-facing spans and convert internally.
 
-**User drop zone.** Original assets you add land in `assets/` (upload, drag-drop, or copy into the folder). Generated proxies land in `working/assets/`. The asset API syncs new files from `assets/` via `POST /api/projects/:slug/assets/sync` (synced per-slug so overlapping polls/tabs don't race `project.json`).
+**User drop zone.** Original assets land in `assets/` (upload, drag-drop, or copy into the folder). Generated proxies land in `working/assets/`. The asset API syncs new files via `POST /api/projects/:slug/assets/sync` (serialized per-slug so overlapping polls/tabs do not race `project.json`).
 
 ---
 
@@ -52,7 +52,7 @@ projects/<slug>/
 | Path | In code |
 | --- | --- |
 | `project.json` | Loaded by `loadProject()` / saved by GUI and CLI |
-| `assets/` | `projectPaths(slug).assets` — `registerAsset`, folder scanner |
+| `assets/` | `projectPaths(slug).assets`: `registerAsset`, folder scanner |
 | `working/proxy.mp4` | Preview proxy from ingest |
 | `working/transcript.json` | Whisper output |
 | `working/assets/` | ffmpeg proxies for video/audio assets |
@@ -65,17 +65,21 @@ Agent sidebar chats use `working/chats.json`, not `localStorage` (theme and defa
 
 ## What works today
 
-Verified against the current codebase:
+Verified against the current codebase (265 tests):
 
-- **Transcript editing** — click words to toggle `deleted`; `openklip cut` / `cut --text` / `restore` on CLI
-- **Preview** — all-intra proxy; scheduler plays kept ranges only (`web/app.tsx`)
-- **Preview cut transitions** — Glimm WebGL sweep when `prefers-reduced-motion` is not set
-- **Captions** — preview overlay + ASS burn-in on export
-- **Assets** — register b-roll, music, stills; UI upload + `assets/` folder sync
-- **Overlays** — b-roll cover, Ken Burns stills, push-in zooms, title cards (lower / center / hero), vignette
-- **Export** — ffmpeg composes kept ranges + overlays + captions
-- **CLI** — full edit surface; `openklip actions --json` capability manifest
-- **Agent demo** — `bun run agent-demo` (phrase list → cut → status → optional export)
+- **Ingest**: video → local transcript + preview proxy + `project.json` (`openklip ingest`; refuses re-ingest unless `--force`)
+- **Transcript editing**: click words to toggle `deleted`; `openklip cut` / `cut --text` / `restore` on CLI
+- **Preview**: all-intra proxy; scheduler plays kept ranges only (`web/app.tsx`)
+- **Cinema player**: fullscreen overlay with Linear-parity transport bar (`web/components/cinema-player.tsx`, `player-controls.tsx`)
+- **Preview cut transitions**: Glimm WebGL sweep when `prefers-reduced-motion` is not set
+- **Captions**: preview overlay + ASS burn-in on export
+- **Assets**: register b-roll, music, stills; sidebar asset bin with upload + `assets/` folder sync
+- **Overlays**: b-roll cover, Ken Burns stills, push-in zooms, title cards (lower / center / hero), vignette
+- **Export**: ffmpeg composes kept ranges + overlays + captions
+- **CLI**: full edit surface; `openklip actions --json` capability manifest
+- **Agent selector**: drive filler cuts via Claude Code, Codex, Cursor, or Grok subscription CLIs
+- **Theme engine**: swappable presets with light/dark scheme (`web/lib/theme-engine.ts`)
+- **Agent demo**: `bun run agent-demo` (phrase list → cut → status → optional export)
 
 Phrase-based cutting is CLI-only today (`openklip cut --text`). The transcript UI is word click, not phrase search.
 
@@ -87,16 +91,16 @@ Phrase-based cutting is CLI-only today (`openklip cut --text`). The transcript U
 
 ```bash
 bun install
-bun run ingest /path/to/talking-head.mp4   # creates projects/<slug>/
-bun run serve <slug>                        # opens editor (sets OPENKLIP_SLUG)
+bun run ingest /path/to/video.mp4   # creates projects/<slug>/
+bun run serve <slug>                   # opens editor (sets OPENKLIP_SLUG)
 bun run export <slug>
 ```
 
 Dev server (port 4399):
 
 ```bash
-bun run dev                                 # latest project, or ?slug= in URL
-OPENKLIP_SLUG=<slug> bun run dev            # pin project when using serve-style env
+bun run dev                            # latest project, or ?slug= in URL
+OPENKLIP_SLUG=<slug> bun run dev       # pin project when using serve-style env
 ```
 
 ---
@@ -124,10 +128,10 @@ Command reference: **[CLAUDE.md](./CLAUDE.md)**. Registry manifest: `openklip ac
 
 ## How it works
 
-- **Cut spine** — `deleted` words → kept source-time ranges (`compileTimeline`, preview scheduler, exporter).
-- **Preview** — `<video>` on `working/proxy.mp4`; seeks across kept ranges.
-- **Export** — ffmpeg `filter_complex`: range concat, b-roll/still cover, zoompan, vignette, libass captions/titles.
-- **Export source** — prefers original media; can fall back to project proxies when source files are missing (see exporter).
+- **Cut spine**: `deleted` words → kept source-time ranges (`compileTimeline`, preview scheduler, exporter).
+- **Preview**: `<video>` on `working/proxy.mp4`; seeks across kept ranges.
+- **Export**: ffmpeg `filter_complex`: range concat, b-roll/still cover, zoompan, vignette, libass captions/titles.
+- **Export source**: prefers original media; can fall back to project proxies when source files are missing (see exporter).
 
 ---
 

@@ -1,4 +1,4 @@
-// `openklip doctor` — environment + project health checks. An agent's most
+// `openklip doctor` : environment + project health checks. An agent's most
 // common silent failures are a missing ffmpeg path, a missing whisper script,
 // or a stale/absent proxy. This surfaces them up front so the cut → export loop
 // doesn't die deep inside a subprocess. Pure (returns a structured report) so it

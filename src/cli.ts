@@ -922,7 +922,7 @@ try {
       break;
     }
     case "actions": {
-      // Emit the unified action registry — the machine-readable capability
+      // Emit the unified action registry : the machine-readable capability
       // manifest an external agent can read whole (--json), or a Markdown table
       // that mirrors the CLAUDE.md capability map. Optionally filter by surface.
       const surfaceArg = flagValue(rest, "--surface");

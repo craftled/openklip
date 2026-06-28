@@ -589,7 +589,7 @@ export function updateZoom(
 
 // Move an item to a new index within its track, preserving the others' order.
 // Overlay paint order is array order (later items paint on top), so this is how
-// a dnd-kit track — or the CLI — restacks b-roll covers, titles, or zooms.
+// a dnd-kit track : or the CLI : restacks b-roll covers, titles, or zooms.
 function reorderById<T extends { id: string }>(
   list: T[],
   id: string,

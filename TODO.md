@@ -2,10 +2,11 @@
 
 ## Status
 
-OpenKlip is a lean, local-first, **agent-native** video editor: external agents drive the edit loop via CLI; humans review in the browser. Both read/write the same `project.json` on disk.
+OpenKlip is a lean, local-first **agent-native video toolchain**: external agents drive the edit loop via CLI; humans review in the browser. Both read/write the same `project.json` on disk.
 
-**Current state:** working local editor; cut → captions → b-roll → vignette → push-in zoom → titles → export all functional; open-sourced MIT.
-Preview cuts now get a Glimm WebGL sweep in the browser; exported MP4s still hard-cut until the ffmpeg transition graph lands.
+**Current release:** v0.6.1 (2026-06-28). Working local editor: cut → captions → b-roll → vignette → push-in zoom → titles → export; cinema player; multi-agent filler cuts; sidebar asset bin; theme engine; 265 tests; MIT.
+
+Preview cuts get a Glimm WebGL sweep in the browser; exported MP4s still hard-cut until the ffmpeg transition graph lands.
 
 ## Completed
 
@@ -22,27 +23,33 @@ Preview cuts now get a Glimm WebGL sweep in the browser; exported MP4s still har
 - [x] **Cinematic look - vignette** (global toggle)
 - [x] **Cinematic look - animated push-in zoom** (`zoom-ramp.ts` smoothstep ramp via ffmpeg `zoompan`)
 - [x] **Cinematic look - 1080p export option**
-- [x] **Title cards** (lower-third + centered, slide-up/fade entrance; ASS builder `titles.ts` + preview overlay + burn-in)
+- [x] **Title cards** (lower-third + centered + hero, slide-up/fade entrance; ASS builder `titles.ts` + preview overlay + burn-in)
 - [x] **MVP reliability pass** (proxy media route, save/export sequencing, source/proxy export fallback, b-roll gap splitting, caption/title collision handling, ASS timestamp rounding)
-- [x] **Agent peer (M2 foundation) - CLI primitives** (`transcript`, `cut`, `cut --text`, `restore`, `broll-add`, `broll-rm`, `captions`, `status`, `export`)
+- [x] **Agent peer - CLI primitives** (`transcript`, `cut`, `cut --text`, `restore`, `broll-add`, `broll-rm`, `captions`, `status`, `export`)
 - [x] **Agent peer - full GUI parity CLI** (`list`, `assets`, zoom/title/broll set commands, look, pad, captions-max)
 - [x] **Agent peer - agent-loop demo** (`bun run agent-demo`, composes primitives from a phrase list)
 - [x] **Agent peer - CLAUDE.md agent skill + pure `actions.ts`** (full GUI/agent parity on the same `project.json`)
-- [x] **Unified action registry** (`src/registry.ts`: one Zod-schema'd definition per `project.json` mutation; the CLI routes every edit command through a single `runAction`; `openklip actions [--json] [--surface]` prints the capability manifest — schemas render to JSON Schema, the MCP `inputSchema` shape, so the optional MCP server below is now mostly wiring)
-- [x] **Design system: Geist (Vercel)** (light theme + light/dark toggle; dark mode shipped alongside this roadmap)
-- [x] **TDD test suite** (`bun test`: actions, captions, EDL, exporter, range streaming, titles, zoom-ramp)
+- [x] **Unified action registry** (`src/registry.ts`: one Zod-schema'd definition per `project.json` mutation; CLI routes every edit command through `runAction`; `openklip actions [--json] [--surface]` prints the capability manifest)
+- [x] **Multi-agent driver** (Claude Code, Codex, Cursor, Grok via `src/agent-driver.ts`; "Find filler" in the editor)
+- [x] **Cinema player + Linear-parity transport bar** (`cinema-player.tsx`, `player-controls.tsx`)
+- [x] **Editor shell refresh** (sidebar asset bin, project switcher, persisted chats, theme engine, keyboard shortcuts)
+- [x] **Project write serialization** (`src/project-lock.ts`, `mutateProject()`; in-process per-slug locks for `project.json` and `chats.json`)
+- [x] **Chats + asset hardening** (atomic `chats.json` writes, POST folder sync, re-ingest guard with `--force`, external still copy-in)
+- [x] **Design system: Geist (Vercel)** (light theme + light/dark toggle; swappable theme presets)
+- [x] **TDD test suite** (`bun test`: 265 tests across actions, captions, EDL, exporter, project lock, chats, assets, and more)
 - [x] **GitHub Actions CI** (`check`, `typecheck`, `test`, `build`)
 - [x] **Open-sourced** (public GitHub repo, MIT license, source media gitignored + purged from history)
 
 ## Architecture & Key Decisions
 
 - Files-on-disk `project.json` EDL; no database; GUI and terminal agent edit the same file (parity is the core agent-native bet).
-- The agent is Claude Code / Codex via terminal subscription; OpenKlip ships **no** LLM, no API keys, no cloud.
+- The agent is Claude Code / Codex / Cursor / Grok via the user's own subscription CLI; OpenKlip ships **no** bundled LLM, no API keys, no cloud.
 - Whisper via Transformers.js, picked over native whisper.cpp (no cmake / build toolchain needed).
 - ffmpeg via `ffmpeg-static`: GPL binary invoked as a subprocess, so it does **not** bind OpenKlip's MIT license.
 - Remotion deliberately **not** used (commercial license at 4+ employees); preview is a native `<video>` scheduler, export is ffmpeg `filter_complex`.
 - All-intra 720p proxy for instant seeks; 8-bit `yuv420p` everywhere; export re-encodes from original source on the same 48 kHz sample grid as preview.
 - ffmpeg `crop` can't vary size per-frame → animated zoom uses `zoompan` (per-frame `z`); static effects use `split` + `overlay`.
+- Server-side `project.json` mutations serialize per-slug in-process (`withProjectLock` / `mutateProject`). Concurrent **processes** (CLI + server, two CLI invocations) still need OS-level file locking (not implemented).
 
 ## Roadmap / Pending
 
@@ -62,7 +69,7 @@ Preview cuts now get a Glimm WebGL sweep in the browser; exported MP4s still har
 ### Editing Intelligence
 
 - [ ] VAD snap-to-silence + equal-power crossfade at cut boundaries (kill audio clicks; tighten the ~100 ms-loose Whisper word boundaries).
-- [ ] Filler-word / dead-air auto-removal (Descript-style).
+- [ ] Filler-word / dead-air auto-removal beyond the current "Find filler" agent action (Descript-style batch pipeline).
 - [ ] LLM highlight detection (long video → short clips).
 
 ### Shorts (9:16)
@@ -73,26 +80,27 @@ Preview cuts now get a Glimm WebGL sweep in the browser; exported MP4s still har
 
 ### Agent
 
-- [x] End-to-end agent-loop demo (`bun run agent-demo` — phrase list → cut → status → export).
+- [x] End-to-end agent-loop demo (`bun run agent-demo`: phrase list → cut → status → export).
 - [x] `openklip doctor` env/project health check (ffmpeg, Whisper, proxy/source/asset media).
-- [ ] Optional MCP server exposing the editing tools.
+- [x] Multi-agent filler-cut driver (Claude, Codex, Cursor, Grok).
+- [ ] Optional MCP server exposing the editing tools (registry manifest exists; wiring remains).
 
 ### Infra
 
-- [x] Slug validation guard on every path join (`assertValidSlug` in `paths.ts`) — closes a path-traversal hole on the `[slug]` API routes.
+- [x] Slug validation guard on every path join (`assertValidSlug` in `paths.ts`): closes a path-traversal hole on the `[slug]` API routes.
 - [x] Export API route (`POST /api/projects/[slug]/export`, Zod-validated body, empty-cut + traversal guarded).
 - [x] Layered project folders (`project.json` at root; derived media under `working/`, render under `output/`).
 - [x] Ken Burns **still** overlays (`still-add`/`still-rm`, `zoompan` push-in in exporter, focus point).
 - [x] Ingester plugin manifest (`ingesters/<id>/ingester.json` + loader + `openklip ingesters`).
-- [x] Post-export HyperFrames seam (`openklip package <slug> remove-background|transcribe`) — corrected to the real `hyperframes` CLI and **verified end-to-end** (real `remove-background` run on an export). HF stays opt-in (not a committed dep).
+- [x] Post-export HyperFrames seam (`openklip package <slug> remove-background|transcribe`): opt-in `hyperframes` CLI, verified end-to-end.
 - [x] Agent skill router (intent → CLI command sequences) feeding the sidebar.
-- [x] GUI: orientation toggle (16:9/9:16/1:1 preview), rebuilding/saving overlay, `@dnd-kit` drag-reorder of b-roll paint order (verified live), replace-from-bin, in/out loop region.
-- [x] Brand presets (`brands/*.json` + `applyBrand`) — caption/vignette/pad defaults, applied at `ingest --brand` or `openklip brand`. Defaults only; `project.json` stays the edit.
-- [x] Overlay reorder (`reorderBroll/Title/Zoom` + `openklip reorder`) — paint-order control for the b-roll/title/zoom tracks.
-- [x] Derived `CompiledTimeline` (`src/compiledTimeline.ts`) — never-persisted authoring→preview view (kept ranges, overlays in output time + paint order, caption groups, runtime).
+- [x] GUI: orientation toggle (16:9/9:16/1:1 preview), rebuilding/saving overlay, `@dnd-kit` drag-reorder of b-roll paint order, replace-from-bin, in/out loop region.
+- [x] Brand presets (`brands/*.json` + `applyBrand`): caption/vignette/pad defaults at `ingest --brand` or `openklip brand`.
+- [x] Overlay reorder (`reorderBroll/Title/Zoom` + `openklip reorder`): paint-order control for the b-roll/title/zoom tracks.
+- [x] Derived `CompiledTimeline` (`src/compiledTimeline.ts`): never-persisted authoring→preview view.
 - [x] `safeAction` dev-mode stack traces in server actions; `serve` runs a health gate (`runDoctor`) before opening the editor.
-
 - [x] GitHub Actions CI (check + typecheck + tests + build).
+- [ ] OS-level file locking for concurrent CLI + server writes on the same project.
 - [ ] Demo gif + repo topics.
 
 ## Known Limitations
@@ -101,9 +109,10 @@ Preview cuts now get a Glimm WebGL sweep in the browser; exported MP4s still har
 - Whisper word timestamps are ~100 ms loose; cuts can clip a phoneme until VAD-snapping lands.
 - Glimm cut transitions are preview-only; exported MP4 hard-jumps between kept ranges.
 - Vertical shorts (9:16 reframe), highlight detection, and MCP server are not implemented.
-- GUI server actions do not yet dispatch through `runAction()` — CLI uses `src/registry.ts`; GUI uses `app/actions.ts` + `projectMutations` (same `project.json`, separate code paths).
+- GUI server actions do not dispatch through `runAction()`: CLI uses `src/registry.ts`; GUI uses `app/actions.ts` + `projectMutations` (same `project.json`, separate code paths).
+- Project write locks are in-process only. Two concurrent **processes** writing the same slug (e.g. CLI agent + running editor server) can still race.
 - Reload the browser after CLI edits to see changes in the editor.
 
 ## README policy
 
-**README = what exists in code today.** Philosophy/principles should describe implemented behavior. Roadmap, aspirations, and “post-MVP” items belong in this file only.
+**README = what exists in code today.** Philosophy/principles should describe implemented behavior. Roadmap, aspirations, and "post-MVP" items belong in this file only.

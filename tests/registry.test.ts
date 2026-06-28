@@ -205,7 +205,7 @@ test("actionManifest exposes JSON-schema input per action and filters by surface
   assert.equal(all.length, actions.length);
   const brollAdd = all.find((m) => m.name === "broll-add");
   assert.ok(brollAdd, "broll-add missing from manifest");
-  // The Zod schema is rendered to JSON Schema — the MCP inputSchema seam.
+  // The Zod schema is rendered to JSON Schema : the MCP inputSchema seam.
   assert.equal(brollAdd?.inputSchema.type, "object");
   assert.ok(brollAdd?.inputSchema.properties.assetId, "assetId not in schema");
 

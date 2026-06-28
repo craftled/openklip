@@ -1,6 +1,6 @@
 // Post-export "package" passes: optional finishing steps that run DOWNSTREAM of
 // `openklip export` on the finished out.mp4 via the real HyperFrames CLI
-// (`hyperframes`, an npm package — NOT bundled; it needs Chrome + ffmpeg).
+// (`hyperframes`, an npm package : NOT bundled; it needs Chrome + ffmpeg).
 //
 // These map to the HyperFrames subcommands that genuinely operate on a finished
 // video. `remove-background` is the matte primitive the "embed captions behind
@@ -78,11 +78,11 @@ export function checkPackagePreflight(input: {
 }): { ok: boolean; errors: string[] } {
   const errors: string[] = [];
   if (!input.outExists) {
-    errors.push("no export found — run `openklip export <slug>` first");
+    errors.push("no export found : run `openklip export <slug>` first");
   }
   if (!input.cli) {
     errors.push(
-      "HyperFrames CLI not found — install it (bun add -d hyperframes) and/or set HYPERFRAMES_CLI to its path"
+      "HyperFrames CLI not found : install it (bun add -d hyperframes) and/or set HYPERFRAMES_CLI to its path"
     );
   }
   return { ok: errors.length === 0, errors };

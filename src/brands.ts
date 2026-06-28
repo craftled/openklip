@@ -2,7 +2,7 @@
 // padding). Applied at ingest (`--brand X`) or later (`openklip brand <slug> X`).
 //
 // Constraint: brands set DEFAULTS only. They never split the edit into a separate
-// manifest — applying a brand mutates the relevant fields of project.json, which
+// manifest : applying a brand mutates the relevant fields of project.json, which
 // remains the single source of truth. Words and overlays are never touched.
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";

@@ -51,7 +51,7 @@ function badgeState(status?: AgentStatus): {
     text: "text-info-text",
     label: "Sign in",
     title: status.signInCmd
-      ? `Not signed in — run: ${status.signInCmd}`
+      ? `Not signed in : run: ${status.signInCmd}`
       : "Not signed in",
   };
 }
