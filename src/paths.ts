@@ -1,9 +1,12 @@
 import { basename, extname, join, resolve } from "node:path";
 
-// projects/ lives at the repo root. Resolve against cwd (the dir Next/the CLI
-// runs from) so this works under both Bun and Node and isn't affected by
-// bundler rewrites of import.meta.
+// Parent directory containing project folders (each subdir with project.json).
+// Override with OPENKLIP_PROJECTS_ROOT to use any folder on disk.
 export function projectsRoot(): string {
+  const env = process.env.OPENKLIP_PROJECTS_ROOT;
+  if (env) {
+    return resolve(env);
+  }
   return resolve(process.cwd(), "projects");
 }
 
@@ -43,9 +46,10 @@ export function projectDir(slug: string): string {
 }
 
 // Layered project layout. `project.json` (the edit) stays at the project root;
-// everything derived lives under working/ (proxy, transcript, audio, frames,
-// asset proxies, export scratch) and rendered output under output/. Asset proxy
-// paths stored in project.json are RELATIVE to dir (e.g. "working/assets/b1.mp4").
+// user originals live in assets/; everything derived lives under working/
+// (proxy, transcript, audio, frames, asset proxies, chats) and rendered output
+// under output/. Proxy paths in project.json are relative to dir
+// (e.g. "working/assets/b1.mp4"); user sources use "assets/track.mp3".
 export function projectPaths(slug: string) {
   const dir = projectDir(slug);
   const working = join(dir, "working");
@@ -59,22 +63,26 @@ export function projectPaths(slug: string) {
     proxy: join(working, "proxy.mp4"),
     audioRaw: join(working, "audio16k.f32"),
     frames: join(working, "frames"),
-    assets: join(working, "assets"),
+    /** User drop folder — originals only. */
+    assets: join(dir, "assets"),
+    /** Generated asset proxies (ffmpeg output). */
+    assetProxies: join(working, "assets"),
+    chats: join(working, "chats.json"),
     out: join(output, "out.mp4"),
   };
 }
 
-/** Absolute path to a registered asset proxy (proxy field is relative to project dir). */
-export function assetStoragePath(slug: string, proxyRelative: string): string {
-  return join(projectDir(slug), proxyRelative);
+/** Relative path (from project dir) for a user asset original. */
+export function assetSourceRelative(filename: string): string {
+  return join("assets", filename);
 }
 
-/** @deprecated Prefer assetStoragePath(slug, asset.proxy). Kept for legacy ids. */
-export function assetProxyPath(slug: string, assetId: string): string {
-  return join(projectDir(slug), "working", "assets", `${assetId}.mp4`);
-}
-
-/** Relative (to project dir) storage path for a new asset proxy of the given filename. */
+/** Relative path (from project dir) for a generated asset proxy. */
 export function assetProxyRelative(filename: string): string {
   return join("working", "assets", filename);
+}
+
+/** Absolute path to a stored asset file (proxy or user original). */
+export function assetStoragePath(slug: string, relativePath: string): string {
+  return join(projectDir(slug), relativePath);
 }

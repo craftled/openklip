@@ -47,7 +47,7 @@ function Row({
   return (
     <div
       className={cn(
-        "flex items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1.5 text-xs",
+        "flex items-center gap-1.5 rounded-md bg-foreground/5 px-2 py-1.5 text-xs",
         active && "ring-1 ring-foreground",
         isDragging && "opacity-60"
       )}
@@ -64,7 +64,7 @@ function Row({
         <GripVertical className="size-3.5" />
       </button>
       <button
-        className="min-w-0 flex-1 truncate text-left"
+        className="min-w-0 flex-1 cursor-pointer truncate text-left"
         onClick={() => onSelect?.(id)}
         type="button"
       >

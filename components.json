@@ -1,12 +1,12 @@
 {
   "$schema": "https://ui.shadcn.com/schema.json",
-  "style": "radix-mira",
+  "style": "new-york",
   "rsc": true,
   "tsx": true,
   "tailwind": {
     "config": "",
     "css": "app/globals.css",
-    "baseColor": "olive",
+    "baseColor": "neutral",
     "cssVariables": true,
     "prefix": ""
   },
@@ -22,6 +22,7 @@
     "hooks": "@/hooks"
   },
   "registries": {
-    "@svgl": "https://svgl.app/r/{name}.json"
+    "@svgl": "https://svgl.app/r/{name}.json",
+    "@agents-ui": "https://livekit.com/ui/r/{name}.json"
   }
 }

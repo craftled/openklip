@@ -79,7 +79,8 @@ export async function withTempProjectsRoot<T>(
 export function writeFixtureProject(slug: string, project: Project): void {
   const dir = join(process.cwd(), "projects", slug);
   mkdirSync(join(dir, "working"), { recursive: true });
+  mkdirSync(join(dir, "assets"), { recursive: true });
+  mkdirSync(join(dir, "output"), { recursive: true });
   writeFileSync(join(dir, "project.json"), JSON.stringify(project, null, 2));
-  // Canonical proxy lives under working/ in the layered layout.
   writeFileSync(join(dir, "working", "proxy.mp4"), "fake-proxy-bytes");
 }

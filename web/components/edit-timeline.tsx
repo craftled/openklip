@@ -104,7 +104,7 @@ function LibraryBlock({
   return (
     <div
       className={cn(
-        "absolute top-1 bottom-1 truncate rounded border border-dashed px-1 text-[10px] leading-none opacity-75",
+        "absolute top-1 bottom-1 truncate rounded border border-dashed px-1 text-caption leading-none opacity-75",
         className
       )}
       style={{ left: `${left}%`, width: `${width}%` }}
@@ -135,7 +135,7 @@ function ClipBlock({
   return (
     <button
       className={cn(
-        "absolute top-1 bottom-1 truncate rounded px-1 text-left text-[10px] leading-none shadow-sm transition-opacity hover:opacity-100",
+        "absolute top-1 bottom-1 cursor-pointer truncate rounded px-1 text-left text-caption leading-none transition-opacity hover:opacity-100",
         active
           ? "ring-2 ring-live ring-offset-1 ring-offset-background"
           : "opacity-90",
@@ -168,16 +168,16 @@ function TrackRow({
   children: ReactNode;
 }) {
   return (
-    <div className="flex border-border/60 border-b last:border-b-0">
+    <div className="flex border-foreground/10 border-b last:border-b-0">
       <div
-        className="flex shrink-0 items-center gap-1.5 border-border/60 border-r bg-muted/30 px-2 text-[11px] text-muted-foreground"
+        className="flex shrink-0 items-center gap-1.5 border-foreground/10 border-r bg-foreground/3 px-2 text-caption text-muted-foreground"
         style={{ width: LABEL_W }}
       >
         <Icon className="size-3 shrink-0" />
         <span className="truncate">{label}</span>
       </div>
       <div
-        className="relative min-w-0 flex-1 cursor-crosshair bg-background/50"
+        className="relative min-w-0 flex-1 cursor-pointer bg-background/50"
         onClick={(e) => seekFromClick(e, durationSec, onSeek)}
         role="presentation"
         style={{ height: TRACK_H }}
@@ -207,31 +207,31 @@ export function EditTimeline({
   const playhead = pct(curSec, durationSec);
 
   return (
-    <div className="shrink-0 border-border border-t bg-muted/15">
-      <div className="flex items-center justify-between border-border/60 border-b px-3 py-2">
+    <div className="shrink-0 border-foreground/10 border-t bg-foreground/2">
+      <div className="flex items-center justify-between border-foreground/10 border-b px-3 py-2">
         <span className="font-medium text-muted-foreground text-xs">
           Timeline
         </span>
-        <span className="text-[11px] text-muted-foreground tabular-nums">
+        <span className="text-caption text-muted-foreground tabular-nums">
           {fmtTime(curSec)} / {fmtTime(durationSec)}
         </span>
       </div>
       <div className="overflow-x-auto">
         <div className="relative min-w-[520px]">
-          <div className="flex border-border/60 border-b">
+          <div className="flex border-foreground/10 border-b">
             <div
-              className="shrink-0 border-border/60 border-r bg-muted/30"
+              className="shrink-0 border-foreground/10 border-r bg-foreground/3"
               style={{ width: LABEL_W, height: RULER_H }}
             />
             <div
-              className="relative min-w-0 flex-1 cursor-crosshair"
+              className="relative min-w-0 flex-1 cursor-pointer"
               onClick={(e) => seekFromClick(e, durationSec, onSeek)}
               role="presentation"
               style={{ height: RULER_H }}
             >
               {ticks.map((t) => (
                 <span
-                  className="absolute top-0 text-[10px] text-muted-foreground/80 tabular-nums"
+                  className="absolute top-0 text-caption text-muted-foreground/80 tabular-nums"
                   key={t}
                   style={{
                     left: `${pct(t, durationSec)}%`,
@@ -270,7 +270,7 @@ export function EditTimeline({
                   className={cn(
                     "absolute top-2 bottom-2 rounded-sm border border-transparent",
                     w.deleted
-                      ? "bg-muted-foreground/15"
+                      ? "bg-foreground/10"
                       : "bg-foreground/10 hover:bg-foreground/20",
                     inSel && "border-live/50 bg-live/15"
                   )}
@@ -330,7 +330,7 @@ export function EditTimeline({
             {titles.map((clip) => (
               <ClipBlock
                 active={selected?.kind === "title" && selected.id === clip.id}
-                className="bg-primary/15 text-foreground"
+                className="bg-foreground/10 text-foreground"
                 clip={clip}
                 durationSec={durationSec}
                 key={clip.id}
@@ -380,7 +380,7 @@ export function EditTimeline({
             style={{ left: LABEL_W, right: 0 }}
           >
             <div
-              className="absolute inset-y-0 w-px bg-live shadow-[0_0_6px_rgba(16,185,129,0.45)]"
+              className="absolute inset-y-0 w-px bg-live"
               style={{ left: `${playhead}%` }}
             />
             <div

@@ -125,6 +125,8 @@ export function PlayerControls({
         "flex items-center gap-3 bg-gradient-to-t from-black/65 to-transparent px-4 pt-12 pb-3",
         className
       )}
+      data-preview-chrome
+      onClick={(e) => e.stopPropagation()}
     >
       <CtrlButton label={playing ? "Pause" : "Play"} onClick={onPlayToggle}>
         {playing ? (
@@ -142,10 +144,10 @@ export function PlayerControls({
         )}
       </CtrlButton>
 
-      <span className="shrink-0 text-[13px] text-white/85 tabular-nums">
+      <span className="shrink-0 text-ui text-white/85 tabular-nums">
         {fmtClock(current)}
       </span>
-      <span className="shrink-0 text-[13px] text-white/30">•</span>
+      <span className="shrink-0 text-ui text-white/30">•</span>
 
       {/* Hairline scrubber with dot handle */}
       <div
@@ -172,7 +174,7 @@ export function PlayerControls({
           />
           <div
             className={cn(
-              "absolute top-1/2 size-3 -translate-y-1/2 rounded-full bg-white shadow-sm transition-opacity",
+              "absolute top-1/2 size-3 -translate-y-1/2 rounded-full bg-white transition-opacity",
               scrubbing
                 ? "opacity-100"
                 : "opacity-0 group-hover/scrub:opacity-100"
@@ -182,13 +184,13 @@ export function PlayerControls({
         </div>
       </div>
 
-      <span className="shrink-0 text-[13px] text-white/55 tabular-nums">
+      <span className="shrink-0 text-ui text-white/55 tabular-nums">
         -{fmtClock(remaining)}
       </span>
 
       <button
         aria-label="Playback speed"
-        className="shrink-0 rounded-md px-1.5 py-1 text-[13px] text-white/75 tabular-nums transition hover:bg-white/10 hover:text-white"
+        className="shrink-0 cursor-pointer rounded-md px-1.5 py-1 text-ui text-white/75 tabular-nums transition-[transform,background-color,color] duration-150 ease-out fine-hover:hover:bg-white/10 fine-hover:hover:text-white active:scale-[0.97]"
         onClick={onCycleSpeed}
         type="button"
       >
@@ -247,7 +249,7 @@ export function CtrlButton({
       aria-label={label}
       aria-pressed={active}
       className={cn(
-        "flex size-8 shrink-0 items-center justify-center rounded-full text-white/75 transition hover:bg-white/10 hover:text-white",
+        "flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-white/75 transition-[transform,background-color,color] duration-150 ease-out fine-hover:hover:bg-white/10 fine-hover:hover:text-white active:scale-[0.97]",
         active && "text-white ring-1 ring-white/40 ring-inset"
       )}
       onClick={onClick}

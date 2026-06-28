@@ -22,7 +22,9 @@ export async function ingest(videoArg: string): Promise<string> {
   const slug = slugFromVideo(source);
   const p = projectPaths(slug);
   await rm(p.dir, { recursive: true, force: true });
+  await mkdir(p.assets, { recursive: true });
   await mkdir(p.frames, { recursive: true });
+  await mkdir(p.output, { recursive: true });
 
   console.log(`[ingest] ${source}`);
   const meta = await probe(source);

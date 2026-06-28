@@ -263,7 +263,7 @@ export function CinemaPlayer({
       {/* Video */}
       {/* biome-ignore lint/a11y/useMediaCaption: captions rendered via captionSlot overlay */}
       <video
-        className="relative max-h-full max-w-full object-contain"
+        className="relative max-h-full max-w-full cursor-pointer object-contain"
         onClick={togglePlay}
         onDoubleClick={toggleFullscreen}
         onDurationChange={(e) => setDur(e.currentTarget.duration)}
@@ -301,7 +301,7 @@ export function CinemaPlayer({
       {!playing && (
         <button
           aria-label="Play"
-          className="absolute top-1/2 left-1/2 z-20 flex size-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition hover:scale-105 hover:bg-black/55"
+          className="absolute top-1/2 left-1/2 z-20 flex size-16 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-[transform,background-color] duration-150 ease-out fine-hover:hover:scale-105 fine-hover:hover:bg-black/55 active:scale-[0.97]"
           onClick={togglePlay}
           type="button"
         >
@@ -312,24 +312,24 @@ export function CinemaPlayer({
       {/* ── Top bar ─────────────────────────────────────────────── */}
       <div
         className={cn(
-          "absolute inset-x-0 top-0 z-30 flex items-center justify-between gap-4 bg-gradient-to-b from-black/55 to-transparent px-5 pt-4 pb-10 transition-opacity duration-300",
+          "absolute inset-x-0 top-0 z-30 flex items-center justify-between gap-4 bg-gradient-to-b from-black/55 to-transparent px-5 pt-4 pb-10 transition-opacity duration-200 ease-out",
           chromeVisible ? "opacity-100" : "pointer-events-none opacity-0"
         )}
       >
         <div className="min-w-0 leading-tight">
           {label && (
-            <div className="truncate font-medium text-[11px] text-white/45 uppercase tracking-wide">
+            <div className="truncate text-section-label text-white/45">
               {label}
             </div>
           )}
-          <div className="truncate font-medium text-[15px] text-white/90">
+          <div className="truncate font-medium text-base text-white/90">
             {projectName}
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
           {onExport && (
             <button
-              className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 font-medium text-[13px] text-white/90 backdrop-blur-sm transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 font-medium text-ui text-white/90 backdrop-blur-sm transition-[transform,background-color] duration-150 ease-out fine-hover:hover:bg-white/20 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
               disabled={exportDisabled}
               onClick={onExport}
               type="button"
@@ -340,7 +340,7 @@ export function CinemaPlayer({
           )}
           <button
             aria-label="Close player"
-            className="flex size-8 items-center justify-center rounded-full text-white/70 transition hover:bg-white/10 hover:text-white"
+            className="flex size-8 cursor-pointer items-center justify-center rounded-full text-white/70 transition-[transform,background-color,color] duration-150 ease-out fine-hover:hover:bg-white/10 fine-hover:hover:text-white active:scale-[0.97]"
             onClick={onClose}
             type="button"
           >
@@ -354,7 +354,7 @@ export function CinemaPlayer({
         bufferedFraction={dur ? buffered / dur : 0}
         captionsOn={caps}
         className={cn(
-          "absolute inset-x-0 bottom-0 z-30 px-5 pb-4 transition-opacity duration-300",
+          "absolute inset-x-0 bottom-0 z-30 px-5 pb-4 transition-opacity duration-200 ease-out",
           chromeVisible ? "opacity-100" : "pointer-events-none opacity-0"
         )}
         current={cur}
