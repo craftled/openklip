@@ -4,6 +4,59 @@ Use these bodies when publishing releases. Each section matches a tag in `CHANGE
 
 ---
 
+## v0.8.2
+
+**Linear-style UI refactor: semantic tokens, CTA hierarchy, timeline track colors.**
+
+### Highlights
+- Export and Choose video use primary blue; skill tokens and secondary chrome stay grey
+- `text-tertiary`, `text-quaternary`, `bg-surface-*` replace ad-hoc muted classes across the editor shell
+- Timeline music, stills, and title tracks use theme tokens instead of arbitrary Tailwind hues
+- Inputs, focus rings, popovers, and chat/transcript typography aligned to [DESIGN.md](../DESIGN.md)
+
+### Known gaps
+- Same as v0.8.0 (export dialog extras, macOS-only folder picker, in-process write locks)
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#082---2026-06-28)
+
+---
+
+## v0.8.1
+
+**Design system source of truth: OKLCH surfaces and Inter Variable typography.**
+
+### Highlights
+- [DESIGN.md](../DESIGN.md) and [CLAUDE.md](../CLAUDE.md) document typography, color, spacing, and motion
+- Inter Variable with Linear weight recipe (510/590/680); JetBrains Mono for timestamps and paths
+- Surface ladder (`--surface-0` through `--surface-3`) and text hierarchy tokens
+- Modal overlays use a shared `bg-overlay` scrim token
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#081---2026-06-28)
+
+---
+
+## v0.8.0
+
+**Agent query layer, MCP server, edit templates, and Codex-style skills in chat.**
+
+### Highlights
+- Bounded transcript reads: `transcript grep`, `span`, `phrase`; `status --json`, `ranges --json`, `overlays --json`
+- Phrase placement helpers: `title-add-phrase`, `zoom-add-phrase`, `broll-add-phrase`
+- MCP server (`openklip mcp`): 35 tools with CLI/GUI parity; `.cursor/mcp.json` for Cursor
+- Edit templates (`templates/`), brand presets, `/` skills slash menu, inline skill tokens
+- Empty workspace flow: folder picker landing, new-project dialog, Sonner toasts
+- 387 tests (84 new for query, MCP, templates, skills, motion, toasts)
+
+### Known gaps
+- Export dialog compression, frame rate, and clipboard controls are UI-only (disabled) until ffmpeg supports them
+- Folder picker is macOS-only; use `OPENKLIP_PROJECTS_ROOT` or `openklip ingest` elsewhere
+- Write locks remain in-process only (concurrent CLI + server can still race)
+- Glimm cut transitions are preview-only; exported MP4 hard-jumps between kept ranges
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#080---2026-06-28)
+
+---
+
 ## v0.7.0
 
 **Center chat layout, export dialog, and workspace folder picker.**

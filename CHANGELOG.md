@@ -5,69 +5,69 @@
 Full Linear-style UI refactor: semantic tokens wired through components, CTA hierarchy enforced, timeline colors aligned.
 
 ### Changed
-- **CTA hierarchy** — Export and Choose video use primary blue; skill tokens stay grey (blue only when it matters).
-- **Semantic tokens** — `text-tertiary`, `text-quaternary`, `bg-surface-*` adopted across editor shell; `text-muted-foreground` removed from `web/`.
-- **Timeline tracks** — music, stills, and titles use theme tokens (`info`, `zoom`, `title`); violet and arbitrary Tailwind hues removed.
-- **Primitives** — inputs use `text-ui`, placeholders `text-quaternary`, focus rings normalized to 1px, hover-card and skills menu use `popover-styled`.
-- **Typography** — transcript and chat panels use `text-ui` / `text-section-label`; caption inactive words use `text-white/70` on player.
+- **CTA hierarchy**: Export and Choose video use primary blue; skill tokens stay grey (blue only when it matters).
+- **Semantic tokens**: `text-tertiary`, `text-quaternary`, `bg-surface-*` adopted across editor shell; `text-muted-foreground` removed from `web/`.
+- **Timeline tracks**: music, stills, and titles use theme tokens (`info`, `zoom`, `title`); violet and arbitrary Tailwind hues removed.
+- **Primitives**: inputs use `text-ui`, placeholders `text-quaternary`, focus rings normalized to 1px, hover-card and skills menu use `popover-styled`.
+- **Typography**: transcript and chat panels use `text-ui` / `text-section-label`; caption inactive words use `text-white/70` on player.
 
 ## 0.8.1 - 2026-06-28
 
 Linear-style design system: OKLCH surfaces, Inter Variable typography, and light/dark parity.
 
 ### Added
-- **DESIGN.md** — design source of truth for typography, color, spacing, and motion.
-- **CLAUDE.md** — points agents at DESIGN.md before any UI work.
-- **JetBrains Mono** — mono font for timestamps, paths, and CLI snippets.
-- **Surface ladder** — `--surface-0` through `--surface-3` and text hierarchy tokens (`--text-primary` through `--text-quaternary`).
+- **DESIGN.md**: design source of truth for typography, color, spacing, and motion.
+- **CLAUDE.md**: points agents at DESIGN.md before any UI work.
+- **JetBrains Mono**: mono font for timestamps, paths, and CLI snippets.
+- **Surface ladder**: `--surface-0` through `--surface-3` and text hierarchy tokens (`--text-primary` through `--text-quaternary`).
 
 ### Changed
-- **Inter Variable** — smooth 400-900 weights with Linear recipe (510/590/680, cv01+ss03, opsz auto).
-- **OpenKlip preset** — light/dark foreground and background tuned for parity (~#fff / ~#08090a).
-- **OKLCH mixes** — foreground shades and semantic text colors use oklch instead of srgb/oklab.
-- **Modal overlays** — dialog, sheet, drawer, and alert-dialog use `bg-overlay` token.
+- **Inter Variable**: smooth 400-900 weights with Linear recipe (510/590/680, cv01+ss03, opsz auto).
+- **OpenKlip preset**: light/dark foreground and background tuned for parity (~#fff / ~#08090a).
+- **OKLCH mixes**: foreground shades and semantic text colors use oklch instead of srgb/oklab.
+- **Modal overlays**: dialog, sheet, drawer, and alert-dialog use `bg-overlay` token.
 
 ## 0.8.0 - 2026-06-28
 
 Agent query layer, MCP server, edit templates, and Codex-style skills in chat.
 
 ### Added
-- **Bounded query reads** — `openklip transcript grep/span/phrase`, `ranges --json`, `overlays --json`, `status --json` for agent discovery without loading full transcripts.
-- **Phrase placement helpers** — `title-add-phrase`, `zoom-add-phrase`, `broll-add-phrase` locate spoken spans and place overlays in one step.
-- **MCP server** — `openklip mcp` (stdio) exposes 35 tools with CLI/GUI parity on `project.json`; `.cursor/mcp.json` wired for Cursor.
-- **Edit templates** — `templates/` playbooks (e.g. talking-head), `openklip brand` / ingest `--brand`, template API route, and template skills in chat.
-- **Skills chat UX** — `/` slash menu, Skills dropdown, and Codex-style inline skill tokens with follow-up text before send.
-- **Empty workspace flow** — folder picker landing, new-project dialog, project create overlay, and Sonner toasts for uploads and actions.
-- **84 new tests** — query, phrase-match, cli-query, agent-tools, skills-catalog, templates, motion, and toast coverage (387 total).
+- **Bounded query reads**: `openklip transcript grep/span/phrase`, `ranges --json`, `overlays --json`, `status --json` for agent discovery without loading full transcripts.
+- **Phrase placement helpers**: `title-add-phrase`, `zoom-add-phrase`, `broll-add-phrase` locate spoken spans and place overlays in one step.
+- **MCP server**: `openklip mcp` (stdio) exposes 35 tools with CLI/GUI parity on `project.json`; `.cursor/mcp.json` wired for Cursor.
+- **Edit templates**: `templates/` playbooks (e.g. talking-head), `openklip brand` / ingest `--brand`, template API route, and template skills in chat.
+- **Skills chat UX**: `/` slash menu, Skills dropdown, and Codex-style inline skill tokens with follow-up text before send.
+- **Empty workspace flow**: folder picker landing, new-project dialog, project create overlay, and Sonner toasts for uploads and actions.
+- **84 new tests**: query, phrase-match, cli-query, agent-tools, skills-catalog, templates, motion, and toast coverage (387 total).
 
 ### Changed
-- **AGENTS.md** — capability map for query commands, MCP, and phrase helpers.
-- **Theme polish** — OpenKlip preset refresh, Geist typography, sidebar/chat motion, relative timestamps on chat list.
-- **Project switcher** — inline create flow replaces `no-projects.tsx` empty state.
+- **AGENTS.md**: capability map for query commands, MCP, and phrase helpers.
+- **Theme polish**: OpenKlip preset refresh, sidebar/chat motion, relative timestamps on chat list.
+- **Project switcher**: inline create flow replaces `no-projects.tsx` empty state.
 
 ### Fixed
-- **`projectMutations.ts`** — restore `edl.ts` schema imports broken when template support landed.
+- **`projectMutations.ts`**: restore `edl.ts` schema imports broken when template support landed.
 
 ## 0.7.0 - 2026-06-28
 
 Editor layout refresh, export options dialog, and configurable projects root (PR #12, PR #13).
 
 ### Added
-- **Center chat panel** — agent threads and prompt input in the center column (`AgentChatPanel`, AI Elements `prompt-input`); chat list stays in the left sidebar.
-- **Chat / Transcript toggle** — switch the center panel between agent chat and word-level transcript editing.
-- **Timeline drawer** — edit timeline opens in a bottom drawer instead of a fixed footer strip.
-- **Compact preview** — preview and chat capped at `max-w-2xl` with a shorter portrait height for readability on wide screens.
+- **Center chat panel**: agent threads and prompt input in the center column (`AgentChatPanel`, AI Elements `prompt-input`); chat list stays in the left sidebar.
+- **Chat / Transcript toggle**: switch the center panel between agent chat and word-level transcript editing.
+- **Timeline drawer**: edit timeline opens in a bottom drawer instead of a fixed footer strip.
+- **Compact preview**: preview and chat capped at `max-w-2xl` with a shorter portrait height for readability on wide screens.
 - **Find filler** above the preview (moved out of the sidebar footer).
-- **Export options dialog** on the toolbar — pick 720p / 1080p / 4K before render; shows pixel dimensions and rough size/time estimates.
-- **Workspace folder picker** — empty-state landing chooses a macOS folder via `POST /api/workspace`; path persists in `.openklip/projects-root`.
-- **`GET /api/workspace`** — returns `{ root, pickerSupported }` for the active projects root.
-- **Collapsible sidebar sections** — chats, assets, and settings use shadcn collapsible panels; settings moved to left sidebar (`SidebarSettingsPanel`).
+- **Export options dialog** on the toolbar: pick 720p / 1080p / 4K before render; shows pixel dimensions and rough size/time estimates.
+- **Workspace folder picker**: empty-state landing chooses a macOS folder via `POST /api/workspace`; path persists in `.openklip/projects-root`.
+- **`GET /api/workspace`**: returns `{ root, pickerSupported }` for the active projects root.
+- **Collapsible sidebar sections**: chats, assets, and settings use shadcn collapsible panels; settings moved to left sidebar (`SidebarSettingsPanel`).
 - **Shared asset upload helpers** (`web/lib/asset-upload.ts`) used by the asset bin and chat `+` upload.
 
 ### Changed
-- **Agent sidebar slimmed** — thread messages, model picker, find-filler, and send form removed from the footer; chat UX lives in the center panel.
-- **Projects root resolution** — `OPENKLIP_PROJECTS_ROOT` env wins, then `.openklip/projects-root`, then `./projects` (`src/paths.ts`, `src/workspace-config.ts`).
-- **Empty projects landing** — browser video upload replaced with folder picker + CLI ingest hint (`openklip ingest <video>`).
+- **Agent sidebar slimmed**: thread messages, model picker, find-filler, and send form removed from the footer; chat UX lives in the center panel.
+- **Projects root resolution**: `OPENKLIP_PROJECTS_ROOT` env wins, then `.openklip/projects-root`, then `./projects` (`src/paths.ts`, `src/workspace-config.ts`).
+- **Empty projects landing**: browser video upload replaced with folder picker + CLI ingest hint (`openklip ingest <video>`).
 
 ### Fixed
 - **Nested-button hydration** in project switcher folder action (`ProjectInlineFolderAction` moved outside the dropdown trigger).
@@ -83,17 +83,17 @@ Sidebar UX pass: asset bin fidelity, project lifecycle in the switcher, chat pre
 
 ### Added
 - **Chat preview cards** on hover (`ChatPreviewRow`): title, project path, source video, edit stats, and message count.
-- **In-progress chat indicator** — subtle spinner before the title while an agent run is active.
-- **Project and assets folder actions** — reveal `projects/<slug>/` or `assets/` in Finder from the switcher and Assets heading (`POST /api/projects/:slug/reveal`).
-- **Asset delete in sidebar** — hover trash with double confirmation; `DELETE /api/projects/:slug/assets/:assetId` prunes timeline overlays.
-- **Project delete in switcher** — hover trash with double confirmation; `DELETE /api/projects/:slug` removes the project folder and switches to the next project.
-- **Empty projects landing** when no projects exist, with **Create new project** (video picker) instead of “Ingest video”.
+- **In-progress chat indicator**: subtle spinner before the title while an agent run is active.
+- **Project and assets folder actions**: reveal `projects/<slug>/` or `assets/` in Finder from the switcher and Assets heading (`POST /api/projects/:slug/reveal`).
+- **Asset delete in sidebar**: hover trash with double confirmation; `DELETE /api/projects/:slug/assets/:assetId` prunes timeline overlays.
+- **Project delete in switcher**: hover trash with double confirmation; `DELETE /api/projects/:slug` removes the project folder and switches to the next project.
+- **Empty projects landing** when no projects exist, with **Create new project** (video picker) instead of "Ingest video".
 
 ### Fixed
 - **Asset bin matches the drop folder.** Folder sync and page load prune registrations whose `src` is outside `projects/<slug>/assets/` or no longer exists on disk, and drop b-roll/still overlays that referenced them. Sync API returns updated `broll`/`stills` so client state stays in sync.
 - **Page load survives sync errors.** `loadEditorProject` treats folder sync as best-effort so a bad drop or proxy build does not break the editor.
-- **Find filler while chats load.** Button shows “Loading chats…” and disabled state; auto-ensures a thread if none is active when clicked.
-- **SSR keyboard hints** — `useModShortcut` avoids hydration mismatch for ⌘ vs Ctrl labels.
+- **Find filler while chats load.** Button shows "Loading chats…" and disabled state; auto-ensures a thread if none is active when clicked.
+- **SSR keyboard hints**: `useModShortcut` avoids hydration mismatch for ⌘ vs Ctrl labels.
 
 ## 0.6.1 - 2026-06-28
 
