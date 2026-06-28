@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.8.1 - 2026-06-28
+
+Linear-style design system: OKLCH surfaces, Inter Variable typography, and light/dark parity.
+
+### Added
+- **DESIGN.md** — design source of truth for typography, color, spacing, and motion.
+- **CLAUDE.md** — points agents at DESIGN.md before any UI work.
+- **JetBrains Mono** — mono font for timestamps, paths, and CLI snippets.
+- **Surface ladder** — `--surface-0` through `--surface-3` and text hierarchy tokens (`--text-primary` through `--text-quaternary`).
+
+### Changed
+- **Inter Variable** — smooth 400-900 weights with Linear recipe (510/590/680, cv01+ss03, opsz auto).
+- **OpenKlip preset** — light/dark foreground and background tuned for parity (~#fff / ~#08090a).
+- **OKLCH mixes** — foreground shades and semantic text colors use oklch instead of srgb/oklab.
+- **Modal overlays** — dialog, sheet, drawer, and alert-dialog use `bg-overlay` token.
+
 ## 0.8.0 - 2026-06-28
 
 Agent query layer, MCP server, edit templates, and Codex-style skills in chat.
