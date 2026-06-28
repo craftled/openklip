@@ -13,9 +13,9 @@
 .hero-bg-fade {
   background: linear-gradient(
     to bottom,
-    rgb(0 0 0 / 28%) 0%,
-    rgb(0 0 0 / 42%) 45%,
-    rgb(0 0 0 / 52%) 100%
+    oklch(0 0 0 / 0.28) 0%,
+    oklch(0 0 0 / 0.42) 45%,
+    oklch(0 0 0 / 0.52) 100%
   );
   opacity: 0;
   transition: opacity 200ms var(--ease-out);

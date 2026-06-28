@@ -37,3 +37,29 @@ test("catppuccin supports both light and dark modes", () => {
   assert.equal(themeSupportsScheme(catppuccin, "dark"), true);
   assert.equal(preferredColorScheme(catppuccin, "light"), "light");
 });
+
+test("all theme presets use oklch semantic colors", () => {
+  const oklchPattern = /^oklch\(/;
+  for (const theme of THEME_CATALOG) {
+    for (const key of [
+      "background",
+      "foreground",
+      "accent",
+      "info",
+      "success",
+      "destructive",
+    ] as const) {
+      assert.match(
+        theme[key],
+        oklchPattern,
+        `${theme.id} light ${key} should be oklch`
+      );
+      const dark = theme.dark ?? theme;
+      assert.match(
+        dark[key],
+        oklchPattern,
+        `${theme.id} dark ${key} should be oklch`
+      );
+    }
+  }
+});

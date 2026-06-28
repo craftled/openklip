@@ -1,6 +1,8 @@
-// Pure, dependency-free. Shared by the live preview overlay (web) and the
-// export burn-in (server). Grouping is coordinate-free (text + order only) so
-// the preview (source-time) and export (output-time) produce identical lines.
+// Shared by the live preview overlay (web) and the export burn-in (server).
+// Grouping is coordinate-free (text + order only) so the preview (source-time)
+// and export (output-time) produce identical lines.
+
+import { colorToHex } from "./color.ts";
 
 export interface CaptionWord {
   endSec: number;
@@ -46,8 +48,13 @@ export function groupCaptions(
 // ---- ASS subtitle generation (export burn-in via libass) ----
 
 const WHITE = "&H00FFFFFF&";
+const DEFAULT_CAPTION_ACCENT = "oklch(0.825 0.093 246.663)";
 
-function toAssColor(hex: string): string {
+function toAssColor(color: string): string {
+  const hex = colorToHex(color);
+  if (!hex) {
+    return "&H00F77B7C&";
+  }
   const m = /^#?([0-9a-f]{6})$/i.exec(hex);
   if (!m) {
     return "&H00F77B7C&";
@@ -142,7 +149,7 @@ function styleLine(name: string, fontSize: number, marginV: number): string {
 export function buildAss(groups: CaptionGroup[], opts: AssOptions): string {
   const fontSize = Math.max(18, Math.round(opts.height * 0.055));
   const placement = opts.placement ?? "bottom";
-  const accent = toAssColor(opts.accent ?? "#94ccff");
+  const accent = toAssColor(opts.accent ?? DEFAULT_CAPTION_ACCENT);
   const styles =
     typeof placement === "function"
       ? [

@@ -6,18 +6,18 @@
   "license": "MIT",
   "source": "https://github.com/catppuccin/catppuccin",
   "supportedModes": ["light", "dark"],
-  "background": "#eff1f5",
-  "foreground": "#4c4f69",
-  "accent": "#8839ef",
-  "info": "#df8e1d",
-  "success": "#40a02b",
-  "destructive": "#d20f39",
+  "background": "oklch(0.958 0.006 264.532)",
+  "foreground": "oklch(0.435 0.043 279.325)",
+  "accent": "oklch(0.555 0.25 297.016)",
+  "info": "oklch(0.714 0.149 67.777)",
+  "success": "oklch(0.625 0.177 140.445)",
+  "destructive": "oklch(0.55 0.216 19.809)",
   "dark": {
-    "background": "#1e1e2e",
-    "foreground": "#cdd6f4",
-    "accent": "#cba6f7",
-    "info": "#fab387",
-    "success": "#a6e3a1",
-    "destructive": "#f38ba8"
+    "background": "oklch(0.243 0.03 283.911)",
+    "foreground": "oklch(0.879 0.043 272.277)",
+    "accent": "oklch(0.787 0.119 304.769)",
+    "info": "oklch(0.824 0.101 52.629)",
+    "success": "oklch(0.858 0.109 142.715)",
+    "destructive": "oklch(0.756 0.13 2.764)"
   }
 }

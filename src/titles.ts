@@ -1,7 +1,9 @@
-// Pure, dependency-free. Editorial TITLE cards (lower-third / centered), distinct
-// from spoken-word captions in captions.ts. Emits a complete ASS file (libass) that
-// matches the captions ASS conventions: V4+ Styles header, H:MM:SS.cs Dialogue times,
-// brace-stripping escape, and a hex->&HBBGGRR& colour helper.
+// Editorial TITLE cards (lower-third / centered), distinct from spoken-word
+// captions in captions.ts. Emits a complete ASS file (libass) that matches the
+// captions ASS conventions: V4+ Styles header, H:MM:SS.cs Dialogue times,
+// brace-stripping escape, and a color->&HBBGGRR& colour helper.
+
+import { colorToHex } from "./color.ts";
 
 export interface TitleItem {
   endSec: number;
@@ -23,8 +25,13 @@ export function parseHeroLines(text: string): {
 }
 
 const WHITE = "&H00FFFFFF&";
+const DEFAULT_TITLE_ACCENT = "oklch(0.809 0.1 284.59)";
 
-function toAssColor(hex: string): string {
+function toAssColor(color: string): string {
+  const hex = colorToHex(color);
+  if (!hex) {
+    return "&H00F77B7C&";
+  }
   const m = /^#?([0-9a-f]{6})$/i.exec(hex);
   if (!m) {
     return "&H00F77B7C&";
@@ -66,7 +73,7 @@ export function buildTitlesAss(
   const heroHeadFont = Math.max(40, Math.round(opts.height * 0.075));
   const heroSubFont = Math.max(18, Math.round(opts.height * 0.028));
   const marginV = Math.round(opts.height * 0.08);
-  const accent = toAssColor(opts.accent ?? "#b9b8ff");
+  const accent = toAssColor(opts.accent ?? DEFAULT_TITLE_ACCENT);
 
   // BorderStyle 3 + a semi-transparent dark BackColour paints an opaque-ish box
   // behind the glyphs so titles read on any footage. Bold white text, Arial.

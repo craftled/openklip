@@ -151,7 +151,6 @@ Single list of current gaps (code is truth). README and release notes point here
 
 - Hero title inspector uses a hand-rolled `<textarea>` instead of the shared `Textarea` primitive (`web/app.tsx`).
 - Delete confirmation microcopy uses `text-[11px]` instead of the `text-caption` token (asset bin, project delete, chat preview).
-- Audio waveform visualizers use hard-coded hex (`#1FD5F9`, `#FA954C`) instead of theme tokens (`media-audio-visualizer-wave.tsx`, `agent-audio-visualizer-wave.tsx`).
 - Video player layer stays black/white by design (Linear cinema parity); not tokenized to the editor chrome.
 
 ### Architecture & parity

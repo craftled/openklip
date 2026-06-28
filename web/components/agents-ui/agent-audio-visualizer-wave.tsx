@@ -9,9 +9,11 @@ import type { LocalAudioTrack, RemoteAudioTrack } from "livekit-client";
 import { type ComponentProps, useMemo } from "react";
 import { ReactShaderToy } from "@/components/agents-ui/react-shader-toy";
 import { useAgentAudioVisualizerWave } from "@/hooks/agents-ui/use-agent-audio-visualizer-wave";
+import { useThemeColorHex } from "@/hooks/use-theme-color-hex";
 import { cn } from "@/lib/utils";
 
-const DEFAULT_COLOR = "#1FD5F9";
+/** SSR fallback: openklip default broll track cyan */
+const WAVEFORM_AGENT_FALLBACK = "#00a0c1";
 
 function hexToRgb(hexColor: string) {
   try {
@@ -27,11 +29,11 @@ function hexToRgb(hexColor: string) {
     }
   } catch {
     console.error(
-      `Invalid hex color '${hexColor}'.\nFalling back to default color '${DEFAULT_COLOR}'.`
+      `Invalid hex color '${hexColor}'.\nFalling back to default color '${WAVEFORM_AGENT_FALLBACK}'.`
     );
   }
 
-  return hexToRgb(DEFAULT_COLOR);
+  return hexToRgb(WAVEFORM_AGENT_FALLBACK);
 }
 
 const shaderSource = `
@@ -169,7 +171,7 @@ interface WaveShaderProps {
   className?: string;
   /**
    * Color of the oscilloscope in hexidecimal format.
-   * @default '#1FD5F9'
+   * Defaults to `--waveform-agent` (theme broll track hue).
    */
   color?: `#${string}`;
   /**
@@ -201,7 +203,7 @@ interface WaveShaderProps {
 
 export function WaveShader({
   speed = 10,
-  color = "#1FD5F9",
+  color = WAVEFORM_AGENT_FALLBACK,
   colorShift = 0.05,
   mix = 1.0,
   amplitude = 0.02,
@@ -274,7 +276,7 @@ export interface AgentAudioVisualizerWaveProps {
   className?: string;
   /**
    * The color of the wave in hexidecimal format.
-   * @defaultValue '#1FD5F9'
+   * Defaults to `--waveform-agent` (theme broll track hue).
    */
   color?: `#${string}`;
   /**
@@ -310,7 +312,7 @@ export interface AgentAudioVisualizerWaveProps {
  * <AgentAudioVisualizerWave
  *   size="lg"
  *   state="speaking"
- *   color="#1FD5F9"
+ *   color="#00a0c1"
  *   colorShift={0.3}
  *   lineWidth={2}
  *   blur={0.5}
@@ -349,6 +351,11 @@ export function AgentAudioVisualizerWave({
     state,
     audioTrack,
   });
+  const themeColor = useThemeColorHex(
+    "--waveform-agent",
+    WAVEFORM_AGENT_FALLBACK
+  );
+  const resolvedColor = (color ?? themeColor) as `#${string}`;
 
   return (
     <WaveShader
@@ -359,7 +366,7 @@ export function AgentAudioVisualizerWave({
         "mask-[linear-gradient(90deg,transparent_0%,black_20%,black_80%,transparent_100%)]",
         className
       )}
-      color={color}
+      color={resolvedColor}
       colorShift={colorShift}
       data-lk-state={state}
       frequency={frequency}
