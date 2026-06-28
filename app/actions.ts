@@ -11,7 +11,7 @@ import {
   type clampTitleItems,
   type clampZoomItems,
 } from "@engine/projectMutations";
-import { loadProject, saveProject } from "@engine/projectStore";
+import { mutateProject } from "@engine/projectStore";
 
 export type ActionResult<T = void> =
   | ({ ok: true } & (T extends void ? object : { data: T }))
@@ -38,9 +38,7 @@ export async function saveProjectEdits(
   }
 ): Promise<ActionResult> {
   try {
-    const project = await loadProject(slug);
-    applyProjectEdits(project, body);
-    await saveProject(slug, project);
+    await mutateProject(slug, (project) => applyProjectEdits(project, body));
     return { ok: true };
   } catch (e) {
     return fail(e);
@@ -52,9 +50,7 @@ export async function saveLook(
   body: { vignette?: boolean }
 ): Promise<ActionResult> {
   try {
-    const project = await loadProject(slug);
-    applyLook(project, body);
-    await saveProject(slug, project);
+    await mutateProject(slug, (project) => applyLook(project, body));
     return { ok: true };
   } catch (e) {
     return fail(e);
@@ -66,10 +62,10 @@ export async function saveZooms(
   zooms: unknown[]
 ): Promise<ActionResult<{ zooms: ReturnType<typeof clampZoomItems> }>> {
   try {
-    const project = await loadProject(slug);
-    applyZooms(project, zooms);
-    const items = project.zooms;
-    await saveProject(slug, project);
+    const items = await mutateProject(slug, (project) => {
+      applyZooms(project, zooms);
+      return project.zooms;
+    });
     return { ok: true, data: { zooms: items } };
   } catch (e) {
     return fail(e);
@@ -81,10 +77,10 @@ export async function saveBroll(
   broll: unknown[]
 ): Promise<ActionResult<{ broll: ReturnType<typeof clampBrollItems> }>> {
   try {
-    const project = await loadProject(slug);
-    applyBroll(project, broll);
-    const items = project.broll;
-    await saveProject(slug, project);
+    const items = await mutateProject(slug, (project) => {
+      applyBroll(project, broll);
+      return project.broll;
+    });
     return { ok: true, data: { broll: items } };
   } catch (e) {
     return fail(e);
@@ -96,10 +92,10 @@ export async function saveTitles(
   titles: unknown[]
 ): Promise<ActionResult<{ titles: ReturnType<typeof clampTitleItems> }>> {
   try {
-    const project = await loadProject(slug);
-    applyTitles(project, titles);
-    const items = project.titles;
-    await saveProject(slug, project);
+    const items = await mutateProject(slug, (project) => {
+      applyTitles(project, titles);
+      return project.titles;
+    });
     return { ok: true, data: { titles: items } };
   } catch (e) {
     return fail(e);
