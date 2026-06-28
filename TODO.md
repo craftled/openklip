@@ -4,7 +4,7 @@
 
 OpenKlip is a lean, local-first **agent-native video toolchain**: external agents drive the edit loop via CLI; humans review in the browser. Both read/write the same `project.json` on disk.
 
-**Current release:** v0.6.2 (2026-06-28). Working local editor: cut → captions → b-roll → vignette → push-in zoom → titles → export; cinema player; multi-agent filler cuts; sidebar asset bin with folder sync; project delete; chat previews; theme engine; 298 tests; MIT.
+**Current release:** v0.7.0 (2026-06-28). Working local editor: cut → captions → b-roll → vignette → push-in zoom → titles → export; cinema player; center chat panel; export dialog; macOS workspace folder picker; multi-agent filler cuts; sidebar asset bin with folder sync; 303 tests; MIT.
 
 Preview cuts get a Glimm WebGL sweep in the browser; exported MP4s still hard-cut until the ffmpeg transition graph lands.
 
@@ -36,9 +36,13 @@ Preview cuts get a Glimm WebGL sweep in the browser; exported MP4s still hard-cu
 - [x] **Project write serialization** (`src/project-lock.ts`, `mutateProject()`; in-process per-slug locks for `project.json` and `chats.json`)
 - [x] **Chats + asset hardening** (atomic `chats.json` writes, POST folder sync, re-ingest guard with `--force`, external still copy-in)
 - [x] **Design system: Geist (Vercel)** (light theme + light/dark toggle; swappable theme presets)
-- [x] **TDD test suite** (`bun test`: 265 tests across actions, captions, EDL, exporter, project lock, chats, assets, and more)
+- [x] **TDD test suite** (`bun test`: 303 tests across actions, captions, EDL, exporter, project lock, chats, assets, workspace, and more)
 - [x] **GitHub Actions CI** (`check`, `typecheck`, `test`, `build`)
 - [x] **Open-sourced** (public GitHub repo, MIT license, source media gitignored + purged from history)
+- [x] **Center chat panel** (agent threads + prompt input in center column; chat list in left sidebar; PR #12)
+- [x] **Export options dialog** (720p / 1080p / 4K max height from toolbar; PR #13)
+- [x] **Workspace folder picker** (macOS `osascript`, `.openklip/projects-root`, `GET/POST /api/workspace`; PR #13)
+- [x] **Timeline drawer + compact preview** (bottom drawer timeline, `max-w-2xl` center column; PR #12)
 
 ## Architecture & Key Decisions
 
@@ -55,6 +59,7 @@ Preview cuts get a Glimm WebGL sweep in the browser; exported MP4s still hard-cu
 
 ### Export
 
+- [ ] Wire export dialog compression, frame rate, and clipboard destination through to ffmpeg (UI exists but disabled).
 - [ ] Fast 4K export via per-segment input seeking (avoid full-stream `select` decode of the whole source).
 - [x] Export-from-proxy fallback when the original source file is missing.
 
@@ -88,6 +93,7 @@ Preview cuts get a Glimm WebGL sweep in the browser; exported MP4s still hard-cu
 ### Infra
 
 - [x] Slug validation guard on every path join (`assertValidSlug` in `paths.ts`): closes a path-traversal hole on the `[slug]` API routes.
+- [x] Configurable projects root (env → `.openklip/projects-root` → `./projects`).
 - [x] Export API route (`POST /api/projects/[slug]/export`, Zod-validated body, empty-cut + traversal guarded).
 - [x] Layered project folders (`project.json` at root; derived media under `working/`, render under `output/`).
 - [x] Ken Burns **still** overlays (`still-add`/`still-rm`, `zoompan` push-in in exporter, focus point).
@@ -106,12 +112,15 @@ Preview cuts get a Glimm WebGL sweep in the browser; exported MP4s still hard-cu
 ## Known Limitations
 
 - 4K export re-decodes the whole source (slow) even for a short cut.
+- Export dialog shows compression, frame rate, and clipboard options but only **resolution** affects export today.
+- Workspace folder picker is **macOS-only**; Linux/Windows need `OPENKLIP_PROJECTS_ROOT` or CLI ingest. Empty landing no longer uploads video from the browser.
 - Whisper word timestamps are ~100 ms loose; cuts can clip a phoneme until VAD-snapping lands.
 - Glimm cut transitions are preview-only; exported MP4 hard-jumps between kept ranges.
 - Vertical shorts (9:16 reframe), highlight detection, and MCP server are not implemented.
 - GUI server actions do not dispatch through `runAction()`: CLI uses `src/registry.ts`; GUI uses `app/actions.ts` + `projectMutations` (same `project.json`, separate code paths).
 - Project write locks are in-process only. Two concurrent **processes** writing the same slug (e.g. CLI agent + running editor server) can still race.
 - Reload the browser after CLI edits to see changes in the editor.
+- A local `.openklip/projects-root` affects `projectsRoot()` for CLI and server started from that cwd (intentional; isolate tests with a clean temp cwd).
 
 ## README policy
 

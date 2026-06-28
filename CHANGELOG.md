@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.7.0 - 2026-06-28
+
+Editor layout refresh, export options dialog, and configurable projects root (PR #12, PR #13).
+
+### Added
+- **Center chat panel** — agent threads and prompt input in the center column (`AgentChatPanel`, AI Elements `prompt-input`); chat list stays in the left sidebar.
+- **Chat / Transcript toggle** — switch the center panel between agent chat and word-level transcript editing.
+- **Timeline drawer** — edit timeline opens in a bottom drawer instead of a fixed footer strip.
+- **Compact preview** — preview and chat capped at `max-w-2xl` with a shorter portrait height for readability on wide screens.
+- **Find filler** above the preview (moved out of the sidebar footer).
+- **Export options dialog** on the toolbar — pick 720p / 1080p / 4K before render; shows pixel dimensions and rough size/time estimates.
+- **Workspace folder picker** — empty-state landing chooses a macOS folder via `POST /api/workspace`; path persists in `.openklip/projects-root`.
+- **`GET /api/workspace`** — returns `{ root, pickerSupported }` for the active projects root.
+- **Collapsible sidebar sections** — chats, assets, and settings use shadcn collapsible panels; settings moved to left sidebar (`SidebarSettingsPanel`).
+- **Shared asset upload helpers** (`web/lib/asset-upload.ts`) used by the asset bin and chat `+` upload.
+
+### Changed
+- **Agent sidebar slimmed** — thread messages, model picker, find-filler, and send form removed from the footer; chat UX lives in the center panel.
+- **Projects root resolution** — `OPENKLIP_PROJECTS_ROOT` env wins, then `.openklip/projects-root`, then `./projects` (`src/paths.ts`, `src/workspace-config.ts`).
+- **Empty projects landing** — browser video upload replaced with folder picker + CLI ingest hint (`openklip ingest <video>`).
+
+### Fixed
+- **Nested-button hydration** in project switcher folder action (`ProjectInlineFolderAction` moved outside the dropdown trigger).
+- **`paths.test.ts`** isolates default `./projects` layout from a local `.openklip/projects-root` file.
+
+### Notes
+- Export dialog **compression**, **frame rate**, and **clipboard** controls are visible but disabled until the ffmpeg pipeline supports them; only **resolution** (`maxHeight`) is wired today.
+- Folder picker requires **macOS** (`osascript`); other platforms should set `OPENKLIP_PROJECTS_ROOT` or ingest from the CLI.
+
 ## 0.6.2 - 2026-06-28
 
 Sidebar UX pass: asset bin fidelity, project lifecycle in the switcher, chat previews, and polish from PR #11.

@@ -4,6 +4,26 @@ Use these bodies when publishing releases. Each section matches a tag in `CHANGE
 
 ---
 
+## v0.7.0
+
+**Center chat layout, export dialog, and workspace folder picker.**
+
+### Highlights
+- Agent chat and prompt input in the center column; chat list stays in the left sidebar
+- Chat / Transcript toggle; timeline opens in a bottom drawer; compact preview (`max-w-2xl`)
+- Export options dialog: pick 720p / 1080p / 4K before render
+- macOS folder picker on empty landing; projects root persists in `.openklip/projects-root`
+- Collapsible sidebar (chats, assets, settings); shared asset upload from chat `+`
+
+### Known gaps
+- Export dialog compression, frame rate, and clipboard controls are UI-only (disabled) until ffmpeg supports them
+- Folder picker is macOS-only; use `OPENKLIP_PROJECTS_ROOT` or `openklip ingest` elsewhere
+- Write locks remain in-process only (concurrent CLI + server can still race)
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#070---2026-06-28)
+
+---
+
 ## v0.6.2
 
 **Sidebar UX: asset fidelity, project lifecycle, chat previews.**

@@ -10,7 +10,11 @@ OpenKlip is a local-first, agent-native video toolchain: external agents run the
 
 ## The file model (read this first)
 
-Each project lives as plain files under `projects/<slug>/` in a layered layout:
+Each project lives as plain files under `projects/<slug>/` in a layered layout. The parent directory is resolved by `projectsRoot()`:
+
+1. `OPENKLIP_PROJECTS_ROOT` if set
+2. else `.openklip/projects-root` in the app cwd (GUI folder picker)
+3. else `./projects`
 
 ```
 projects/<slug>/

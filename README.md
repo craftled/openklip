@@ -39,7 +39,11 @@ These follow from how the repo is actually built:
 
 ## Project layout
 
-Default root: `projects/` (override with `OPENKLIP_PROJECTS_ROOT`).
+Default root: `./projects` under the app cwd. Resolution order:
+
+1. `OPENKLIP_PROJECTS_ROOT` environment variable
+2. `.openklip/projects-root` (one line, absolute path; set by the GUI folder picker)
+3. `./projects`
 
 ```text
 projects/<slug>/
@@ -65,23 +69,25 @@ Agent sidebar chats use `working/chats.json`, not `localStorage` (theme and defa
 
 ## What works today
 
-Verified against the current codebase (265 tests):
+Verified against the current codebase (303 tests):
 
 - **Ingest**: video → local transcript + preview proxy + `project.json` (`openklip ingest`; refuses re-ingest unless `--force`)
 - **Transcript editing**: click words to toggle `deleted`; `openklip cut` / `cut --text` / `restore` on CLI
-- **Preview**: all-intra proxy; scheduler plays kept ranges only (`web/app.tsx`)
+- **Preview**: all-intra proxy; scheduler plays kept ranges only; compact center column (`max-w-2xl`)
+- **Center panel**: Chat (agent threads + prompt input) or Transcript toggle; timeline in a bottom drawer
 - **Cinema player**: fullscreen overlay with Linear-parity transport bar (`web/components/cinema-player.tsx`, `player-controls.tsx`)
 - **Preview cut transitions**: Glimm WebGL sweep when `prefers-reduced-motion` is not set
 - **Captions**: preview overlay + ASS burn-in on export
-- **Assets**: register b-roll, music, stills; sidebar asset bin with upload + `assets/` folder sync
+- **Assets**: register b-roll, music, stills; sidebar asset bin with upload + `assets/` folder sync; upload from chat `+`
 - **Overlays**: b-roll cover, Ken Burns stills, push-in zooms, title cards (lower / center / hero), vignette
-- **Export**: ffmpeg composes kept ranges + overlays + captions
+- **Export**: ffmpeg composes kept ranges + overlays + captions; GUI export dialog picks max height (720p / 1080p / 4K)
+- **Workspace**: macOS folder picker on empty landing; projects root persisted in `.openklip/projects-root`
 - **CLI**: full edit surface; `openklip actions --json` capability manifest
 - **Agent selector**: drive filler cuts via Claude Code, Codex, Cursor, or Grok subscription CLIs
 - **Theme engine**: swappable presets with light/dark scheme (`web/lib/theme-engine.ts`)
 - **Agent demo**: `bun run agent-demo` (phrase list → cut → status → optional export)
 
-Phrase-based cutting is CLI-only today (`openklip cut --text`). The transcript UI is word click, not phrase search.
+Phrase-based cutting is CLI-only today (`openklip cut --text`). The transcript UI is word click, not phrase search. First project on a machine: use `openklip ingest` from the CLI, or pick a folder in the GUI (macOS) that already contains ingested projects.
 
 ---
 

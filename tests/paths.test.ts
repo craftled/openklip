@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { withDefaultProjectsRoot } from "./helpers/pathsIsolation.ts";
 import {
   assertValidSlug,
   assetStoragePath,
@@ -19,30 +20,34 @@ test("slugFromVideo strips extension before slugifying", () => {
 });
 
 test("projectPaths uses the layered input/working/output layout", () => {
-  const p = projectPaths("demo");
-  // The edit itself stays at the project root.
-  assert.ok(p.project.endsWith("projects/demo/project.json"));
-  // Derived media + scratch live under working/.
-  assert.ok(p.proxy.endsWith("projects/demo/working/proxy.mp4"));
-  assert.ok(p.transcript.endsWith("projects/demo/working/transcript.json"));
-  assert.ok(p.audioRaw.endsWith("projects/demo/working/audio16k.f32"));
-  assert.ok(p.frames.endsWith("projects/demo/working/frames"));
-  assert.ok(p.assets.endsWith("projects/demo/assets"));
-  assert.ok(p.assetProxies.endsWith("projects/demo/working/assets"));
-  assert.ok(p.chats.endsWith("projects/demo/working/chats.json"));
-  assert.ok(p.working.endsWith("projects/demo/working"));
-  // Rendered output lives under output/.
-  assert.ok(p.out.endsWith("projects/demo/output/out.mp4"));
-  assert.ok(p.output.endsWith("projects/demo/output"));
-  assert.equal(projectDir("demo"), p.dir);
+  withDefaultProjectsRoot(() => {
+    const p = projectPaths("demo");
+    // The edit itself stays at the project root.
+    assert.ok(p.project.endsWith("projects/demo/project.json"));
+    // Derived media + scratch live under working/.
+    assert.ok(p.proxy.endsWith("projects/demo/working/proxy.mp4"));
+    assert.ok(p.transcript.endsWith("projects/demo/working/transcript.json"));
+    assert.ok(p.audioRaw.endsWith("projects/demo/working/audio16k.f32"));
+    assert.ok(p.frames.endsWith("projects/demo/working/frames"));
+    assert.ok(p.assets.endsWith("projects/demo/assets"));
+    assert.ok(p.assetProxies.endsWith("projects/demo/working/assets"));
+    assert.ok(p.chats.endsWith("projects/demo/working/chats.json"));
+    assert.ok(p.working.endsWith("projects/demo/working"));
+    // Rendered output lives under output/.
+    assert.ok(p.out.endsWith("projects/demo/output/out.mp4"));
+    assert.ok(p.output.endsWith("projects/demo/output"));
+    assert.equal(projectDir("demo"), p.dir);
+  });
 });
 
 test("assetStoragePath joins a stored relative proxy onto the project dir", () => {
-  assert.ok(
-    assetStoragePath("demo", "working/assets/b1.mp4").endsWith(
-      "projects/demo/working/assets/b1.mp4"
-    )
-  );
+  withDefaultProjectsRoot(() => {
+    assert.ok(
+      assetStoragePath("demo", "working/assets/b1.mp4").endsWith(
+        "projects/demo/working/assets/b1.mp4"
+      )
+    );
+  });
 });
 
 test("assertValidSlug accepts normal slugs and returns them", () => {
@@ -80,5 +85,7 @@ test("projectPaths refuses to build paths for a traversal slug", () => {
 });
 
 test("projectDir still resolves a clean slug", () => {
-  assert.ok(projectDir("my-video_2").endsWith("projects/my-video_2"));
+  withDefaultProjectsRoot(() => {
+    assert.ok(projectDir("my-video_2").endsWith("projects/my-video_2"));
+  });
 });
