@@ -30,6 +30,23 @@ export function fmtClock(sec: number): string {
   return `${m}:${ss}`;
 }
 
+/** Zero-padded minutes for scrubber hover preview (e.g. 04:33 / 17:29). */
+function fmtScrubClock(sec: number): string {
+  if (!Number.isFinite(sec) || sec < 0) {
+    return "00:00";
+  }
+  const s = Math.floor(sec);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const r = s % 60;
+  const mm = String(m).padStart(2, "0");
+  const ss = String(r).padStart(2, "0");
+  if (h > 0) {
+    return `${h}:${mm}:${ss}`;
+  }
+  return `${mm}:${ss}`;
+}
+
 interface PlayerControlsProps {
   bufferedFraction?: number;
   captionsOn: boolean;
@@ -84,40 +101,87 @@ export function PlayerControls({
 }: PlayerControlsProps) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [scrubbing, setScrubbing] = useState(false);
+  const [hoverFrac, setHoverFrac] = useState<number | null>(null);
+
+  const fractionFromPointer = useCallback((clientX: number) => {
+    const track = trackRef.current;
+    if (!track) {
+      return null;
+    }
+    const r = track.getBoundingClientRect();
+    if (r.width <= 0) {
+      return null;
+    }
+    return Math.max(0, Math.min(1, (clientX - r.left) / r.width));
+  }, []);
 
   const seekFromPointer = useCallback(
     (clientX: number) => {
-      const track = trackRef.current;
-      if (!track) {
-        return;
+      const frac = fractionFromPointer(clientX);
+      if (frac !== null) {
+        onSeekFraction(frac);
       }
-      const r = track.getBoundingClientRect();
-      onSeekFraction(Math.max(0, Math.min(1, (clientX - r.left) / r.width)));
     },
-    [onSeekFraction]
+    [fractionFromPointer, onSeekFraction]
+  );
+
+  const updateHoverFromPointer = useCallback(
+    (clientX: number) => {
+      setHoverFrac(fractionFromPointer(clientX));
+    },
+    [fractionFromPointer]
   );
 
   const onScrubDown = useCallback(
     (e: React.PointerEvent) => {
       (e.target as HTMLElement).setPointerCapture(e.pointerId);
       setScrubbing(true);
+      updateHoverFromPointer(e.clientX);
       seekFromPointer(e.clientX);
     },
-    [seekFromPointer]
+    [seekFromPointer, updateHoverFromPointer]
   );
 
   const onScrubMove = useCallback(
     (e: React.PointerEvent) => {
+      updateHoverFromPointer(e.clientX);
       if (scrubbing) {
         seekFromPointer(e.clientX);
       }
     },
-    [scrubbing, seekFromPointer]
+    [scrubbing, seekFromPointer, updateHoverFromPointer]
+  );
+
+  const onScrubLeave = useCallback(() => {
+    if (!scrubbing) {
+      setHoverFrac(null);
+    }
+  }, [scrubbing]);
+
+  const onScrubUp = useCallback(
+    (e: React.PointerEvent) => {
+      setScrubbing(false);
+      const track = trackRef.current;
+      if (!track) {
+        setHoverFrac(null);
+        return;
+      }
+      const r = track.getBoundingClientRect();
+      const inside =
+        e.clientX >= r.left &&
+        e.clientX <= r.right &&
+        e.clientY >= r.top &&
+        e.clientY <= r.bottom;
+      setHoverFrac(inside ? fractionFromPointer(e.clientX) : null);
+    },
+    [fractionFromPointer]
   );
 
   const pct = duration ? Math.min(100, (current / duration) * 100) : 0;
   const bufPct = Math.min(100, bufferedFraction * 100);
   const remaining = Math.max(0, duration - current);
+  const hoverSec =
+    hoverFrac !== null && duration > 0 ? hoverFrac * duration : null;
 
   return (
     <div
@@ -149,7 +213,7 @@ export function PlayerControls({
       </span>
       <span className="shrink-0 text-ui text-white/30">•</span>
 
-      {/* Hairline scrubber with dot handle */}
+      {/* Hairline scrubber with dot handle + hover preview */}
       <div
         aria-label="Seek"
         aria-valuemax={Math.round(duration)}
@@ -157,12 +221,34 @@ export function PlayerControls({
         aria-valuenow={Math.round(current)}
         className="group/scrub relative flex min-w-16 flex-1 cursor-pointer items-center py-2"
         onPointerDown={onScrubDown}
+        onPointerEnter={(e) => updateHoverFromPointer(e.clientX)}
+        onPointerLeave={onScrubLeave}
         onPointerMove={onScrubMove}
-        onPointerUp={() => setScrubbing(false)}
+        onPointerUp={onScrubUp}
         ref={trackRef}
         role="slider"
         tabIndex={0}
       >
+        {hoverFrac !== null && hoverSec !== null && (
+          <>
+            <div
+              className="pointer-events-none absolute -top-1.5 -bottom-1.5 z-10 w-px bg-white/50"
+              style={{ left: `${hoverFrac * 100}%` }}
+            />
+            <div
+              className="pointer-events-none absolute bottom-full z-10 mb-3.5 -translate-x-1/2 whitespace-nowrap text-[0.6875rem] text-white/75 tabular-nums leading-none tracking-small"
+              style={{
+                left: `clamp(2rem, ${hoverFrac * 100}%, calc(100% - 2rem))`,
+              }}
+            >
+              {fmtScrubClock(hoverSec)}
+              <span className="text-white/30">
+                {" "}
+                / {fmtScrubClock(duration)}
+              </span>
+            </div>
+          </>
+        )}
         <div className="relative h-[3px] w-full rounded-full bg-white/20 transition-[height] group-hover/scrub:h-[5px]">
           <div
             className="absolute inset-y-0 left-0 rounded-full bg-white/25"
