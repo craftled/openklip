@@ -61,7 +61,7 @@ export async function withTempProjectsRoot<T>(
   const dir = join(root, "projects", slug);
   mkdirSync(dir, { recursive: true });
   // Pin projectsRoot() to this temp tree explicitly so project path
-  // resolution doesn't depend on process.cwd() — Bun runs test files in
+  // resolution doesn't depend on process.cwd(). Bun runs test files in
   // parallel and a global chdir would race across files. Restore after.
   const prevRoot = process.env.OPENKLIP_PROJECTS_ROOT;
   const prevSlug = process.env.OPENKLIP_SLUG;

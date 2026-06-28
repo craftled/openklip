@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { projectPaths } from "./paths.ts";
+import { withChatsLock } from "./project-lock.ts";
 
 export interface ThreadMessage {
   content: string;
@@ -120,113 +121,125 @@ export async function setActiveProjectThreadId(
   slug: string,
   threadId: string | null
 ): Promise<void> {
-  const data = await loadProjectChats(slug);
-  data.activeThreadId = threadId;
-  await saveProjectChats(slug, data);
+  await withChatsLock(slug, async () => {
+    const data = await loadProjectChats(slug);
+    data.activeThreadId = threadId;
+    await saveProjectChats(slug, data);
+  });
 }
 
-export async function createProjectThread(
+export function createProjectThread(
   slug: string,
   title?: string
 ): Promise<AgentThread> {
-  const data = await loadProjectChats(slug);
-  const thread: AgentThread = {
-    id: nextChatId("th"),
-    slug,
-    title: title ?? "New chat",
-    messages: [],
-    updatedAt: Date.now(),
-  };
-  data.threads = [thread, ...data.threads];
-  await saveProjectChats(slug, data);
-  return thread;
+  return withChatsLock(slug, async () => {
+    const data = await loadProjectChats(slug);
+    const thread: AgentThread = {
+      id: nextChatId("th"),
+      slug,
+      title: title ?? "New chat",
+      messages: [],
+      updatedAt: Date.now(),
+    };
+    data.threads = [thread, ...data.threads];
+    await saveProjectChats(slug, data);
+    return thread;
+  });
 }
 
-export async function appendProjectMessage(
+export function appendProjectMessage(
   slug: string,
   threadId: string,
   role: ThreadMessage["role"],
   content: string
 ): Promise<AgentThread | undefined> {
-  const data = await loadProjectChats(slug);
-  const idx = data.threads.findIndex((t) => t.id === threadId);
-  if (idx === -1) {
-    return;
-  }
-  const thread = data.threads[idx];
-  const message: ThreadMessage = {
-    id: nextChatId("m"),
-    role,
-    content,
-    createdAt: Date.now(),
-  };
-  const next: AgentThread = {
-    ...thread,
-    messages: [...thread.messages, message],
-    updatedAt: message.createdAt,
-    title:
-      thread.messages.length === 0 && role === "user"
-        ? content.slice(0, 48) || "New chat"
-        : thread.title,
-  };
-  data.threads[idx] = next;
-  await saveProjectChats(slug, data);
-  return next;
+  return withChatsLock(slug, async () => {
+    const data = await loadProjectChats(slug);
+    const idx = data.threads.findIndex((t) => t.id === threadId);
+    if (idx === -1) {
+      return;
+    }
+    const thread = data.threads[idx];
+    const message: ThreadMessage = {
+      id: nextChatId("m"),
+      role,
+      content,
+      createdAt: Date.now(),
+    };
+    const next: AgentThread = {
+      ...thread,
+      messages: [...thread.messages, message],
+      updatedAt: message.createdAt,
+      title:
+        thread.messages.length === 0 && role === "user"
+          ? content.slice(0, 48) || "New chat"
+          : thread.title,
+    };
+    data.threads[idx] = next;
+    await saveProjectChats(slug, data);
+    return next;
+  });
 }
 
 export async function deleteProjectThread(
   slug: string,
   threadId: string
 ): Promise<void> {
-  const data = await loadProjectChats(slug);
-  data.threads = data.threads.filter((t) => t.id !== threadId);
-  if (data.activeThreadId === threadId) {
-    data.activeThreadId =
-      data.threads.find((t) => t.archived !== true)?.id ?? null;
-  }
-  await saveProjectChats(slug, data);
+  await withChatsLock(slug, async () => {
+    const data = await loadProjectChats(slug);
+    data.threads = data.threads.filter((t) => t.id !== threadId);
+    if (data.activeThreadId === threadId) {
+      data.activeThreadId =
+        data.threads.find((t) => t.archived !== true)?.id ?? null;
+    }
+    await saveProjectChats(slug, data);
+  });
 }
 
-export async function renameProjectThread(
+export function renameProjectThread(
   slug: string,
   threadId: string,
   title: string
 ): Promise<AgentThread | undefined> {
-  const trimmed = title.trim();
-  if (!trimmed) {
-    return;
-  }
-  const data = await loadProjectChats(slug);
-  const idx = data.threads.findIndex((t) => t.id === threadId);
-  if (idx === -1) {
-    return;
-  }
-  const next: AgentThread = {
-    ...data.threads[idx],
-    title: trimmed,
-    updatedAt: Date.now(),
-  };
-  data.threads[idx] = next;
-  await saveProjectChats(slug, data);
-  return next;
+  return withChatsLock(slug, async () => {
+    const trimmed = title.trim();
+    if (!trimmed) {
+      return;
+    }
+    const data = await loadProjectChats(slug);
+    const idx = data.threads.findIndex((t) => t.id === threadId);
+    if (idx === -1) {
+      return;
+    }
+    const next: AgentThread = {
+      ...data.threads[idx],
+      title: trimmed,
+      updatedAt: Date.now(),
+    };
+    data.threads[idx] = next;
+    await saveProjectChats(slug, data);
+    return next;
+  });
 }
 
-export async function setProjectThreadArchived(
+export function setProjectThreadArchived(
   slug: string,
   threadId: string,
   archived: boolean
 ): Promise<AgentThread | undefined> {
-  const data = await loadProjectChats(slug);
-  const idx = data.threads.findIndex((t) => t.id === threadId);
-  if (idx === -1) {
-    return;
-  }
-  const next: AgentThread = {
-    ...data.threads[idx],
-    archived,
-    updatedAt: Date.now(),
-  };
-  data.threads[idx] = next;
-  await saveProjectChats(slug, data);
-  return next;
+  return withChatsLock(slug, async () => {
+    const data = await loadProjectChats(slug);
+    const idx = data.threads.findIndex((t) => t.id === threadId);
+    if (idx === -1) {
+      return;
+    }
+    const next: AgentThread = {
+      ...data.threads[idx],
+      archived,
+      updatedAt: Date.now(),
+    };
+    data.threads[idx] = next;
+    await saveProjectChats(slug, data);
+    return next;
+  });
 }

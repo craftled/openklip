@@ -5,6 +5,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { type Project, ProjectSchema } from "./edl.ts";
 import { projectPaths, projectsRoot } from "./paths.ts";
+import { withProjectLock } from "./project-lock.ts";
 
 export interface ProjectListing {
   mtimeMs: number;
@@ -61,4 +62,21 @@ export async function saveProject(
   project: Project
 ): Promise<void> {
   await writeFile(projectPaths(slug).project, JSON.stringify(project, null, 2));
+}
+
+// Load → mutate → save inside the per-slug project lock, so concurrent server
+// requests (multiple tabs / agent sessions) can't race the read-modify-write
+// and lose an edit. `fn` mutates the loaded project in place; its return value
+// is passed back to the caller. Use this for every server-side project.json
+// mutation instead of open-coding load+save.
+export function mutateProject<T>(
+  slug: string,
+  fn: (project: Project) => T | Promise<T>
+): Promise<T> {
+  return withProjectLock(slug, async () => {
+    const project = await loadProject(slug);
+    const result = await fn(project);
+    await saveProject(slug, project);
+    return result;
+  });
 }

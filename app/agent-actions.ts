@@ -5,9 +5,9 @@
 // the same project.json the editor reads. No API keys. Kept in its own file so
 // it doesn't touch the hand-written action surface.
 import { detectAgents, runFillerAgent } from "@engine/agent-driver";
-import { loadProject, saveProject } from "@engine/projectStore";
+import { mutateProject } from "@engine/projectStore";
 
-// Re-export the type from source (type-only — never emits runtime code) so client
+// Re-export the type from source (type-only, never emits runtime code) so client
 // components import it from here without pulling the server-only driver into their
 // bundle. The return type of getAgentStatuses is inferred from detectAgents.
 export type { AgentStatus } from "@engine/agent-driver";
@@ -33,20 +33,25 @@ export async function suggestFillerCuts(
   agent: string
 ): Promise<AgentResult> {
   try {
-    const project = await loadProject(slug);
-    const { ids } = await runFillerAgent(
-      project.words.map((w) => ({ id: w.id, text: w.text })),
-      { agent }
-    );
-    const set = new Set(ids);
-    const cutWords: Array<{ id: string; text: string }> = [];
-    for (const w of project.words) {
-      if (set.has(w.id) && !w.deleted) {
-        w.deleted = true;
-        cutWords.push({ id: w.id, text: w.text });
+    // Hold the project lock across the agent run + apply + save so two
+    // concurrent suggestions on the same project can't both load the same
+    // baseline and clobber each other's cuts. Chats use a separate lock, so
+    // chat writes stay responsive while this runs.
+    const cutWords = await mutateProject(slug, async (project) => {
+      const { ids } = await runFillerAgent(
+        project.words.map((w) => ({ id: w.id, text: w.text })),
+        { agent }
+      );
+      const set = new Set(ids);
+      const cut: Array<{ id: string; text: string }> = [];
+      for (const w of project.words) {
+        if (set.has(w.id) && !w.deleted) {
+          w.deleted = true;
+          cut.push({ id: w.id, text: w.text });
+        }
       }
-    }
-    await saveProject(slug, project);
+      return cut;
+    });
     return { ok: true, cut: cutWords.length, words: cutWords };
   } catch (e) {
     return { ok: false, error: (e as Error).message };

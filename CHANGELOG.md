@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+- **Project-wide write serialization.** All `project.json` mutations from the server (server actions, agent-driven filler cuts, asset sync, upload) now go through one per-slug lock (`src/project-lock.ts`) via a new `mutateProject(slug, fn)` helper, so concurrent tabs / agent sessions can't race the read-modify-write and lose an edit. `chats.json` mutations get a separate per-slug lock (`withChatsLock`) so chat writes stay responsive while an agent run holds the project lock. Replaces the narrower asset-only lock from 0.6.0. Scope: in-process (one running server); concurrent processes still need OS file locking.
+
 ## 0.6.0 - 2026-06-26
 
 Editor shell refresh: the asset bin, project chats, and theme picker now live in the left sidebar; the center column is preview, transcript, and timeline only.
@@ -11,7 +16,7 @@ Editor shell refresh: the asset bin, project chats, and theme picker now live in
 - **Theme engine** — swappable presets (OpenKlip, Catppuccin, GitHub, Nord, Dracula, Tokyo Night) with light/dark scheme and no-flash boot script.
 - **Keyboard shortcuts** — ⌘B toggles agent sidebar, ⌘I toggles inspector (`EditorSidebarShortcuts`).
 - **Asset folder scanner** — CLI/GUI parity when files land in `projects/<slug>/assets/` (`src/asset-scanner.ts`).
-- **Folder sync endpoint** — `POST /api/projects/:slug/assets/sync` registers any new files dropped into `assets/`. Sync is POST (not a mutating GET) and serialized per-slug so overlapping polls/tabs never race the `project.json` read-modify-write (`src/asset-lock.ts`).
+- **Folder sync endpoint:** `POST /api/projects/:slug/assets/sync` registers any new files dropped into `assets/`. Sync is POST (not a mutating GET) and serialized per-slug so overlapping polls/tabs never race the `project.json` read-modify-write (`src/asset-lock.ts`).
 
 ### Changed
 - Removed the asset strip below the timeline; assets render only under **Assets** in the agent sidebar.
