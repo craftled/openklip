@@ -14,7 +14,7 @@ Use these bodies when publishing releases. Each section matches a tag in `CHANGE
 - Timeline music, stills, and title tracks use theme tokens instead of arbitrary Tailwind hues
 - Inputs, focus rings, popovers, and chat/transcript typography aligned to [DESIGN.md](../DESIGN.md)
 
-### Fixed (post-tag on `main`)
+### Fixed
 - Typecheck: `agent-tools.ts`, `mcp-server.ts`, `new-project-dialog.tsx`
 - Asset folder sync storm: `AssetBin` callback ref stops re-sync on every parent re-render
 
