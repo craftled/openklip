@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   assertValidSlug,
-  assetProxyPath,
   assetStoragePath,
   projectDir,
   projectPaths,
@@ -28,20 +27,14 @@ test("projectPaths uses the layered input/working/output layout", () => {
   assert.ok(p.transcript.endsWith("projects/demo/working/transcript.json"));
   assert.ok(p.audioRaw.endsWith("projects/demo/working/audio16k.f32"));
   assert.ok(p.frames.endsWith("projects/demo/working/frames"));
-  assert.ok(p.assets.endsWith("projects/demo/working/assets"));
+  assert.ok(p.assets.endsWith("projects/demo/assets"));
+  assert.ok(p.assetProxies.endsWith("projects/demo/working/assets"));
+  assert.ok(p.chats.endsWith("projects/demo/working/chats.json"));
   assert.ok(p.working.endsWith("projects/demo/working"));
   // Rendered output lives under output/.
   assert.ok(p.out.endsWith("projects/demo/output/out.mp4"));
   assert.ok(p.output.endsWith("projects/demo/output"));
   assert.equal(projectDir("demo"), p.dir);
-});
-
-test("assetProxyPath resolves proxied asset media under working/", () => {
-  assert.ok(
-    assetProxyPath("demo", "b-roll").endsWith(
-      "projects/demo/working/assets/b-roll.mp4"
-    )
-  );
 });
 
 test("assetStoragePath joins a stored relative proxy onto the project dir", () => {

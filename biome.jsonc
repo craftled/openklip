@@ -36,8 +36,17 @@
       },
       "suspicious": {
         "noArrayIndexKey": "off",
-        "noEvolvingTypes": "off"
+        "noEvolvingTypes": "off",
+        "noBitwiseOperators": "off"
       }
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["web/components/agents-ui/**", "web/hooks/agents-ui/**"],
+      "linter": {
+        "enabled": false
+      }
+    }
+  ]
 }

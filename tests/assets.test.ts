@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import {
   inferAssetKind,
   listAssetsByKind,
   registerAsset,
+  registerAssetBytes,
 } from "../src/assets.ts";
 import { ProjectSchema } from "../src/edl.ts";
 import {
@@ -61,10 +62,10 @@ test("ProjectSchema defaults missing asset kind to broll", () => {
     words: [],
     assets: [
       {
-        id: "legacy",
+        id: "no-kind",
         name: "old.mp4",
         src: "/old.mp4",
-        proxy: "assets/legacy.mp4",
+        proxy: "working/assets/old.mp4",
         durationSamples: 48_000,
       },
     ],
@@ -75,14 +76,31 @@ test("ProjectSchema defaults missing asset kind to broll", () => {
 test("registerAsset copies a still into the project asset bin", async () => {
   await withTempProjectsRoot(async ({ slug }) => {
     writeFixtureProject(slug, makeProject({ slug, assets: [] }));
-    const stillPath = join(process.cwd(), "projects", slug, "incoming.png");
+    const assetsDir = join(process.cwd(), "projects", slug, "assets");
+    mkdirSync(assetsDir, { recursive: true });
+    const stillPath = join(assetsDir, "incoming.png");
     writeFileSync(stillPath, Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
     const asset = await registerAsset(slug, stillPath, "still");
     assert.equal(asset.kind, "still");
-    assert.match(asset.proxy, /^working\/assets\/.+\.png$/);
+    assert.equal(asset.proxy, "assets/incoming.png");
     const raw = readFileSync(`projects/${slug}/project.json`, "utf8");
     const project = ProjectSchema.parse(JSON.parse(raw));
     assert.equal(project.assets.length, 1);
     assert.equal(project.assets[0]?.id, asset.id);
+  });
+});
+
+test("registerAssetBytes keeps the uploaded source file on disk", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug, assets: [] }));
+    const asset = await registerAssetBytes(
+      slug,
+      "incoming.png",
+      new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]),
+      "still"
+    );
+    assert.equal(asset.kind, "still");
+    assert.ok(existsSync(asset.src));
+    assert.ok(asset.src.includes("/assets/incoming.png"));
   });
 });

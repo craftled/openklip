@@ -2,7 +2,7 @@
 
 ## Status
 
-OpenKlip is a lean, local-first, **agent-native** video editor: you **edit video by editing text** (Descript-style). The stack is Bun + TypeScript + React 19 + Next.js 16, with `ffmpeg-static` invoked as a subprocess and local Whisper running via Transformers.js. The project is files-on-disk: `project.json` **is** the edit (an EDL of every word with a `deleted` flag): no database. There are no API keys and no bundled LLM; the "agent" is Claude Code / Codex driven from the terminal, reading and writing the same project files the GUI does, so GUI and agent stay at full parity. Primary output is full-screen YouTube (16:9); the secondary target is vertical shorts (9:16, for TikTok / LinkedIn / X). Public on GitHub at `craftled/openklip` (MIT).
+OpenKlip is a lean, local-first, **agent-native** video editor: external agents drive the edit loop via CLI; humans review in the browser. Both read/write the same `project.json` on disk.
 
 **Current state:** working local editor; cut → captions → b-roll → vignette → push-in zoom → titles → export all functional; open-sourced MIT.
 Preview cuts now get a Glimm WebGL sweep in the browser; exported MP4s still hard-cut until the ffmpeg transition graph lands.
@@ -10,7 +10,7 @@ Preview cuts now get a Glimm WebGL sweep in the browser; exported MP4s still har
 ## Completed
 
 - [x] **M0 cut spine - ingest** (ffmpeg all-intra 720p proxy + local Whisper word-level transcript via Transformers.js, no API keys)
-- [x] **M0 cut spine - edit-by-text** (Descript-style: delete transcript words → trims the cut on the shared `project.json` EDL)
+- [x] **M0 cut spine - edit-by-text** (word-level `deleted` flags on `project.json` → preview + export follow kept ranges)
 - [x] **M0 cut spine - preview scheduler** (native `<video>` playback gap-skips deleted ranges on the all-intra proxy for instant seeks)
 - [x] **M0 cut spine - export** (ffmpeg re-encodes surviving ranges from the original source, frame-accurate)
 - [x] **Canonical time base** (48 kHz integer-sample grid shared by preview + export: what you scrub is what you export)
@@ -99,3 +99,11 @@ Preview cuts now get a Glimm WebGL sweep in the browser; exported MP4s still har
 
 - 4K export re-decodes the whole source (slow) even for a short cut.
 - Whisper word timestamps are ~100 ms loose; cuts can clip a phoneme until VAD-snapping lands.
+- Glimm cut transitions are preview-only; exported MP4 hard-jumps between kept ranges.
+- Vertical shorts (9:16 reframe), highlight detection, and MCP server are not implemented.
+- GUI server actions do not yet dispatch through `runAction()` — CLI uses `src/registry.ts`; GUI uses `app/actions.ts` + `projectMutations` (same `project.json`, separate code paths).
+- Reload the browser after CLI edits to see changes in the editor.
+
+## README policy
+
+**README = what exists in code today.** Philosophy/principles should describe implemented behavior. Roadmap, aspirations, and “post-MVP” items belong in this file only.

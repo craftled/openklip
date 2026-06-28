@@ -1,7 +1,14 @@
 "use client";
 
 import { Film, ImageIcon, Music, Upload } from "lucide-react";
-import { type DragEvent, useCallback, useRef, useState } from "react";
+import {
+  type DragEvent,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+import { AssetPreviewRow } from "@/components/asset-preview-hover";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
@@ -15,8 +22,15 @@ export interface BinAsset {
   proxy: string;
 }
 
+export function withAssetKind<T extends { kind?: AssetKind }>(
+  asset: T
+): T & { kind: AssetKind } {
+  return { ...asset, kind: (asset.kind ?? "broll") as AssetKind };
+}
+
 interface AssetBinProps {
   assets: BinAsset[];
+  mediaVersion?: number;
   onAssetsUpdated: (assets: BinAsset[]) => void;
   sampleRate: number;
   slug: string;
@@ -51,8 +65,26 @@ function fmtDur(samples: number, sr: number): string {
   return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 }
 
+async function readUploadResponse(res: Response): Promise<{
+  assets?: BinAsset[];
+  error?: string;
+}> {
+  const text = await res.text();
+  try {
+    return JSON.parse(text) as { assets?: BinAsset[]; error?: string };
+  } catch {
+    const snippet = text.replace(/\s+/g, " ").trim().slice(0, 160);
+    throw new Error(
+      res.ok
+        ? "Upload returned an invalid response from the server"
+        : `Upload failed (${res.status})${snippet ? `: ${snippet}` : ""}`
+    );
+  }
+}
+
 export function AssetBin({
   assets,
+  mediaVersion,
   onAssetsUpdated,
   sampleRate,
   slug,
@@ -61,6 +93,31 @@ export function AssetBin({
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const syncFromFolder = useCallback(async () => {
+    try {
+      const res = await fetch(
+        `/api/projects/${encodeURIComponent(slug)}/assets?sync=1`
+      );
+      const data = await readUploadResponse(res);
+      if (res.ok && data.assets) {
+        onAssetsUpdated(data.assets.map(withAssetKind));
+      }
+    } catch {
+      // folder sync is best-effort
+    }
+  }, [onAssetsUpdated, slug]);
+
+  useEffect(() => {
+    void syncFromFolder();
+    const id = setInterval(() => void syncFromFolder(), 8000);
+    const onFocus = () => void syncFromFolder();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [syncFromFolder]);
 
   const uploadFiles = useCallback(
     async (files: FileList | File[]) => {
@@ -79,28 +136,23 @@ export function AssetBin({
             `/api/projects/${encodeURIComponent(slug)}/assets`,
             { method: "POST", body: fd }
           );
-          const data = (await res.json()) as {
-            assets?: BinAsset[];
-            error?: string;
-          };
+          const data = await readUploadResponse(res);
           if (!res.ok) {
             throw new Error(data.error ?? `upload failed (${res.status})`);
           }
           if (data.assets) {
-            latest = data.assets.map((a) => ({
-              ...a,
-              kind: (a.kind ?? "broll") as AssetKind,
-            }));
+            latest = data.assets.map(withAssetKind);
           }
         }
         onAssetsUpdated(latest);
+        await syncFromFolder();
       } catch (e) {
         setError((e as Error).message);
       } finally {
         setUploading(false);
       }
     },
-    [assets, onAssetsUpdated, slug]
+    [assets, onAssetsUpdated, slug, syncFromFolder]
   );
 
   const onDrop = async (e: DragEvent) => {
@@ -119,22 +171,13 @@ export function AssetBin({
   }
 
   return (
-    <div className="shrink-0 border-border border-t bg-muted/10">
-      <div className="flex items-center justify-between px-3 py-2">
-        <span className="font-medium text-muted-foreground text-xs">
-          Asset bin
-        </span>
-        <span className="text-[11px] text-muted-foreground">
-          Local project folder · drag files here
-        </span>
-      </div>
-
+    <div className="px-1">
       <button
         className={cn(
-          "mx-3 mb-3 flex w-[calc(100%-1.5rem)] flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed px-4 py-5 text-center transition-colors",
+          "mx-0 mb-2 flex w-full cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed px-3 py-3 text-center transition-colors",
           dragging
-            ? "border-live bg-live/10"
-            : "border-border bg-background/60 hover:border-foreground/25 hover:bg-muted/40",
+            ? "border-success bg-success/10"
+            : "border-foreground/20 bg-background/60 hover:border-foreground/30 hover:bg-foreground/5",
           uploading && "pointer-events-none opacity-60"
         )}
         onClick={() => inputRef.current?.click()}
@@ -152,14 +195,9 @@ export function AssetBin({
         onDrop={onDrop}
         type="button"
       >
-        <Upload className="size-5 text-muted-foreground" />
-        <span className="font-medium text-[13px]">
-          {uploading ? "Registering…" : "Drop b-roll, music, or stills"}
-        </span>
-        <span className="max-w-sm text-[11px] text-muted-foreground leading-snug">
-          Video → b-roll layer · audio → music · images → stills. Same files the
-          CLI and agent use via{" "}
-          <code className="text-[10px]">openklip asset-add</code>.
+        <Upload className="size-4 text-muted-foreground" />
+        <span className="font-medium text-xs">
+          {uploading ? "Registering…" : "Drop or click to add"}
         </span>
         <input
           accept="video/*,audio/*,image/*"
@@ -177,48 +215,50 @@ export function AssetBin({
       </button>
 
       {error && (
-        <p className="px-3 pb-2 text-destructive text-xs">
+        <p className="px-1 pb-2 text-destructive text-xs">
           Upload failed: {error}
         </p>
       )}
 
-      <div className="grid gap-3 px-3 pb-3 md:grid-cols-3">
+      <div className="grid gap-2 pb-1">
         {(Object.keys(KIND_META) as AssetKind[]).map((kind) => {
           const meta = KIND_META[kind];
           const Icon = meta.icon;
           const items = grouped[kind];
           return (
             <div
-              className="rounded-md border border-border/80 bg-background/80 p-2.5"
+              className="rounded-md border border-border bg-foreground/3 p-2.5"
               key={kind}
             >
-              <div className="mb-2 flex items-center gap-1.5 font-medium text-[11px] text-muted-foreground">
+              <div className="mb-2 flex items-center gap-1.5 text-muted-foreground text-section-label">
                 <Icon className="size-3.5" />
                 {meta.label}
                 <Badge
-                  className="ml-auto h-4 px-1.5 text-[10px]"
+                  className="ml-auto h-4 px-1.5 text-caption"
                   variant="secondary"
                 >
                   {items.length}
                 </Badge>
               </div>
               {items.length === 0 ? (
-                <p className="text-[11px] text-muted-foreground/70">
+                <p className="text-caption text-muted-foreground/70">
                   No {meta.label.toLowerCase()} yet
                 </p>
               ) : (
                 <ul className="flex flex-col gap-1">
                   {items.map((a) => (
-                    <li
-                      className="flex items-center gap-2 rounded px-1.5 py-1 text-[12px] hover:bg-muted/60"
+                    <AssetPreviewRow
+                      asset={a}
+                      className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-sm hover:bg-foreground/5"
                       key={a.id}
-                      title={a.name}
+                      mediaVersion={mediaVersion}
+                      slug={slug}
                     >
                       <span className="min-w-0 flex-1 truncate">{a.name}</span>
-                      <span className="shrink-0 text-[10px] text-muted-foreground tabular-nums">
+                      <span className="shrink-0 text-caption text-muted-foreground tabular-nums">
                         {fmtDur(a.durationSamples, sampleRate)}
                       </span>
-                    </li>
+                    </AssetPreviewRow>
                   ))}
                 </ul>
               )}

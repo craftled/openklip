@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.6.0 - 2026-06-26
+
+Editor shell refresh: the asset bin, project chats, and theme picker now live in the left sidebar; the center column is preview, transcript, and timeline only.
+
+### Added
+- **Asset bin in sidebar** — drag-and-drop upload, grouped b-roll/music/stills, folder sync poll, and hover previews (`AssetBin`, `AssetPreviewRow`).
+- **Project switcher** — switch projects, ingest video from the sidebar, ⌘1–⌘9 shortcuts.
+- **Persisted chats API** — threads stored in `working/chats.json` with archive/rename/delete (`src/chats.ts`, `/api/projects/:slug/chats`).
+- **Theme engine** — swappable presets (OpenKlip, Catppuccin, GitHub, Nord, Dracula, Tokyo Night) with light/dark scheme and no-flash boot script.
+- **Keyboard shortcuts** — ⌘B toggles agent sidebar, ⌘I toggles inspector (`EditorSidebarShortcuts`).
+- **Asset folder scanner** — CLI/GUI parity when files land in `projects/<slug>/assets/` (`src/asset-scanner.ts`).
+
+### Changed
+- Removed the asset strip below the timeline; assets render only under **Assets** in the agent sidebar.
+- Agent threads moved from browser localStorage to per-project disk via the chats API.
+- Inspector settings grouped under a Paper-style right sidebar with theme and default-agent pickers.
+- Unified `registerAsset` path for b-roll, music, and stills; dropped standalone `src/broll.ts`.
+
+### Fixed
+- Lint/test hygiene for theme re-exports, vendored agents-ui shader component, and `AgentModelSelect` extraction.
+
 ## 0.5.0 - 2026-06-26
 
 Linear-parity video player: the editor preview and a new fullscreen "cinema" mode now share one transport bar that matches Linear's player chrome — white-on-dark controls over a gradient scrim, a hairline scrubber with a dot handle, and a left-to-right row of play, volume, time, remaining, speed, captions, picture-in-picture, and fullscreen.

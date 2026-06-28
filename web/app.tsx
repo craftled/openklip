@@ -9,10 +9,12 @@ import {
 } from "glimm";
 import {
   Captions,
+  Check,
   Clock3,
   Download,
   Film,
   Moon,
+  Palette,
   PanelLeft,
   PanelRight,
   Settings2,
@@ -25,6 +27,7 @@ import {
 import {
   type ComponentType,
   type CSSProperties,
+  type MouseEvent,
   type ReactNode,
   useCallback,
   useEffect,
@@ -32,11 +35,14 @@ import {
   useRef,
   useState,
 } from "react";
-import { AgentSidebar, type ProjectListing } from "@/components/agent-sidebar";
-import { AssetBin } from "@/components/asset-bin";
+import { AgentModelSelect } from "@/components/agent-model-select";
+import { AgentSidebar } from "@/components/agent-sidebar";
+import { withAssetKind } from "@/components/asset-bin";
 import { CinemaPlayer } from "@/components/cinema-player";
 import { EditTimeline } from "@/components/edit-timeline";
+import { EditorSidebarShortcuts } from "@/components/editor-sidebar-shortcuts";
 import { HeroTitleOverlay } from "@/components/hero-title-overlay";
+import { KeyboardHint } from "@/components/keyboard-hint";
 import { OverlaySortable } from "@/components/overlay-sortable";
 import { PLAYER_SPEEDS, PlayerControls } from "@/components/player-controls";
 import { Button } from "@/components/ui/button";
@@ -52,7 +58,7 @@ import {
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
+  type SidebarContextProps,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -73,12 +79,36 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { AgentProviderIcon } from "@/lib/agent-icons";
+import {
+  type AgentModelId,
+  DEFAULT_AGENT_MODEL,
+  getAgentModelLabel,
+  getDefaultAgentModel,
+  setDefaultAgentModel,
+  subscribeDefaultAgent,
+} from "@/lib/agent-preferences";
+import { modShortcut } from "@/lib/keyboard-shortcuts";
 import {
   clampLoopRegion,
   ORIENTATION_LABEL,
   ORIENTATION_RATIO,
   type Orientation,
 } from "@/lib/preview-layout";
+import type { ProjectListing } from "@/lib/project-list";
+import { getThemeLabel, THEME_CATALOG } from "@/lib/theme-catalog";
+import {
+  type AppThemeId,
+  applyAppTheme,
+  applyColorScheme,
+  type ColorScheme,
+  getAppTheme,
+  getColorScheme,
+  setAppTheme,
+  setColorScheme,
+  subscribeAppTheme,
+  subscribeColorScheme,
+} from "@/lib/theme-preferences";
 import { cn } from "@/lib/utils";
 import type { ActionResult } from "../app/actions.ts";
 import {
@@ -258,6 +288,8 @@ export function App({
     initialProject.look?.vignette ?? false
   );
   const [export1080, setExport1080] = useState(true);
+  const [defaultAgent, setDefaultAgent] =
+    useState<AgentModelId>(DEFAULT_AGENT_MODEL);
   const [cinema, setCinema] = useState(false);
   const [previewMuted, setPreviewMuted] = useState(false);
   const [previewRate, setPreviewRate] = useState(1);
@@ -288,30 +320,35 @@ export function App({
   }, [loop]);
   const [pendingSaves, setPendingSaves] = useState(0);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [theme, setTheme] = useState<"light" | "dark">(() =>
-    typeof document !== "undefined" &&
-    document.documentElement.classList.contains("dark")
-      ? "dark"
-      : "light"
+  const [appTheme, setAppThemeState] = useState<AppThemeId>(() =>
+    getAppTheme()
+  );
+  const [colorScheme, setColorSchemeState] = useState<ColorScheme>(() =>
+    getColorScheme()
   );
   const projectLoaded = true;
-  const themeMounted = useRef(false);
   useEffect(() => {
-    document.documentElement.classList.toggle("dark", theme === "dark");
-    if (themeMounted.current) {
-      try {
-        localStorage.setItem("openklip-theme", theme);
-      } catch {
-        // ignore unavailable storage
-      }
-    }
-    themeMounted.current = true;
-  }, [theme]);
-  const toggleTheme = useCallback(
-    () => setTheme((p) => (p === "dark" ? "light" : "dark")),
-    []
-  );
-
+    applyColorScheme(getColorScheme());
+    const unsubTheme = subscribeAppTheme((theme) => {
+      setAppThemeState(theme);
+      applyAppTheme(theme, getColorScheme());
+    });
+    const unsubScheme = subscribeColorScheme((scheme) => {
+      setColorSchemeState(scheme);
+      applyAppTheme(getAppTheme(), scheme);
+    });
+    return () => {
+      unsubTheme();
+      unsubScheme();
+    };
+  }, []);
+  const toggleColorScheme = useCallback(() => {
+    setColorScheme(colorScheme === "dark" ? "light" : "dark");
+  }, [colorScheme]);
+  useEffect(() => {
+    setDefaultAgent(getDefaultAgentModel());
+    return subscribeDefaultAgent(setDefaultAgent);
+  }, []);
   const videoRef = useRef<HTMLVideoElement>(null);
   const brollRef = useRef<HTMLVideoElement>(null);
   const transitionCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -690,7 +727,7 @@ export function App({
     enqueueSave(() => saveProjectEdits(project.slug, { padMs: n }));
   };
 
-  const onPlay = async () => {
+  const onPlay = useCallback(async () => {
     const s = schedRef.current;
     if (!s) {
       return;
@@ -710,7 +747,42 @@ export function App({
         setExportMsg(`Playback error: ${(e as Error).message}`);
       }
     }
-  };
+  }, [playing]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (cinema || (e.key !== " " && e.key !== "Spacebar")) {
+        return;
+      }
+      const el = e.target as HTMLElement | null;
+      if (!el) {
+        return;
+      }
+      const tag = el.tagName;
+      if (
+        tag === "INPUT" ||
+        tag === "TEXTAREA" ||
+        tag === "SELECT" ||
+        el.isContentEditable
+      ) {
+        return;
+      }
+      e.preventDefault();
+      void onPlay();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [cinema, onPlay]);
+
+  const onPreviewClick = useCallback(
+    (e: MouseEvent<HTMLDivElement>) => {
+      if ((e.target as HTMLElement).closest("[data-preview-chrome]")) {
+        return;
+      }
+      void onPlay();
+    },
+    [onPlay]
+  );
 
   const onSeek = useCallback(
     (sourceSec: number) => {
@@ -1001,6 +1073,8 @@ export function App({
   return (
     <SidebarProvider
       className="min-h-screen flex-col overflow-auto bg-background text-foreground md:h-screen md:min-h-0 md:flex-row md:overflow-hidden"
+      cookieName="openklip_sidebar_agent"
+      keyboardShortcut={false}
       style={
         {
           "--sidebar-width": "18rem",
@@ -1020,12 +1094,27 @@ export function App({
           src={`/media/proxy.mp4?v=${project.mediaVersion ?? 0}`}
         />
       )}
-      <AgentSidebar activeSlug={project.slug} initialProjects={projects} />
+      <AgentSidebar
+        activeSlug={project.slug}
+        assets={project.assets.map(withAssetKind)}
+        mediaVersion={project.mediaVersion}
+        onAssetsUpdated={(assets) => {
+          setProject((p) => ({ ...p, assets }));
+          const nextBroll = assets.find((a) => (a.kind ?? "broll") === "broll");
+          if (nextBroll && !assets.some((a) => a.id === chosenAsset)) {
+            setChosenAsset(nextBroll.id);
+          }
+        }}
+        projects={projects}
+        sampleRate={project.sampleRate}
+      />
 
       <SidebarContextBridge>
-        {({ toggleSidebar: toggleLeftSidebar }) => (
+        {(agentSidebar) => (
           <SidebarProvider
             className="min-h-screen flex-1 flex-col overflow-auto bg-background text-foreground md:h-screen md:min-h-0 md:flex-row md:overflow-hidden"
+            cookieName="openklip_sidebar_inspector"
+            keyboardShortcut={false}
             style={
               {
                 "--sidebar-width": "17rem",
@@ -1033,46 +1122,69 @@ export function App({
               } as CSSProperties
             }
           >
+            <EditorSidebarShortcuts agentSidebar={agentSidebar} />
             {/* CENTER — preview + transcript */}
             <SidebarInset className="flex min-h-[28rem] min-w-0 flex-col md:min-h-0">
               <div className="flex h-12 shrink-0 items-center gap-2 border-border border-b px-3">
                 <Button
-                  aria-label="Toggle agent sidebar"
-                  onClick={toggleLeftSidebar}
-                  size="icon-sm"
+                  aria-label={`Toggle agent sidebar (${modShortcut("b")})`}
+                  className="h-8 shrink-0 gap-1 px-2"
+                  onClick={agentSidebar.toggleSidebar}
+                  title={`Toggle agent sidebar (${modShortcut("b")})`}
                   variant="ghost"
                 >
-                  <PanelLeft />
+                  <PanelLeft className="size-4" />
+                  <KeyboardHint shortcutKey="b" />
                 </Button>
-                <div className="h-4 w-px bg-border" />
+                <div className="h-4 w-px bg-foreground/10" />
                 <div className="min-w-0">
-                  <div className="font-medium text-[13px]">Editor</div>
-                  <div className="truncate text-[11px] text-muted-foreground">
+                  <div className="font-medium text-ui">Editor</div>
+                  <div className="truncate text-caption text-muted-foreground">
                     {ranges.length} cuts · {fmt(keptDuration)} / {fmt(fullDur)}
                   </div>
                 </div>
-                <div className="ml-auto flex items-center gap-0.5 rounded-md border border-border p-0.5">
-                  {(["landscape", "portrait", "square"] as Orientation[]).map(
-                    (o) => (
-                      <Button
-                        aria-label={`Preview ${ORIENTATION_LABEL[o]}`}
-                        aria-pressed={orientation === o}
-                        key={o}
-                        onClick={() => setOrientation(o)}
-                        size="sm"
-                        variant={orientation === o ? "secondary" : "ghost"}
-                      >
-                        {ORIENTATION_LABEL[o]}
-                      </Button>
-                    )
-                  )}
+                <div className="ml-auto flex items-center gap-2">
+                  <Button
+                    disabled={exportDisabled}
+                    onClick={onExport}
+                    size="sm"
+                    variant="secondary"
+                  >
+                    <Download />
+                    {exportLabel}
+                  </Button>
+                  <div className="flex items-center gap-0.5 rounded-lg border border-border bg-muted/50 p-0.5">
+                    {(["landscape", "portrait", "square"] as Orientation[]).map(
+                      (o) => (
+                        <Button
+                          aria-label={`Preview ${ORIENTATION_LABEL[o]}`}
+                          aria-pressed={orientation === o}
+                          key={o}
+                          onClick={() => setOrientation(o)}
+                          size="sm"
+                          variant={orientation === o ? "secondary" : "ghost"}
+                        >
+                          {ORIENTATION_LABEL[o]}
+                        </Button>
+                      )
+                    )}
+                  </div>
+                  <Button
+                    aria-label="Toggle color scheme"
+                    onClick={toggleColorScheme}
+                    size="icon-sm"
+                    variant="ghost"
+                  >
+                    {colorScheme === "dark" ? <Sun /> : <Moon />}
+                  </Button>
+                  <RightSidebarTrigger />
                 </div>
-                <RightSidebarTrigger />
               </div>
               <div className="flex flex-col gap-3 p-4">
                 <div className="flex w-full justify-center">
                   <div
-                    className="group/preview relative overflow-hidden rounded-lg border border-border bg-black"
+                    className="group/preview relative cursor-pointer overflow-hidden rounded-lg border border-border bg-black"
+                    onClick={onPreviewClick}
                     style={
                       orientation === "landscape"
                         ? {
@@ -1128,7 +1240,7 @@ export function App({
                       >
                         <span
                           className={cn(
-                            "max-w-[80%] rounded-md bg-black/60 px-4 py-2 text-center font-semibold text-white backdrop-blur",
+                            "max-w-[80%] rounded-md bg-black/60 px-4 py-2 text-center font-medium text-white backdrop-blur",
                             standardTitle.position === "center"
                               ? "text-[clamp(22px,4vw,52px)]"
                               : "text-[clamp(16px,2.6vw,32px)]"
@@ -1145,7 +1257,7 @@ export function App({
                           captionsRaised ? "bottom-[28%]" : "bottom-[9%]"
                         )}
                       >
-                        <div className="max-w-[82%] rounded-md bg-black/55 px-3.5 py-1.5 text-center font-semibold text-[clamp(15px,2.3vw,30px)] text-white leading-tight backdrop-blur">
+                        <div className="max-w-[82%] rounded-md bg-black/55 px-3.5 py-1.5 text-center font-medium text-[clamp(15px,2.3vw,30px)] text-white leading-tight backdrop-blur">
                           {activeGroup.words.map((w, i) => {
                             const next =
                               activeGroup.words[i + 1]?.startSec ??
@@ -1171,7 +1283,7 @@ export function App({
                       ref={transitionCanvasRef}
                     />
                     {(exporting || pendingSaves > 0) && (
-                      <div className="pointer-events-none absolute top-2 right-2 z-[5] flex items-center gap-1.5 rounded-md bg-black/70 px-2 py-1 font-medium text-[11px] text-white backdrop-blur">
+                      <div className="pointer-events-none absolute top-2 right-2 z-[5] flex items-center gap-1.5 rounded-md bg-black/70 px-2 py-1 font-medium text-caption text-white backdrop-blur">
                         <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
                         {exporting
                           ? (exportMsg ?? "Exporting…")
@@ -1181,7 +1293,7 @@ export function App({
                     {/* Linear-parity transport, shared with the cinema overlay */}
                     <PlayerControls
                       captionsOn={captionsOn}
-                      className="absolute inset-x-0 bottom-0 z-[6] px-3 pb-2 opacity-0 transition-opacity duration-200 focus-within:opacity-100 group-hover/preview:opacity-100"
+                      className="absolute inset-x-0 bottom-0 z-[6] px-3 pb-2 opacity-0 transition-opacity duration-200 ease-out focus-within:opacity-100 group-hover/preview:opacity-100"
                       current={outPos}
                       duration={keptDuration}
                       fullscreenLabel="Open cinema player"
@@ -1236,7 +1348,7 @@ export function App({
                     {loop && (
                       <Button
                         aria-label="Clear loop region"
-                        className="text-[11px] text-muted-foreground"
+                        className="text-caption text-muted-foreground"
                         onClick={() => {
                           setLoop(null);
                           setLoopInPending(null);
@@ -1261,18 +1373,18 @@ export function App({
                 </div>
               </div>
 
-              <div className="min-h-0 flex-1 border-border border-t">
+              <div className="min-h-0 flex-1 border-foreground/10 border-t">
                 <ScrollArea className="h-full">
                   <div className="px-6 pt-4 pb-12">
                     <div className="mb-3 flex items-center gap-2">
                       <span className="font-medium text-muted-foreground text-xs">
                         Transcript
                       </span>
-                      <span className="ml-auto text-[11px] text-muted-foreground/70">
+                      <span className="ml-auto text-caption text-muted-foreground/70">
                         Click to cut · shift-click to select
                       </span>
                     </div>
-                    <p className="max-w-[60ch] text-[15px] leading-[1.95]">
+                    <p className="max-w-[60ch] text-base leading-[1.95]">
                       {project.words.map((w, i) => {
                         const active =
                           curSample >= w.startSample &&
@@ -1285,7 +1397,7 @@ export function App({
                         return (
                           <span
                             className={cn(
-                              "cursor-pointer rounded px-0.5 py-px transition-colors hover:bg-muted",
+                              "cursor-pointer rounded px-0.5 py-px transition-colors fine-hover:hover:bg-muted active:bg-muted/80",
                               w.deleted &&
                                 "text-muted-foreground/60 line-through decoration-1",
                               active && "bg-live/15 text-live",
@@ -1304,7 +1416,7 @@ export function App({
                       })}
                     </p>
                     {exportMsg && (
-                      <p className="mt-6 max-w-[60ch] break-words border-border border-t pt-3 text-muted-foreground text-xs">
+                      <p className="mt-6 max-w-[60ch] break-words border-foreground/10 border-t pt-3 text-muted-foreground text-xs">
                         {exportMsg}
                       </p>
                     )}
@@ -1331,45 +1443,19 @@ export function App({
                 wordSpans={timelineWords}
                 zooms={timelineZooms}
               />
-              <AssetBin
-                assets={project.assets.map((a) => ({
-                  ...a,
-                  kind: (a.kind ?? "broll") as "broll" | "music" | "still",
-                }))}
-                onAssetsUpdated={(assets) => {
-                  setProject((p) => ({ ...p, assets }));
-                  const nextBroll = assets.find(
-                    (a) => (a.kind ?? "broll") === "broll"
-                  );
-                  if (nextBroll && !assets.some((a) => a.id === chosenAsset)) {
-                    setChosenAsset(nextBroll.id);
-                  }
-                }}
-                sampleRate={sr}
-                slug={project.slug}
-              />
             </SidebarInset>
 
             {/* RIGHT — actions + inspector (Paper "properties" panel) */}
-            <Sidebar className="border-border" collapsible="icon" side="right">
+            <Sidebar className="bg-background" collapsible="icon" side="right">
               <SidebarHeader className="border-border border-b">
                 <SidebarMenu>
                   <SidebarMenuItem>
-                    <SidebarMenuButton
-                      disabled={exportDisabled}
-                      onClick={onExport}
-                      tooltip={exportLabel}
-                    >
-                      <Download />
-                      <span>{exportLabel}</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton tooltip="Output quality">
+                    <SidebarMenuButton tooltip="Settings">
                       <Settings2 />
-                      <span>Output quality</span>
+                      <span>Settings</span>
                     </SidebarMenuButton>
                     <SidebarMenuBadge>
+                      {getThemeLabel(appTheme)} ·{" "}
                       {export1080 ? "1080p" : "Auto"}
                     </SidebarMenuBadge>
                     <SidebarMenuSub>
@@ -1383,6 +1469,55 @@ export function App({
                             <span>Limit to 1080p</span>
                           </label>
                         </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+                      <SidebarMenuSubItem>
+                        <span className="px-2 py-1 font-medium text-muted-foreground text-section-label">
+                          Theme
+                        </span>
+                      </SidebarMenuSubItem>
+                      {THEME_CATALOG.map((themeOption) => (
+                        <SidebarMenuSubItem key={themeOption.id}>
+                          <SidebarMenuSubButton
+                            className="gap-2"
+                            isActive={appTheme === themeOption.id}
+                            onClick={() => setAppTheme(themeOption.id)}
+                          >
+                            {appTheme === themeOption.id ? (
+                              <Check className="size-3.5 shrink-0" />
+                            ) : (
+                              <Palette className="size-3.5 shrink-0 text-muted-foreground" />
+                            )}
+                            <span className="min-w-0 flex-1 truncate">
+                              {themeOption.name}
+                            </span>
+                            {themeOption.supportedModes.length === 1 &&
+                            themeOption.supportedModes[0] === "dark" ? (
+                              <span className="shrink-0 text-caption text-muted-foreground">
+                                dark
+                              </span>
+                            ) : null}
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      ))}
+                    </SidebarMenuSub>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton tooltip="Default agent">
+                      <AgentProviderIcon
+                        className="size-4 shrink-0"
+                        value={defaultAgent}
+                      />
+                      <span>Default agent</span>
+                    </SidebarMenuButton>
+                    <SidebarMenuBadge>
+                      {getAgentModelLabel(defaultAgent)}
+                    </SidebarMenuBadge>
+                    <SidebarMenuSub>
+                      <SidebarMenuSubItem className="px-2 pb-2">
+                        <AgentModelSelect
+                          onValueChange={setDefaultAgentModel}
+                          value={defaultAgent}
+                        />
                       </SidebarMenuSubItem>
                     </SidebarMenuSub>
                   </SidebarMenuItem>
@@ -1417,7 +1552,7 @@ export function App({
                 {selected && (selZoom || selTitle || selBroll) ? (
                   <div className="group-data-[collapsible=icon]:hidden">
                     <div className="px-3 py-3">
-                      <div className="flex items-center gap-2 font-medium text-[13px]">
+                      <div className="flex items-center gap-2 font-medium text-ui">
                         {selZoom ? (
                           <ZoomIn className="size-3.5 text-muted-foreground" />
                         ) : selTitle ? (
@@ -1430,7 +1565,7 @@ export function App({
                           : selTitle
                             ? "Title card"
                             : "B-roll"}
-                        <span className="ml-auto text-[11px] text-muted-foreground tabular-nums">
+                        <span className="ml-auto text-caption text-muted-foreground tabular-nums">
                           {selZoom &&
                             `${fmt(selZoom.startSample / sr)}–${fmt(selZoom.endSample / sr)}`}
                           {selTitle &&
@@ -1504,7 +1639,7 @@ export function App({
                       <Section title="Title">
                         {selTitle.position === "hero" ? (
                           <textarea
-                            className="field-sizing-content min-h-16 w-full resize-y rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                            className="field-sizing-content min-h-16 w-full resize-y rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                             onChange={(e) =>
                               updateTitle(selTitle.id, { text: e.target.value })
                             }
@@ -1566,7 +1701,7 @@ export function App({
                         </Select>
                         {(project.broll ?? []).length > 1 && (
                           <div className="mt-3">
-                            <span className="text-[11px] text-muted-foreground">
+                            <span className="text-caption text-muted-foreground">
                               Paint order — drag to restack
                             </span>
                             <div className="mt-1.5">
@@ -1600,9 +1735,9 @@ export function App({
                   </div>
                 ) : selRange ? (
                   <div className="group-data-[collapsible=icon]:hidden">
-                    <div className="px-3 py-3 font-medium text-[13px]">
+                    <div className="px-3 py-3 font-medium text-ui">
                       Selection
-                      <span className="ml-2 font-normal text-[11px] text-muted-foreground">
+                      <span className="ml-2 text-caption text-muted-foreground">
                         {selRange[1] - selRange[0] + 1} words
                       </span>
                     </div>
@@ -1648,7 +1783,7 @@ export function App({
                     <Section title="Title">
                       {titlePos === "hero" ? (
                         <textarea
-                          className="field-sizing-content min-h-16 w-full resize-y rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                          className="field-sizing-content min-h-16 w-full resize-y rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                           onChange={(e) => setTitleText(e.target.value)}
                           placeholder={
                             "Headline\nSubtitle (optional second line)"
@@ -1737,19 +1872,6 @@ export function App({
                   </div>
                 )}
               </SidebarContent>
-              <SidebarFooter className="border-border border-t">
-                <SidebarMenu>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      onClick={toggleTheme}
-                      tooltip="Toggle theme"
-                    >
-                      {theme === "dark" ? <Sun /> : <Moon />}
-                      <span>Theme</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                </SidebarMenu>
-              </SidebarFooter>
               <SidebarRail />
             </Sidebar>
           </SidebarProvider>
@@ -1774,7 +1896,7 @@ function InfoSubItem({
         <span>
           <Icon className="size-3.5 shrink-0 text-muted-foreground" />
           <span className="min-w-0 flex-1 truncate">{label}</span>
-          <span className="ml-auto shrink-0 text-[11px] text-muted-foreground/70 tabular-nums">
+          <span className="ml-auto shrink-0 text-caption text-muted-foreground/70 tabular-nums">
             {value}
           </span>
         </span>
@@ -1786,30 +1908,32 @@ function InfoSubItem({
 function SidebarContextBridge({
   children,
 }: {
-  children: (context: ReturnType<typeof useSidebar>) => ReactNode;
+  children: (context: SidebarContextProps) => ReactNode;
 }) {
   return children(useSidebar());
 }
 
 function RightSidebarTrigger({ className }: { className?: string }) {
   const { toggleSidebar } = useSidebar();
+  const label = `Toggle inspector (${modShortcut("i")})`;
 
   return (
     <Button
-      aria-label="Toggle inspector sidebar"
-      className={className}
+      aria-label={label}
+      className={cn("h-8 shrink-0 gap-1 px-2", className)}
       onClick={toggleSidebar}
-      size="icon-sm"
+      title={label}
       variant="ghost"
     >
-      <PanelRight />
+      <PanelRight className="size-4" />
+      <KeyboardHint shortcutKey="i" />
     </Button>
   );
 }
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <SidebarGroup className="border-border border-t px-3 py-3">
+    <SidebarGroup className="border-foreground/10 border-t px-3 py-3">
       <SidebarGroupLabel className="mb-2.5 h-auto px-0 font-medium text-muted-foreground">
         {title}
       </SidebarGroupLabel>

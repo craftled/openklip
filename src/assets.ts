@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
-import { copyFile, mkdir, writeFile } from "node:fs/promises";
-import { basename, extname, isAbsolute, resolve } from "node:path";
+import { mkdir, writeFile } from "node:fs/promises";
+import { basename, extname, isAbsolute, relative, resolve } from "node:path";
 import {
   type Asset,
   type AssetKind,
@@ -25,6 +25,14 @@ export function inferAssetKind(filename: string): AssetKind {
     return "music";
   }
   return "broll";
+}
+
+const VIDEO_EXT = new Set([".mp4", ".mov", ".m4v", ".webm", ".mkv", ".avi"]);
+
+/** True when the filename looks like a droppable asset (not junk). */
+export function isRecognizedAssetFile(filename: string): boolean {
+  const ext = extname(filename).toLowerCase();
+  return IMAGE_EXT.has(ext) || AUDIO_EXT.has(ext) || VIDEO_EXT.has(ext);
 }
 
 function uniqueAssetId(project: { assets: Asset[] }, base: string): string {
@@ -130,17 +138,14 @@ async function buildMusicProxy(
   };
 }
 
-async function buildStillProxy(
+function buildStillProxy(
   slug: string,
-  id: string,
+  _id: string,
   src: string
-): Promise<{ proxy: string; durationSamples: number }> {
-  const ext = extname(src).toLowerCase() || ".png";
-  const proxyRel = assetProxyRelative(`${id}${ext}`);
-  const out = resolve(projectPaths(slug).dir, proxyRel);
-  await copyFile(src, out);
+): { proxy: string; durationSamples: number } {
+  const rel = relative(projectPaths(slug).dir, src).replace(/\\/g, "/");
   return {
-    proxy: proxyRel,
+    proxy: rel,
     durationSamples: Math.round(STILL_HOLD_SEC * SAMPLE_RATE),
   };
 }
@@ -163,6 +168,7 @@ export async function registerAsset(
 
   const p = projectPaths(slug);
   await mkdir(p.assets, { recursive: true });
+  await mkdir(p.assetProxies, { recursive: true });
 
   console.log(`[asset] ${resolvedKind}: ${src}`);
 
@@ -172,7 +178,7 @@ export async function registerAsset(
     built = await buildMusicProxy(slug, id, src);
   } else if (resolvedKind === "still") {
     console.log("[asset] copying still...");
-    built = await buildStillProxy(slug, id, src);
+    built = buildStillProxy(slug, id, src);
   } else {
     console.log("[asset] building video proxy...");
     built = await buildVideoProxy(slug, id, src);
@@ -192,7 +198,7 @@ export async function registerAsset(
   return asset;
 }
 
-/** Register bytes uploaded from the browser (writes a temp file under the project). */
+/** Register bytes uploaded from the browser (persists source under assets/). */
 export async function registerAssetBytes(
   slug: string,
   filename: string,
@@ -203,17 +209,21 @@ export async function registerAssetBytes(
     basename(filename).replace(/[^a-zA-Z0-9._-]/g, "_") || "upload";
   const p = projectPaths(slug);
   await mkdir(p.assets, { recursive: true });
-  const staging = resolve(p.assets, `.upload-${Date.now()}-${safeName}`);
-  await writeFile(staging, data);
-  try {
-    return await registerAsset(slug, staging, kind);
-  } finally {
-    try {
-      await Bun.file(staging).delete();
-    } catch {
-      // staging cleanup is best-effort
+  await mkdir(p.assetProxies, { recursive: true });
+
+  let stored = resolve(p.assets, safeName);
+  if (existsSync(stored)) {
+    const ext = extname(safeName);
+    const stem = basename(safeName, ext) || "upload";
+    let n = 2;
+    while (existsSync(stored)) {
+      stored = resolve(p.assets, `${stem}-${n}${ext}`);
+      n += 1;
     }
   }
+
+  await writeFile(stored, data);
+  return await registerAsset(slug, stored, kind);
 }
 
 export function listAssetsByKind(assets: Asset[]): Record<AssetKind, Asset[]> {

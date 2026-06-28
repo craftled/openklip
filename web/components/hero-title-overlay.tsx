@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { parseHeroLines } from "../../src/titles.ts";
 import { TextSwap } from "./text-swap.tsx";
 
-const FADE_MS = 400;
+const FADE_MS = 200;
 
 interface HeroTitle {
   id: string;
@@ -79,12 +79,12 @@ export function HeroTitleOverlay({
       />
       <div className="pointer-events-none absolute inset-0 z-[4] flex flex-col items-center justify-center px-[8%] text-center text-white">
         <TextSwap
-          className="font-serif text-[clamp(28px,5.5vw,64px)] leading-tight tracking-tight drop-shadow-[0_2px_24px_rgba(0,0,0,0.45)]"
+          className="font-medium text-[clamp(28px,5.5vw,64px)] leading-tight tracking-tight drop-shadow-[0_2px_24px_rgba(0,0,0,0.45)]"
           text={headline}
         />
         {subtitle ? (
           <TextSwap
-            className="mt-3 max-w-[90%] font-serif text-[clamp(14px,2.2vw,26px)] text-white/90 leading-snug drop-shadow-[0_2px_16px_rgba(0,0,0,0.4)]"
+            className="mt-3 max-w-[90%] font-medium text-[clamp(14px,2.2vw,26px)] text-white/90 leading-snug drop-shadow-[0_2px_16px_rgba(0,0,0,0.4)]"
             text={subtitle}
           />
         ) : null}

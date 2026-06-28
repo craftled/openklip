@@ -1,0 +1,344 @@
+/* =============================================================================
+   OPENKLIP THEME BASE — structure only (palette from themes/*.json)
+
+   Semantic colors are injected by theme-engine (#openklip-theme-vars).
+   Derived tokens, typography, and editor track colors live here.
+============================================================================= */
+
+:root,
+.dark {
+  --background-elevated: color-mix(
+    in srgb,
+    var(--foreground) 1.5%,
+    var(--background)
+  );
+  --foreground-dimmed: color-mix(
+    in srgb,
+    var(--foreground) 80%,
+    var(--background)
+  );
+  --user-message-bubble: oklch(from var(--foreground) l c h / 0.05);
+  --user-message-bubble-dimmed: oklch(from var(--foreground) l c h / 0.03);
+
+  --foreground-1-5: color-mix(
+    in srgb,
+    var(--foreground) 1.5%,
+    var(--background)
+  );
+  --foreground-2: color-mix(in srgb, var(--foreground) 2%, var(--background));
+  --foreground-3: color-mix(in srgb, var(--foreground) 3%, var(--background));
+  --foreground-5: color-mix(in srgb, var(--foreground) 5%, var(--background));
+  --foreground-10: color-mix(in srgb, var(--foreground) 10%, var(--background));
+  --foreground-20: color-mix(in srgb, var(--foreground) 20%, var(--background));
+  --foreground-30: color-mix(in srgb, var(--foreground) 30%, var(--background));
+  --foreground-40: color-mix(in srgb, var(--foreground) 40%, var(--background));
+  --foreground-50: color-mix(in srgb, var(--foreground) 50%, var(--background));
+  --foreground-60: color-mix(in srgb, var(--foreground) 60%, var(--background));
+  --foreground-70: color-mix(in srgb, var(--foreground) 70%, var(--background));
+  --foreground-80: color-mix(in srgb, var(--foreground) 80%, var(--background));
+  --foreground-90: color-mix(in srgb, var(--foreground) 90%, var(--background));
+  --foreground-95: color-mix(in srgb, var(--foreground) 95%, var(--background));
+
+  --success-text: color-mix(in oklab, var(--success) 50%, var(--foreground));
+  --destructive-text: color-mix(
+    in oklab,
+    var(--destructive) 50%,
+    var(--foreground)
+  );
+  --info-text: color-mix(in oklab, var(--info) 50%, var(--foreground));
+
+  --secondary: oklch(from var(--foreground) l c h / 0.05);
+  --secondary-foreground: var(--foreground);
+  --muted: oklch(from var(--foreground) l c h / 0.05);
+  --muted-foreground: var(--foreground-50);
+  --card: var(--background);
+  --card-foreground: var(--foreground);
+  --popover: var(--background);
+  --popover-foreground: var(--foreground);
+  --border: oklch(from var(--foreground) l c h / 0.05);
+  --input: oklch(from var(--foreground) l c h / 0.1);
+  --ring: oklch(from var(--foreground) l c h / 0.25);
+  --ring-width: 1px;
+  --ring-offset: 0px;
+
+  --md-bullets: var(--foreground-50);
+  --md-counters: var(--foreground-50);
+
+  /* Timeline / inspector track colors (overridable per theme preset) */
+  --live: var(--success);
+  --broll: oklch(0.78 0.09 196);
+  --zoom: oklch(0.84 0.11 84);
+  --title: oklch(0.76 0.13 10);
+
+  --font-sans: var(--font-inter), sans-serif;
+  --font-default: var(--font-inter), sans-serif;
+
+  --text-ui: 0.8667rem;
+  --text-caption: 0.733rem;
+  --font-size-base: 15px;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --leading-ui: 1.45;
+  --leading-tight: 1.25;
+  --tracking-ui: -0.011em;
+  --tracking-label: 0.04em;
+  --radius: 0.5rem;
+  --spacing: 0.25rem;
+
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+
+  --z-base: 0;
+  --z-local: 10;
+  --z-sticky: 20;
+  --z-panel: 50;
+  --z-dropdown: 100;
+  --z-tooltip: 150;
+  --z-modal: 200;
+  --z-overlay: 300;
+}
+
+/* Dark-only preset selected while color scheme is light */
+html[data-theme-mismatch]::before {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  content: "";
+  background: var(--foreground-10);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-accent: var(--accent);
+  --color-info: var(--info);
+  --color-success: var(--success);
+  --color-destructive: var(--destructive);
+
+  --color-foreground-1-5: var(--foreground-1-5);
+  --color-foreground-2: var(--foreground-2);
+  --color-foreground-3: var(--foreground-3);
+  --color-foreground-5: var(--foreground-5);
+  --color-foreground-10: var(--foreground-10);
+  --color-foreground-20: var(--foreground-20);
+  --color-foreground-30: var(--foreground-30);
+  --color-foreground-40: var(--foreground-40);
+  --color-foreground-50: var(--foreground-50);
+  --color-foreground-60: var(--foreground-60);
+  --color-foreground-70: var(--foreground-70);
+  --color-foreground-80: var(--foreground-80);
+  --color-foreground-90: var(--foreground-90);
+  --color-foreground-95: var(--foreground-95);
+
+  --color-sidebar-hover: oklch(from var(--foreground) l c h / 0.02);
+  --color-user-message-bubble: var(--user-message-bubble);
+
+  --color-live: var(--live);
+  --color-broll: var(--broll);
+  --color-zoom: var(--zoom);
+  --color-title: var(--title);
+  --color-primary: var(--foreground);
+  --color-primary-foreground: var(--background);
+  --color-sidebar: var(--background);
+  --color-sidebar-foreground: var(--foreground);
+  --color-sidebar-primary: var(--foreground);
+  --color-sidebar-primary-foreground: var(--background);
+  --color-sidebar-accent: var(--foreground-5);
+  --color-sidebar-accent-foreground: var(--foreground);
+  --color-sidebar-border: var(--border);
+  --color-sidebar-ring: var(--ring);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-destructive-foreground: var(--background);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-md-bullets: var(--md-bullets);
+  --color-md-counters: var(--md-counters);
+
+  --font-sans: var(--font-default);
+  --text-ui: var(--text-ui);
+  --text-caption: var(--text-caption);
+
+  --z-index-base: var(--z-base);
+  --z-index-local: var(--z-local);
+  --z-index-sticky: var(--z-sticky);
+  --z-index-panel: var(--z-panel);
+  --z-index-dropdown: var(--z-dropdown);
+  --z-index-tooltip: var(--z-tooltip);
+  --z-index-modal: var(--z-modal);
+  --z-index-overlay: var(--z-overlay);
+
+  --container-3xs: 16rem;
+  --container-panel-compact: 28rem;
+  --container-panel-medium: 40rem;
+  --container-mobile: 48rem;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+    border-color: var(--border);
+  }
+
+  html {
+    font-family: var(--font-default);
+    font-size: var(--font-size-base);
+    font-optical-sizing: auto;
+    font-feature-settings: "cv01", "cv02", "cv03", "cv04", "case";
+    letter-spacing: var(--tracking-ui);
+  }
+
+  html,
+  body {
+    height: auto;
+    min-height: 100%;
+    overflow: auto;
+  }
+
+  body {
+    font-family: var(--font-default);
+    font-weight: var(--font-weight-normal);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    line-height: var(--leading-ui);
+    color: var(--foreground);
+    background: var(--background);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--leading-tight);
+    letter-spacing: var(--tracking-ui);
+  }
+
+  strong,
+  b {
+    font-weight: var(--font-weight-medium);
+  }
+
+  code,
+  kbd,
+  pre,
+  samp {
+    font-family: var(--font-default);
+    font-size: 0.933em;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--muted-foreground);
+  }
+
+  *:focus-visible {
+    --tw-ring-offset-width: var(--ring-offset);
+    --tw-ring-width: var(--ring-width);
+    --tw-ring-color: var(--ring);
+    outline: none;
+  }
+}
+
+@layer utilities {
+  .ring-1,
+  .ring-2,
+  .ring-\[3px\],
+  .ring-4 {
+    --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0
+      var(--tw-ring-offset-width) var(--tw-ring-offset-color);
+    --tw-ring-shadow: var(--tw-ring-inset) 0 0 0
+      calc(var(--ring-width) + var(--tw-ring-offset-width)) var(--tw-ring-color);
+    box-shadow:
+      var(--tw-ring-offset-shadow), var(--tw-ring-shadow),
+      var(--tw-shadow, 0 0 #0000);
+  }
+
+  .panel-scroll::-webkit-scrollbar {
+    height: 4px;
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scrollbar-hover::-webkit-scrollbar {
+    width: 4px;
+  }
+  .scrollbar-hover::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-hover::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 4px;
+  }
+  .group:hover .scrollbar-hover::-webkit-scrollbar-thumb {
+    background: var(--border);
+  }
+  .group:hover .scrollbar-hover::-webkit-scrollbar-thumb:hover {
+    background: var(--muted-foreground);
+  }
+
+  .text-section-label {
+    font-size: var(--text-caption);
+    font-weight: var(--font-weight-medium);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-label);
+  }
+
+  .text-ui {
+    font-size: var(--text-ui);
+    font-weight: var(--font-weight-normal);
+    line-height: var(--leading-ui);
+    letter-spacing: var(--tracking-ui);
+  }
+
+  .text-caption {
+    font-size: var(--text-caption);
+    font-weight: var(--font-weight-normal);
+    line-height: var(--leading-ui);
+  }
+
+  .popover-styled {
+    color: var(--foreground);
+    background: var(--background);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: none;
+  }
+
+  [data-sidebar-instant] [data-slot="sidebar-gap"],
+  [data-sidebar-instant] [data-slot="sidebar-container"],
+  [data-sidebar-instant] [data-slot="sidebar-group-label"] {
+    transition: none !important;
+  }
+}

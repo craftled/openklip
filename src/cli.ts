@@ -4,7 +4,6 @@ import { dirname, resolve } from "node:path";
 import { summarize } from "./actions.ts";
 import { registerAsset } from "./assets.ts";
 import { applyBrand, loadBrand } from "./brands.ts";
-import { registerBroll } from "./broll.ts";
 import { runDoctor } from "./doctor.ts";
 import {
   type Broll,
@@ -39,7 +38,7 @@ import {
 const [cmd, ...rest] = process.argv.slice(2);
 
 function help(): void {
-  console.log(`OpenKlip - edit video by editing text
+  console.log(`OpenKlip - agent-native video editing on plain files
 
 Discovery
   openklip list                      list projects (most recent first)
@@ -337,7 +336,7 @@ try {
       if (!(rest[0] && rest[1])) {
         throw new Error("usage: openklip broll <slug> <file>");
       }
-      await registerBroll(rest[0], rest[1]);
+      await registerAsset(rest[0], rest[1], "broll");
       break;
     }
     case "transcript": {

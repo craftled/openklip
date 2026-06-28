@@ -12,5 +12,7 @@ export default async function Page({ searchParams }: Props) {
   const { slug } = await searchParams;
   const project = await loadEditorProject(slug ?? null);
   const projects = listProjects();
-  return <App initialProject={project} projects={projects} />;
+  return (
+    <App initialProject={project} key={project.slug} projects={projects} />
+  );
 }

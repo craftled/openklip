@@ -12,7 +12,7 @@ export default function EditorError({
   return (
     <div className="grid h-screen place-items-center bg-background px-6">
       <div className="max-w-md space-y-4 text-center">
-        <h1 className="font-heading font-semibold text-foreground text-lg">
+        <h1 className="font-semibold text-foreground text-lg">
           Could not load OpenKlip
         </h1>
         <p className="text-muted-foreground text-sm">{error.message}</p>

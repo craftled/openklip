@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  Folder,
   MessageSquarePlus,
   PanelLeft,
   Search,
@@ -16,19 +15,14 @@ import {
   useMemo,
   useState,
 } from "react";
-import { OpenklipMark } from "@/components/openklip-mark";
+import { AgentModelSelect } from "@/components/agent-model-select";
+import { AssetBin, type BinAsset } from "@/components/asset-bin";
+import { ChatListItem } from "@/components/chat-list-item";
+import { KeyboardHint } from "@/components/keyboard-hint";
+import { ProjectSwitcher } from "@/components/project-switcher";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Sidebar,
   SidebarContent,
@@ -38,22 +32,34 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
   SidebarRail,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { ClaudeAiIcon } from "@/components/ui/svgs/claudeAiIcon";
-import { CursorLight } from "@/components/ui/svgs/cursorLight";
-import { GrokLight } from "@/components/ui/svgs/grokLight";
-import { Openai } from "@/components/ui/svgs/openai";
+import { agentProviderId } from "@/lib/agent-icons";
 import {
-  type AgentThread,
-  appendMessage,
-  assistantHint,
-  createThread,
-  listThreads,
-} from "@/lib/agent-threads";
+  type AgentModelId,
+  DEFAULT_AGENT_MODEL,
+  getDefaultAgentModel,
+  subscribeDefaultAgent,
+} from "@/lib/agent-preferences";
+import { type AgentThread, assistantHint } from "@/lib/agent-threads";
+import {
+  appendMessageApi,
+  archiveThreadApi,
+  createThreadApi,
+  deleteThreadApi,
+  ensureThreadApi,
+  fetchProjectChats,
+  renameThreadApi,
+  setActiveThreadApi,
+} from "@/lib/agent-threads-client";
+import {
+  chatListEmptyLabel,
+  filterThreadsByQuery,
+  resolveThreadAfterRemove,
+} from "@/lib/chat-list";
+import { modShortcut } from "@/lib/keyboard-shortcuts";
+import type { ProjectListing } from "@/lib/project-list";
 import { cn } from "@/lib/utils";
 import {
   type AgentStatus,
@@ -61,112 +67,13 @@ import {
   suggestFillerCuts,
 } from "../../app/agent-actions.ts";
 
-// Map a selector value to its provider id (the key detectAgents() returns).
-function agentId(value: string): "claude" | "codex" | "cursor" | "grok" {
-  if (value.startsWith("claude")) {
-    return "claude";
-  }
-  if (value.startsWith("gpt")) {
-    return "codex";
-  }
-  if (value.startsWith("composer")) {
-    return "cursor";
-  }
-  return "grok";
-}
-
-// Availability state → dot color + short label. green = signed in, amber =
-// installed but not signed in, gray = not installed / still checking.
-function badgeState(status?: AgentStatus): {
-  dot: string;
-  text: string;
-  label: string;
-  title: string;
-} {
-  if (!status) {
-    return {
-      dot: "bg-muted-foreground/30",
-      text: "text-muted-foreground",
-      label: "Checking…",
-      title: "Checking…",
-    };
-  }
-  if (!status.installed) {
-    return {
-      dot: "bg-muted-foreground/40",
-      text: "text-muted-foreground",
-      label: "Not installed",
-      title: `${status.cli} CLI not found on PATH`,
-    };
-  }
-  if (status.connected) {
-    return {
-      dot: "bg-emerald-500",
-      text: "text-emerald-600 dark:text-emerald-500",
-      label: "Signed in",
-      title: `${status.cli} signed in`,
-    };
-  }
-  return {
-    dot: "bg-amber-500",
-    text: "text-amber-600 dark:text-amber-500",
-    label: "Sign in",
-    title: status.signInCmd
-      ? `Not signed in — run: ${status.signInCmd}`
-      : "Not signed in",
-  };
-}
-
-// Dot only — for the compact trigger.
-function StatusDot({
-  status,
-  className,
-}: {
-  status?: AgentStatus;
-  className?: string;
-}) {
-  const s = badgeState(status);
-  return (
-    <span
-      aria-label={s.title}
-      className={cn("size-1.5 shrink-0 rounded-full", s.dot, className)}
-      role="img"
-      title={s.title}
-    />
-  );
-}
-
-// Dot + short text label — for the dropdown group headers.
-function StatusBadge({
-  status,
-  className,
-}: {
-  status?: AgentStatus;
-  className?: string;
-}) {
-  const s = badgeState(status);
-  return (
-    <span
-      className={cn(
-        "flex items-center gap-1 font-medium text-[9px] normal-case tracking-normal",
-        className
-      )}
-      title={s.title}
-    >
-      <span className={cn("size-1.5 shrink-0 rounded-full", s.dot)} />
-      <span className={s.text}>{s.label}</span>
-    </span>
-  );
-}
-
-export interface ProjectListing {
-  mtimeMs: number;
-  slug: string;
-}
-
 interface AgentSidebarProps {
   activeSlug: string;
-  initialProjects: ProjectListing[];
+  assets: BinAsset[];
+  mediaVersion?: number;
+  onAssetsUpdated: (assets: BinAsset[]) => void;
+  projects: ProjectListing[];
+  sampleRate: number;
 }
 
 function relativeTime(ms: number): string {
@@ -187,24 +94,36 @@ function relativeTime(ms: number): string {
 
 export function AgentSidebar({
   activeSlug,
-  initialProjects,
+  assets,
+  mediaVersion,
+  onAssetsUpdated,
+  projects,
+  sampleRate,
 }: AgentSidebarProps) {
   const router = useRouter();
-  const [projects] = useState(initialProjects);
-  const [threadsBySlug, setThreadsBySlug] = useState<
-    Record<string, AgentThread[]>
-  >({});
+  const [threads, setThreads] = useState<AgentThread[]>([]);
+  const [archivedThreads, setArchivedThreads] = useState<AgentThread[]>([]);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
+  const [chatsLoading, setChatsLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [draft, setDraft] = useState("");
-  const [expandedSlugs, setExpandedSlugs] = useState<Set<string>>(
-    () => new Set([activeSlug])
-  );
-  // MOCKUP: static agent selector. OpenKlip ships no LLM — this picks which of
-  // your existing subscription CLIs drives AI edits. Not wired to a backend yet.
-  const [agent, setAgent] = useState("claude-opus-4-8");
+  const [agent, setAgent] = useState<AgentModelId>(DEFAULT_AGENT_MODEL);
+  const [defaultAgent, setDefaultAgent] =
+    useState<AgentModelId>(DEFAULT_AGENT_MODEL);
   const [running, setRunning] = useState(false);
   const [statuses, setStatuses] = useState<Record<string, AgentStatus>>({});
+  useEffect(() => {
+    const initial = getDefaultAgentModel();
+    setAgent(initial);
+    setDefaultAgent(initial);
+    return subscribeDefaultAgent((model) => {
+      setDefaultAgent(model);
+      setAgent(model);
+    });
+  }, []);
+  useEffect(() => {
+    setAgent(getDefaultAgentModel());
+  }, [activeSlug]);
   useEffect(() => {
     let alive = true;
     getAgentStatuses()
@@ -220,7 +139,7 @@ export function AgentSidebar({
       alive = false;
     };
   }, []);
-  const activeStatus = statuses[agentId(agent)];
+  const activeStatus = statuses[agentProviderId(agent)];
   const agentUsable =
     !activeStatus || (activeStatus.installed && activeStatus.connected);
   const providerLabel = agent.startsWith("claude")
@@ -231,58 +150,173 @@ export function AgentSidebar({
         ? "Cursor"
         : "Grok";
 
-  const refreshThreadsForSlug = useCallback((slug: string) => {
-    setThreadsBySlug((prev) => ({ ...prev, [slug]: listThreads(slug) }));
-  }, []);
+  const refreshThreads = useCallback(async () => {
+    const data = await fetchProjectChats(activeSlug);
+    setThreads(data.threads);
+    setArchivedThreads(data.archived);
+    setActiveThreadId(data.activeThreadId);
+  }, [activeSlug]);
 
-  // Hydrate thread state from localStorage after mount — never during render (SSR-safe).
-  useEffect(() => {
-    const next: Record<string, AgentThread[]> = {};
-    for (const p of projects) {
-      next[p.slug] = listThreads(p.slug);
-    }
-    if (!next[activeSlug]?.length) {
-      createThread(activeSlug);
-      next[activeSlug] = listThreads(activeSlug);
-    }
-    setThreadsBySlug(next);
-    setActiveThreadId(next[activeSlug]?.[0]?.id ?? null);
-  }, [activeSlug, projects]);
-
-  const activeThread = useMemo(() => {
-    const list = threadsBySlug[activeSlug] ?? [];
-    return list.find((t) => t.id === activeThreadId);
-  }, [threadsBySlug, activeSlug, activeThreadId]);
-
-  const filteredProjects = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) {
-      return projects;
-    }
-    return projects.filter((p) => p.slug.toLowerCase().includes(q));
-  }, [projects, search]);
-
-  const threadsForProject = useCallback(
-    (slug: string) => {
-      const q = search.trim().toLowerCase();
-      const list = threadsBySlug[slug] ?? [];
-      if (!q) {
-        return list;
-      }
-      return list.filter((t) => t.title.toLowerCase().includes(q));
+  const selectThread = useCallback(
+    async (threadId: string) => {
+      setActiveThreadId(threadId);
+      await setActiveThreadApi(activeSlug, threadId);
     },
-    [search, threadsBySlug]
+    [activeSlug]
   );
 
-  const openProject = (slug: string) => {
-    setExpandedSlugs((prev) => new Set(prev).add(slug));
-    router.push(`/?slug=${encodeURIComponent(slug)}`);
-  };
+  const focusThreadAfterRemoval = useCallback(
+    async (removedId: string) => {
+      const data = await fetchProjectChats(activeSlug);
+      const nextId = resolveThreadAfterRemove(
+        data.threads,
+        removedId,
+        activeThreadId
+      );
+      if (nextId) {
+        await selectThread(nextId);
+        await refreshThreads();
+        return;
+      }
+      if (data.threads.length === 0) {
+        const created = await createThreadApi(activeSlug);
+        await selectThread(created.id);
+        await refreshThreads();
+        return;
+      }
+      const fallbackId = data.threads[0]?.id;
+      if (fallbackId) {
+        await selectThread(fallbackId);
+        await refreshThreads();
+      }
+    },
+    [activeSlug, activeThreadId, refreshThreads, selectThread]
+  );
+
+  const onRenameThread = useCallback(
+    async (threadId: string, title: string) => {
+      await renameThreadApi(activeSlug, threadId, title);
+      await refreshThreads();
+    },
+    [activeSlug, refreshThreads]
+  );
+
+  const onArchiveThread = useCallback(
+    async (threadId: string) => {
+      await archiveThreadApi(activeSlug, threadId, true);
+      await refreshThreads();
+      await focusThreadAfterRemoval(threadId);
+    },
+    [activeSlug, focusThreadAfterRemoval, refreshThreads]
+  );
+
+  const onUnarchiveThread = useCallback(
+    async (threadId: string) => {
+      await archiveThreadApi(activeSlug, threadId, false);
+      await refreshThreads();
+    },
+    [activeSlug, refreshThreads]
+  );
+
+  const onDeleteThread = useCallback(
+    async (threadId: string) => {
+      await deleteThreadApi(activeSlug, threadId);
+      await refreshThreads();
+      await focusThreadAfterRemoval(threadId);
+    },
+    [activeSlug, focusThreadAfterRemoval, refreshThreads]
+  );
+
+  const openProject = useCallback(
+    (slug: string) => {
+      if (slug !== activeSlug) {
+        router.push(`/?slug=${encodeURIComponent(slug)}`);
+      }
+    },
+    [activeSlug, router]
+  );
+
+  const onIngestVideo = useCallback(
+    async (file: File) => {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/projects", { method: "POST", body: fd });
+      const data = (await res.json()) as { error?: string; slug?: string };
+      if (!(res.ok && data.slug)) {
+        throw new Error(data.error ?? `Ingest failed (${res.status})`);
+      }
+      router.push(`/?slug=${encodeURIComponent(data.slug)}`);
+      router.refresh();
+    },
+    [router]
+  );
+
+  // Hydrate chats from working/chats.json via API after mount.
+  useEffect(() => {
+    let alive = true;
+    setChatsLoading(true);
+    void (async () => {
+      try {
+        await ensureThreadApi(activeSlug);
+        const data = await fetchProjectChats(activeSlug);
+        if (!alive) {
+          return;
+        }
+        setThreads(data.threads);
+        setArchivedThreads(data.archived);
+        setActiveThreadId(data.activeThreadId);
+      } finally {
+        if (alive) {
+          setChatsLoading(false);
+        }
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [activeSlug]);
+
+  const activeThread = useMemo(
+    () =>
+      threads.find((t) => t.id === activeThreadId) ??
+      archivedThreads.find((t) => t.id === activeThreadId),
+    [threads, archivedThreads, activeThreadId]
+  );
+
+  const filteredChats = useMemo(
+    () => filterThreadsByQuery(threads, search),
+    [threads, search]
+  );
+
+  const filteredArchivedChats = useMemo(
+    () => filterThreadsByQuery(archivedThreads, search),
+    [archivedThreads, search]
+  );
+
+  const chatEmptyLabel = useMemo(
+    () =>
+      chatListEmptyLabel({
+        loading: chatsLoading,
+        totalCount: threads.length + archivedThreads.length,
+        filteredActiveCount: filteredChats.length,
+        filteredArchivedCount: filteredArchivedChats.length,
+      }),
+    [
+      archivedThreads.length,
+      chatsLoading,
+      filteredArchivedChats.length,
+      filteredChats.length,
+      threads.length,
+    ]
+  );
 
   const onNewChat = () => {
-    const thread = createThread(activeSlug);
-    refreshThreadsForSlug(activeSlug);
-    setActiveThreadId(thread.id);
+    setAgent(getDefaultAgentModel());
+    void (async () => {
+      const thread = await createThreadApi(activeSlug);
+      await refreshThreads();
+      await selectThread(thread.id);
+    })();
   };
 
   const onSend = (e: FormEvent) => {
@@ -291,10 +325,17 @@ export function AgentSidebar({
     if (!(text && activeThreadId)) {
       return;
     }
-    appendMessage(activeThreadId, "user", text);
-    appendMessage(activeThreadId, "assistant", assistantHint(activeSlug, text));
-    setDraft("");
-    refreshThreadsForSlug(activeSlug);
+    void (async () => {
+      await appendMessageApi(activeSlug, activeThreadId, "user", text);
+      await appendMessageApi(
+        activeSlug,
+        activeThreadId,
+        "assistant",
+        assistantHint(activeSlug, text)
+      );
+      setDraft("");
+      await refreshThreads();
+    })();
   };
 
   // Real wiring: drive the selected Claude model (via `claude -p`) to find and
@@ -307,8 +348,14 @@ export function AgentSidebar({
     try {
       const res = await suggestFillerCuts(activeSlug, agent);
       if (activeThreadId) {
-        appendMessage(activeThreadId, "user", "Find and cut filler words");
-        appendMessage(
+        await appendMessageApi(
+          activeSlug,
+          activeThreadId,
+          "user",
+          "Find and cut filler words"
+        );
+        await appendMessageApi(
+          activeSlug,
           activeThreadId,
           "assistant",
           res.ok
@@ -319,7 +366,7 @@ export function AgentSidebar({
               }`
             : `Error: ${res.error}`
         );
-        refreshThreadsForSlug(activeSlug);
+        await refreshThreads();
       }
       router.refresh();
     } finally {
@@ -328,32 +375,17 @@ export function AgentSidebar({
   };
 
   return (
-    <Sidebar
-      className="border-border bg-sidebar"
-      collapsible="offcanvas"
-      side="left"
-    >
-      <SidebarHeader className="gap-2 border-border border-b p-2">
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton className="h-10" size="lg" tooltip="OpenKlip">
-              <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-live/15 text-live">
-                <OpenklipMark className="size-4" />
-              </span>
-              <span className="grid min-w-0 flex-1 text-left leading-tight">
-                <span className="truncate font-semibold text-[13px]">
-                  OpenKlip
-                </span>
-                <span className="truncate text-muted-foreground text-xs">
-                  Agent editor
-                </span>
-              </span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+    <Sidebar className="bg-background" collapsible="offcanvas" side="left">
+      <SidebarHeader className="gap-2 border-border border-b px-2 pt-2 pb-1.5">
+        <ProjectSwitcher
+          activeSlug={activeSlug}
+          onIngestVideo={onIngestVideo}
+          onSelectProject={openProject}
+          projects={projects}
+        />
         <div className="flex flex-col gap-1.5 px-1">
           <Button
-            className="h-8 justify-start gap-2 px-2 font-normal text-[13px]"
+            className="h-8 justify-start gap-2 px-2 text-ui"
             onClick={onNewChat}
             size="sm"
             variant="ghost"
@@ -361,12 +393,12 @@ export function AgentSidebar({
             <MessageSquarePlus className="size-4" />
             New chat
           </Button>
-          <div className="relative">
+          <div className="relative rounded-lg border border-border bg-muted/50 has-[:focus-visible]:bg-background">
             <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
-              className="h-8 border-none bg-muted/60 pl-8 text-[13px] shadow-none"
+              className="h-8 border-0 bg-transparent pl-8 text-sm shadow-none focus-visible:ring-0"
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search projects & chats"
+              placeholder="Search chats"
               value={search}
             />
           </div>
@@ -375,110 +407,89 @@ export function AgentSidebar({
 
       <SidebarContent className="gap-0">
         <SidebarGroup className="py-2">
-          <SidebarGroupLabel className="px-3 text-[11px] uppercase tracking-wide">
-            Projects
+          <SidebarGroupLabel className="px-3 text-section-label">
+            Chats
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu className="gap-0.5 px-1">
-              {filteredProjects.length === 0 && (
+              {chatEmptyLabel && (
                 <p className="px-3 py-2 text-muted-foreground text-xs">
-                  No projects yet. Run{" "}
-                  <code className="text-[11px]">openklip ingest</code>
+                  {chatEmptyLabel}
                 </p>
               )}
-              {filteredProjects.map((p) => {
-                const open = expandedSlugs.has(p.slug);
-                const slugThreads = threadsForProject(p.slug);
-                const isActiveProject = p.slug === activeSlug;
-                return (
-                  <SidebarMenuItem key={p.slug}>
-                    <SidebarMenuButton
-                      className={cn(
-                        "h-8 gap-2 text-[13px]",
-                        isActiveProject && "bg-sidebar-accent"
-                      )}
-                      isActive={isActiveProject}
-                      onClick={() => {
-                        if (p.slug === activeSlug) {
-                          setExpandedSlugs((prev) => {
-                            const next = new Set(prev);
-                            if (next.has(p.slug)) {
-                              next.delete(p.slug);
-                            } else {
-                              next.add(p.slug);
-                            }
-                            return next;
-                          });
-                        } else {
-                          openProject(p.slug);
-                        }
-                      }}
-                      tooltip={p.slug}
-                    >
-                      <Folder className="size-4 shrink-0 text-muted-foreground" />
-                      <span className="min-w-0 flex-1 truncate">{p.slug}</span>
-                      <span className="text-[10px] text-muted-foreground tabular-nums">
-                        {slugThreads.length}
-                      </span>
-                    </SidebarMenuButton>
-                    {(open || isActiveProject) && slugThreads.length > 0 && (
-                      <ul className="mt-0.5 mb-1 ml-6 flex flex-col gap-0.5 border-sidebar-border border-l pl-2">
-                        {slugThreads.map((t) => (
-                          <li key={t.id}>
-                            <button
-                              className={cn(
-                                "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px] transition-colors hover:bg-sidebar-accent",
-                                t.id === activeThreadId &&
-                                  isActiveProject &&
-                                  "bg-sidebar-accent font-medium"
-                              )}
-                              onClick={() => {
-                                if (p.slug !== activeSlug) {
-                                  openProject(p.slug);
-                                }
-                                setActiveThreadId(t.id);
-                              }}
-                              type="button"
-                            >
-                              <span className="min-w-0 flex-1 truncate">
-                                {t.title}
-                              </span>
-                              <span className="shrink-0 text-[10px] text-muted-foreground tabular-nums">
-                                {relativeTime(t.updatedAt)}
-                              </span>
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </SidebarMenuItem>
-                );
-              })}
+              {filteredChats.map((t) => (
+                <ChatListItem
+                  isActive={t.id === activeThreadId}
+                  key={t.id}
+                  onArchive={() => onArchiveThread(t.id)}
+                  onDelete={() => onDeleteThread(t.id)}
+                  onRename={(title) => onRenameThread(t.id, title)}
+                  onSelect={() => selectThread(t.id)}
+                  thread={t}
+                  timeLabel={relativeTime(t.updatedAt)}
+                />
+              ))}
             </SidebarMenu>
+            {filteredArchivedChats.length > 0 && (
+              <>
+                <SidebarGroupLabel className="mt-2 px-3 text-section-label">
+                  Archived
+                </SidebarGroupLabel>
+                <SidebarMenu className="gap-0.5 px-1">
+                  {filteredArchivedChats.map((t) => (
+                    <ChatListItem
+                      archived
+                      isActive={t.id === activeThreadId}
+                      key={t.id}
+                      onArchive={() => onArchiveThread(t.id)}
+                      onDelete={() => onDeleteThread(t.id)}
+                      onRename={(title) => onRenameThread(t.id, title)}
+                      onSelect={() => selectThread(t.id)}
+                      onUnarchive={() => onUnarchiveThread(t.id)}
+                      thread={t}
+                      timeLabel={relativeTime(t.updatedAt)}
+                    />
+                  ))}
+                </SidebarMenu>
+              </>
+            )}
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup className="border-foreground/10 border-t py-2">
+          <SidebarGroupLabel className="px-3 text-section-label">
+            Assets
+          </SidebarGroupLabel>
+          <SidebarGroupContent className="px-2">
+            <AssetBin
+              assets={assets}
+              mediaVersion={mediaVersion}
+              onAssetsUpdated={onAssetsUpdated}
+              sampleRate={sampleRate}
+              slug={activeSlug}
+            />
           </SidebarGroupContent>
         </SidebarGroup>
 
         {activeThread && activeThread.messages.length > 0 && (
-          <SidebarGroup className="min-h-0 flex-1 border-border border-t py-2">
-            <SidebarGroupLabel className="px-3 text-[11px] uppercase tracking-wide">
+          <SidebarGroup className="min-h-0 flex-1 border-foreground/10 border-t py-2">
+            <SidebarGroupLabel className="px-3 text-section-label">
               Thread
             </SidebarGroupLabel>
             <SidebarGroupContent className="min-h-0 flex-1 px-2">
               <ScrollArea className="h-[min(240px,28vh)]">
                 <div className="flex flex-col gap-2 pr-2 pb-2">
-                  {activeThread.messages.map((m, i) => (
+                  {activeThread.messages.map((m) => (
                     <div
                       className={cn(
-                        "rounded-lg px-2.5 py-2 text-[12px] leading-relaxed",
+                        "rounded-lg px-2.5 py-2 text-sm leading-relaxed",
                         m.role === "user"
-                          ? "bg-muted/80 text-foreground"
+                          ? "bg-user-message-bubble text-foreground"
                           : "bg-transparent text-muted-foreground"
                       )}
-                      // Composite key: index makes it unique even if old
-                      // localStorage holds messages with colliding ids.
-                      key={`${m.id}-${i}`}
+                      key={m.id}
                     >
-                      <div className="mb-0.5 font-medium text-[10px] text-muted-foreground uppercase tracking-wide">
+                      <div className="mb-0.5 text-muted-foreground text-section-label">
                         {m.role === "user" ? "You" : "Agent"}
                       </div>
                       <pre className="whitespace-pre-wrap font-sans">
@@ -493,77 +504,14 @@ export function AgentSidebar({
         )}
       </SidebarContent>
 
-      <SidebarFooter className="gap-2 border-border border-t p-2">
-        {/* MOCKUP — agent/model selector. Drives AI edits via your own subscription. */}
-        <Select onValueChange={setAgent} value={agent}>
-          <SelectTrigger className="h-8 w-full border-none bg-muted/60 text-[12px] shadow-none [&_svg.size-3\.5]:shrink-0">
-            <SelectValue />
-            <StatusDot className="ml-auto" status={activeStatus} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              <SelectLabel className="flex items-center gap-2 text-[10px] uppercase tracking-wide">
-                <span>Claude · Max</span>
-                <StatusBadge className="ml-auto" status={statuses.claude} />
-              </SelectLabel>
-              <SelectItem value="claude-opus-4-8">
-                <span className="flex items-center gap-2">
-                  <ClaudeAiIcon className="size-3.5" /> Opus 4.8
-                </span>
-              </SelectItem>
-              <SelectItem value="claude-sonnet-4-6">
-                <span className="flex items-center gap-2">
-                  <ClaudeAiIcon className="size-3.5" /> Sonnet 4.6
-                </span>
-              </SelectItem>
-              <SelectItem value="claude-haiku-4-5">
-                <span className="flex items-center gap-2">
-                  <ClaudeAiIcon className="size-3.5" /> Haiku 4.5
-                </span>
-              </SelectItem>
-            </SelectGroup>
-            <SelectGroup>
-              <SelectLabel className="flex items-center gap-2 text-[10px] uppercase tracking-wide">
-                <span>Codex · ChatGPT</span>
-                <StatusBadge className="ml-auto" status={statuses.codex} />
-              </SelectLabel>
-              <SelectItem value="gpt-5-5">
-                <span className="flex items-center gap-2">
-                  <Openai className="size-3.5" /> GPT-5.5
-                </span>
-              </SelectItem>
-              <SelectItem value="gpt-5-4">
-                <span className="flex items-center gap-2">
-                  <Openai className="size-3.5" /> GPT-5.4
-                </span>
-              </SelectItem>
-            </SelectGroup>
-            <SelectGroup>
-              <SelectLabel className="flex items-center gap-2 text-[10px] uppercase tracking-wide">
-                <span>Cursor</span>
-                <StatusBadge className="ml-auto" status={statuses.cursor} />
-              </SelectLabel>
-              <SelectItem value="composer-2-5">
-                <span className="flex items-center gap-2">
-                  <CursorLight className="size-3.5" /> Composer 2.5
-                </span>
-              </SelectItem>
-            </SelectGroup>
-            <SelectGroup>
-              <SelectLabel className="flex items-center gap-2 text-[10px] uppercase tracking-wide">
-                <span>xAI · SuperGrok</span>
-                <StatusBadge className="ml-auto" status={statuses.grok} />
-              </SelectLabel>
-              <SelectItem value="grok-build">
-                <span className="flex items-center gap-2">
-                  <GrokLight className="size-3.5" /> Grok Build
-                </span>
-              </SelectItem>
-            </SelectGroup>
-          </SelectContent>
-        </Select>
+      <SidebarFooter className="gap-2 border-border/50 border-t p-2">
+        <AgentModelSelect
+          defaultAgent={defaultAgent}
+          onValueChange={setAgent}
+          value={agent}
+        />
         <Button
-          className="h-8 w-full justify-start gap-2 px-2 font-normal text-[12px]"
+          className="h-8 w-full justify-start gap-2 px-2 text-sm"
           disabled={running || !agentUsable}
           onClick={onFindFiller}
           size="sm"
@@ -577,7 +525,7 @@ export function AgentSidebar({
           variant="ghost"
         >
           <Sparkles
-            className={cn("size-3.5 text-live", running && "animate-pulse")}
+            className={cn("size-3.5 text-accent", running && "animate-pulse")}
           />
           {(() => {
             if (running) {
@@ -593,7 +541,7 @@ export function AgentSidebar({
         </Button>
         <form className="flex gap-1.5" onSubmit={onSend}>
           <Input
-            className="h-9 flex-1 text-[13px]"
+            className="h-9 flex-1 text-sm"
             onChange={(e) => setDraft(e.target.value)}
             placeholder={`Ask about ${activeSlug}…`}
             value={draft}
@@ -608,9 +556,9 @@ export function AgentSidebar({
             <Send className="size-4" />
           </Button>
         </form>
-        <p className="px-1 text-[10px] text-muted-foreground leading-snug">
-          Threads are local. Agents run CLI commands against the same{" "}
-          <code className="text-[10px]">project.json</code>.
+        <p className="px-1 text-caption text-muted-foreground leading-snug">
+          Chats live in working/chats.json. Agents run CLI commands against the
+          same <code className="text-caption">project.json</code>.
         </p>
       </SidebarFooter>
       <SidebarRail />
@@ -620,16 +568,18 @@ export function AgentSidebar({
 
 export function AgentSidebarTrigger({ className }: { className?: string }) {
   const { toggleSidebar } = useSidebar();
+  const label = `Toggle agent sidebar (${modShortcut("b")})`;
 
   return (
     <Button
-      aria-label="Toggle agent sidebar"
-      className={className}
+      aria-label={label}
+      className={cn("h-8 shrink-0 gap-1 px-2", className)}
       onClick={toggleSidebar}
-      size="icon-sm"
+      title={label}
       variant="ghost"
     >
       <PanelLeft className="size-4" />
+      <KeyboardHint shortcutKey="b" />
     </Button>
   );
 }

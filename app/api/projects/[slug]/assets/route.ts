@@ -1,3 +1,4 @@
+import { syncAssetsFromFolder } from "@engine/asset-scanner";
 import { listAssetsByKind, registerAssetBytes } from "@engine/assets";
 import { type Asset, type AssetKind, AssetKindSchema } from "@engine/edl";
 import { loadProject } from "@engine/projectStore";
@@ -5,14 +6,18 @@ import type { NextRequest } from "next/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 600;
 
 interface RouteParams {
   params: Promise<{ slug: string }>;
 }
 
-export async function GET(_req: NextRequest, { params }: RouteParams) {
+export async function GET(req: NextRequest, { params }: RouteParams) {
   const { slug } = await params;
   try {
+    if (req.nextUrl.searchParams.get("sync") === "1") {
+      await syncAssetsFromFolder(slug);
+    }
     const project = await loadProject(slug);
     return Response.json({
       assets: project.assets,
