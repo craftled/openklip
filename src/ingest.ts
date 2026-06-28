@@ -3,6 +3,7 @@ import { mkdir, rm } from "node:fs/promises";
 import { isAbsolute, resolve } from "node:path";
 import { type Project, ProjectSchema, SAMPLE_RATE, type Word } from "./edl.ts";
 import { FFMPEG, probe, run } from "./ffmpeg.ts";
+import { assertProjectCanBeIngested } from "./ingest-guard.ts";
 import { projectPaths, slugFromVideo } from "./paths.ts";
 
 interface RawChunk {
@@ -27,11 +28,7 @@ export async function ingest(
   // Re-ingesting a slug wipes the whole project dir. Refuse unless the caller
   // explicitly opts in with --force, so an accidental re-upload can't destroy
   // an existing edit.
-  if (!opts?.force && existsSync(p.project)) {
-    throw new Error(
-      `project already exists: ${slug} (re-ingest would wipe it; pass --force to overwrite)`
-    );
-  }
+  assertProjectCanBeIngested(slug, opts?.force);
   await rm(p.dir, { recursive: true, force: true });
   await mkdir(p.assets, { recursive: true });
   await mkdir(p.frames, { recursive: true });
