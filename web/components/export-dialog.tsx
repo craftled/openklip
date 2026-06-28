@@ -164,9 +164,9 @@ export function ExportDialog({
   const [resolution, setResolution] = useState<ExportResolution>(
     () => defaultResolution ?? (sourceHeight > 1080 ? "1080" : "4k")
   );
-  const [compression, setCompression] = useState<ExportCompression>("social");
-  const [frameRate, setFrameRate] = useState(String(Math.round(sourceFps)));
-  const [destination, setDestination] = useState<ExportDestination>("file");
+  const compression: ExportCompression = "social";
+  const frameRate = String(Math.round(sourceFps));
+  const destination: ExportDestination = "file";
 
   const dims = useMemo(
     () => outputDimensions(resolution, sourceWidth, sourceHeight),
@@ -226,9 +226,9 @@ export function ExportDialog({
             </ToggleGroup>
           </div>
 
-          <div>
+          <div className="opacity-60">
             <ExportOptionLabel icon={Aperture} label="Frame rate" />
-            <Select onValueChange={setFrameRate} value={frameRate}>
+            <Select disabled value={frameRate}>
               <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
@@ -241,7 +241,7 @@ export function ExportDialog({
               </SelectContent>
             </Select>
             <p className="mt-1.5 text-caption text-muted-foreground">
-              Uses source timing when it differs from the selected rate.
+              Exports at source frame rate. Custom rates coming soon.
             </p>
           </div>
 
@@ -273,15 +273,11 @@ export function ExportDialog({
             </p>
           </div>
 
-          <div>
+          <div className="opacity-60">
             <ExportOptionLabel icon={Spline} label="Compression" />
             <ToggleGroup
               className="w-full flex-wrap"
-              onValueChange={(v) => {
-                if (v) {
-                  setCompression(v as ExportCompression);
-                }
-              }}
+              disabled
               type="single"
               value={compression}
               variant="outline"
@@ -292,20 +288,17 @@ export function ExportDialog({
               <ToggleGroupItem value="web-low">Web (Low)</ToggleGroupItem>
             </ToggleGroup>
             <p className="mt-2 text-caption text-muted-foreground leading-relaxed">
-              {compressionMeta.description}
+              Compression presets coming soon. Exports use the default encoder
+              settings.
             </p>
           </div>
         </div>
 
-        <div>
+        <div className="opacity-60">
           <ExportOptionLabel icon={Film} label="Export to" />
           <ToggleGroup
             className="w-full sm:max-w-xs"
-            onValueChange={(v) => {
-              if (v) {
-                setDestination(v as ExportDestination);
-              }
-            }}
+            disabled
             type="single"
             value={destination}
             variant="outline"

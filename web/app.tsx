@@ -177,7 +177,6 @@ interface Project {
   sampleRate: number;
   slug: string;
   source: string;
-  width: number;
   stills?: Array<{
     assetId: string;
     endSample: number;
@@ -188,6 +187,7 @@ interface Project {
     startSample: number;
   }>;
   titles: TitleItem[];
+  width: number;
   words: Word[];
   zooms: ZoomItem[];
 }

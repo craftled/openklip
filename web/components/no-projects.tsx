@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 export function NoProjectsLanding() {
   const router = useRouter();
   const [picking, setPicking] = useState(false);
+  const [pickerSupported, setPickerSupported] = useState(true);
   const [workRoot, setWorkRoot] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -15,9 +16,15 @@ export function NoProjectsLanding() {
     let alive = true;
     void fetch("/api/workspace")
       .then((res) => res.json())
-      .then((data: { root?: string }) => {
-        if (alive && data.root) {
+      .then((data: { pickerSupported?: boolean; root?: string }) => {
+        if (!alive) {
+          return;
+        }
+        if (data.root) {
           setWorkRoot(data.root);
+        }
+        if (data.pickerSupported === false) {
+          setPickerSupported(false);
         }
       })
       .catch(() => {
@@ -78,13 +85,20 @@ export function NoProjectsLanding() {
         ) : null}
       </div>
       <Button
-        disabled={picking}
+        disabled={picking || !pickerSupported}
         onClick={() => void onChooseFolder()}
         type="button"
       >
         <FolderOpen className="size-4" />
         {picking ? "Choosing…" : "Choose folder"}
       </Button>
+      {pickerSupported ? null : (
+        <p className="max-w-sm text-muted-foreground text-xs leading-relaxed">
+          The folder picker requires macOS. Set{" "}
+          <code className="font-mono">OPENKLIP_PROJECTS_ROOT</code> to your
+          projects directory, or run ingest from the CLI.
+        </p>
+      )}
       {workRoot ? (
         <p className="max-w-sm text-muted-foreground text-xs leading-relaxed">
           Run <code className="font-mono">openklip ingest &lt;video&gt;</code>{" "}

@@ -1,8 +1,13 @@
+import { platform } from "node:os";
 import { projectsRoot } from "@engine/paths";
 import { pickFolder } from "@engine/pick-folder";
 import { listProjects } from "@engine/projectStore";
 import { writeConfiguredProjectsRoot } from "@engine/workspace-config";
 import { z } from "zod";
+
+function folderPickerSupported(): boolean {
+  return platform() === "darwin" || process.env.OPENKLIP_TEST_PICK === "1";
+}
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,7 +19,10 @@ const WorkspaceRequestSchema = z
   .strict();
 
 export function GET(): Response {
-  return Response.json({ root: projectsRoot() });
+  return Response.json({
+    pickerSupported: folderPickerSupported(),
+    root: projectsRoot(),
+  });
 }
 
 export async function POST(req: Request): Promise<Response> {
