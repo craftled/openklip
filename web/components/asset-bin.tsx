@@ -220,14 +220,14 @@ export function AssetBin({
         </p>
       )}
 
-      <div className="grid gap-2 pb-1">
+      <div className="flex flex-col gap-2 pb-1">
         {(Object.keys(KIND_META) as AssetKind[]).map((kind) => {
           const meta = KIND_META[kind];
           const Icon = meta.icon;
           const items = grouped[kind];
           return (
             <div
-              className="rounded-md border border-border bg-foreground/3 p-2.5"
+              className="min-w-0 overflow-hidden rounded-md border border-border bg-foreground/3 p-2.5"
               key={kind}
             >
               <div className="mb-2 flex items-center gap-1.5 text-muted-foreground text-section-label">
