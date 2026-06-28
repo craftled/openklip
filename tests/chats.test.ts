@@ -38,7 +38,7 @@ test("chats persist under working/chats.json per project", async () => {
   });
 });
 
-test("saveProjectChats writes atomically — no tmp file left behind", async () => {
+test("saveProjectChats writes atomically: no tmp file left behind", async () => {
   await withTempProjectsRoot(async ({ slug, root }) => {
     resetChatIdSequenceForTests();
     writeFixtureProject(slug, makeProject({ slug }));

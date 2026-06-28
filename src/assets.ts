@@ -146,7 +146,7 @@ async function buildStillProxy(
   const p = projectPaths(slug);
   const durationSamples = Math.round(STILL_HOLD_SEC * SAMPLE_RATE);
   const relToAssets = relative(p.assets, src).replace(/\\/g, "/");
-  // Source already lives in the user assets/ drop folder — reference it in place.
+  // Source already lives in the user assets/ drop folder: reference it in place.
   if (
     relToAssets &&
     !relToAssets.startsWith("..") &&
@@ -158,7 +158,7 @@ async function buildStillProxy(
     };
   }
   // Source is outside assets/ (e.g. a CLI path like ~/Pictures/x.png). Copy it
-  // in so project.json stays portable — a "../../…" proxy would break the
+  // in so project.json stays portable: a "../../…" proxy would break the
   // moment the project dir moves and would leak absolute structure.
   const safeName = basename(src).replace(/[^a-zA-Z0-9._-]/g, "_") || "still";
   let dest = resolve(p.assets, safeName);

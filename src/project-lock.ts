@@ -8,11 +8,11 @@
 //
 // project.json and chats.json get separate locks so a long-running project
 // mutation (e.g. an agent suggestion that shells out) doesn't block chat
-// writes — they touch different files and don't conflict.
+// writes: they touch different files and don't conflict.
 //
 // Scope: this serializes within one process (one running server). Concurrent
 // processes (two CLI invocations, or a CLI agent and the server) write the
-// same files and need OS-level file locking — see the note in the PR.
+// same files and need OS-level file locking; see the note in the PR.
 function chain<T>(
   map: Map<string, Promise<unknown>>,
   slug: string,

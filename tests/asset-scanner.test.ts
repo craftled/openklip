@@ -55,7 +55,7 @@ test("syncAssetsFromFolder serializes overlapping calls (no lost updates)", asyn
 
     // Two concurrent syncs over the same files. Without per-slug
     // serialization both would read project.json before either write landed,
-    // each register both files, and the second save would clobber the first —
+    // each register both files, and the second save would clobber the first:
     // duplicate ids or a lost update. With the lock they collapse: one
     // registers, the other sees them already known.
     const [first, second] = await Promise.all([

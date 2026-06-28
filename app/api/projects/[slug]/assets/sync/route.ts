@@ -12,7 +12,7 @@ interface RouteParams {
 }
 
 // Folder sync mutates project.json (registers any new files dropped into
-// assets/), so it lives behind POST — a GET that mutates is an anti-pattern
+// assets/), so it lives behind POST: a GET that mutates is an anti-pattern
 // (crawlers/bots/service workers will issue GETs to any URL they discover;
 // see Next.js prefetching guide §"Triggering unwanted side-effects during
 // prefetching"). syncAssetsFromFolder serializes per-slug so overlapping

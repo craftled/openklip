@@ -91,7 +91,7 @@ test("mutateProject serializes concurrent edits (no lost update)", async () => {
     const delay = (ms: number) =>
       new Promise<void>((resolve) => setTimeout(resolve, ms));
     // Each call reads padMs, pauses (to widen the race window), then writes
-    // padMs+1. Without per-slug serialization both read 0 and both save 1 —
+    // padMs+1. Without per-slug serialization both read 0 and both save 1:
     // a lost update. With the lock they chain: 0 -> 1 -> 2.
     await Promise.all([
       mutateProject(slug, async (p) => {

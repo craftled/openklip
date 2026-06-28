@@ -7,7 +7,7 @@
 import { detectAgents, runFillerAgent } from "@engine/agent-driver";
 import { mutateProject } from "@engine/projectStore";
 
-// Re-export the type from source (type-only — never emits runtime code) so client
+// Re-export the type from source (type-only, never emits runtime code) so client
 // components import it from here without pulling the server-only driver into their
 // bundle. The return type of getAgentStatuses is inferred from detectAgents.
 export type { AgentStatus } from "@engine/agent-driver";

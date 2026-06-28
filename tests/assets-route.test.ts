@@ -77,7 +77,7 @@ test("POST /api/projects/:slug/assets returns JSON error for missing file", asyn
   });
 });
 
-test("GET /api/projects/:slug/assets is pure — does not register dropped files", async () => {
+test("GET /api/projects/:slug/assets is pure: does not register dropped files", async () => {
   await withTempProjectsRoot(async ({ slug, root }) => {
     writeFixtureProject(slug, makeProject({ slug, assets: [] }));
     const assetsDir = join(root, "projects", slug, "assets");

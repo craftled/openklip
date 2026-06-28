@@ -32,7 +32,7 @@ test("withProjectLock does not block a different slug", async () => {
       log.push(`end-${slug}`);
     });
   await Promise.all([slow("a"), slow("b")]);
-  // Different slugs run concurrently — both starts land before either end.
+  // Different slugs run concurrently: both starts land before either end.
   assert.ok(log[0]?.startsWith("start"), `first entry: ${log[0]}`);
   assert.ok(log[1]?.startsWith("start"), `second entry: ${log[1]}`);
 });

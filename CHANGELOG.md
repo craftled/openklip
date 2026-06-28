@@ -16,7 +16,7 @@ Editor shell refresh: the asset bin, project chats, and theme picker now live in
 - **Theme engine** — swappable presets (OpenKlip, Catppuccin, GitHub, Nord, Dracula, Tokyo Night) with light/dark scheme and no-flash boot script.
 - **Keyboard shortcuts** — ⌘B toggles agent sidebar, ⌘I toggles inspector (`EditorSidebarShortcuts`).
 - **Asset folder scanner** — CLI/GUI parity when files land in `projects/<slug>/assets/` (`src/asset-scanner.ts`).
-- **Folder sync endpoint** — `POST /api/projects/:slug/assets/sync` registers any new files dropped into `assets/`. Sync is POST (not a mutating GET) and serialized per-slug so overlapping polls/tabs never race the `project.json` read-modify-write (`src/asset-lock.ts`).
+- **Folder sync endpoint:** `POST /api/projects/:slug/assets/sync` registers any new files dropped into `assets/`. Sync is POST (not a mutating GET) and serialized per-slug so overlapping polls/tabs never race the `project.json` read-modify-write (`src/asset-lock.ts`).
 
 ### Changed
 - Removed the asset strip below the timeline; assets render only under **Assets** in the agent sidebar.
