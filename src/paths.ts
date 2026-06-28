@@ -1,4 +1,5 @@
 import { basename, extname, join, resolve } from "node:path";
+import { readConfiguredProjectsRoot } from "./workspace-config.ts";
 
 // Parent directory containing project folders (each subdir with project.json).
 // Override with OPENKLIP_PROJECTS_ROOT to use any folder on disk.
@@ -6,6 +7,10 @@ export function projectsRoot(): string {
   const env = process.env.OPENKLIP_PROJECTS_ROOT;
   if (env) {
     return resolve(env);
+  }
+  const configured = readConfiguredProjectsRoot();
+  if (configured) {
+    return configured;
   }
   return resolve(process.cwd(), "projects");
 }

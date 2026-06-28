@@ -8,6 +8,7 @@ next-env.d.ts
 .DS_Store
 .env*
 .openklip-worktrees/
+.openklip/
 
 # source media: keep large/private footage out of the repo
 *.mp4

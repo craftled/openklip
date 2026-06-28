@@ -1,66 +1,111 @@
 "use client";
 
-import { Plus } from "lucide-react";
+import { FolderOpen } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 
 export function NoProjectsLanding() {
   const router = useRouter();
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [creating, setCreating] = useState(false);
+  const [picking, setPicking] = useState(false);
+  const [pickerSupported, setPickerSupported] = useState(true);
+  const [workRoot, setWorkRoot] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const onPickVideo = async (file: File) => {
-    setCreating(true);
+  useEffect(() => {
+    let alive = true;
+    void fetch("/api/workspace")
+      .then((res) => res.json())
+      .then((data: { pickerSupported?: boolean; root?: string }) => {
+        if (!alive) {
+          return;
+        }
+        if (data.root) {
+          setWorkRoot(data.root);
+        }
+        if (data.pickerSupported === false) {
+          setPickerSupported(false);
+        }
+      })
+      .catch(() => {
+        // Best-effort: the picker still works without the current root.
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const onChooseFolder = useCallback(async () => {
+    setPicking(true);
     setError(null);
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await fetch("/api/projects", { method: "POST", body: fd });
-      const data = (await res.json()) as { error?: string; slug?: string };
-      if (!(res.ok && data.slug)) {
-        throw new Error(data.error ?? `Create project failed (${res.status})`);
+      const res = await fetch("/api/workspace", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "pick" }),
+      });
+      const data = (await res.json()) as {
+        cancelled?: boolean;
+        error?: string;
+        projects?: Array<{ slug: string }>;
+        root?: string;
+      };
+      if (!res.ok) {
+        throw new Error(data.error ?? `Choose folder failed (${res.status})`);
       }
-      router.push(`/?slug=${encodeURIComponent(data.slug)}`);
-      router.refresh();
+      if (data.cancelled) {
+        return;
+      }
+      if (data.root) {
+        setWorkRoot(data.root);
+      }
+      if ((data.projects?.length ?? 0) > 0) {
+        router.refresh();
+      }
     } catch (e) {
       setError((e as Error).message);
     } finally {
-      setCreating(false);
+      setPicking(false);
     }
-  };
+  }, [router]);
+
+  const subtitle = workRoot
+    ? "No projects in this folder yet."
+    : "Choose a folder to work in.";
 
   return (
     <main className="flex min-h-svh flex-col items-center justify-center gap-4 p-8 text-center">
       <div className="space-y-1">
         <h1 className="font-semibold text-lg">No projects yet</h1>
-        <p className="max-w-sm text-muted-foreground text-sm">
-          Choose a source video to create your first project.
-        </p>
+        <p className="max-w-sm text-muted-foreground text-sm">{subtitle}</p>
+        {workRoot ? (
+          <p className="mx-auto max-w-md truncate font-mono text-muted-foreground text-xs">
+            {workRoot}
+          </p>
+        ) : null}
       </div>
       <Button
-        disabled={creating}
-        onClick={() => inputRef.current?.click()}
+        disabled={picking || !pickerSupported}
+        onClick={() => void onChooseFolder()}
         type="button"
       >
-        <Plus className="size-4" />
-        {creating ? "Creating…" : "Create new project"}
+        <FolderOpen className="size-4" />
+        {picking ? "Choosing…" : "Choose folder"}
       </Button>
+      {pickerSupported ? null : (
+        <p className="max-w-sm text-muted-foreground text-xs leading-relaxed">
+          The folder picker requires macOS. Set{" "}
+          <code className="font-mono">OPENKLIP_PROJECTS_ROOT</code> to your
+          projects directory, or run ingest from the CLI.
+        </p>
+      )}
+      {workRoot ? (
+        <p className="max-w-sm text-muted-foreground text-xs leading-relaxed">
+          Run <code className="font-mono">openklip ingest &lt;video&gt;</code>{" "}
+          to create a project in this folder.
+        </p>
+      ) : null}
       {error && <p className="text-destructive text-sm">{error}</p>}
-      <input
-        accept="video/*"
-        className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) {
-            void onPickVideo(file);
-          }
-          e.target.value = "";
-        }}
-        ref={inputRef}
-        type="file"
-      />
     </main>
   );
 }
