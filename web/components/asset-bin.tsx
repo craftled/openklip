@@ -12,6 +12,7 @@ import { AssetPreviewRow } from "@/components/asset-preview-hover";
 import { Badge } from "@/components/ui/badge";
 import type { AssetBinUpdate } from "@/lib/asset-bin-update";
 import { deleteAssetApi } from "@/lib/asset-bin-update";
+import { syncProjectAssets, uploadProjectAssets } from "@/lib/asset-upload";
 import { cn } from "@/lib/utils";
 
 export type { AssetBinUpdate } from "@/lib/asset-bin-update";
@@ -67,48 +68,6 @@ function fmtDur(samples: number, sr: number): string {
     return `${s.toFixed(1)}s`;
   }
   return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
-}
-
-async function readJsonResponse(
-  res: Response
-): Promise<Record<string, unknown>> {
-  const text = await res.text();
-  try {
-    return JSON.parse(text) as Record<string, unknown>;
-  } catch {
-    const snippet = text.replace(/\s+/g, " ").trim().slice(0, 160);
-    throw new Error(
-      res.ok
-        ? "Server returned an invalid response"
-        : `Request failed (${res.status})${snippet ? `: ${snippet}` : ""}`
-    );
-  }
-}
-
-async function readUploadResponse(res: Response): Promise<{
-  assets?: BinAsset[];
-  error?: string;
-}> {
-  const data = await readJsonResponse(res);
-  return data as { assets?: BinAsset[]; error?: string };
-}
-
-function parseSyncResponse(
-  res: Response,
-  data: Record<string, unknown>
-): AssetBinUpdate | null {
-  if (!(res.ok && Array.isArray(data.assets))) {
-    return null;
-  }
-  return {
-    assets: (data.assets as BinAsset[]).map(withAssetKind),
-    broll: Array.isArray(data.broll)
-      ? (data.broll as AssetBinUpdate["broll"])
-      : undefined,
-    stills: Array.isArray(data.stills)
-      ? (data.stills as AssetBinUpdate["stills"])
-      : undefined,
-  };
 }
 
 function AssetBinRow({
@@ -211,12 +170,7 @@ export function AssetBin({
     }
     syncingRef.current = true;
     try {
-      const res = await fetch(
-        `/api/projects/${encodeURIComponent(slug)}/assets/sync`,
-        { method: "POST" }
-      );
-      const data = await readJsonResponse(res);
-      const update = parseSyncResponse(res, data);
+      const update = await syncProjectAssets(slug);
       if (update) {
         onAssetsUpdated(update);
       }
@@ -247,23 +201,10 @@ export function AssetBin({
       setUploading(true);
       setError(null);
       try {
-        let latest = assets;
-        for (const file of list) {
-          const fd = new FormData();
-          fd.append("file", file);
-          const res = await fetch(
-            `/api/projects/${encodeURIComponent(slug)}/assets`,
-            { method: "POST", body: fd }
-          );
-          const data = await readUploadResponse(res);
-          if (!res.ok) {
-            throw new Error(data.error ?? `upload failed (${res.status})`);
-          }
-          if (data.assets) {
-            latest = data.assets.map(withAssetKind);
-          }
+        const latest = await uploadProjectAssets(slug, files);
+        if (latest.length > 0) {
+          onAssetsUpdated({ assets: latest });
         }
-        onAssetsUpdated({ assets: latest });
         await syncFromFolder();
       } catch (e) {
         setError((e as Error).message);
@@ -271,7 +212,7 @@ export function AssetBin({
         setUploading(false);
       }
     },
-    [assets, onAssetsUpdated, slug, syncFromFolder]
+    [onAssetsUpdated, slug, syncFromFolder]
   );
 
   const onDeleteAsset = useCallback(

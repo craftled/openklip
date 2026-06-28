@@ -114,7 +114,7 @@ export function ProjectSwitcher({
   return (
     <>
       <SidebarMenu>
-        <SidebarMenuItem>
+        <SidebarMenuItem className="group/project-trigger">
           <DropdownMenu
             onOpenChange={(open) => {
               setMenuOpen(open);
@@ -134,9 +134,8 @@ export function ProjectSwitcher({
                   {projectInitial(active.slug)}
                 </div>
                 <div className="grid min-w-0 flex-1 text-left text-sm leading-tight">
-                  <span className="flex min-w-0 items-center gap-0.5">
-                    <span className="truncate font-medium">{active.slug}</span>
-                    <ProjectInlineFolderAction slug={active.slug} />
+                  <span className="truncate pr-4 font-medium">
+                    {active.slug}
                   </span>
                   <span className="truncate text-muted-foreground text-xs">
                     {creating
@@ -252,6 +251,11 @@ export function ProjectSwitcher({
               </DropdownMenuGroup>
             </DropdownMenuContent>
           </DropdownMenu>
+          <ProjectInlineFolderAction
+            className="absolute top-1/2 right-7 z-10 -translate-y-1/2 opacity-100"
+            revealGroup="project"
+            slug={active.slug}
+          />
         </SidebarMenuItem>
       </SidebarMenu>
       {createError && (

@@ -207,15 +207,7 @@ export function EditTimeline({
   const playhead = pct(curSec, durationSec);
 
   return (
-    <div className="shrink-0 border-foreground/10 border-t bg-foreground/2">
-      <div className="flex items-center justify-between border-foreground/10 border-b px-3 py-2">
-        <span className="font-medium text-muted-foreground text-xs">
-          Timeline
-        </span>
-        <span className="text-caption text-muted-foreground tabular-nums">
-          {fmtTime(curSec)} / {fmtTime(durationSec)}
-        </span>
-      </div>
+    <div className="bg-foreground/2">
       <div className="overflow-x-auto">
         <div className="relative min-w-[520px]">
           <div className="flex border-foreground/10 border-b">

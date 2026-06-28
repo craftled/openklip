@@ -2,6 +2,7 @@
 
 import {
   Archive,
+  MessageSquare,
   MoreHorizontal,
   Pencil,
   RotateCcw,
@@ -116,14 +117,16 @@ export function ChatListItem({
         >
           <SidebarMenuButton
             aria-busy={inProgress}
-            className={cn("h-8 gap-2 text-ui", archived && "opacity-70")}
+            className={cn(archived && "opacity-70")}
             isActive={isActive}
             onClick={onSelect}
           >
-            <span className="flex min-w-0 flex-1 items-center gap-1.5">
-              {inProgress ? <ChatProgressIndicator /> : null}
-              <span className="truncate">{thread.title}</span>
-            </span>
+            {inProgress ? (
+              <ChatProgressIndicator />
+            ) : (
+              <MessageSquare className="size-4 shrink-0" />
+            )}
+            <span className="min-w-0 flex-1 truncate">{thread.title}</span>
             <span className="text-caption text-muted-foreground tabular-nums">
               {timeLabel}
             </span>
