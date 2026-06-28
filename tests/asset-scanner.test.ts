@@ -1,75 +1,174 @@
-import assert from "node:assert/strict";
+import { describe, expect, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { test } from "node:test";
 import {
   listAssetDropFiles,
+  pruneStaleAssets,
   syncAssetsFromFolder,
 } from "../src/asset-scanner.ts";
+import { loadProject } from "../src/projectStore.ts";
+import {
+  brollClipFor,
+  keptMusicAsset,
+  orphanBrollAsset,
+  projectAssetsDir,
+  TINY_PNG,
+  writeAssetDrop,
+} from "./helpers/assetFixture.ts";
 import {
   makeProject,
   withTempProjectsRoot,
   writeFixtureProject,
 } from "./helpers/projectFixture.ts";
 
-test("listAssetDropFiles lists only recognized files in assets/", async () => {
-  await withTempProjectsRoot(({ slug, root }) => {
-    writeFixtureProject(slug, makeProject({ slug, assets: [] }));
-    const assetsDir = join(root, "projects", slug, "assets");
-    mkdirSync(assetsDir, { recursive: true });
-    writeFileSync(join(assetsDir, "track.mp3"), "fake");
-    writeFileSync(join(assetsDir, "notes.txt"), "skip");
-    writeFileSync(join(assetsDir, ".hidden"), "skip");
+describe("listAssetDropFiles", () => {
+  test("lists only recognized files directly in assets/", async () => {
+    await withTempProjectsRoot(({ slug, root }) => {
+      writeFixtureProject(slug, makeProject({ slug, assets: [] }));
+      const assetsDir = projectAssetsDir(root, slug);
+      mkdirSync(assetsDir, { recursive: true });
+      writeFileSync(join(assetsDir, "track.mp3"), "fake");
+      writeFileSync(join(assetsDir, "notes.txt"), "skip");
+      writeFileSync(join(assetsDir, ".hidden"), "skip");
 
-    const files = listAssetDropFiles(slug);
-    assert.equal(files.length, 1);
-    assert.ok(files[0]?.endsWith("track.mp3"));
+      const files = listAssetDropFiles(slug);
+      expect(files).toHaveLength(1);
+      expect(files[0]).toEndWith("track.mp3");
+    });
   });
 });
 
-test("syncAssetsFromFolder registers new drops in project.json", async () => {
-  await withTempProjectsRoot(async ({ slug, root }) => {
-    writeFixtureProject(slug, makeProject({ slug, assets: [] }));
-    const assetsDir = join(root, "projects", slug, "assets");
-    mkdirSync(assetsDir, { recursive: true });
-    writeFileSync(
-      join(assetsDir, "incoming.png"),
-      Buffer.from([137, 80, 78, 71])
-    );
+describe("pruneStaleAssets", () => {
+  test("removes registrations whose src is outside the project assets/ folder", async () => {
+    await withTempProjectsRoot(async ({ slug, root }) => {
+      const assetsDir = projectAssetsDir(root, slug);
+      writeAssetDrop(root, slug, "keep.mp3");
+      writeFixtureProject(
+        slug,
+        makeProject({
+          slug,
+          assets: [orphanBrollAsset(), keptMusicAsset(assetsDir)],
+        })
+      );
 
-    const assets = await syncAssetsFromFolder(slug);
-    assert.equal(assets.length, 1);
-    assert.equal(assets[0]?.kind, "still");
-    assert.ok(assets[0]?.src.includes("/assets/incoming.png"));
-    assert.equal(assets[0]?.proxy, "assets/incoming.png");
+      const project = await loadProject(slug);
+      expect(pruneStaleAssets(slug, project)).toBe(true);
+      expect(project.assets.map((a) => a.id)).toEqual(["keep"]);
+    });
+  });
+
+  test("removes registrations when the src file was deleted from assets/", async () => {
+    await withTempProjectsRoot(async ({ slug, root }) => {
+      const assetsDir = projectAssetsDir(root, slug);
+      mkdirSync(assetsDir, { recursive: true });
+      writeFixtureProject(
+        slug,
+        makeProject({
+          slug,
+          assets: [
+            {
+              id: "missing",
+              kind: "music",
+              name: "gone.mp3",
+              src: join(assetsDir, "gone.mp3"),
+              proxy: "working/assets/gone.aac",
+              durationSamples: 1000,
+            },
+            keptMusicAsset(assetsDir),
+          ],
+        })
+      );
+      writeFileSync(join(assetsDir, "keep.mp3"), "fake");
+
+      const project = await loadProject(slug);
+      expect(pruneStaleAssets(slug, project)).toBe(true);
+      expect(project.assets.map((a) => a.id)).toEqual(["keep"]);
+    });
+  });
+
+  test("returns false when every registration matches a file in assets/", async () => {
+    await withTempProjectsRoot(async ({ slug, root }) => {
+      const assetsDir = projectAssetsDir(root, slug);
+      writeAssetDrop(root, slug, "keep.mp3");
+      writeFixtureProject(
+        slug,
+        makeProject({
+          slug,
+          assets: [keptMusicAsset(assetsDir)],
+        })
+      );
+
+      const project = await loadProject(slug);
+      expect(pruneStaleAssets(slug, project)).toBe(false);
+      expect(project.assets.map((a) => a.id)).toEqual(["keep"]);
+    });
+  });
+
+  test("prunes timeline overlays that reference removed assets", async () => {
+    await withTempProjectsRoot(async ({ slug, root }) => {
+      const assetsDir = projectAssetsDir(root, slug);
+      writeAssetDrop(root, slug, "keep.mp3");
+      writeFixtureProject(
+        slug,
+        makeProject({
+          slug,
+          assets: [orphanBrollAsset(), keptMusicAsset(assetsDir)],
+          broll: [brollClipFor("orphan")],
+        })
+      );
+
+      const project = await loadProject(slug);
+      pruneStaleAssets(slug, project);
+      expect(project.broll).toHaveLength(0);
+    });
   });
 });
 
-test("syncAssetsFromFolder serializes overlapping calls (no lost updates)", async () => {
-  await withTempProjectsRoot(async ({ slug, root }) => {
-    writeFixtureProject(slug, makeProject({ slug, assets: [] }));
-    const assetsDir = join(root, "projects", slug, "assets");
-    mkdirSync(assetsDir, { recursive: true });
-    writeFileSync(join(assetsDir, "a.png"), Buffer.from([137, 80, 78, 71]));
-    writeFileSync(join(assetsDir, "b.png"), Buffer.from([137, 80, 78, 71]));
+describe("syncAssetsFromFolder", () => {
+  test("prunes stale registrations before registering new drops", async () => {
+    await withTempProjectsRoot(async ({ slug, root }) => {
+      writeFixtureProject(
+        slug,
+        makeProject({ slug, assets: [orphanBrollAsset()] })
+      );
+      writeAssetDrop(root, slug, "incoming.png", TINY_PNG);
 
-    // Two concurrent syncs over the same files. Without per-slug
-    // serialization both would read project.json before either write landed,
-    // each register both files, and the second save would clobber the first:
-    // duplicate ids or a lost update. With the lock they collapse: one
-    // registers, the other sees them already known.
-    const [first, second] = await Promise.all([
-      syncAssetsFromFolder(slug),
-      syncAssetsFromFolder(slug),
-    ]);
+      const assets = await syncAssetsFromFolder(slug);
+      expect(assets).toHaveLength(1);
+      expect(assets[0]?.name).toBe("incoming.png");
+    });
+  });
 
-    assert.equal(first.length, 2);
-    assert.equal(second.length, 2);
-    const firstSrcs = first.map((a) => a.src).sort();
-    const secondSrcs = second.map((a) => a.src).sort();
-    assert.deepEqual(firstSrcs, secondSrcs);
-    // No duplicate ids on disk.
-    const ids = first.map((a) => a.id);
-    assert.equal(new Set(ids).size, ids.length);
+  test("registers files dropped into assets/ that are not yet in project.json", async () => {
+    await withTempProjectsRoot(async ({ slug, root }) => {
+      writeFixtureProject(slug, makeProject({ slug, assets: [] }));
+      writeAssetDrop(root, slug, "incoming.png", TINY_PNG);
+
+      const assets = await syncAssetsFromFolder(slug);
+      expect(assets).toHaveLength(1);
+      expect(assets[0]?.kind).toBe("still");
+      expect(assets[0]?.src).toContain("/assets/incoming.png");
+      expect(assets[0]?.proxy).toBe("assets/incoming.png");
+    });
+  });
+
+  test("serializes overlapping calls so project.json never loses updates", async () => {
+    await withTempProjectsRoot(async ({ slug, root }) => {
+      writeFixtureProject(slug, makeProject({ slug, assets: [] }));
+      writeAssetDrop(root, slug, "a.png", TINY_PNG);
+      writeAssetDrop(root, slug, "b.png", TINY_PNG);
+
+      const [first, second] = await Promise.all([
+        syncAssetsFromFolder(slug),
+        syncAssetsFromFolder(slug),
+      ]);
+
+      expect(first).toHaveLength(2);
+      expect(second).toHaveLength(2);
+      expect(first.map((a) => a.src).sort()).toEqual(
+        second.map((a) => a.src).sort()
+      );
+      expect(new Set(first.map((a) => a.id)).size).toBe(first.length);
+    });
   });
 });

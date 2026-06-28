@@ -14,6 +14,8 @@ Reliability pass after the 0.6.0 editor shell refresh: serialize server-side wri
 - **Stills from outside `assets/` are copied in.** External still originals copy into `assets/` instead of storing a fragile `../../…` relative proxy.
 - **Re-ingest no longer silently wipes an existing project.** `ingest` refuses when `project.json` already exists unless `--force` (CLI) or `?force=1` (upload API returns 409 Conflict).
 - **Folder sync is POST, not a mutating GET.** `POST /api/projects/:slug/assets/sync` registers files dropped into `assets/`; `GET /assets` is read-only.
+- **Asset bin matches the drop folder.** Folder sync and page load prune registrations whose `src` is outside `projects/<slug>/assets/` or no longer exists on disk, and drop timeline overlays that referenced them.
+- **Project delete in switcher.** Hover a project row to reveal trash; click once for “Delete?”, again to confirm. Removes the project folder from disk and switches to the next project.
 
 ## 0.6.0 - 2026-06-26
 

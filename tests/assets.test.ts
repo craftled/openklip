@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import {
+  deleteAsset,
   inferAssetKind,
   listAssetsByKind,
   registerAsset,
@@ -122,5 +123,23 @@ test("registerAsset copies an external still into assets/ (no ../../ proxy)", as
     assert.ok(!asset.proxy.includes(".."));
     // The original was copied into the project's assets/ dir.
     assert.ok(existsSync(join(root, "projects", slug, asset.proxy)));
+  });
+});
+
+test("deleteAsset removes registration and project-local files", async () => {
+  await withTempProjectsRoot(async ({ slug, root }) => {
+    writeFixtureProject(slug, makeProject({ slug, assets: [] }));
+    const asset = await registerAssetBytes(
+      slug,
+      "incoming.png",
+      new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]),
+      "still"
+    );
+    const proxyPath = join(root, "projects", slug, asset.proxy);
+    assert.ok(existsSync(proxyPath));
+
+    const project = await deleteAsset(slug, asset.id);
+    assert.equal(project.assets.length, 0);
+    assert.ok(!existsSync(proxyPath));
   });
 });

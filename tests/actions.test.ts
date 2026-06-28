@@ -7,6 +7,7 @@ import {
   cutAllByText,
   cutByText,
   cutWords,
+  removeAsset,
   removeBroll,
   removeTitle,
   removeZoom,
@@ -97,6 +98,44 @@ function makeProject(): Project {
     ],
   };
 }
+
+test("removeAsset drops overlays that reference the asset", () => {
+  const p = makeProject();
+  p.assets = [
+    {
+      id: "clip",
+      kind: "broll",
+      name: "clip.mp4",
+      src: "/clip.mp4",
+      proxy: "working/assets/clip.mp4",
+      durationSamples: 48_000,
+    },
+  ];
+  p.broll = [
+    {
+      id: "b1",
+      assetId: "clip",
+      startSample: 0,
+      endSample: 48_000,
+      srcInSample: 0,
+    },
+  ];
+  p.stills = [
+    {
+      id: "s1",
+      assetId: "clip",
+      startSample: 0,
+      endSample: 48_000,
+      scale: 1.2,
+      focusX: 0.5,
+      focusY: 0.5,
+    },
+  ];
+  assert.equal(removeAsset(p, "clip"), true);
+  assert.equal(p.assets.length, 0);
+  assert.equal(p.broll.length, 0);
+  assert.equal(p.stills.length, 0);
+});
 
 test("cutWords marks the listed ids deleted", () => {
   const p = makeProject();

@@ -16,9 +16,14 @@ import {
   useState,
 } from "react";
 import { AgentModelSelect } from "@/components/agent-model-select";
-import { AssetBin, type BinAsset } from "@/components/asset-bin";
+import {
+  AssetBin,
+  type AssetBinUpdate,
+  type BinAsset,
+} from "@/components/asset-bin";
 import { ChatListItem } from "@/components/chat-list-item";
 import { KeyboardHint } from "@/components/keyboard-hint";
+import { ProjectInlineFolderAction } from "@/components/project-folder-action";
 import { ProjectSwitcher } from "@/components/project-switcher";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,6 +40,7 @@ import {
   SidebarRail,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { useModShortcut } from "@/hooks/use-mod-shortcut";
 import { agentProviderId } from "@/lib/agent-icons";
 import {
   type AgentModelId,
@@ -58,8 +64,9 @@ import {
   filterThreadsByQuery,
   resolveThreadAfterRemove,
 } from "@/lib/chat-list";
-import { modShortcut } from "@/lib/keyboard-shortcuts";
+import type { ProjectHoverContext } from "@/lib/project-context";
 import type { ProjectListing } from "@/lib/project-list";
+import { deleteProjectApi } from "@/lib/projects-client";
 import { cn } from "@/lib/utils";
 import {
   type AgentStatus,
@@ -71,7 +78,8 @@ interface AgentSidebarProps {
   activeSlug: string;
   assets: BinAsset[];
   mediaVersion?: number;
-  onAssetsUpdated: (assets: BinAsset[]) => void;
+  onAssetsUpdated: (update: AssetBinUpdate) => void;
+  projectHover: ProjectHoverContext;
   projects: ProjectListing[];
   sampleRate: number;
 }
@@ -97,6 +105,7 @@ export function AgentSidebar({
   assets,
   mediaVersion,
   onAssetsUpdated,
+  projectHover,
   projects,
   sampleRate,
 }: AgentSidebarProps) {
@@ -110,7 +119,7 @@ export function AgentSidebar({
   const [agent, setAgent] = useState<AgentModelId>(DEFAULT_AGENT_MODEL);
   const [defaultAgent, setDefaultAgent] =
     useState<AgentModelId>(DEFAULT_AGENT_MODEL);
-  const [running, setRunning] = useState(false);
+  const [runningThreadId, setRunningThreadId] = useState<string | null>(null);
   const [statuses, setStatuses] = useState<Record<string, AgentStatus>>({});
   useEffect(() => {
     const initial = getDefaultAgentModel();
@@ -236,19 +245,31 @@ export function AgentSidebar({
     [activeSlug, router]
   );
 
-  const onIngestVideo = useCallback(
+  const onCreateProject = useCallback(
     async (file: File) => {
       const fd = new FormData();
       fd.append("file", file);
       const res = await fetch("/api/projects", { method: "POST", body: fd });
       const data = (await res.json()) as { error?: string; slug?: string };
       if (!(res.ok && data.slug)) {
-        throw new Error(data.error ?? `Ingest failed (${res.status})`);
+        throw new Error(data.error ?? `Create project failed (${res.status})`);
       }
       router.push(`/?slug=${encodeURIComponent(data.slug)}`);
       router.refresh();
     },
     [router]
+  );
+
+  const onDeleteProject = useCallback(
+    async (slug: string) => {
+      const { projects: remaining } = await deleteProjectApi(slug);
+      if (slug === activeSlug) {
+        const next = remaining[0]?.slug;
+        router.push(next ? `/?slug=${encodeURIComponent(next)}` : "/");
+      }
+      router.refresh();
+    },
+    [activeSlug, router]
   );
 
   // Hydrate chats from working/chats.json via API after mount.
@@ -322,55 +343,73 @@ export function AgentSidebar({
   const onSend = (e: FormEvent) => {
     e.preventDefault();
     const text = draft.trim();
-    if (!(text && activeThreadId)) {
+    const threadId = activeThreadId;
+    if (!(text && threadId)) {
       return;
     }
     void (async () => {
-      await appendMessageApi(activeSlug, activeThreadId, "user", text);
-      await appendMessageApi(
-        activeSlug,
-        activeThreadId,
-        "assistant",
-        assistantHint(activeSlug, text)
-      );
-      setDraft("");
-      await refreshThreads();
+      setRunningThreadId(threadId);
+      try {
+        await appendMessageApi(activeSlug, threadId, "user", text);
+        await appendMessageApi(
+          activeSlug,
+          threadId,
+          "assistant",
+          assistantHint(activeSlug, text)
+        );
+        setDraft("");
+        await refreshThreads();
+      } finally {
+        setRunningThreadId(null);
+      }
     })();
   };
 
   // Real wiring: drive the selected Claude model (via `claude -p`) to find and
   // cut filler words on the live project.json, then refresh the editor.
   const onFindFiller = async () => {
-    if (running) {
+    if (runningThreadId || !agentUsable || chatsLoading) {
       return;
     }
-    setRunning(true);
+    let threadId = activeThreadId;
+    if (!threadId) {
+      try {
+        const ensured = await ensureThreadApi(activeSlug);
+        threadId = ensured.activeThreadId;
+        if (!threadId) {
+          return;
+        }
+        setThreads(ensured.threads);
+        setActiveThreadId(threadId);
+      } catch {
+        return;
+      }
+    }
+    setRunningThreadId(threadId);
     try {
       const res = await suggestFillerCuts(activeSlug, agent);
-      if (activeThreadId) {
-        await appendMessageApi(
-          activeSlug,
-          activeThreadId,
-          "user",
-          "Find and cut filler words"
-        );
-        await appendMessageApi(
-          activeSlug,
-          activeThreadId,
-          "assistant",
-          res.ok
-            ? `${providerLabel} cut ${res.cut} filler word(s)${
-                res.words.length
-                  ? `: ${res.words.map((w) => `${w.id} "${w.text}"`).join(", ")}`
-                  : " : none found"
-              }`
-            : `Error: ${res.error}`
-        );
-        await refreshThreads();
-      }
+      await appendMessageApi(
+        activeSlug,
+        threadId,
+        "user",
+        "Find and cut filler words"
+      );
+      await appendMessageApi(
+        activeSlug,
+        threadId,
+        "assistant",
+        res.ok
+          ? `${providerLabel} cut ${res.cut} filler word(s)${
+              res.words.length
+                ? `: ${res.words.map((w) => `${w.id} "${w.text}"`).join(", ")}`
+                : " : none found"
+            }`
+          : `Error: ${res.error}`
+      );
+      await refreshThreads();
       router.refresh();
     } finally {
-      setRunning(false);
+      setRunningThreadId(null);
     }
   };
 
@@ -379,7 +418,8 @@ export function AgentSidebar({
       <SidebarHeader className="gap-2 border-border border-b px-2 pt-2 pb-1.5">
         <ProjectSwitcher
           activeSlug={activeSlug}
-          onIngestVideo={onIngestVideo}
+          onCreateProject={onCreateProject}
+          onDeleteProject={onDeleteProject}
           onSelectProject={openProject}
           projects={projects}
         />
@@ -419,12 +459,14 @@ export function AgentSidebar({
               )}
               {filteredChats.map((t) => (
                 <ChatListItem
+                  inProgress={runningThreadId === t.id}
                   isActive={t.id === activeThreadId}
                   key={t.id}
                   onArchive={() => onArchiveThread(t.id)}
                   onDelete={() => onDeleteThread(t.id)}
                   onRename={(title) => onRenameThread(t.id, title)}
                   onSelect={() => selectThread(t.id)}
+                  project={projectHover}
                   thread={t}
                   timeLabel={relativeTime(t.updatedAt)}
                 />
@@ -446,6 +488,7 @@ export function AgentSidebar({
                       onRename={(title) => onRenameThread(t.id, title)}
                       onSelect={() => selectThread(t.id)}
                       onUnarchive={() => onUnarchiveThread(t.id)}
+                      project={projectHover}
                       thread={t}
                       timeLabel={relativeTime(t.updatedAt)}
                     />
@@ -456,9 +499,14 @@ export function AgentSidebar({
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <SidebarGroup className="border-foreground/10 border-t py-2">
-          <SidebarGroupLabel className="px-3 text-section-label">
-            Assets
+        <SidebarGroup className="group/assets border-foreground/10 border-t py-2">
+          <SidebarGroupLabel className="flex w-full items-center justify-between px-3 text-section-label">
+            <span>Assets</span>
+            <ProjectInlineFolderAction
+              revealGroup="assets"
+              slug={activeSlug}
+              target="assets"
+            />
           </SidebarGroupLabel>
           <SidebarGroupContent className="px-2">
             <AssetBin
@@ -512,24 +560,32 @@ export function AgentSidebar({
         />
         <Button
           className="h-8 w-full justify-start gap-2 px-2 text-sm"
-          disabled={running || !agentUsable}
+          disabled={runningThreadId !== null || !agentUsable || chatsLoading}
           onClick={onFindFiller}
           size="sm"
           title={
-            agentUsable
-              ? undefined
-              : activeStatus?.installed
-                ? `Sign in first : run: ${activeStatus.signInCmd}`
-                : `${providerLabel} CLI is not installed`
+            chatsLoading
+              ? "Loading chats…"
+              : agentUsable
+                ? undefined
+                : activeStatus?.installed
+                  ? `Sign in first : run: ${activeStatus.signInCmd}`
+                  : `${providerLabel} CLI is not installed`
           }
           variant="ghost"
         >
           <Sparkles
-            className={cn("size-3.5 text-accent", running && "animate-pulse")}
+            className={cn(
+              "size-3.5 text-accent",
+              runningThreadId !== null && "animate-pulse"
+            )}
           />
           {(() => {
-            if (running) {
+            if (runningThreadId !== null) {
               return `${providerLabel} is reading…`;
+            }
+            if (chatsLoading) {
+              return "Loading chats…";
             }
             if (!agentUsable) {
               return activeStatus?.installed
@@ -548,7 +604,7 @@ export function AgentSidebar({
           />
           <Button
             aria-label="Send message"
-            disabled={!draft.trim()}
+            disabled={!draft.trim() || runningThreadId !== null}
             size="icon-sm"
             type="submit"
             variant="secondary"
@@ -568,7 +624,8 @@ export function AgentSidebar({
 
 export function AgentSidebarTrigger({ className }: { className?: string }) {
   const { toggleSidebar } = useSidebar();
-  const label = `Toggle agent sidebar (${modShortcut("b")})`;
+  const shortcut = useModShortcut("b");
+  const label = `Toggle agent sidebar (${shortcut})`;
 
   return (
     <Button

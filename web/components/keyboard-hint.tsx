@@ -1,4 +1,6 @@
-import { modShortcut } from "@/lib/keyboard-shortcuts";
+"use client";
+
+import { useModShortcut } from "@/hooks/use-mod-shortcut";
 import { cn } from "@/lib/utils";
 
 export function KeyboardHint({
@@ -8,6 +10,8 @@ export function KeyboardHint({
   className?: string;
   shortcutKey: string;
 }) {
+  const label = useModShortcut(shortcutKey);
+
   return (
     <kbd
       className={cn(
@@ -15,7 +19,7 @@ export function KeyboardHint({
         className
       )}
     >
-      {modShortcut(shortcutKey)}
+      {label}
     </kbd>
   );
 }

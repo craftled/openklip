@@ -1,8 +1,13 @@
+/** Stable label for SSR and the first client paint (avoids hydration mismatch). */
+export function modShortcutNeutral(key: string): string {
+  return `Mod+${key.toUpperCase()}`;
+}
+
 /** Human-readable modifier+key label for tooltips (⌘B on Apple, Ctrl+B elsewhere). */
 export function modShortcut(key: string): string {
   const upper = key.toUpperCase();
   if (typeof navigator === "undefined") {
-    return `⌘${upper}`;
+    return modShortcutNeutral(key);
   }
   return /Mac|iPhone|iPad/i.test(navigator.userAgent)
     ? `⌘${upper}`

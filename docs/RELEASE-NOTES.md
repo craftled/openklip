@@ -13,6 +13,7 @@ Use these bodies when publishing releases. Each section matches a tag in `CHANGE
 - Atomic `chats.json` writes; corrupt files backed up instead of silently wiped
 - Re-ingest guard: `openklip ingest --force` required to overwrite an existing project
 - Asset folder sync moved to `POST /api/projects/:slug/assets/sync` (GET is read-only)
+- Asset bin reconciles with `assets/` on sync and page load (prunes external or missing registrations)
 - Sidebar asset bin no longer horizontal-scrolls on long filenames
 
 ### Known gaps

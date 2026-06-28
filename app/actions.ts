@@ -1,6 +1,8 @@
 "use server";
 
+import { existsSync } from "node:fs";
 import { exportCut } from "@engine/exporter";
+import { projectPaths } from "@engine/paths";
 import {
   applyBroll,
   applyLook,
@@ -12,6 +14,7 @@ import {
   type clampZoomItems,
 } from "@engine/projectMutations";
 import { mutateProject } from "@engine/projectStore";
+import { revealInFileManager } from "@engine/reveal-path";
 
 export type ActionResult<T = void> =
   | ({ ok: true } & (T extends void ? object : { data: T }))
@@ -116,6 +119,19 @@ export async function exportProject(
   try {
     const result = await exportCut(slug, { maxHeight });
     return { ok: true, data: result };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function revealProjectFolder(slug: string): Promise<ActionResult> {
+  try {
+    const paths = projectPaths(slug);
+    if (!existsSync(paths.project)) {
+      throw new Error(`project not found: ${slug}`);
+    }
+    await revealInFileManager(paths.dir);
+    return { ok: true };
   } catch (e) {
     return fail(e);
   }

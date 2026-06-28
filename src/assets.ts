@@ -1,6 +1,14 @@
 import { existsSync } from "node:fs";
-import { copyFile, mkdir, writeFile } from "node:fs/promises";
-import { basename, extname, isAbsolute, relative, resolve } from "node:path";
+import { copyFile, mkdir, unlink, writeFile } from "node:fs/promises";
+import {
+  basename,
+  extname,
+  isAbsolute,
+  relative,
+  resolve,
+  sep,
+} from "node:path";
+import { removeAsset } from "./actions.ts";
 import {
   type Asset,
   type AssetKind,
@@ -260,4 +268,49 @@ export function listAssetsByKind(assets: Asset[]): Record<AssetKind, Asset[]> {
     music: assets.filter((a) => a.kind === "music"),
     still: assets.filter((a) => a.kind === "still"),
   };
+}
+
+function pathUnderDir(dir: string, target: string): boolean {
+  const resolved = resolve(target);
+  const root = resolve(dir);
+  return resolved === root || resolved.startsWith(`${root}${sep}`);
+}
+
+async function safeUnlinkInProject(
+  slug: string,
+  relOrAbs: string
+): Promise<void> {
+  const p = projectPaths(slug);
+  const abs = isAbsolute(relOrAbs) ? relOrAbs : resolve(p.dir, relOrAbs);
+  if (!pathUnderDir(p.dir, abs)) {
+    return;
+  }
+  try {
+    await unlink(abs);
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== "ENOENT") {
+      throw e;
+    }
+  }
+}
+
+/** Remove an asset from the bin, prune overlays, and delete project-local files. */
+export async function deleteAsset(
+  slug: string,
+  assetId: string
+): Promise<Project> {
+  const project = await loadProject(slug);
+  const asset = project.assets.find((a) => a.id === assetId);
+  if (!asset) {
+    throw new Error(`unknown asset "${assetId}"`);
+  }
+  if (!removeAsset(project, assetId)) {
+    throw new Error(`unknown asset "${assetId}"`);
+  }
+  await saveProject(slug, project);
+  await safeUnlinkInProject(slug, asset.proxy);
+  if (asset.src) {
+    await safeUnlinkInProject(slug, asset.src);
+  }
+  return project;
 }

@@ -6,6 +6,11 @@ import { GET, POST } from "../app/api/projects/[slug]/assets/route.ts";
 import { POST as SYNC_POST } from "../app/api/projects/[slug]/assets/sync/route.ts";
 import { FFMPEG } from "../src/ffmpeg.ts";
 import {
+  brollClipFor,
+  orphanBrollAsset,
+  TINY_PNG,
+} from "./helpers/assetFixture.ts";
+import {
   makeProject,
   withTempProjectsRoot,
   writeFixtureProject,
@@ -82,10 +87,7 @@ test("GET /api/projects/:slug/assets is pure: does not register dropped files", 
     writeFixtureProject(slug, makeProject({ slug, assets: [] }));
     const assetsDir = join(root, "projects", slug, "assets");
     mkdirSync(assetsDir, { recursive: true });
-    writeFileSync(
-      join(assetsDir, "incoming.png"),
-      Buffer.from([137, 80, 78, 71])
-    );
+    writeFileSync(join(assetsDir, "incoming.png"), TINY_PNG);
 
     const res = await GET(
       new Request(`http://localhost/api/projects/${slug}/assets`) as Parameters<
@@ -105,10 +107,7 @@ test("POST /api/projects/:slug/assets/sync registers new drops and returns them"
     writeFixtureProject(slug, makeProject({ slug, assets: [] }));
     const assetsDir = join(root, "projects", slug, "assets");
     mkdirSync(assetsDir, { recursive: true });
-    writeFileSync(
-      join(assetsDir, "incoming.png"),
-      Buffer.from([137, 80, 78, 71])
-    );
+    writeFileSync(join(assetsDir, "incoming.png"), TINY_PNG);
 
     const res = await SYNC_POST(
       new Request(`http://localhost/api/projects/${slug}/assets/sync`, {
@@ -122,5 +121,38 @@ test("POST /api/projects/:slug/assets/sync registers new drops and returns them"
     assert.equal(res.status, 200);
     assert.equal(data.assets?.length, 1);
     assert.equal(data.assets?.[0]?.kind, "still");
+  });
+});
+
+test("POST /api/projects/:slug/assets/sync prunes orphan registrations outside assets/", async () => {
+  await withTempProjectsRoot(async ({ slug, root }) => {
+    writeFixtureProject(
+      slug,
+      makeProject({
+        slug,
+        assets: [orphanBrollAsset()],
+        broll: [brollClipFor("orphan")],
+      })
+    );
+    const assetsDir = join(root, "projects", slug, "assets");
+    mkdirSync(assetsDir, { recursive: true });
+    writeFileSync(join(assetsDir, "incoming.png"), TINY_PNG);
+
+    const res = await SYNC_POST(
+      new Request(`http://localhost/api/projects/${slug}/assets/sync`, {
+        method: "POST",
+      }) as Parameters<typeof SYNC_POST>[0],
+      ctx(slug)
+    );
+    const data = (await res.json()) as {
+      assets?: { name: string }[];
+      broll?: unknown[];
+      byKind?: { broll: unknown[] };
+    };
+    assert.equal(res.status, 200);
+    assert.equal(data.assets?.length, 1);
+    assert.equal(data.assets?.[0]?.name, "incoming.png");
+    assert.equal(data.broll?.length, 0);
+    assert.equal(data.byKind?.broll.length, 0);
   });
 });

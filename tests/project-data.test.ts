@@ -1,18 +1,47 @@
-import assert from "node:assert/strict";
-import { test } from "node:test";
+import { describe, expect, mock, test } from "bun:test";
 import { loadEditorProject } from "../app/lib/project-data.ts";
+import { defaultFixtureOrphan } from "./helpers/assetFixture.ts";
 import {
   makeProject,
   withTempProjectsRoot,
   writeFixtureProject,
 } from "./helpers/projectFixture.ts";
 
-test("loadEditorProject returns project with mediaVersion from proxy mtime", async () => {
-  await withTempProjectsRoot(async ({ slug }) => {
-    writeFixtureProject(slug, makeProject({ slug }));
-    const loaded = await loadEditorProject(slug);
-    assert.equal(loaded.slug, slug);
-    assert.equal(typeof loaded.mediaVersion, "number");
-    assert.ok(loaded.mediaVersion > 0);
+describe("loadEditorProject", () => {
+  test("returns project with mediaVersion from proxy mtime", async () => {
+    await withTempProjectsRoot(async ({ slug }) => {
+      writeFixtureProject(slug, makeProject({ slug }));
+      const loaded = await loadEditorProject(slug);
+      expect(loaded.slug).toBe(slug);
+      expect(typeof loaded.mediaVersion).toBe("number");
+      expect(loaded.mediaVersion).toBeGreaterThan(0);
+    });
+  });
+
+  test("syncs assets/ on load and drops registrations outside the drop folder", async () => {
+    await withTempProjectsRoot(async ({ slug }) => {
+      const fixture = makeProject({ slug });
+      expect(defaultFixtureOrphan(fixture)?.src).toContain("/tmp/");
+      writeFixtureProject(slug, fixture);
+
+      const loaded = await loadEditorProject(slug);
+      expect(loaded.assets).toHaveLength(0);
+    });
+  });
+
+  test("still loads the project when folder sync throws", async () => {
+    await withTempProjectsRoot(async ({ slug }) => {
+      writeFixtureProject(slug, makeProject({ slug, assets: [] }));
+      mock.module("@engine/asset-scanner", () => ({
+        syncAssetsFromFolder: () => {
+          throw new Error("ffmpeg proxy build failed");
+        },
+      }));
+
+      const loaded = await loadEditorProject(slug);
+      expect(loaded.slug).toBe(slug);
+
+      mock.restore();
+    });
   });
 });
