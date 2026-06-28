@@ -1,4 +1,3 @@
-import { mock } from "bun:test";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { POST } from "../app/api/projects/[slug]/reveal/route.ts";
@@ -12,19 +11,18 @@ function ctx(slug: string) {
   return { params: Promise.resolve({ slug }) };
 }
 
-function withMockReveal(run: () => Promise<void>) {
-  mock.module("@engine/reveal-path", () => ({
-    revealCommand: (targetPath: string) => ({
-      command: "true",
-      args: [targetPath],
-    }),
-    revealInFileManager: async () => {
-      // Headless CI has no file manager; route behavior is tested separately.
-    },
-  }));
-  return run().finally(() => {
-    mock.restore();
-  });
+async function withDryReveal(run: () => Promise<void>) {
+  const prev = process.env.OPENKLIP_TEST_REVEAL;
+  process.env.OPENKLIP_TEST_REVEAL = "1";
+  try {
+    await run();
+  } finally {
+    if (prev === undefined) {
+      delete process.env.OPENKLIP_TEST_REVEAL;
+    } else {
+      process.env.OPENKLIP_TEST_REVEAL = prev;
+    }
+  }
 }
 
 test("reveal route returns 404 for a missing project", async () => {
@@ -48,7 +46,7 @@ test("reveal route returns 400 for an invalid slug", async () => {
 });
 
 test("reveal route returns 200 for an existing project", async () => {
-  await withMockReveal(async () => {
+  await withDryReveal(async () => {
     await withTempProjectsRoot(async ({ slug }) => {
       writeFixtureProject(slug, makeProject({ slug }));
       const res = await POST(new Request("http://localhost/reveal"), ctx(slug));
@@ -61,7 +59,7 @@ test("reveal route returns 200 for an existing project", async () => {
 });
 
 test("reveal route opens the assets folder", async () => {
-  await withMockReveal(async () => {
+  await withDryReveal(async () => {
     await withTempProjectsRoot(async ({ slug }) => {
       writeFixtureProject(slug, makeProject({ slug }));
       const res = await POST(

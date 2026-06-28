@@ -19,6 +19,9 @@ export function revealCommand(targetPath: string): {
 }
 
 export async function revealInFileManager(targetPath: string): Promise<void> {
+  if (process.env.OPENKLIP_TEST_REVEAL === "1") {
+    return;
+  }
   const { command, args } = revealCommand(targetPath);
   await execFileAsync(command, args, {
     env: process.env,
