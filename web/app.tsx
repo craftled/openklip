@@ -53,7 +53,6 @@ import { HeroTitleOverlay } from "@/components/hero-title-overlay";
 import { KeyboardHint } from "@/components/keyboard-hint";
 import { OverlaySortable } from "@/components/overlay-sortable";
 import { PLAYER_SPEEDS, PlayerControls } from "@/components/player-controls";
-import { TemplateSelect } from "@/components/template-select";
 import { Button } from "@/components/ui/button";
 import {
   Drawer,
@@ -1312,13 +1311,6 @@ export function App({
                           />
                         </DrawerContent>
                       </Drawer>
-                      <TemplateSelect
-                        onTemplateChange={(templateId) =>
-                          setProject((p) => ({ ...p, template: templateId }))
-                        }
-                        slug={project.slug}
-                        template={project.template}
-                      />
                     </div>
                     <div className="mx-auto w-full max-w-2xl">
                       <div
