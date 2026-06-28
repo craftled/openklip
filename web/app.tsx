@@ -41,6 +41,10 @@ import { withAssetKind } from "@/components/asset-bin";
 import { CinemaPlayer } from "@/components/cinema-player";
 import { EditTimeline } from "@/components/edit-timeline";
 import { EditorSidebarShortcuts } from "@/components/editor-sidebar-shortcuts";
+import {
+  ExportDialog,
+  type ExportDialogOptions,
+} from "@/components/export-dialog";
 import { HeroTitleOverlay } from "@/components/hero-title-overlay";
 import { KeyboardHint } from "@/components/keyboard-hint";
 import { OverlaySortable } from "@/components/overlay-sortable";
@@ -165,12 +169,15 @@ interface Project {
   captions?: { enabled: boolean; maxWords?: number };
   dirPath: string;
   durationSamples: number;
+  fps: number;
+  height: number;
   look?: { vignette: boolean };
   mediaVersion?: number;
   padMs: number;
   sampleRate: number;
   slug: string;
   source: string;
+  width: number;
   stills?: Array<{
     assetId: string;
     endSample: number;
@@ -886,7 +893,13 @@ export function App({
     []
   );
 
-  const onExport = async () => {
+  const onExport = async (options?: ExportDialogOptions) => {
+    const maxHeight = options?.maxHeight ?? (export1080 ? 1080 : undefined);
+    if (options?.resolution) {
+      setExport1080(
+        options.resolution === "1080" || options.resolution === "720"
+      );
+    }
     setExporting(true);
     setExportMsg(null);
     try {
@@ -894,10 +907,7 @@ export function App({
       if (saveErrorRef.current) {
         throw new Error(`Save failed: ${saveErrorRef.current}`);
       }
-      const r = await exportProject(
-        project.slug,
-        export1080 ? 1080 : undefined
-      );
+      const r = await exportProject(project.slug, maxHeight);
       setExportMsg(
         r.ok
           ? `Exported ${r.data.ranges} cuts @ ${r.data.height}p (${r.data.durationSec.toFixed(1)}s) to ${r.data.out}`
@@ -1161,15 +1171,24 @@ export function App({
                   </div>
                 </div>
                 <div className="ml-auto flex items-center gap-2">
-                  <Button
+                  <ExportDialog
+                    defaultResolution={export1080 ? "1080" : "4k"}
                     disabled={exportDisabled}
-                    onClick={onExport}
-                    size="sm"
-                    variant="secondary"
+                    durationSec={keptDuration}
+                    onExport={onExport}
+                    sourceFps={project.fps}
+                    sourceHeight={project.height}
+                    sourceWidth={project.width}
                   >
-                    <Download />
-                    {exportLabel}
-                  </Button>
+                    <Button
+                      disabled={exportDisabled}
+                      size="sm"
+                      variant="secondary"
+                    >
+                      <Download />
+                      {exportLabel}
+                    </Button>
+                  </ExportDialog>
                   <div className="flex items-center gap-0.5 rounded-lg border border-border bg-muted/50 p-0.5">
                     {(["landscape", "portrait", "square"] as Orientation[]).map(
                       (o) => (
