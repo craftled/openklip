@@ -5,7 +5,7 @@ import { test } from "node:test";
 import { GET, POST } from "../app/api/projects/[slug]/assets/route.ts";
 import { POST as SYNC_POST } from "../app/api/projects/[slug]/assets/sync/route.ts";
 import { FFMPEG } from "../src/ffmpeg.ts";
-import { orphanBrollAsset, TINY_PNG } from "./helpers/assetFixture.ts";
+import { brollClipFor, orphanBrollAsset, TINY_PNG } from "./helpers/assetFixture.ts";
 import {
   makeProject,
   withTempProjectsRoot,
@@ -124,7 +124,11 @@ test("POST /api/projects/:slug/assets/sync prunes orphan registrations outside a
   await withTempProjectsRoot(async ({ slug, root }) => {
     writeFixtureProject(
       slug,
-      makeProject({ slug, assets: [orphanBrollAsset()] })
+      makeProject({
+        slug,
+        assets: [orphanBrollAsset()],
+        broll: [brollClipFor("orphan")],
+      })
     );
     const assetsDir = join(root, "projects", slug, "assets");
     mkdirSync(assetsDir, { recursive: true });
@@ -138,11 +142,13 @@ test("POST /api/projects/:slug/assets/sync prunes orphan registrations outside a
     );
     const data = (await res.json()) as {
       assets?: { name: string }[];
+      broll?: unknown[];
       byKind?: { broll: unknown[] };
     };
     assert.equal(res.status, 200);
     assert.equal(data.assets?.length, 1);
     assert.equal(data.assets?.[0]?.name, "incoming.png");
+    assert.equal(data.broll?.length, 0);
     assert.equal(data.byKind?.broll.length, 0);
   });
 });

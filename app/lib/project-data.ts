@@ -17,8 +17,12 @@ export function formatDisplayPath(absPath: string): string {
 
 export async function loadEditorProject(slugParam?: string | null) {
   const slug = resolveSlug(slugParam);
-  // Keep the first paint aligned with the on-disk assets/ drop folder.
-  await syncAssetsFromFolder(slug);
+  try {
+    // Best-effort: keep first paint aligned with assets/ without blocking load.
+    await syncAssetsFromFolder(slug);
+  } catch {
+    // A bad drop, proxy build failure, or I/O error must not break the editor.
+  }
   const project = await loadProject(slug);
   const paths = projectPaths(slug);
   const mediaVersion = Math.round(statSync(paths.proxy).mtimeMs);

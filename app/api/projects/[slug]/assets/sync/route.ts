@@ -25,7 +25,9 @@ export async function POST(_req: NextRequest, { params }: RouteParams) {
     const project = await loadProject(slug);
     return Response.json({
       assets: project.assets,
+      broll: project.broll,
       byKind: listAssetsByKind(project.assets),
+      stills: project.stills ?? [],
     });
   } catch (e) {
     return Response.json({ error: (e as Error).message }, { status: 500 });

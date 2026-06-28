@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, mock, test } from "bun:test";
 import { loadEditorProject } from "../app/lib/project-data.ts";
 import { defaultFixtureOrphan } from "./helpers/assetFixture.ts";
 import {
@@ -26,6 +26,22 @@ describe("loadEditorProject", () => {
 
       const loaded = await loadEditorProject(slug);
       expect(loaded.assets).toHaveLength(0);
+    });
+  });
+
+  test("still loads the project when folder sync throws", async () => {
+    await withTempProjectsRoot(async ({ slug }) => {
+      writeFixtureProject(slug, makeProject({ slug, assets: [] }));
+      mock.module("@engine/asset-scanner", () => ({
+        syncAssetsFromFolder: async () => {
+          throw new Error("ffmpeg proxy build failed");
+        },
+      }));
+
+      const loaded = await loadEditorProject(slug);
+      expect(loaded.slug).toBe(slug);
+
+      mock.restore();
     });
   });
 });

@@ -69,21 +69,41 @@ function fmtDur(samples: number, sr: number): string {
   return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 }
 
-async function readUploadResponse(res: Response): Promise<{
-  assets?: BinAsset[];
-  error?: string;
-}> {
+async function readJsonResponse(res: Response): Promise<Record<string, unknown>> {
   const text = await res.text();
   try {
-    return JSON.parse(text) as { assets?: BinAsset[]; error?: string };
+    return JSON.parse(text) as Record<string, unknown>;
   } catch {
     const snippet = text.replace(/\s+/g, " ").trim().slice(0, 160);
     throw new Error(
       res.ok
-        ? "Upload returned an invalid response from the server"
-        : `Upload failed (${res.status})${snippet ? `: ${snippet}` : ""}`
+        ? "Server returned an invalid response"
+        : `Request failed (${res.status})${snippet ? `: ${snippet}` : ""}`
     );
   }
+}
+
+async function readUploadResponse(res: Response): Promise<{
+  assets?: BinAsset[];
+  error?: string;
+}> {
+  const data = await readJsonResponse(res);
+  return data as { assets?: BinAsset[]; error?: string };
+}
+
+function parseSyncResponse(res: Response, data: Record<string, unknown>): AssetBinUpdate | null {
+  if (!res.ok || !Array.isArray(data.assets)) {
+    return null;
+  }
+  return {
+    assets: (data.assets as BinAsset[]).map(withAssetKind),
+    broll: Array.isArray(data.broll)
+      ? (data.broll as AssetBinUpdate["broll"])
+      : undefined,
+    stills: Array.isArray(data.stills)
+      ? (data.stills as AssetBinUpdate["stills"])
+      : undefined,
+  };
 }
 
 function AssetBinRow({
@@ -190,9 +210,10 @@ export function AssetBin({
         `/api/projects/${encodeURIComponent(slug)}/assets/sync`,
         { method: "POST" }
       );
-      const data = await readUploadResponse(res);
-      if (res.ok && data.assets) {
-        onAssetsUpdated({ assets: data.assets.map(withAssetKind) });
+      const data = await readJsonResponse(res);
+      const update = parseSyncResponse(res, data);
+      if (update) {
+        onAssetsUpdated(update);
       }
     } catch {
       // folder sync is best-effort

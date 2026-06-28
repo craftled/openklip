@@ -364,9 +364,22 @@ export function AgentSidebar({
   // Real wiring: drive the selected Claude model (via `claude -p`) to find and
   // cut filler words on the live project.json, then refresh the editor.
   const onFindFiller = async () => {
-    const threadId = activeThreadId;
-    if (runningThreadId || !threadId) {
+    if (runningThreadId || !agentUsable || chatsLoading) {
       return;
+    }
+    let threadId = activeThreadId;
+    if (!threadId) {
+      try {
+        const ensured = await ensureThreadApi(activeSlug);
+        threadId = ensured.activeThreadId;
+        if (!threadId) {
+          return;
+        }
+        setThreads(ensured.threads);
+        setActiveThreadId(threadId);
+      } catch {
+        return;
+      }
     }
     setRunningThreadId(threadId);
     try {
@@ -543,15 +556,19 @@ export function AgentSidebar({
         />
         <Button
           className="h-8 w-full justify-start gap-2 px-2 text-sm"
-          disabled={runningThreadId !== null || !agentUsable}
+          disabled={
+            runningThreadId !== null || !agentUsable || chatsLoading
+          }
           onClick={onFindFiller}
           size="sm"
           title={
-            agentUsable
-              ? undefined
-              : activeStatus?.installed
-                ? `Sign in first : run: ${activeStatus.signInCmd}`
-                : `${providerLabel} CLI is not installed`
+            chatsLoading
+              ? "Loading chats…"
+              : agentUsable
+                ? undefined
+                : activeStatus?.installed
+                  ? `Sign in first : run: ${activeStatus.signInCmd}`
+                  : `${providerLabel} CLI is not installed`
           }
           variant="ghost"
         >
@@ -564,6 +581,9 @@ export function AgentSidebar({
           {(() => {
             if (runningThreadId !== null) {
               return `${providerLabel} is reading…`;
+            }
+            if (chatsLoading) {
+              return "Loading chats…";
             }
             if (!agentUsable) {
               return activeStatus?.installed
