@@ -141,6 +141,23 @@
   --zoom: oklch(0.676 0.184 75);
   --title: oklch(0.657 0.183 25);
 
+  /* Waveform visualizers (theme-aware; map to editor track hues) */
+  --waveform-agent: var(--broll);
+  --waveform-media: var(--zoom);
+
+  /* Brand blue scale (base: contrast-adjusted light-mode accent) */
+  --brand-50: oklch(0.95 0.024 256.14);
+  --brand-100: oklch(0.872 0.064 256.237);
+  --brand-200: oklch(0.794 0.106 256.358);
+  --brand-300: oklch(0.715 0.15 256.506);
+  --brand-400: oklch(0.636 0.197 256.68);
+  --brand-500: oklch(0.564 0.212 258.298);
+  --brand-600: oklch(0.486 0.182 258.298);
+  --brand-700: oklch(0.409 0.153 258.298);
+  --brand-800: oklch(0.331 0.124 258.298);
+  --brand-900: oklch(0.253 0.095 258.298);
+  --brand-950: oklch(0.176 0.066 258.298);
+
   --font-sans:
     var(--font-inter), "SF Pro Display", system-ui, -apple-system, sans-serif;
   --font-monospace:
@@ -218,6 +235,20 @@ html[data-theme-mismatch]::before {
   --color-broll: var(--broll);
   --color-zoom: var(--zoom);
   --color-title: var(--title);
+  --color-waveform-agent: var(--waveform-agent);
+  --color-waveform-media: var(--waveform-media);
+
+  --color-brand-50: var(--brand-50);
+  --color-brand-100: var(--brand-100);
+  --color-brand-200: var(--brand-200);
+  --color-brand-300: var(--brand-300);
+  --color-brand-400: var(--brand-400);
+  --color-brand-500: var(--brand-500);
+  --color-brand-600: var(--brand-600);
+  --color-brand-700: var(--brand-700);
+  --color-brand-800: var(--brand-800);
+  --color-brand-900: var(--brand-900);
+  --color-brand-950: var(--brand-950);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-accent-foreground: var(--accent-foreground);

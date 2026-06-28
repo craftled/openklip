@@ -7,14 +7,18 @@ import {
 } from "@/components/agents-ui/agent-audio-visualizer-wave";
 import { useMediaAudioVisualizerWave } from "@/hooks/use-media-audio-visualizer-wave";
 import { useMediaElementVolume } from "@/hooks/use-media-element-volume";
+import { useThemeColorHex } from "@/hooks/use-theme-color-hex";
 import { cn } from "@/lib/utils";
+
+/** SSR fallback: openklip default zoom track amber */
+const WAVEFORM_MEDIA_FALLBACK = "#d78100";
 
 export function MediaAudioVisualizerWave({
   mediaRef,
   active = true,
   size = "md",
   state = "speaking",
-  color = "#FA954C",
+  color,
   colorShift = 0.3,
   lineWidth = 2,
   blur = 0.5,
@@ -42,6 +46,12 @@ export function MediaAudioVisualizerWave({
     volume,
   });
 
+  const themeColor = useThemeColorHex(
+    "--waveform-media",
+    WAVEFORM_MEDIA_FALLBACK
+  );
+  const resolvedColor = (color ?? themeColor) as `#${string}`;
+
   const resolvedLineWidth = useMemo(() => {
     switch (size) {
       case "icon":
@@ -61,7 +71,7 @@ export function MediaAudioVisualizerWave({
         "mask-[linear-gradient(90deg,transparent_0%,black_20%,black_80%,transparent_100%)]",
         className
       )}
-      color={color}
+      color={resolvedColor}
       colorShift={colorShift}
       frequency={frequency}
       lineWidth={resolvedLineWidth}

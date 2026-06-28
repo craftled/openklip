@@ -58,7 +58,6 @@ function MusicPreview({ src }: { src: string }) {
         <MediaAudioVisualizerWave
           active={playing}
           className="mx-auto aspect-square size-auto h-full max-h-[min(56%,120px)] w-full max-w-[85%]"
-          color="#FA954C"
           colorShift={0.3}
           lineWidth={2}
           mediaRef={audioRef}

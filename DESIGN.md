@@ -61,13 +61,27 @@ Typography (Inter Variable, weights 510/590, cv01+ss03, opsz auto) is identical 
 
 ### Primary (system blue, CTAs only)
 
+Lightness is nudged down from Apple system blue so white label text passes WCAG AA normal text (4.5:1). Chroma and hue unchanged.
+
 | Mode | Token | Value | Usage |
 | --- | --- | --- | --- |
-| Light | `--accent` / `--primary` | `oklch(0.603 0.218 257.4)` (#007AFF) | Export, Create, Send, Confirm |
-| Dark | `--accent` / `--primary` | `oklch(0.624 0.206 255.5)` (#0A84FF) | Same |
+| Light | `--accent` / `--primary` | `oklch(0.575 0.218 257.4)` (~#0071f5) | Export, Create, Send, Confirm |
+| Dark | `--accent` / `--primary` | `oklch(0.57 0.206 255.5)` (~#0072ec) | Same |
 | Both | `--primary-foreground` | `oklch(1 0 0)` | Text on primary buttons |
 
 Secondary, ghost, and nav items stay grey. Do not route accent into borders, rings, or selected nav states.
+
+### Brand blue scale (50-950)
+
+Derived from the light-mode accent via OKLCH palette algorithm (`src/color.ts`). Static tokens in `app/theme-base.css`; Tailwind classes `bg-brand-500`, `text-brand-700`, etc.
+
+| Step | OKLCH |
+| --- | --- |
+| 50 | `oklch(0.95 0.024 256.14)` |
+| 500 | `oklch(0.564 0.212 258.298)` |
+| 950 | `oklch(0.176 0.066 258.298)` |
+
+Full ladder: `--brand-50` through `--brand-950` in `app/theme-base.css`.
 
 ### Semantic (UI status)
 
@@ -91,6 +105,17 @@ Timeline and inspector clips use Radix step 9-10 equivalents from oklch.fyi. Fun
 | Title | `oklch(0.657 0.183 25)` | [Tomato](https://oklch.fyi/color-palettes/tomato) step 9 |
 
 Defined in `themes/openklip.json` (`editor` block) and `app/theme-base.css` fallbacks. Alternate theme presets (Catppuccin, Nord, etc.) may override; default skin follows the table above.
+
+### Waveform visualizers (theme-aware)
+
+Shader waveforms resolve editor track hues at runtime, not hard-coded hex.
+
+| Token | Maps to | Usage |
+| --- | --- | --- |
+| `--waveform-agent` | `var(--broll)` | Agent audio visualizer (cyan) |
+| `--waveform-media` | `var(--zoom)` | Music/asset preview visualizer (amber) |
+
+Resolved client-side via `useThemeColorHex` (`web/hooks/use-theme-color-hex.ts`). SSR fallbacks: `#00a0c1` (broll), `#d78100` (zoom).
 
 ## Spacing
 
@@ -128,7 +153,7 @@ Defined in `themes/openklip.json` (`editor` block) and `app/theme-base.css` fall
 ## Theme Architecture
 
 - **Stack:** shadcn/ui v4 (new-york) + Tailwind v4 + Radix primitives
-- **Presets:** JSON files in `themes/*.json`, injected by theme engine into `#openklip-theme-vars`
+- **Presets:** JSON files in `themes/*.json` (all semantic colors in `oklch()`), injected by theme engine into `#openklip-theme-vars`
 - **Default preset:** `openklip` (monochrome + system blue)
 - **Token dialect:** Prefer semantic tokens (`border-border`, `bg-secondary`) in components; `foreground-N` mixes for editor-specific tints
 
@@ -147,7 +172,9 @@ Defined in `themes/openklip.json` (`editor` block) and `app/theme-base.css` fall
 | 2026-06-28 | Initial design system | `/design-consultation`: agent-native builder posture, memorable thing "blue only when it matters" |
 | 2026-06-28 | Inter retained | User preference; matches ChatGPT-adjacent monochrome shell |
 | 2026-06-28 | Saturated OKLCH track colors | Radix palettes from oklch.fyi (green/cyan/amber/tomato steps 9-10) for timeline scanability |
-| 2026-06-28 | System blue primary only | #007AFF / #0A84FF on primary CTAs; grey everything else in chrome |
+| 2026-06-28 | System blue primary only | System-blue family on primary CTAs only; grey everything else in chrome |
+| 2026-06-28 | OKLCH color system | All theme presets and UI tokens in oklch(); brand 50-950 scale; waveform colors theme-aware |
+| 2026-06-28 | Primary L contrast pass | Accent L lowered (0.575 light / 0.57 dark) for WCAG AA white-on-blue button text |
 | 2026-06-28 | Linear-style typography | Inter Variable, weights 510/590, cv01+ss03, opsz auto, 1.6 leading, JetBrains Mono for code |
 | 2026-06-28 | Light/dark chrome parity | OKLCH surface ladder, text hierarchy tokens, Linear-aligned base fg/bg, shared overlay |
 | 2026-06-28 | Phosphor fill icons | Solid glyphs at 55% `--icon-foreground` soften monochrome chrome vs Lucide strokes; buttons inherit parent color |
