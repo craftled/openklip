@@ -4,6 +4,25 @@ Use these bodies when publishing releases. Each section matches a tag in `CHANGE
 
 ---
 
+## v0.6.2
+
+**Sidebar UX: asset fidelity, project lifecycle, chat previews.**
+
+### Highlights
+- Asset bin reconciles with `assets/` on sync and page load (prunes stale registrations and timeline overlays)
+- Hover delete for assets and projects (double confirmation)
+- Chat preview cards and in-progress spinner on chat rows
+- Reveal project or assets folder in Finder from the sidebar
+- “Create new project” copy and empty-state landing when no projects exist
+- Page load and find-filler edge cases hardened (best-effort sync, chats loading)
+
+### Known gaps
+- Write locks are in-process only. Concurrent CLI + server writes on the same slug still need OS-level file locking.
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#062---2026-06-28)
+
+---
+
 ## v0.6.1
 
 **Reliability pass after the 0.6.0 editor shell refresh.**
@@ -13,7 +32,6 @@ Use these bodies when publishing releases. Each section matches a tag in `CHANGE
 - Atomic `chats.json` writes; corrupt files backed up instead of silently wiped
 - Re-ingest guard: `openklip ingest --force` required to overwrite an existing project
 - Asset folder sync moved to `POST /api/projects/:slug/assets/sync` (GET is read-only)
-- Asset bin reconciles with `assets/` on sync and page load (prunes external or missing registrations)
 - Sidebar asset bin no longer horizontal-scrolls on long filenames
 
 ### Known gaps

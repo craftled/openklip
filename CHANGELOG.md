@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.6.2 - 2026-06-28
+
+Sidebar UX pass: asset bin fidelity, project lifecycle in the switcher, chat previews, and polish from PR #11.
+
+### Added
+- **Chat preview cards** on hover (`ChatPreviewRow`): title, project path, source video, edit stats, and message count.
+- **In-progress chat indicator** — subtle spinner before the title while an agent run is active.
+- **Project and assets folder actions** — reveal `projects/<slug>/` or `assets/` in Finder from the switcher and Assets heading (`POST /api/projects/:slug/reveal`).
+- **Asset delete in sidebar** — hover trash with double confirmation; `DELETE /api/projects/:slug/assets/:assetId` prunes timeline overlays.
+- **Project delete in switcher** — hover trash with double confirmation; `DELETE /api/projects/:slug` removes the project folder and switches to the next project.
+- **Empty projects landing** when no projects exist, with **Create new project** (video picker) instead of “Ingest video”.
+
+### Fixed
+- **Asset bin matches the drop folder.** Folder sync and page load prune registrations whose `src` is outside `projects/<slug>/assets/` or no longer exists on disk, and drop b-roll/still overlays that referenced them. Sync API returns updated `broll`/`stills` so client state stays in sync.
+- **Page load survives sync errors.** `loadEditorProject` treats folder sync as best-effort so a bad drop or proxy build does not break the editor.
+- **Find filler while chats load.** Button shows “Loading chats…” and disabled state; auto-ensures a thread if none is active when clicked.
+- **SSR keyboard hints** — `useModShortcut` avoids hydration mismatch for ⌘ vs Ctrl labels.
+
 ## 0.6.1 - 2026-06-28
 
 Reliability pass after the 0.6.0 editor shell refresh: serialize server-side writes, harden chats persistence, and fix sidebar layout.
@@ -14,8 +32,6 @@ Reliability pass after the 0.6.0 editor shell refresh: serialize server-side wri
 - **Stills from outside `assets/` are copied in.** External still originals copy into `assets/` instead of storing a fragile `../../…` relative proxy.
 - **Re-ingest no longer silently wipes an existing project.** `ingest` refuses when `project.json` already exists unless `--force` (CLI) or `?force=1` (upload API returns 409 Conflict).
 - **Folder sync is POST, not a mutating GET.** `POST /api/projects/:slug/assets/sync` registers files dropped into `assets/`; `GET /assets` is read-only.
-- **Asset bin matches the drop folder.** Folder sync and page load prune registrations whose `src` is outside `projects/<slug>/assets/` or no longer exists on disk, and drop timeline overlays that referenced them.
-- **Project delete in switcher.** Hover a project row to reveal trash; click once for “Delete?”, again to confirm. Removes the project folder from disk and switches to the next project.
 
 ## 0.6.0 - 2026-06-26
 
