@@ -2,7 +2,11 @@
 
 import { useAgentChat } from "@/components/agent-chat-context";
 import { AgentPromptInput } from "@/components/agent-prompt-input";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Conversation,
+  ConversationContent,
+  ConversationScrollButton,
+} from "@/components/ai-elements/conversation";
 import { AgentProviderIcon } from "@/lib/agent-icons";
 import { getAgentModelLabel } from "@/lib/agent-preferences";
 import type { AssetBinUpdate } from "@/lib/asset-bin-update";
@@ -46,8 +50,8 @@ export function AgentChatPanel({ onAssetsUpdated, slug }: AgentChatPanelProps) {
           </div>
         </div>
 
-        <ScrollArea className="min-h-0 flex-1">
-          <div className="flex w-full flex-col gap-2 px-6 py-4 text-left">
+        <Conversation className="min-h-0 flex-1">
+          <ConversationContent className="gap-2 px-6 py-4 text-left">
             {chatsLoading && (
               <p className="text-sm text-tertiary">Loading chats…</p>
             )}
@@ -65,7 +69,7 @@ export function AgentChatPanel({ onAssetsUpdated, slug }: AgentChatPanelProps) {
                   "rounded-lg px-3 py-2.5 text-ui leading-relaxed",
                   m.role === "user"
                     ? "bg-user-message-bubble text-foreground"
-                    : "bg-transparent text-secondary"
+                    : "bg-transparent text-foreground"
                 )}
                 key={m.id}
               >
@@ -77,8 +81,9 @@ export function AgentChatPanel({ onAssetsUpdated, slug }: AgentChatPanelProps) {
                 </pre>
               </div>
             ))}
-          </div>
-        </ScrollArea>
+          </ConversationContent>
+          <ConversationScrollButton />
+        </Conversation>
 
         <div className="shrink-0 border-border border-t px-6 py-4">
           <AgentPromptInput
