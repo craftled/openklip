@@ -4,7 +4,7 @@
 
 OpenKlip is a lean, local-first **agent-native video toolchain**: external agents drive the edit loop via CLI; humans review in the browser. Both read/write the same `project.json` on disk.
 
-**Current release:** v0.8.2.0 (2026-06-28). Working local editor: cut → captions → b-roll → vignette → push-in zoom → titles → export; cinema player; center chat panel with skills slash menu; MCP agent tools (35 tools); edit templates; Linear-style UI (Inter Variable + OKLCH); export dialog; macOS workspace folder picker; multi-agent filler cuts; sidebar asset bin with folder sync; 387 tests; MIT.
+**Current release:** v0.8.5.0 (2026-06-28). Working local editor: cut → captions → b-roll → vignette → push-in zoom → titles → export; cinema player; resizable right chat sidebar with Claude MCP edits; asset cards (`openklip analyze` + **Describe assets**); skills slash menu; MCP agent tools (35 tools); edit templates; Linear-style UI (Inter Variable + OKLCH, Phosphor fill icons); export dialog; macOS workspace folder picker; multi-agent filler cuts; sidebar asset bin with folder sync; 411 tests; MIT.
 
 Preview cuts get a Glimm WebGL sweep in the browser; exported MP4s still hard-cut until the ffmpeg transition graph lands.
 
@@ -48,6 +48,10 @@ Preview cuts get a Glimm WebGL sweep in the browser; exported MP4s still hard-cu
 - [x] **Edit templates + brand presets** (`templates/`, `openklip template set`, `openklip brand`; PR #14)
 - [x] **Empty workspace + project create flow** (folder picker landing, new-project dialog, Sonner toasts; PR #14)
 - [x] **Linear UI refactor v0.8.1–v0.8.2** (DESIGN.md, semantic `text-tertiary`/`bg-surface-*` tokens, timeline track colors, CTA hierarchy)
+- [x] **Agentic chat edits (Claude)** (MCP-loaded chat applies cut/zoom/b-roll/title/export; non-Claude agents stay read-only or CLI-answer; v0.8.5)
+- [x] **Resizable chat sidebar** (full-height right column, drag handle 340–760px, localStorage persistence; v0.8.5)
+- [x] **Asset cards / analyze assets** (`src/asset-cards.ts`, `openklip analyze`, GUI **Describe assets** button; v0.8.5)
+- [x] **Phosphor fill icons** (`@phosphor-icons/react` via `web/lib/icon.tsx`; v0.8.5)
 
 ## Architecture & Key Decisions
 
@@ -140,8 +144,8 @@ Single list of current gaps (code is truth). README and release notes point here
 ### Agent & chat
 
 - OpenKlip ships **no bundled LLM** for the core edit loop; external agent, MCP, or manual CLI drives mutations.
-- Skills chat routes intent to suggested CLI command sequences; it does not execute them in-process (except **Find filler**, which shells out to the selected agent CLI).
-- **Find filler** needs the chosen agent CLI on PATH and signed in; Cursor requires one-time `cursor-agent login`.
+- **Claude chat edits** load the openklip MCP server and mutate `project.json` in-process. Other agents answer via CLI or return read-only hints; skills slash menu still routes to suggested command sequences.
+- **Find filler** and **Describe assets** shell out to the selected agent CLI; needs that CLI on PATH and signed in. Cursor requires one-time `cursor-agent login`.
 
 ### Design & UI (non-blocking polish)
 

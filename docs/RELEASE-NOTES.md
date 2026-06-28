@@ -4,6 +4,27 @@ Use these bodies when publishing releases. Each section matches a tag in `CHANGE
 
 ---
 
+## v0.8.5
+
+**Chat does edits, not advice: Claude MCP mutations, resizable sidebar, asset cards, Phosphor icons.**
+
+### Highlights
+- With Claude selected, chat loads the openklip MCP server and applies cut/zoom/b-roll/title/export directly (one-line confirmation, not CLI instructions)
+- Resizable right chat column (340–760px, persisted); Properties/Settings sit below the preview
+- **Describe assets** in the asset bin or `openklip analyze <slug>` writes per-asset cards (summary, tags, bestFor) for meaning-based placement
+- Phosphor fill icons across the editor shell via `web/lib/icon.tsx`
+
+### Fixed
+- Assistant chat text used the wrong `text-secondary` token (invisible on dark surfaces)
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations) for the full list (current).
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#085---2026-06-28)
+
+---
+
 ## v0.8.2
 
 **Linear-style UI refactor: semantic tokens, CTA hierarchy, timeline track colors.**

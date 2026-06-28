@@ -6,8 +6,8 @@ Chat does edits, not advice; editor layout puts chat in a resizable right column
 
 ### Added
 - **Agentic chat edits**: for Claude, free-text chat now loads the openklip MCP server and calls the edit tools (cut, zoom, b-roll, title, template, export) to DO the edit, replying with a one-line confirmation instead of CLI instructions. Verified end-to-end (a chat "add a push-in zoom on hello world" wrote the zoom to project.json). Non-Claude agents fall back to a read-only answer.
-- **Resizable chat sidebar**: chat lives in a full-height right column, drag-adjustable (340–760px) via an edge handle, persisted to localStorage, keyboard-accessible.
-- **Asset cards / Analyze assets**: per-asset subagent descriptions so the editing agent places media by meaning (`src/asset-cards.ts`, `analyze-assets-button.tsx`, `analyzeProjectAssets` action).
+- **Resizable chat sidebar**: chat lives in a full-height right column; drag the edge handle to resize (340–760px), width persists in localStorage, keyboard-accessible.
+- **Asset cards / Analyze assets**: click **Describe assets** in the asset bin or run `openklip analyze <slug>` to fan out per-asset subagents that write summary, tags, and bestFor onto each b-roll/still so the editing agent places media by meaning.
 - **Phosphor fill icons**: replaced Lucide stroke icons with `@phosphor-icons/react` (fill weight) via a shared `web/lib/icon.tsx` wrapper across the editor shell.
 
 ### Changed

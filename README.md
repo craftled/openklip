@@ -29,7 +29,7 @@ These follow from how the repo is actually built:
 
 **Same file, two surfaces.** The CLI applies edits through `runAction()` in `src/registry.ts`. The GUI applies edits through Next.js server actions in `app/actions.ts` (via `mutateProject()` for serialized read-modify-write). Both persist to the same `project.json`. Reload the browser after external CLI edits.
 
-**Agent-native, not agent-bundled.** No in-app LLM for the core loop. The agent sidebar can shell out to Claude Code, Codex, Cursor, or Grok for "Find filler" (`src/agent-driver.ts`), or map chat text to suggested `openklip …` command sequences (`web/lib/skill-router.ts`). Or run `bun run agent-demo`.
+**Agent-native, not agent-bundled.** No in-app LLM for the core loop. With Claude selected, chat loads the openklip MCP server and applies edits directly (cut, zoom, b-roll, title, export). Other agents get live CLI answers or skill-router hints. "Find filler" and "Describe assets" shell out to the selected agent CLI (`src/agent-driver.ts`). Or run `bun run agent-demo`.
 
 **Sample-accurate time.** Word and overlay times are stored as integer samples at 48 kHz. CLI commands take seconds for human-facing spans and convert internally.
 
@@ -69,13 +69,15 @@ Agent sidebar chats use `working/chats.json`, not `localStorage` (theme and defa
 
 ## What works today
 
-Verified against the current codebase (387 tests, v0.8.2.0):
+Verified against the current codebase (411 tests, v0.8.5.0):
 
 - **Ingest**: video → local transcript + preview proxy + `project.json` (`openklip ingest`; refuses re-ingest unless `--force`)
 - **Transcript editing**: click words to toggle `deleted`; `openklip cut` / `cut --text` / `restore` on CLI
 - **Bounded transcript reads**: `openklip transcript grep`, `span`, `phrase` for agent discovery without dumping full transcripts
 - **Preview**: all-intra proxy; scheduler plays kept ranges only; compact center column (`max-w-2xl`)
-- **Center panel**: Chat (agent threads + prompt input, `/` skills menu, inline skill tokens) or Transcript toggle; timeline in a bottom drawer
+- **Editor layout**: Resizable right chat sidebar (340–760px, persisted); center column is preview with Properties/Settings below video; transcript toggle; timeline in a bottom drawer
+- **Agent chat**: `/` skills menu, inline skill tokens; Claude applies edits via MCP; other agents answer or suggest commands
+- **Asset cards**: `openklip analyze` or **Describe assets** in the asset bin runs per-asset subagents that write summary/tags/bestFor onto each b-roll/still so agents place media by meaning
 - **Cinema player**: fullscreen overlay with Linear-parity transport bar (`web/components/cinema-player.tsx`, `player-controls.tsx`)
 - **Preview cut transitions**: Glimm WebGL sweep when `prefers-reduced-motion` is not set
 - **Captions**: preview overlay + ASS burn-in on export
@@ -87,7 +89,7 @@ Verified against the current codebase (387 tests, v0.8.2.0):
 - **MCP server**: `openklip mcp` (stdio) exposes 35 tools with CLI/GUI parity; `.cursor/mcp.json` wired for Cursor
 - **Edit templates**: `templates/<id>/skill.md` playbooks; `openklip template set`; brand presets at ingest (`openklip brand`)
 - **Agent selector**: drive filler cuts via Claude Code, Codex, Cursor, or Grok subscription CLIs
-- **Design system**: Linear-style Inter Variable + OKLCH surfaces ([DESIGN.md](./DESIGN.md)); swappable theme presets with light/dark scheme
+- **Design system**: Linear-style Inter Variable + OKLCH surfaces ([DESIGN.md](./DESIGN.md)); Phosphor fill icons via `web/lib/icon.tsx`; swappable theme presets with light/dark scheme
 - **Agent demo**: `bun run agent-demo` (phrase list → cut → status → optional export)
 
 Phrase-based cutting is CLI/MCP-only today (`openklip cut --text`). The transcript UI is word click, not phrase search. First project on a machine: use `openklip ingest` from the CLI, or pick a folder in the GUI (macOS) that already contains ingested projects. Known gaps: **[TODO.md](./TODO.md)**.
