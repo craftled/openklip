@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.8.3 - 2026-06-28
+
+Workspace folder is user-chosen; the repo is no longer used as scratch.
+
+### Changed
+- **Projects root fallback**: defaults to `~/Movies/OpenKlip` (macOS video convention, matching iMovie/Final Cut) instead of `./projects` inside the repo. Resolution order unchanged: `OPENKLIP_PROJECTS_ROOT` → GUI-picked folder (`.openklip/projects-root`) → `~/Movies/OpenKlip`.
+
+### Removed
+- **In-repo `projects/` folder**: deleted the bundled scratch directory and dropped its `.gitignore` entry; project data now lives outside the repo.
+
 ## 0.8.2 - 2026-06-28
 
 Full Linear-style UI refactor: semantic tokens wired through components, CTA hierarchy enforced, timeline colors aligned.

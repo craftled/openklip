@@ -14,7 +14,7 @@ Each project lives as plain files under `projects/<slug>/` in a layered layout. 
 
 1. `OPENKLIP_PROJECTS_ROOT` if set
 2. else `.openklip/projects-root` in the app cwd (GUI folder picker)
-3. else `./projects`
+3. else `~/Movies/OpenKlip`
 
 ```
 projects/<slug>/

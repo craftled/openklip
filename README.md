@@ -39,11 +39,11 @@ These follow from how the repo is actually built:
 
 ## Project layout
 
-Default root: `./projects` under the app cwd. Resolution order:
+The user picks the projects folder in the GUI. Resolution order:
 
 1. `OPENKLIP_PROJECTS_ROOT` environment variable
 2. `.openklip/projects-root` (one line, absolute path; set by the GUI folder picker)
-3. `./projects`
+3. `~/Movies/OpenKlip` (fallback for the CLI and pre-pick cases)
 
 ```text
 projects/<slug>/

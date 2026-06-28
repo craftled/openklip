@@ -48,7 +48,7 @@ function projectsRootCheck(): DoctorCheck {
   const root = projectsRoot();
   return existsSync(root)
     ? check("projects-root", "ok", root)
-    : check("projects-root", "warn", `no projects/ yet: ${root}`);
+    : check("projects-root", "warn", `projects root not created yet: ${root}`);
 }
 
 function relPath(dir: string, p: string): string {

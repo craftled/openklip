@@ -1,8 +1,10 @@
+import { homedir } from "node:os";
 import { basename, extname, join, resolve } from "node:path";
 import { readConfiguredProjectsRoot } from "./workspace-config.ts";
 
 // Parent directory containing project folders (each subdir with project.json).
-// Override with OPENKLIP_PROJECTS_ROOT to use any folder on disk.
+// The user picks this folder in the GUI; the fallback lives in the user's home
+// (never inside the repo) for the CLI and pre-pick cases.
 export function projectsRoot(): string {
   const env = process.env.OPENKLIP_PROJECTS_ROOT;
   if (env) {
@@ -12,7 +14,7 @@ export function projectsRoot(): string {
   if (configured) {
     return configured;
   }
-  return resolve(process.cwd(), "projects");
+  return join(homedir(), "Movies", "OpenKlip");
 }
 
 // A slug names a directory directly under projects/. Validate before any path
