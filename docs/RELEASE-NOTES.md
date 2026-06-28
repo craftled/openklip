@@ -56,7 +56,7 @@ Use these bodies when publishing releases. Each section matches a tag in `CHANGE
 
 ### Highlights
 - Multi-agent driver shells out to installed coding-agent CLIs (no API keys)
-- "Find filler with &lt;agent&gt;" server action cuts filler words into `project.json`
+- "Find filler with <agent>" server action cuts filler words into `project.json`
 - Connection detection with Signed in / Sign in / Not installed badges per provider
 
 **Full changelog:** [CHANGELOG.md](../CHANGELOG.md#040---2026-06-26)
