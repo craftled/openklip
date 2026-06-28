@@ -28,7 +28,7 @@ Preview cuts get a Glimm WebGL sweep in the browser; exported MP4s still hard-cu
 - [x] **Agent peer - CLI primitives** (`transcript`, `cut`, `cut --text`, `restore`, `broll-add`, `broll-rm`, `captions`, `status`, `export`)
 - [x] **Agent peer - full GUI parity CLI** (`list`, `assets`, zoom/title/broll set commands, look, pad, captions-max)
 - [x] **Agent peer - agent-loop demo** (`bun run agent-demo`, composes primitives from a phrase list)
-- [x] **Agent peer - CLAUDE.md agent skill + pure `actions.ts`** (full GUI/agent parity on the same `project.json`)
+- [x] **Agent peer - AGENTS.md agent skill + pure `actions.ts`** (full GUI/agent parity on the same `project.json`)
 - [x] **Unified action registry** (`src/registry.ts`: one Zod-schema'd definition per `project.json` mutation; CLI routes every edit command through `runAction`; `openklip actions [--json] [--surface]` prints the capability manifest)
 - [x] **Multi-agent driver** (Claude Code, Codex, Cursor, Grok via `src/agent-driver.ts`; "Find filler" in the editor)
 - [x] **Cinema player + Linear-parity transport bar** (`cinema-player.tsx`, `player-controls.tsx`)
@@ -115,4 +115,4 @@ Preview cuts get a Glimm WebGL sweep in the browser; exported MP4s still hard-cu
 
 ## README policy
 
-**README = what exists in code today.** Philosophy/principles should describe implemented behavior. Roadmap, aspirations, and "post-MVP" items belong in this file only.
+See **AGENTS.md** (Project rules → README policy). Roadmap items stay in this file only.

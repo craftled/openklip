@@ -226,7 +226,7 @@ Add optional `openklip doctor` (ffmpeg, whisper cache, proxy health) and stricte
 
 **Discuss:**
 - [ ] `openklip doctor` scope: deps only, or per-project health too?
-- [ ] Ship HyperFrames skills as optional companion (`npx skills add …`) vs extend `CLAUDE.md` only?
+- [ ] Ship HyperFrames skills as optional companion (`npx skills add …`) vs extend `AGENTS.md` only?
 
 ---
 
@@ -394,7 +394,7 @@ ingesters/<id>/ingester.ts     # script
 
 ### Agent
 
-7. **Skills:** Extend `CLAUDE.md` only, or also publish OpenKlip skills via `npx skills add`?
+7. **Skills:** Extend `AGENTS.md` only, or also publish OpenKlip skills via `npx skills add`?
 8. **`openklip doctor`:** What checks matter for support/debug?
 
 ### UX
@@ -424,7 +424,7 @@ If we agree to proceed incrementally:
 - HyperFrames: https://github.com/heygen-com/hyperframes
 - HyperFrames skills: `npx skills add heygen-com/hyperframes`
 - OpenKlip roadmap: `TODO.md`
-- OpenKlip agent skill: `CLAUDE.md`
+- OpenKlip agent skill: `AGENTS.md`
 
 ---
 

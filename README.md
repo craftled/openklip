@@ -122,7 +122,7 @@ Deterministic script:
 bun run agent-demo <slug> --phrases scripts/example-phrases.txt --export
 ```
 
-Command reference: **[CLAUDE.md](./CLAUDE.md)**. Registry manifest: `openklip actions --json`.
+Command reference: **[AGENTS.md](./AGENTS.md)**. Registry manifest: `openklip actions --json`.
 
 ---
 

@@ -344,7 +344,7 @@ export function actionManifest(surface?: Surface): ActionManifestEntry[] {
 }
 
 // Render the registry as a Markdown table : the generatable replacement for the
-// hand-maintained capability map in CLAUDE.md.
+// hand-maintained capability map in AGENTS.md.
 export function actionTable(surface?: Surface): string {
   const rows = actions
     .filter((a) => !surface || a.surfaces.includes(surface))
