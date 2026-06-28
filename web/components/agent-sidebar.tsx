@@ -29,6 +29,7 @@ import {
   SidebarSeparator,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { useInboxWatch } from "@/hooks/use-inbox-watch";
 import { useModShortcut } from "@/hooks/use-mod-shortcut";
 import {
   type AgentModelId,
@@ -47,7 +48,10 @@ import {
   Settings2,
 } from "@/lib/icon";
 import type { ProjectHoverContext } from "@/lib/project-context";
-import { createProjectFromVideo } from "@/lib/project-create";
+import {
+  createProjectFromVideo,
+  type IngestProgressView,
+} from "@/lib/project-create";
 import type { ProjectListing } from "@/lib/project-list";
 import { deleteProjectApi } from "@/lib/projects-client";
 import { relativeTimeShort } from "@/lib/relative-time";
@@ -126,9 +130,15 @@ export function AgentSidebar({
   );
 
   const onCreateProject = useCallback(
-    (file: File) => createProjectFromVideo(file),
+    (file: File, onProgress: (p: IngestProgressView) => void) =>
+      createProjectFromVideo(file, onProgress),
     []
   );
+
+  // Folder-watch: a video dropped into the projects root auto-ingests; refresh
+  // the project list when one completes so it shows up in the switcher.
+  const onInboxIngested = useCallback(() => router.refresh(), [router]);
+  useInboxWatch(onInboxIngested);
 
   const onDeleteProject = useCallback(
     async (slug: string) => {

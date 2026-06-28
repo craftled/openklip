@@ -18,6 +18,7 @@ import { analyzeAssets, assetCardLines } from "@engine/asset-cards";
 import { projectsRoot } from "@engine/paths";
 import { loadProject, mutateProject } from "@engine/projectStore";
 import { analyzeSceneLog, sceneLogLines } from "@engine/scene-log";
+import { type VerifyReport, verifyCut, verifyVerdict } from "@engine/verify";
 
 // Re-export the type from source (type-only, never emits runtime code) so client
 // components import it from here without pulling the server-only driver into their
@@ -128,6 +129,22 @@ async function analyzeProjectSceneLog(
     }
   });
   return true;
+}
+
+export type VerifyReply =
+  | { ok: true; report: VerifyReport; verdict: string }
+  | { ok: false; error: string };
+
+// The verify loop: re-transcribe the rendered cut (output/out.mp4) and check it
+// against the EDL. Read-only; requires an export to exist. Returns the report
+// and a one-line verdict for the toast.
+export async function verifyProjectCut(slug: string): Promise<VerifyReply> {
+  try {
+    const report = await verifyCut(slug);
+    return { ok: true, report, verdict: verifyVerdict(report) };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
 }
 
 export type ChatReply =

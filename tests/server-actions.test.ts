@@ -6,6 +6,7 @@ import {
   saveBroll,
   saveLook,
   saveProjectEdits,
+  saveStills,
   saveTitles,
   saveZooms,
 } from "../app/actions.ts";
@@ -74,6 +75,42 @@ test("saveBroll ignores unknown asset ids", async () => {
     if (result.ok) {
       assert.equal(result.data.broll.length, 0);
     }
+  });
+});
+
+test("saveStills persists clamped still overlays", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    const project = makeProject({
+      slug,
+      assets: [
+        {
+          id: "shot1",
+          kind: "still",
+          name: "shot1.png",
+          src: "/tmp/shot1.png",
+          proxy: "working/assets/shot1.png",
+          durationSamples: 48_000 * 5,
+        },
+      ],
+    });
+    writeFixtureProject(slug, project);
+    const result = await saveStills(slug, [
+      {
+        id: "s1",
+        assetId: "shot1",
+        startSample: 0,
+        endSample: 96_000,
+        scale: 1.2,
+        focusX: 0.5,
+        focusY: 0.5,
+      },
+    ]);
+    assert.equal(result.ok, true);
+    if (result.ok) {
+      assert.equal(result.data.stills.length, 1);
+    }
+    const loaded = await loadProject(slug);
+    assert.equal(loaded.stills?.length, 1);
   });
 });
 

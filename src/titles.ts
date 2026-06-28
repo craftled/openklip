@@ -4,6 +4,37 @@
 // brace-stripping escape, and a color->&HBBGGRR& colour helper.
 
 import { colorToHex } from "./color.ts";
+import { type Motion, MotionSchema } from "./edl.ts";
+
+// Resolve the speed-scaled entrance timing from the motion config. Pure, so the
+// "make it snappier" math is unit tested. Higher speed → shorter durations.
+export function resolveTitleMotion(motion: Motion): {
+  fadeMs: number;
+  heroFadeMs: number;
+} {
+  const scale = (ms: number) => Math.max(0, Math.round(ms / motion.speed));
+  return {
+    fadeMs: scale(motion.fadeMs),
+    heroFadeMs: scale(motion.heroFadeMs),
+  };
+}
+
+// The ASS override tags for a title's entrance, driven by the motion config.
+// Lower thirds slide up into place over the fade-in window; hero/center fade.
+export function titleMotionTags(
+  kind: "center" | "hero" | "lower",
+  motion: Motion,
+  geom: { baseY: number; cx: number; slidePx: number }
+): string {
+  const { fadeMs, heroFadeMs } = resolveTitleMotion(motion);
+  if (kind === "hero") {
+    return `{\\an5\\fad(${heroFadeMs},${heroFadeMs})}`;
+  }
+  if (kind === "center") {
+    return `{\\an5\\fad(${fadeMs},${fadeMs})}`;
+  }
+  return `{\\an2\\fad(${fadeMs},${fadeMs})\\move(${geom.cx},${geom.baseY + geom.slidePx},${geom.cx},${geom.baseY},0,${fadeMs})}`;
+}
 
 export interface TitleItem {
   endSec: number;
@@ -60,6 +91,7 @@ function assEscape(s: string): string {
 export interface TitleAssOptions {
   accent?: string;
   height: number;
+  motion?: Motion;
   width: number;
 }
 
@@ -99,12 +131,12 @@ export function buildTitlesAss(
     "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
   ];
 
-  const fadeMs = 180;
-  const heroFadeMs = 320;
-  const slidePx = Math.max(16, Math.round(opts.height * 0.04));
+  const motion = opts.motion ?? MotionSchema.parse(undefined);
+  const slidePx = Math.max(16, Math.round(opts.height * motion.slideFrac));
   // Lower titles anchor at bottom-center; the slide-up baseline is MarginV above the floor.
   const baseY = opts.height - marginV;
   const cx = Math.round(opts.width / 2);
+  const geom = { baseY, cx, slidePx };
 
   const events: string[] = [];
   for (const item of items) {
@@ -127,7 +159,7 @@ export function buildTitlesAss(
         continue;
       }
       style = "TitleHeroHead";
-      override = `{\\an5\\fad(${heroFadeMs},${heroFadeMs})}`;
+      override = titleMotionTags("hero", motion, geom);
       payload = assEscape(headline);
       if (subtitle) {
         payload += `{\\r}\\N{\\fs${heroSubFont}}${assEscape(subtitle)}`;
@@ -141,12 +173,11 @@ export function buildTitlesAss(
     if (isCenter) {
       // Centered hero card: fade only, no slide. \an5 = middle-center.
       style = "TitleCenter";
-      override = `{\\an5\\fad(${fadeMs},${fadeMs})}`;
+      override = titleMotionTags("center", motion, geom);
     } else {
       // Lower third: fade + a short upward slide into place. \an2 = bottom-center.
-      // \move(fromX,fromY,toX,toY) slides from slidePx below the resting baseline up to it.
       style = "TitleLower";
-      override = `{\\an2\\fad(${fadeMs},${fadeMs})\\move(${cx},${baseY + slidePx},${cx},${baseY})}`;
+      override = titleMotionTags("lower", motion, geom);
     }
 
     events.push(

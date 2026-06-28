@@ -27,8 +27,10 @@ import {
 } from "./edl.ts";
 import { exportCut } from "./exporter.ts";
 import { FFMPEG, FFPROBE } from "./ffmpeg.ts";
+import { GRADE_NAMES, isGrade } from "./grade.ts";
 import { ingest } from "./ingest.ts";
 import { loadIngesters } from "./ingesters.ts";
+import { listLuts, lutPath } from "./lut.ts";
 import { startMcpServer } from "./mcp-server.ts";
 import {
   buildPackageArgv,
@@ -58,6 +60,7 @@ import {
   listTemplates,
   loadTemplateSkill,
 } from "./templates.ts";
+import { verifyCut, verifyVerdict } from "./verify.ts";
 
 const [cmd, ...rest] = process.argv.slice(2);
 
@@ -112,6 +115,7 @@ Overlays
   openklip still-add <slug> <assetId> <fromSec> <toSec>
                                      overlay a still image with a Ken Burns push-in
                                        --scale <1-3>  --focus-x <0-1>  --focus-y <0-1>
+  openklip still-set <slug> <stillId> patch still (--asset --from --to --scale --focus-x --focus-y)
   openklip still-rm <slug> <stillId> remove a still overlay
   openklip title-add-phrase <slug> "spoken phrase" "title text"
                                      place title at first phrase match
@@ -670,6 +674,30 @@ try {
       );
       break;
     }
+    case "still-set": {
+      if (!(rest[0] && rest[1])) {
+        throw new Error(
+          "usage: openklip still-set <slug> <stillId> [--asset id] [--from N] [--to N] [--scale N] [--focus-x N] [--focus-y N]"
+        );
+      }
+      const slug = rest[0];
+      const args = rest.slice(2);
+      const project = await loadProject(slug);
+      const item = runAction("still-set", project, {
+        id: rest[1],
+        assetId: flagValue(args, "--asset"),
+        fromSec: flagNumber(args, "--from"),
+        toSec: flagNumber(args, "--to"),
+        scale: flagNumber(args, "--scale"),
+        focusX: flagNumber(args, "--focus-x"),
+        focusY: flagNumber(args, "--focus-y"),
+      }) as Still;
+      await saveProject(slug, project);
+      console.log(
+        `updated still ${item.id} (asset "${item.assetId}", ${secSpan(item.startSample, item.endSample)}, ${item.scale}x)`
+      );
+      break;
+    }
     case "still-rm": {
       if (!(rest[0] && rest[1])) {
         throw new Error("usage: openklip still-rm <slug> <stillId>");
@@ -897,17 +925,91 @@ try {
       break;
     }
     case "look": {
+      const gradeUsage = `openklip look <slug> grade <${GRADE_NAMES.join("|")}>`;
       if (!(rest[0] && rest[1] && rest[2])) {
-        throw new Error("usage: openklip look <slug> vignette <on|off>");
+        throw new Error(
+          `usage: openklip look <slug> vignette <on|off>\n       ${gradeUsage}\n       openklip look <slug> lut <name|none>`
+        );
+      }
+      if (rest[1] === "grade") {
+        if (!isGrade(rest[2])) {
+          throw new Error(`usage: ${gradeUsage}`);
+        }
+        const project = await loadProject(rest[0]);
+        runAction("look-grade", project, { grade: rest[2] });
+        await saveProject(rest[0], project);
+        console.log(`grade: ${project.look.grade}`);
+        break;
+      }
+      if (rest[1] === "lut") {
+        const clearing = rest[2] === "none" || rest[2] === "off";
+        if (!(clearing || existsSync(lutPath(rest[2])))) {
+          const have = listLuts();
+          const hint = have.length
+            ? `available: ${have.join(", ")}`
+            : "no LUTs in luts/ (drop a name.cube there)";
+          throw new Error(`LUT not found: ${rest[2]} (${hint})`);
+        }
+        const project = await loadProject(rest[0]);
+        runAction("look-lut", project, { lut: clearing ? "" : rest[2] });
+        await saveProject(rest[0], project);
+        console.log(`lut: ${project.look.lut ?? "none"}`);
+        break;
       }
       if (rest[1] !== "vignette") {
-        throw new Error("usage: openklip look <slug> vignette <on|off>");
+        throw new Error(
+          `usage: openklip look <slug> vignette <on|off>\n       ${gradeUsage}\n       openklip look <slug> lut <name|none>`
+        );
       }
       const vignette = parseOnOff(rest[2], "openklip look <slug> vignette");
       const project = await loadProject(rest[0]);
       runAction("look-vignette", project, { vignette });
       await saveProject(rest[0], project);
       console.log(`vignette ${vignette ? "on" : "off"}`);
+      break;
+    }
+    case "motion": {
+      if (!rest[0]) {
+        throw new Error(
+          "usage: openklip motion <slug> [--speed n] [--fade ms] [--hero-fade ms] [--slide frac]"
+        );
+      }
+      const slug = rest[0];
+      const num = (flag: string) => {
+        const v = flagValue(rest, flag);
+        if (v === undefined) {
+          return;
+        }
+        const n = Number(v);
+        if (!Number.isFinite(n)) {
+          throw new Error(`${flag} must be a number`);
+        }
+        return n;
+      };
+      const input: Record<string, number> = {};
+      const speed = num("--speed");
+      const fadeMs = num("--fade");
+      const heroFadeMs = num("--hero-fade");
+      const slideFrac = num("--slide");
+      if (speed !== undefined) {
+        input.speed = speed;
+      }
+      if (fadeMs !== undefined) {
+        input.fadeMs = fadeMs;
+      }
+      if (heroFadeMs !== undefined) {
+        input.heroFadeMs = heroFadeMs;
+      }
+      if (slideFrac !== undefined) {
+        input.slideFrac = slideFrac;
+      }
+      const project = await loadProject(slug);
+      runAction("motion", project, input);
+      await saveProject(slug, project);
+      const m = project.motion;
+      console.log(
+        `motion: speed ${m.speed}, fade ${m.fadeMs}ms, hero ${m.heroFadeMs}ms, slide ${m.slideFrac}`
+      );
       break;
     }
     case "pad": {
@@ -948,7 +1050,10 @@ try {
         `  captions:     ${project.captions.enabled ? "on" : "off"}  (max ${project.captions.maxWords ?? 6} words/line)`
       );
       console.log(
-        `  look:         vignette ${project.look?.vignette ? "on" : "off"}`
+        `  look:         vignette ${project.look?.vignette ? "on" : "off"}, grade ${project.look?.grade ?? "none"}${project.look?.lut ? `, lut ${project.look.lut}` : ""}`
+      );
+      console.log(
+        `  motion:       speed ${project.motion.speed}, fade ${project.motion.fadeMs}ms`
       );
       console.log(`  assets:       ${s.assetCount}`);
       console.log(`  b-roll:       ${s.brollCount}`);
@@ -1141,6 +1246,19 @@ try {
       );
       break;
     }
+    case "verify": {
+      if (!rest[0]) {
+        throw new Error("usage: openklip verify <slug>");
+      }
+      console.log("[verify] re-transcribing the rendered cut...");
+      const report = await verifyCut(rest[0]);
+      console.log(verifyVerdict(report));
+      if (report.missingKept.length > 0) {
+        console.log(`  missing kept words: ${report.missingKept.join(", ")}`);
+      }
+      process.exitCode = report.ok ? 0 : 1;
+      break;
+    }
     case "brand": {
       if (!(rest[0] && rest[1])) {
         throw new Error("usage: openklip brand <slug> <name>");
@@ -1322,6 +1440,18 @@ try {
         );
       }
       console.log(`\n${list.length} ingester(s)`);
+      break;
+    }
+    case "luts": {
+      const names = listLuts();
+      if (names.length === 0) {
+        console.log("no LUTs in luts/ (drop a name.cube there)");
+        break;
+      }
+      for (const n of names) {
+        console.log(n);
+      }
+      console.log(`\n${names.length} LUT(s)`);
       break;
     }
     case "doctor": {

@@ -5,6 +5,7 @@ import { z } from "zod";
 import { spanForPhraseOverlay } from "./cli-query.ts";
 import { samplesToSec } from "./edl.ts";
 import { exportCut } from "./exporter.ts";
+import { listLuts } from "./lut.ts";
 import { listProjects, loadProject, mutateProject } from "./projectStore.ts";
 import {
   grepTranscript,
@@ -25,6 +26,7 @@ import {
   listTemplates,
   loadTemplateSkill,
 } from "./templates.ts";
+import { verifyCut, verifyVerdict } from "./verify.ts";
 
 const slug = z.string().min(1).describe("Project slug under projects/");
 
@@ -239,6 +241,12 @@ const queryTools: AgentToolDef[] = [
     run: () => ({ templates: listTemplates() }),
   }),
   defineQueryTool({
+    name: "luts",
+    summary: "List available .cube LUTs (luts/) for look-lut.",
+    schema: z.object({}),
+    run: () => ({ luts: listLuts() }),
+  }),
+  defineQueryTool({
     name: "template_show",
     summary: "Load an edit template skill file on demand.",
     schema: z.object({ id: z.string().min(1) }),
@@ -330,6 +338,16 @@ const queryTools: AgentToolDef[] = [
     }),
     run: async ({ slug: projectSlug, maxHeight }) =>
       exportCut(projectSlug, { maxHeight }),
+  }),
+  defineQueryTool({
+    name: "verify",
+    summary:
+      "Re-transcribe the rendered cut and check it against the EDL (filler, leaked cuts, coverage).",
+    schema: z.object({ slug }),
+    run: async ({ slug: projectSlug }) => {
+      const report = await verifyCut(projectSlug);
+      return { ...report, verdict: verifyVerdict(report) };
+    },
   }),
 ];
 

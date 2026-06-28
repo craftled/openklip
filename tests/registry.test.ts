@@ -69,6 +69,7 @@ const EXPECTED = [
   "broll-set",
   "broll-rm",
   "still-add",
+  "still-set",
   "still-rm",
   "title-add",
   "title-set",

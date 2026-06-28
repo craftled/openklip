@@ -1,13 +1,59 @@
 "use client";
 
-import type { ComponentType, MouseEvent, ReactNode } from "react";
-import { Film, ImageIcon, Music, Scissors, Type, ZoomIn } from "@/lib/icon";
+import {
+  type ComponentType,
+  type MouseEvent,
+  type PointerEvent,
+  type ReactNode,
+  type RefObject,
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Film,
+  ImageIcon,
+  Music,
+  Scan,
+  Scissors,
+  Type,
+  ZoomIn,
+} from "@/lib/icon";
+import {
+  minClipSpanSamples,
+  moveClipSpan,
+  resizeClipSpan,
+} from "@/lib/timeline-clip-edit";
+import {
+  buildTimelineSnapPoints,
+  defaultSnapThresholdSamples,
+  type SnapPoint,
+  snapSample,
+} from "@/lib/timeline-snap";
+import {
+  clampTimelineZoom,
+  clipLeftPx,
+  clipWidthPx,
+  MAX_TIMELINE_ZOOM,
+  MIN_TIMELINE_ZOOM,
+  pointerXToSample,
+  pointerXToSec,
+  secToPx,
+  TIMELINE_ZOOM_STEP,
+  timelineContentWidthPx,
+} from "@/lib/timeline-zoom";
 import { cn } from "@/lib/utils";
 
+export type TimelineClipKind = "broll" | "zoom" | "title" | "still";
+
 export interface TimelineClip {
+  endSample: number;
   endSec: number;
   id: string;
   label: string;
+  startSample: number;
   startSec: number;
 }
 
@@ -18,23 +64,40 @@ export interface TimelineRange {
 
 export interface TimelineWord {
   deleted: boolean;
+  endSample: number;
   endSec: number;
   id: string;
   index: number;
+  startSample: number;
   startSec: number;
+}
+
+export interface TimelineTiming {
+  endSample: number;
+  startSample: number;
 }
 
 interface EditTimelineProps {
   broll: TimelineClip[];
   curSec: number;
+  durationSamples: number;
   durationSec: number;
   libraryMusic?: TimelineClip[];
   libraryStills?: TimelineClip[];
+  onClipTiming: (
+    kind: TimelineClipKind,
+    id: string,
+    timing: TimelineTiming,
+    commit: boolean
+  ) => void;
   onSeek: (sec: number) => void;
-  onSelect: (kind: "broll" | "title" | "zoom", id: string) => void;
+  onSelect: (kind: TimelineClipKind, id: string) => void;
+  onWordClick: (index: number, shiftKey: boolean) => void;
   ranges: TimelineRange[];
-  selected: { id: string; kind: "broll" | "title" | "zoom" } | null;
+  sampleRate: number;
+  selected: { id: string; kind: TimelineClipKind } | null;
   selRange: readonly [number, number] | null;
+  stills: TimelineClip[];
   titles: TimelineClip[];
   wordSpans: TimelineWord[];
   zooms: TimelineClip[];
@@ -43,9 +106,56 @@ interface EditTimelineProps {
 const LABEL_W = 76;
 const RULER_H = 22;
 const TRACK_H = 30;
+const HANDLE_W = 6;
 
-function pct(sec: number, dur: number): number {
-  return dur > 0 ? Math.min(100, Math.max(0, (sec / dur) * 100)) : 0;
+function TimelineToolbar({
+  onSnapToggle,
+  onZoomIn,
+  onZoomOut,
+  snappingEnabled,
+  zoom,
+}: {
+  onSnapToggle: () => void;
+  onZoomIn: () => void;
+  onZoomOut: () => void;
+  snappingEnabled: boolean;
+  zoom: number;
+}) {
+  return (
+    <div className="flex items-center justify-end gap-1 border-foreground/10 border-b px-2 py-1.5">
+      <Button
+        aria-label={snappingEnabled ? "Disable snap" : "Enable snap"}
+        aria-pressed={snappingEnabled}
+        onClick={onSnapToggle}
+        size="sm"
+        title="Snap to words and clips"
+        variant={snappingEnabled ? "secondary" : "ghost"}
+      >
+        <Scan className="size-3.5" />
+      </Button>
+      <Button
+        aria-label="Zoom out"
+        disabled={zoom <= MIN_TIMELINE_ZOOM}
+        onClick={onZoomOut}
+        size="sm"
+        variant="ghost"
+      >
+        −
+      </Button>
+      <span className="min-w-[3rem] text-center text-caption text-tertiary tabular-nums">
+        {Math.round(zoom * 100)}%
+      </span>
+      <Button
+        aria-label="Zoom in"
+        disabled={zoom >= MAX_TIMELINE_ZOOM}
+        onClick={onZoomIn}
+        size="sm"
+        variant="ghost"
+      >
+        +
+      </Button>
+    </div>
+  );
 }
 
 function fmtTime(s: number): string {
@@ -78,94 +188,240 @@ function rulerTicks(durationSec: number): number[] {
 
 function seekFromClick(
   e: MouseEvent<HTMLElement>,
-  durationSec: number,
-  onSeek: (sec: number) => void
+  onSeek: (sec: number) => void,
+  scrollLeft: number,
+  zoom: number
 ): void {
   const rect = e.currentTarget.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const ratio = rect.width > 0 ? x / rect.width : 0;
-  onSeek(ratio * durationSec);
+  onSeek(pointerXToSec({ clientX: e.clientX, rect, scrollLeft, zoom }));
 }
 
 function LibraryBlock({
   clip,
-  durationSec,
   className,
+  zoom,
 }: {
   clip: TimelineClip;
-  durationSec: number;
   className: string;
+  zoom: number;
 }) {
-  const left = pct(clip.startSec, durationSec);
-  const width = Math.max(
-    0.6,
-    pct(clip.endSec, durationSec) - pct(clip.startSec, durationSec)
-  );
   return (
     <div
       className={cn(
         "absolute top-1 bottom-1 truncate rounded border border-dashed px-1 text-caption leading-none opacity-75",
         className
       )}
-      style={{ left: `${left}%`, width: `${width}%` }}
+      style={{
+        left: clipLeftPx(clip.startSec, zoom),
+        width: clipWidthPx(clip.startSec, clip.endSec, zoom),
+      }}
       title={`${clip.label} (registered, not placed on edit)`}
     >
       {clip.label}
     </div>
   );
 }
-function ClipBlock({
-  clip,
-  durationSec,
+
+function EditableClipBlock({
   active,
   className,
-  onClick,
+  clip,
+  durationSamples,
+  onSelect,
+  onTiming,
+  sampleRate,
+  scrollRef,
+  snapPoints,
+  snappingEnabled,
+  snapThresholdSamples,
+  trackEl,
+  zoom,
 }: {
-  clip: TimelineClip;
-  durationSec: number;
   active: boolean;
   className: string;
-  onClick: () => void;
+  clip: TimelineClip;
+  durationSamples: number;
+  onSelect: () => void;
+  onTiming: (timing: TimelineTiming, commit: boolean) => void;
+  sampleRate: number;
+  scrollRef: RefObject<HTMLDivElement | null>;
+  snapPoints: SnapPoint[];
+  snappingEnabled: boolean;
+  snapThresholdSamples: number;
+  trackEl: HTMLDivElement | null;
+  zoom: number;
 }) {
-  const left = pct(clip.startSec, durationSec);
-  const width = Math.max(
-    0.6,
-    pct(clip.endSec, durationSec) - pct(clip.startSec, durationSec)
+  const dragRef = useRef<{
+    lastTiming: TimelineTiming;
+    mode: "move" | "resize-end" | "resize-start";
+    originEnd: number;
+    originSample: number;
+    originStart: number;
+  } | null>(null);
+
+  const sampleAtPointer = useCallback(
+    (clientX: number) => {
+      if (!trackEl) {
+        return 0;
+      }
+      const rect = trackEl.getBoundingClientRect();
+      const scrollLeft = scrollRef.current?.scrollLeft ?? 0;
+      const raw = pointerXToSample({
+        clientX,
+        rect,
+        scrollLeft,
+        durationSamples,
+        zoom,
+        sampleRate,
+      });
+      return snapSample({
+        sample: raw,
+        enabled: snappingEnabled,
+        snapPoints,
+        thresholdSamples: snapThresholdSamples,
+      }).snappedSample;
+    },
+    [
+      durationSamples,
+      sampleRate,
+      scrollRef,
+      snapPoints,
+      snapThresholdSamples,
+      snappingEnabled,
+      trackEl,
+      zoom,
+    ]
   );
+
+  const updateFromPointer = useCallback(
+    (clientX: number) => {
+      if (!(dragRef.current && trackEl)) {
+        return;
+      }
+      const minSpan = minClipSpanSamples(sampleRate);
+      const d = dragRef.current;
+      let timing: TimelineTiming;
+      if (d.mode === "move") {
+        const anchor = sampleAtPointer(clientX);
+        const delta = anchor - d.originSample;
+        timing = moveClipSpan(
+          d.originStart,
+          d.originEnd,
+          delta,
+          durationSamples,
+          minSpan
+        );
+      } else {
+        const edgeSample = sampleAtPointer(clientX);
+        timing = resizeClipSpan(
+          d.originStart,
+          d.originEnd,
+          d.mode === "resize-start" ? "start" : "end",
+          edgeSample,
+          durationSamples,
+          minSpan
+        );
+      }
+      d.lastTiming = timing;
+      onTiming(timing, false);
+    },
+    [durationSamples, onTiming, sampleAtPointer, sampleRate, trackEl]
+  );
+
+  const endDrag = useCallback(() => {
+    if (dragRef.current) {
+      onTiming(dragRef.current.lastTiming, true);
+      dragRef.current = null;
+    }
+  }, [onTiming]);
+
+  const beginDrag = (
+    e: PointerEvent<HTMLElement>,
+    mode: "move" | "resize-end" | "resize-start"
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    if (!trackEl) {
+      return;
+    }
+    onSelect();
+    dragRef.current = {
+      mode,
+      originSample: sampleAtPointer(e.clientX),
+      originStart: clip.startSample,
+      originEnd: clip.endSample,
+      lastTiming: {
+        startSample: clip.startSample,
+        endSample: clip.endSample,
+      },
+    };
+  };
+
   return (
-    <button
+    <div
       className={cn(
-        "absolute top-1 bottom-1 cursor-pointer truncate rounded px-1 text-left text-caption leading-none transition-opacity hover:opacity-100",
+        "absolute top-1 bottom-1 truncate rounded text-caption leading-none transition-opacity hover:opacity-100",
         active
-          ? "ring-2 ring-live ring-offset-1 ring-offset-background"
-          : "opacity-90",
+          ? "z-20 ring-2 ring-live ring-offset-1 ring-offset-background"
+          : "z-10 opacity-90",
         className
       )}
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick();
+      onPointerCancel={endDrag}
+      onPointerDown={(e) => beginDrag(e, "move")}
+      onPointerMove={(e) => {
+        if (dragRef.current?.mode) {
+          updateFromPointer(e.clientX);
+        }
       }}
-      style={{ left: `${left}%`, width: `${width}%` }}
+      onPointerUp={endDrag}
+      style={{
+        left: clipLeftPx(clip.startSec, zoom),
+        width: clipWidthPx(clip.startSec, clip.endSec, zoom),
+      }}
       title={clip.label}
-      type="button"
     >
-      {clip.label}
-    </button>
+      <button
+        aria-label={`Resize start: ${clip.label}`}
+        className="absolute top-0 bottom-0 left-0 z-30 cursor-ew-resize rounded-l bg-foreground/15 opacity-0 hover:opacity-100"
+        data-handle="start"
+        onPointerDown={(e) => beginDrag(e, "resize-start")}
+        style={{ width: HANDLE_W }}
+        type="button"
+      />
+      <span className="pointer-events-none block truncate px-1.5 py-0.5 text-left">
+        {clip.label}
+      </span>
+      <button
+        aria-label={`Resize end: ${clip.label}`}
+        className="absolute top-0 right-0 bottom-0 z-30 cursor-ew-resize rounded-r bg-foreground/15 opacity-0 hover:opacity-100"
+        data-handle="end"
+        onPointerDown={(e) => beginDrag(e, "resize-end")}
+        style={{ width: HANDLE_W }}
+        type="button"
+      />
+    </div>
   );
 }
 
 function TrackRow({
+  children,
+  contentWidthPx,
   icon: Icon,
   label,
-  durationSec,
   onSeek,
-  children,
+  scrollLeft,
+  trackRef,
+  zoom,
 }: {
+  children: ReactNode;
+  contentWidthPx: number;
   icon: ComponentType<{ className?: string }>;
   label: string;
-  durationSec: number;
   onSeek: (sec: number) => void;
-  children: ReactNode;
+  scrollLeft: number;
+  trackRef?: (el: HTMLDivElement | null) => void;
+  zoom: number;
 }) {
   return (
     <div className="flex border-foreground/10 border-b last:border-b-0">
@@ -177,10 +433,11 @@ function TrackRow({
         <span className="truncate">{label}</span>
       </div>
       <div
-        className="relative min-w-0 flex-1 cursor-pointer bg-background/50"
-        onClick={(e) => seekFromClick(e, durationSec, onSeek)}
+        className="relative shrink-0 cursor-pointer bg-background/50"
+        onClick={(e) => seekFromClick(e, onSeek, scrollLeft, zoom)}
+        ref={trackRef}
         role="presentation"
-        style={{ height: TRACK_H }}
+        style={{ width: contentWidthPx, height: TRACK_H }}
       >
         {children}
       </div>
@@ -188,45 +445,184 @@ function TrackRow({
   );
 }
 
+function ClipTrack({
+  allOverlays,
+  clips,
+  clipClassName,
+  contentWidthPx,
+  durationSamples,
+  icon,
+  label,
+  onClipTiming,
+  onSeek,
+  onSelect,
+  playheadSample,
+  sampleRate,
+  scrollRef,
+  scrollLeft,
+  selected,
+  snappingEnabled,
+  snapThresholdSamples,
+  trackKind,
+  wordSpans,
+  zoom,
+}: {
+  allOverlays: TimelineClip[];
+  clips: TimelineClip[];
+  clipClassName: string;
+  contentWidthPx: number;
+  durationSamples: number;
+  icon: ComponentType<{ className?: string }>;
+  label: string;
+  onClipTiming: EditTimelineProps["onClipTiming"];
+  onSeek: (sec: number) => void;
+  onSelect: EditTimelineProps["onSelect"];
+  playheadSample: number;
+  sampleRate: number;
+  scrollRef: RefObject<HTMLDivElement | null>;
+  scrollLeft: number;
+  selected: EditTimelineProps["selected"];
+  snappingEnabled: boolean;
+  snapThresholdSamples: number;
+  trackKind: TimelineClipKind;
+  wordSpans: TimelineWord[];
+  zoom: number;
+}) {
+  const [trackEl, setTrackEl] = useState<HTMLDivElement | null>(null);
+
+  return (
+    <TrackRow
+      contentWidthPx={contentWidthPx}
+      icon={icon}
+      label={label}
+      onSeek={onSeek}
+      scrollLeft={scrollLeft}
+      trackRef={setTrackEl}
+      zoom={zoom}
+    >
+      {clips.map((clip) => {
+        const snapPoints = buildTimelineSnapPoints({
+          words: wordSpans,
+          overlays: allOverlays,
+          excludeClipId: clip.id,
+          playheadSample,
+        });
+        return (
+          <EditableClipBlock
+            active={selected?.kind === trackKind && selected.id === clip.id}
+            className={clipClassName}
+            clip={clip}
+            durationSamples={durationSamples}
+            key={clip.id}
+            onSelect={() => onSelect(trackKind, clip.id)}
+            onTiming={(timing, commit) =>
+              onClipTiming(trackKind, clip.id, timing, commit)
+            }
+            sampleRate={sampleRate}
+            scrollRef={scrollRef}
+            snapPoints={snapPoints}
+            snappingEnabled={snappingEnabled}
+            snapThresholdSamples={snapThresholdSamples}
+            trackEl={trackEl}
+            zoom={zoom}
+          />
+        );
+      })}
+    </TrackRow>
+  );
+}
+
 export function EditTimeline({
   broll,
   curSec,
+  durationSamples,
   durationSec,
   libraryMusic = [],
   libraryStills = [],
+  onClipTiming,
   onSeek,
   onSelect,
+  onWordClick,
   ranges,
+  sampleRate,
   selected,
   selRange,
+  stills,
   titles,
   wordSpans,
   zooms,
 }: EditTimelineProps) {
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const [snappingEnabled, setSnappingEnabled] = useState(true);
+  const [scrollLeft, setScrollLeft] = useState(0);
+
+  const contentWidthPx = timelineContentWidthPx(durationSec, zoom);
+  const canvasWidthPx = LABEL_W + contentWidthPx;
+  const playheadPx = secToPx(curSec, zoom);
+  const playheadSample = Math.round(curSec * sampleRate);
+  const snapThresholdSamples = defaultSnapThresholdSamples(sampleRate);
   const ticks = rulerTicks(durationSec);
-  const playhead = pct(curSec, durationSec);
+
+  const allOverlays = useMemo(
+    () => [...broll, ...zooms, ...titles, ...stills],
+    [broll, stills, titles, zooms]
+  );
+
+  const onScroll = useCallback(() => {
+    setScrollLeft(scrollRef.current?.scrollLeft ?? 0);
+  }, []);
+
+  const clipTrackProps = {
+    allOverlays,
+    contentWidthPx,
+    durationSamples,
+    onClipTiming,
+    onSeek,
+    onSelect,
+    playheadSample,
+    sampleRate,
+    scrollRef,
+    scrollLeft,
+    selected,
+    snappingEnabled,
+    snapThresholdSamples,
+    wordSpans,
+    zoom,
+  };
 
   return (
     <div className="bg-foreground/2">
-      <div className="overflow-x-auto">
-        <div className="relative min-w-[520px]">
+      <TimelineToolbar
+        onSnapToggle={() => setSnappingEnabled((v) => !v)}
+        onZoomIn={() =>
+          setZoom((z) => clampTimelineZoom(z + TIMELINE_ZOOM_STEP))
+        }
+        onZoomOut={() =>
+          setZoom((z) => clampTimelineZoom(z - TIMELINE_ZOOM_STEP))
+        }
+        snappingEnabled={snappingEnabled}
+        zoom={zoom}
+      />
+      <div className="overflow-x-auto" onScroll={onScroll} ref={scrollRef}>
+        <div className="relative" style={{ width: canvasWidthPx }}>
           <div className="flex border-foreground/10 border-b">
             <div
               className="shrink-0 border-foreground/10 border-r bg-foreground/3"
               style={{ width: LABEL_W, height: RULER_H }}
             />
             <div
-              className="relative min-w-0 flex-1 cursor-pointer"
-              onClick={(e) => seekFromClick(e, durationSec, onSeek)}
+              className="relative shrink-0 cursor-pointer"
+              onClick={(e) => seekFromClick(e, onSeek, scrollLeft, zoom)}
               role="presentation"
-              style={{ height: RULER_H }}
+              style={{ width: contentWidthPx, height: RULER_H }}
             >
               {ticks.map((t) => (
                 <span
                   className="absolute top-0 text-caption text-quaternary tabular-nums"
                   key={t}
                   style={{
-                    left: `${pct(t, durationSec)}%`,
+                    left: secToPx(t, zoom),
                     transform: "translateX(-50%)",
                   }}
                 >
@@ -237,18 +633,20 @@ export function EditTimeline({
           </div>
 
           <TrackRow
-            durationSec={durationSec}
+            contentWidthPx={contentWidthPx}
             icon={Scissors}
             label="Words"
             onSeek={onSeek}
+            scrollLeft={scrollLeft}
+            zoom={zoom}
           >
             {ranges.map((r, i) => (
               <div
                 className="absolute top-1 bottom-1 rounded bg-live/20 ring-1 ring-live/30"
                 key={`${r.startSec}-${r.endSec}-${i}`}
                 style={{
-                  left: `${pct(r.startSec, durationSec)}%`,
-                  width: `${Math.max(0.4, pct(r.endSec, durationSec) - pct(r.startSec, durationSec))}%`,
+                  left: clipLeftPx(r.startSec, zoom),
+                  width: clipWidthPx(r.startSec, r.endSec, zoom),
                 }}
               />
             ))}
@@ -258,92 +656,89 @@ export function EditTimeline({
                 w.index >= selRange[0] &&
                 w.index <= selRange[1];
               return (
-                <div
+                <button
+                  aria-label={
+                    w.deleted
+                      ? "Cut word (click to restore)"
+                      : "Kept word (click to cut)"
+                  }
+                  aria-pressed={w.deleted}
                   className={cn(
                     "absolute top-2 bottom-2 rounded-sm border border-transparent",
                     w.deleted
-                      ? "bg-foreground/10"
+                      ? "bg-foreground/10 hover:bg-foreground/15"
                       : "bg-foreground/10 hover:bg-foreground/20",
                     inSel && "border-live/50 bg-live/15"
                   )}
                   key={w.id}
-                  style={{
-                    left: `${pct(w.startSec, durationSec)}%`,
-                    width: `${Math.max(0.25, pct(w.endSec, durationSec) - pct(w.startSec, durationSec))}%`,
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onWordClick(w.index, e.shiftKey);
                   }}
-                  title={w.deleted ? "Cut" : "Kept"}
+                  style={{
+                    left: clipLeftPx(w.startSec, zoom),
+                    width: clipWidthPx(w.startSec, w.endSec, zoom),
+                  }}
+                  title={
+                    w.deleted ? "Cut (click to restore)" : "Kept (click to cut)"
+                  }
+                  type="button"
                 />
               );
             })}
           </TrackRow>
 
-          <TrackRow
-            durationSec={durationSec}
+          <ClipTrack
+            {...clipTrackProps}
+            clipClassName="bg-broll/25 text-foreground"
+            clips={broll}
             icon={Film}
             label="B-roll"
-            onSeek={onSeek}
-          >
-            {broll.map((clip) => (
-              <ClipBlock
-                active={selected?.kind === "broll" && selected.id === clip.id}
-                className="bg-broll/25 text-foreground"
-                clip={clip}
-                durationSec={durationSec}
-                key={clip.id}
-                onClick={() => onSelect("broll", clip.id)}
-              />
-            ))}
-          </TrackRow>
+            trackKind="broll"
+          />
 
-          <TrackRow
-            durationSec={durationSec}
+          <ClipTrack
+            {...clipTrackProps}
+            clipClassName="bg-zoom/20 text-foreground"
+            clips={zooms}
             icon={ZoomIn}
             label="Push-in"
-            onSeek={onSeek}
-          >
-            {zooms.map((clip) => (
-              <ClipBlock
-                active={selected?.kind === "zoom" && selected.id === clip.id}
-                className="bg-zoom/20 text-foreground"
-                clip={clip}
-                durationSec={durationSec}
-                key={clip.id}
-                onClick={() => onSelect("zoom", clip.id)}
-              />
-            ))}
-          </TrackRow>
+            trackKind="zoom"
+          />
 
-          <TrackRow
-            durationSec={durationSec}
+          <ClipTrack
+            {...clipTrackProps}
+            clipClassName="border border-title/30 bg-title/15 text-foreground"
+            clips={titles}
             icon={Type}
             label="Titles"
-            onSeek={onSeek}
-          >
-            {titles.map((clip) => (
-              <ClipBlock
-                active={selected?.kind === "title" && selected.id === clip.id}
-                className="border border-title/30 bg-title/15 text-foreground"
-                clip={clip}
-                durationSec={durationSec}
-                key={clip.id}
-                onClick={() => onSelect("title", clip.id)}
-              />
-            ))}
-          </TrackRow>
+            trackKind="title"
+          />
+
+          <ClipTrack
+            {...clipTrackProps}
+            clipClassName="border border-zoom/40 bg-zoom/10 text-foreground"
+            clips={stills}
+            icon={ImageIcon}
+            label="Stills"
+            trackKind="still"
+          />
 
           {libraryMusic.length > 0 && (
             <TrackRow
-              durationSec={durationSec}
+              contentWidthPx={contentWidthPx}
               icon={Music}
-              label="Music"
+              label="Music lib"
               onSeek={onSeek}
+              scrollLeft={scrollLeft}
+              zoom={zoom}
             >
               {libraryMusic.map((clip) => (
                 <LibraryBlock
                   className="border-info/40 bg-info/10 text-foreground"
                   clip={clip}
-                  durationSec={durationSec}
                   key={clip.id}
+                  zoom={zoom}
                 />
               ))}
             </TrackRow>
@@ -351,17 +746,19 @@ export function EditTimeline({
 
           {libraryStills.length > 0 && (
             <TrackRow
-              durationSec={durationSec}
+              contentWidthPx={contentWidthPx}
               icon={ImageIcon}
-              label="Stills"
+              label="Still lib"
               onSeek={onSeek}
+              scrollLeft={scrollLeft}
+              zoom={zoom}
             >
               {libraryStills.map((clip) => (
                 <LibraryBlock
-                  className="border-zoom/40 bg-zoom/10 text-foreground"
+                  className="border-info/30 bg-info/8 text-foreground"
                   clip={clip}
-                  durationSec={durationSec}
                   key={clip.id}
+                  zoom={zoom}
                 />
               ))}
             </TrackRow>
@@ -369,15 +766,15 @@ export function EditTimeline({
 
           <div
             className="pointer-events-none absolute inset-y-0 z-30"
-            style={{ left: LABEL_W, right: 0 }}
+            style={{ left: LABEL_W, width: contentWidthPx }}
           >
             <div
               className="absolute inset-y-0 w-px bg-live"
-              style={{ left: `${playhead}%` }}
+              style={{ left: playheadPx }}
             />
             <div
               className="absolute top-0 size-2 -translate-x-1/2 rounded-full bg-live"
-              style={{ left: `${playhead}%`, marginTop: RULER_H - 4 }}
+              style={{ left: playheadPx, marginTop: RULER_H - 4 }}
             />
           </div>
         </div>

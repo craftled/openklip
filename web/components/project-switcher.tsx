@@ -26,6 +26,7 @@ import {
 import { useProjectCreate } from "@/hooks/use-project-create";
 import { toastProjectDeleted, toastProjectDeleteFailed } from "@/lib/app-toast";
 import { Check, ChevronsUpDown, Plus } from "@/lib/icon";
+import type { IngestProgressView } from "@/lib/project-create";
 import type { ProjectListing } from "@/lib/project-list";
 import {
   findActiveProject,
@@ -43,7 +44,10 @@ export function ProjectSwitcher({
   projects,
 }: {
   activeSlug: string;
-  onCreateProject: (file: File) => Promise<string>;
+  onCreateProject: (
+    file: File,
+    onProgress: (p: IngestProgressView) => void
+  ) => Promise<string>;
   onDeleteProject: (slug: string) => Promise<void>;
   onProjectCreated: (slug: string) => void;
   onSelectProject: (slug: string) => void;
@@ -51,10 +55,11 @@ export function ProjectSwitcher({
 }) {
   const { isMobile } = useSidebar();
   const [newProjectOpen, setNewProjectOpen] = useState(false);
-  const { createPhase, createdSlug, creating, ingestVideo } = useProjectCreate({
-    onCreateProject,
-    onProjectCreated,
-  });
+  const { createPhase, createdSlug, creating, ingestVideo, progress } =
+    useProjectCreate({
+      onCreateProject,
+      onProjectCreated,
+    });
   const [confirmDeleteSlug, setConfirmDeleteSlug] = useState<string | null>(
     null
   );
@@ -104,6 +109,7 @@ export function ProjectSwitcher({
       {createPhase ? (
         <ProjectCreateOverlay
           phase={createPhase}
+          progress={progress}
           slug={createdSlug ?? undefined}
         />
       ) : null}

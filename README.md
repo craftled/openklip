@@ -76,7 +76,7 @@ Verified against the current codebase (411 tests, v0.8.5.0):
 - **Bounded transcript reads**: `openklip transcript grep`, `span`, `phrase` for agent discovery without dumping full transcripts
 - **Preview**: all-intra proxy; scheduler plays kept ranges only; compact center column (`max-w-2xl`)
 - **Editor layout**: Resizable right chat sidebar (340–760px, persisted); center column is preview with Properties/Settings below video; transcript toggle; timeline in a bottom drawer
-- **Agent chat**: `/` skills menu, inline skill tokens; Claude applies edits via MCP; other agents answer or suggest commands
+- **Agent chat**: `/` skills menu, inline skill tokens; skills route to the same tool surface as `openklip tools` on `project.json`; Claude applies edits via MCP; other agents answer or suggest commands
 - **Asset cards**: `openklip analyze` or **Describe assets** in the asset bin runs per-asset subagents that write summary/tags/bestFor onto each b-roll/still so agents place media by meaning
 - **Cinema player**: fullscreen overlay with Linear-parity transport bar (`web/components/cinema-player.tsx`, `player-controls.tsx`)
 - **Preview cut transitions**: Glimm WebGL sweep when `prefers-reduced-motion` is not set

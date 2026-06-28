@@ -62,6 +62,10 @@ Time is integer audio samples at 48 kHz. The CLI takes seconds where a human num
 | Toggle captions | `openklip captions <slug> on\|off` |
 | Caption line length | `openklip captions-max <slug> <n>` |
 | Toggle vignette | `openklip look <slug> vignette on\|off` |
+| Set animation feel | `openklip motion <slug> --speed <n>` |
+| Set color grade | `openklip look <slug> grade <name>` |
+| Apply a LUT (.cube) | `openklip look <slug> lut <name>` |
+| List available LUTs | `openklip luts` |
 | Cut boundary padding | `openklip pad <slug> <ms>` |
 | Review edit | `openklip status <slug>` (`--json` for agents) |
 | Kept ranges / overlays | `openklip ranges <slug>`, `openklip overlays <slug>` |
@@ -71,6 +75,7 @@ Time is integer audio samples at 48 kHz. The CLI takes seconds where a human num
 | List all agent tools (query + mutate + export) | `openklip tools` |
 | MCP server (stdio) | `openklip mcp` or `bun run mcp` |
 | Export MP4 | `openklip export <slug>` |
+| Verify rendered cut | `openklip verify <slug>` |
 | Post-export packaging (HyperFrames) | `openklip package <slug> <pass>` |
 
 ## Commands
@@ -135,6 +140,9 @@ Prefer bounded reads over dumping the full transcript. Use `--json` for machine 
 | `openklip captions <slug> <on\|off>` | Toggle burned captions for export. |
 | `openklip captions-max <slug> <n>` | Words per caption line (1–12). |
 | `openklip look <slug> vignette <on\|off>` | Toggle vignette. |
+| `openklip motion <slug> [--speed n] [--fade ms] [--hero-fade ms] [--slide frac]` | Global animation feel for overlay entrances (the deck's anim.tsx). `speed` scales every duration, so "make it snappier" is one number (`--speed 1.4`). Titles read it at export (ASS fade + slide). |
+| `openklip look <slug> grade <name>` | Set the color grade applied to the whole picture at export: `none`, `neutral`, `warm`, `cool`, `cool_desat`, `filmic`, `punchy`. Expands to a deterministic ffmpeg filter chain. `none` is the default no-op. |
+| `openklip look <slug> lut <name\|none>` | Apply a named `.cube` LUT from `luts/` (the technical color transform, e.g. log to Rec.709), applied before the grade. `none` clears it. Drop `name.cube` into `luts/`; reference by name so `project.json` stays portable. `openklip luts` lists them. |
 | `openklip pad <slug> <ms>` | Symmetric padding around kept ranges (0–500 ms). |
 | `openklip brand <slug> <name>` | Apply a brand preset (`brands/<name>.json`): sets caption/vignette/pad **defaults** only. `project.json` stays the edit; words and overlays are untouched. Also available at ingest: `openklip ingest <video> --brand <name>`. |
 | `openklip template list` | List edit templates (`templates/<id>/skill.md`): agent playbooks for cuts, overlays, and export. |
@@ -150,6 +158,7 @@ Prefer bounded reads over dumping the full transcript. Use `--json` for machine 
 | `openklip ranges <slug> [--json]` | Kept source-time segments after cuts and pad. |
 | `openklip overlays <slug> [--json]` | All b-roll, titles, zooms, stills with ids and spans. |
 | `openklip export <slug>` | Render the current cut to `out.mp4`. `--height 1080` for max output height. |
+| `openklip verify <slug>` | The verify loop: re-transcribe `output/out.mp4` with the same Whisper path used at ingest and diff it against the EDL. Flags filler that survived, deleted words that leaked back in, and low kept-word coverage (clipped words). Exits non-zero on drift. Requires an export. Also the `verify` agent tool. |
 | `openklip doctor [slug]` | Health check: ffmpeg/ffprobe binaries, Whisper script, and (with a slug) the project's `project.json`, source/proxy media, and asset proxies. Exits non-zero if any check fails. Run it when the agent loop fails deep inside a subprocess. |
 | `openklip ingesters` | List ingester plugins (`ingesters/<id>/ingester.json`): declarative seams for non-file media import (URL, batch, etc.). |
 | `openklip actions` | **Mutations only:** every `project.json` edit action (cut, broll, title, zoom, still, captions, look, pad, reorder). `--json` emits JSON Schema (`inputSchema` shape). |
