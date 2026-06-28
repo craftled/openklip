@@ -2,8 +2,18 @@
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { summarize } from "./actions.ts";
+import { agentToolManifest, agentToolTable } from "./agent-tools.ts";
 import { registerAsset } from "./assets.ts";
 import { applyBrand, loadBrand } from "./brands.ts";
+import {
+  runOverlays,
+  runRanges,
+  runStatusJson,
+  runTranscriptGrep,
+  runTranscriptPhrase,
+  runTranscriptSpan,
+  spanForPhraseOverlay,
+} from "./cli-query.ts";
 import { runDoctor } from "./doctor.ts";
 import {
   type Broll,
@@ -18,6 +28,7 @@ import { exportCut } from "./exporter.ts";
 import { FFMPEG, FFPROBE } from "./ffmpeg.ts";
 import { ingest } from "./ingest.ts";
 import { loadIngesters } from "./ingesters.ts";
+import { startMcpServer } from "./mcp-server.ts";
 import {
   buildPackageArgv,
   checkPackagePreflight,
@@ -28,12 +39,18 @@ import {
 } from "./package-pass.ts";
 import { projectPaths } from "./paths.ts";
 import { latestProject, listProjects } from "./projectStore.ts";
+import { expandWordTokens } from "./query.ts";
 import {
   actionManifest,
   actionTable,
   runAction,
   type Surface,
 } from "./registry.ts";
+import {
+  applyProjectTemplate,
+  listTemplates,
+  loadTemplateSkill,
+} from "./templates.ts";
 
 const [cmd, ...rest] = process.argv.slice(2);
 
@@ -51,6 +68,15 @@ Setup
   openklip asset-add <slug> <file>   register b-roll, music, or still (auto-detect)
                                        --kind broll|music|still
   openklip broll <slug> <file>       register b-roll video (alias for asset-add)
+
+Transcript (read)
+  openklip transcript <slug>         print every word with id, time, cut state
+  openklip transcript grep <slug> "phrase" [--all] [--json]
+                                     find phrase runs (word ids + seconds)
+  openklip transcript span <slug> <w12|w12-w20> [--context N] [--json]
+                                     slice words around ids
+  openklip transcript phrase <slug> "phrase" [--json]
+                                     first match span for overlay placement
 
 Transcript edits
   openklip transcript <slug>         print every word with id, time, cut state
@@ -80,6 +106,14 @@ Overlays
                                      overlay a still image with a Ken Burns push-in
                                        --scale <1-3>  --focus-x <0-1>  --focus-y <0-1>
   openklip still-rm <slug> <stillId> remove a still overlay
+  openklip title-add-phrase <slug> "spoken phrase" "title text"
+                                     place title at first phrase match
+                                       --position lower|center|hero
+  openklip zoom-add-phrase <slug> "spoken phrase"
+                                     push-in zoom at first phrase match
+                                       --scale <1-3>  --ramp <sec>
+  openklip broll-add-phrase <slug> <assetId> "spoken phrase"
+                                     b-roll cover at first phrase match
   openklip reorder <slug> <broll|title|zoom> <id> <toIndex>
                                      restack an overlay (paint order)
 
@@ -89,17 +123,27 @@ Look & captions
   openklip look <slug> vignette <on|off> toggle vignette
   openklip pad <slug> <ms>               cut boundary padding (0-500 ms)
   openklip brand <slug> <name>           apply a brand preset (look defaults)
+  openklip template list                 list edit templates (templates/*/skill.md)
+  openklip template show <id>            print a template skill file
+  openklip template set <slug> <id>      attach a template to a project
 
 Review & export
   openklip status <slug>             summarize the current edit
+                                       --json            agent-friendly JSON
+  openklip ranges <slug> [--json]    kept source-time segments after cuts
+  openklip overlays <slug> [--json]  b-roll, titles, zooms, stills with ids
   openklip export <slug>             render the current cut to out.mp4
                                        --height <px>  max output height (e.g. 1080)
 
 Diagnostics
   openklip doctor [slug]             check ffmpeg, whisper, and project health
-  openklip actions                   print the action registry (capability manifest)
+  openklip actions                   project.json mutation registry only
                                        --json            machine-readable manifest
                                        --surface mcp     filter by cli|gui|mcp
+  openklip tools                     unified agent tool manifest (query + mutate + export)
+                                       --json            machine-readable manifest
+                                       --surface mcp     filter by cli|gui|mcp
+  openklip mcp                       start the MCP stdio server (Cursor, Claude Desktop, …)
 
 Post-export (optional, external)
   openklip package <slug> <pass>     run a HyperFrames finishing pass on out.mp4
@@ -166,34 +210,7 @@ function flagNumber(args: string[], flag: string): number | undefined {
 // Expand cut tokens (word ids "w12" and inclusive ranges "w12-w20") into the
 // concrete list of word ids present on the project, preserving project order.
 function resolveCutIds(project: Project, tokens: string[]): string[] {
-  const order = new Map(project.words.map((w, i) => [w.id, i]));
-  const picked = new Set<string>();
-  for (const tok of tokens) {
-    const dash = tok.indexOf("-");
-    if (dash > 0) {
-      const from = tok.slice(0, dash);
-      const to = tok.slice(dash + 1);
-      const a = order.get(from);
-      const b = order.get(to);
-      if (a === undefined) {
-        throw new Error(`unknown word id "${from}"`);
-      }
-      if (b === undefined) {
-        throw new Error(`unknown word id "${to}"`);
-      }
-      const [lo, hi] = a <= b ? [a, b] : [b, a];
-      for (let i = lo; i <= hi; i++) {
-        picked.add(project.words[i].id);
-      }
-    } else {
-      if (!order.has(tok)) {
-        throw new Error(`unknown word id "${tok}"`);
-      }
-      picked.add(tok);
-    }
-  }
-  // Return in project order for stable output.
-  return project.words.map((w) => w.id).filter((id) => picked.has(id));
+  return expandWordTokens(project, tokens);
 }
 
 try {
@@ -345,6 +362,78 @@ try {
       break;
     }
     case "transcript": {
+      const sub = rest[0];
+      if (sub === "grep" || sub === "span" || sub === "phrase") {
+        const slug = rest[1];
+        if (!slug) {
+          throw new Error(
+            `usage: openklip transcript ${sub} <slug> ... (see openklip help)`
+          );
+        }
+        const project = await loadProject(slug);
+        const tail = rest.slice(2);
+        if (sub === "grep") {
+          const phraseParts: string[] = [];
+          for (const arg of tail) {
+            if (arg === "--all" || arg === "--json") {
+              continue;
+            }
+            phraseParts.push(arg);
+          }
+          const phrase = phraseParts.join(" ");
+          if (!phrase) {
+            throw new Error(
+              'usage: openklip transcript grep <slug> "phrase" [--all] [--json]'
+            );
+          }
+          process.stdout.write(
+            runTranscriptGrep(project, phrase, {
+              all: tail.includes("--all"),
+              json: tail.includes("--json"),
+            })
+          );
+          break;
+        }
+        if (sub === "span") {
+          const token = tail.find((a) => !a.startsWith("--"));
+          if (!token) {
+            throw new Error(
+              "usage: openklip transcript span <slug> <w12|w12-w20> [--context N] [--json]"
+            );
+          }
+          const ctxRaw = flagValue(tail, "--context");
+          const context = ctxRaw === undefined ? undefined : Number(ctxRaw);
+          if (context !== undefined && !Number.isFinite(context)) {
+            throw new Error("--context must be a non-negative number");
+          }
+          process.stdout.write(
+            runTranscriptSpan(project, token, {
+              context,
+              json: tail.includes("--json"),
+            })
+          );
+          break;
+        }
+        const phraseParts: string[] = [];
+        for (const arg of tail) {
+          if (arg === "--json") {
+            continue;
+          }
+          phraseParts.push(arg);
+        }
+        const phrase = phraseParts.join(" ");
+        if (!phrase) {
+          throw new Error(
+            'usage: openklip transcript phrase <slug> "phrase" [--json]'
+          );
+        }
+        process.stdout.write(
+          runTranscriptPhrase(project, phrase, {
+            json: tail.includes("--json"),
+          })
+        );
+        break;
+      }
       if (!rest[0]) {
         throw new Error("usage: openklip transcript <slug>");
       }
@@ -781,11 +870,18 @@ try {
     }
     case "status": {
       if (!rest[0]) {
-        throw new Error("usage: openklip status <slug>");
+        throw new Error("usage: openklip status <slug> [--json]");
       }
       const project = await loadProject(rest[0]);
+      if (rest.includes("--json")) {
+        process.stdout.write(runStatusJson(project));
+        break;
+      }
       const s = summarize(project);
       console.log(`project: ${project.slug}`);
+      if (project.template) {
+        console.log(`  template:     ${project.template}`);
+      }
       console.log(
         `  words:        ${s.words}  (${s.kept} kept, ${s.deleted} cut)`
       );
@@ -820,6 +916,157 @@ try {
       }
       break;
     }
+    case "ranges": {
+      if (!rest[0]) {
+        throw new Error("usage: openklip ranges <slug> [--json]");
+      }
+      const project = await loadProject(rest[0]);
+      process.stdout.write(
+        runRanges(project, { json: rest.includes("--json") })
+      );
+      break;
+    }
+    case "overlays": {
+      if (!rest[0]) {
+        throw new Error("usage: openklip overlays <slug> [--json]");
+      }
+      const project = await loadProject(rest[0]);
+      process.stdout.write(
+        runOverlays(project, { json: rest.includes("--json") })
+      );
+      break;
+    }
+    case "title-add-phrase": {
+      if (!rest[0]) {
+        throw new Error(
+          'usage: openklip title-add-phrase <slug> "spoken phrase" "title text" [--position lower|center|hero]'
+        );
+      }
+      const slug = rest[0];
+      const args = rest.slice(1);
+      const posIdx = args.indexOf("--position");
+      let position: "lower" | "center" | "hero" = "lower";
+      if (posIdx !== -1) {
+        const pos = args[posIdx + 1]?.toLowerCase();
+        if (pos !== "lower" && pos !== "center" && pos !== "hero") {
+          throw new Error("--position must be lower, center, or hero");
+        }
+        position = pos;
+      }
+      const positional = args.filter(
+        (_, i) => posIdx === -1 || (i !== posIdx && i !== posIdx + 1)
+      );
+      if (positional.length < 2) {
+        throw new Error(
+          'usage: openklip title-add-phrase <slug> "spoken phrase" "title text" [--position lower|center|hero]'
+        );
+      }
+      const spokenPhrase = positional[0];
+      const text = positional.slice(1).join(" ").replace(/\\n/g, "\n");
+      const project = await loadProject(slug);
+      const span = spanForPhraseOverlay(project, spokenPhrase);
+      if (!span.matched) {
+        throw new Error(`no match for spoken phrase: "${spokenPhrase}"`);
+      }
+      const item = runAction("title-add", project, {
+        fromSec: span.fromSec,
+        toSec: span.toSec,
+        text,
+        position,
+      }) as Title;
+      await saveProject(slug, project);
+      console.log(
+        `added title ${item.id} at phrase "${spokenPhrase}" (${span.fromSec.toFixed(3)}s-${span.toSec.toFixed(3)}s, ${position}): "${item.text.replace(/\n/g, "\\n")}"`
+      );
+      break;
+    }
+    case "zoom-add-phrase": {
+      if (!rest[0]) {
+        throw new Error(
+          'usage: openklip zoom-add-phrase <slug> "spoken phrase" [--scale N] [--ramp N]'
+        );
+      }
+      const slug = rest[0];
+      const args = rest.slice(1);
+      const scaleIdx = args.indexOf("--scale");
+      const rampIdx = args.indexOf("--ramp");
+      let scale: number | undefined;
+      let rampSec: number | undefined;
+      if (scaleIdx !== -1) {
+        scale = Number(args[scaleIdx + 1]);
+        if (!Number.isFinite(scale)) {
+          throw new Error("--scale must be a number between 1 and 3");
+        }
+      }
+      if (rampIdx !== -1) {
+        rampSec = Number(args[rampIdx + 1]);
+        if (!Number.isFinite(rampSec)) {
+          throw new Error("--ramp must be a number between 0 and 5");
+        }
+      }
+      const spokenParts: string[] = [];
+      for (let i = 0; i < args.length; i++) {
+        if (scaleIdx !== -1 && (i === scaleIdx || i === scaleIdx + 1)) {
+          continue;
+        }
+        if (rampIdx !== -1 && (i === rampIdx || i === rampIdx + 1)) {
+          continue;
+        }
+        spokenParts.push(args[i]);
+      }
+      const spokenPhrase = spokenParts.join(" ");
+      if (!spokenPhrase) {
+        throw new Error(
+          'usage: openklip zoom-add-phrase <slug> "spoken phrase" [--scale N] [--ramp N]'
+        );
+      }
+      const project = await loadProject(slug);
+      const span = spanForPhraseOverlay(project, spokenPhrase);
+      if (!span.matched) {
+        throw new Error(`no match for spoken phrase: "${spokenPhrase}"`);
+      }
+      const item = runAction("zoom-add", project, {
+        fromSec: span.fromSec,
+        toSec: span.toSec,
+        scale,
+        rampSec,
+      }) as Zoom;
+      await saveProject(slug, project);
+      console.log(
+        `added zoom ${item.id} at phrase "${spokenPhrase}" (${span.fromSec.toFixed(3)}s-${span.toSec.toFixed(3)}s, ${item.scale}x)`
+      );
+      break;
+    }
+    case "broll-add-phrase": {
+      if (!(rest[0] && rest[1])) {
+        throw new Error(
+          'usage: openklip broll-add-phrase <slug> <assetId> "spoken phrase"'
+        );
+      }
+      const slug = rest[0];
+      const assetId = rest[1];
+      const spokenPhrase = rest.slice(2).join(" ");
+      if (!spokenPhrase) {
+        throw new Error(
+          'usage: openklip broll-add-phrase <slug> <assetId> "spoken phrase"'
+        );
+      }
+      const project = await loadProject(slug);
+      const span = spanForPhraseOverlay(project, spokenPhrase);
+      if (!span.matched) {
+        throw new Error(`no match for spoken phrase: "${spokenPhrase}"`);
+      }
+      const item = runAction("broll-add", project, {
+        assetId,
+        fromSec: span.fromSec,
+        toSec: span.toSec,
+      }) as Broll;
+      await saveProject(slug, project);
+      console.log(
+        `added b-roll ${item.id} at phrase "${spokenPhrase}" (asset "${assetId}", ${span.fromSec.toFixed(3)}s-${span.toSec.toFixed(3)}s)`
+      );
+      break;
+    }
     case "export": {
       if (!rest[0]) {
         throw new Error("usage: openklip export <slug> [--height <px>]");
@@ -849,6 +1096,45 @@ try {
         `applied brand "${rest[1]}": captions ${project.captions.enabled ? "on" : "off"} (max ${project.captions.maxWords}), vignette ${project.look?.vignette ? "on" : "off"}, pad ${project.padMs}ms`
       );
       break;
+    }
+    case "template": {
+      const sub = rest[0];
+      if (sub === "list") {
+        const list = listTemplates();
+        if (list.length === 0) {
+          console.log("no templates in templates/");
+          break;
+        }
+        for (const t of list) {
+          console.log(
+            `${t.id}\t${t.label}${t.description ? `\t${t.description}` : ""}`
+          );
+        }
+        console.log(`\n${list.length} template(s)`);
+        break;
+      }
+      if (sub === "show") {
+        const id = rest[1];
+        if (!id) {
+          throw new Error("usage: openklip template show <id>");
+        }
+        console.log(loadTemplateSkill(id));
+        break;
+      }
+      if (sub === "set") {
+        const [slug, id] = rest.slice(1);
+        if (!(slug && id)) {
+          throw new Error("usage: openklip template set <slug> <id>");
+        }
+        const project = await loadProject(slug);
+        applyProjectTemplate(project, id);
+        await saveProject(slug, project);
+        console.log(`template set to "${id}" for ${slug}`);
+        break;
+      }
+      throw new Error(
+        "usage: openklip template list | show <id> | set <slug> <id>"
+      );
     }
     case "reorder": {
       if (!(rest[0] && rest[1] && rest[2] && rest[3] !== undefined)) {
@@ -940,6 +1226,28 @@ try {
         break;
       }
       console.log(actionTable(surface));
+      break;
+    }
+    case "tools": {
+      const surfaceArg = flagValue(rest, "--surface");
+      if (
+        surfaceArg !== undefined &&
+        surfaceArg !== "cli" &&
+        surfaceArg !== "gui" &&
+        surfaceArg !== "mcp"
+      ) {
+        throw new Error("--surface must be cli, gui, or mcp");
+      }
+      const surface = surfaceArg as Surface | undefined;
+      if (rest.includes("--json")) {
+        console.log(JSON.stringify(agentToolManifest(surface), null, 2));
+        break;
+      }
+      console.log(agentToolTable(surface));
+      break;
+    }
+    case "mcp": {
+      await startMcpServer();
       break;
     }
     case "ingesters": {

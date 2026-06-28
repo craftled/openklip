@@ -1,0 +1,376 @@
+// Unified agent tool registry: query reads, registry mutations, and lifecycle
+// commands in one manifest. CLI (`openklip tools`), MCP (stdio server), and docs
+// all read from here so surfaces stay in sync with the GUI's project.json edits.
+import { z } from "zod";
+import { spanForPhraseOverlay } from "./cli-query.ts";
+import { samplesToSec } from "./edl.ts";
+import { exportCut } from "./exporter.ts";
+import { listProjects, loadProject, mutateProject } from "./projectStore.ts";
+import {
+  grepTranscript,
+  listOverlays,
+  listRanges,
+  phraseSpan,
+  projectStatus,
+  wordSpan,
+} from "./query.ts";
+import {
+  type ActionDef,
+  actions,
+  runAction,
+  type Surface,
+} from "./registry.ts";
+import {
+  applyProjectTemplate,
+  listTemplates,
+  loadTemplateSkill,
+} from "./templates.ts";
+
+const slug = z.string().min(1).describe("Project slug under projects/");
+
+export interface AgentToolDef {
+  name: string;
+  run: (input: unknown) => Promise<unknown>;
+  schema: z.ZodType;
+  summary: string;
+  surfaces: Surface[];
+  /** Flat Zod shape for MCP registerTool inputSchema. */
+  zodShape: Record<string, z.ZodType>;
+}
+
+function toolSchemaWithSlug(actionSchema: z.ZodType): z.ZodType {
+  if (actionSchema instanceof z.ZodObject) {
+    return z.object({ slug }).merge(actionSchema);
+  }
+  return z.object({ slug });
+}
+
+function zodShapeFromSchema(schema: z.ZodType): Record<string, z.ZodType> {
+  const merged =
+    schema instanceof z.ZodObject
+      ? schema
+      : z.object({ slug: z.string().min(1) });
+  return merged.shape as Record<string, z.ZodType>;
+}
+
+function mutationTool(action: ActionDef): AgentToolDef {
+  const schema = toolSchemaWithSlug(action.schema);
+  return {
+    name: action.name,
+    summary: action.summary,
+    surfaces: action.surfaces,
+    schema,
+    zodShape: zodShapeFromSchema(schema),
+    run: (raw) => {
+      const input = schema.parse(raw) as { slug: string } & Record<
+        string,
+        unknown
+      >;
+      const { slug: projectSlug, ...actionInput } = input;
+      return mutateProject(projectSlug, (project) =>
+        runAction(action.name, project, actionInput)
+      );
+    },
+  };
+}
+
+function defineQueryTool(def: {
+  name: string;
+  summary: string;
+  schema: z.ZodObject<z.ZodRawShape>;
+  surfaces?: Surface[];
+  run: (input: z.infer<def["schema"]>) => Promise<unknown> | unknown;
+}): AgentToolDef {
+  return {
+    name: def.name,
+    summary: def.summary,
+    surfaces: def.surfaces ?? ["mcp", "cli"],
+    schema: def.schema,
+    zodShape: def.schema.shape as Record<string, z.ZodType>,
+    run: async (raw) => def.run(def.schema.parse(raw)),
+  };
+}
+
+const queryTools: AgentToolDef[] = [
+  defineQueryTool({
+    name: "list_projects",
+    summary: "List OpenKlip projects (most recent first).",
+    schema: z.object({}),
+    run: () => ({
+      projects: listProjects().map((p) => ({
+        slug: p.slug,
+        mtimeMs: p.mtimeMs,
+      })),
+    }),
+  }),
+  defineQueryTool({
+    name: "list_assets",
+    summary: "List registered media assets for a project.",
+    schema: z.object({ slug }),
+    run: async ({ slug: projectSlug }) => {
+      const project = await loadProject(projectSlug);
+      return {
+        assets: project.assets.map((a) => ({
+          id: a.id,
+          kind: a.kind ?? "broll",
+          name: a.name,
+          durationSec: samplesToSec(a.durationSamples),
+        })),
+      };
+    },
+  }),
+  defineQueryTool({
+    name: "project_status",
+    summary: "Agent-friendly edit summary (words, ranges, overlays, look).",
+    schema: z.object({ slug }),
+    run: async ({ slug: projectSlug }) => {
+      const project = await loadProject(projectSlug);
+      return projectStatus(project);
+    },
+  }),
+  defineQueryTool({
+    name: "project_ranges",
+    summary: "Kept source-time segments after cuts and pad.",
+    schema: z.object({ slug }),
+    run: async ({ slug: projectSlug }) => {
+      const project = await loadProject(projectSlug);
+      return { ranges: listRanges(project) };
+    },
+  }),
+  defineQueryTool({
+    name: "project_overlays",
+    summary: "All b-roll, titles, zooms, and stills with ids and spans.",
+    schema: z.object({ slug }),
+    run: async ({ slug: projectSlug }) => {
+      const project = await loadProject(projectSlug);
+      return listOverlays(project);
+    },
+  }),
+  defineQueryTool({
+    name: "transcript_grep",
+    summary: "Find phrase runs in the transcript (word ids and seconds).",
+    schema: z.object({
+      slug,
+      phrase: z.string().min(1),
+      all: z.boolean().default(false),
+    }),
+    run: async ({ slug: projectSlug, phrase, all }) => {
+      const project = await loadProject(projectSlug);
+      return grepTranscript(project, phrase, { all });
+    },
+  }),
+  defineQueryTool({
+    name: "transcript_span",
+    summary: "Slice transcript words around word ids (w12 or w12-w20).",
+    schema: z.object({
+      slug,
+      token: z.string().min(1),
+      context: z.number().int().nonnegative().default(0),
+    }),
+    run: async ({ slug: projectSlug, token, context }) => {
+      const project = await loadProject(projectSlug);
+      return wordSpan(project, token, { context });
+    },
+  }),
+  defineQueryTool({
+    name: "transcript_phrase",
+    summary: "First phrase match span for overlay placement.",
+    schema: z.object({ slug, phrase: z.string().min(1) }),
+    run: async ({ slug: projectSlug, phrase }) => {
+      const project = await loadProject(projectSlug);
+      return { phrase, ...phraseSpan(project, phrase) };
+    },
+  }),
+  defineQueryTool({
+    name: "transcript_list",
+    summary: "Full transcript as JSON (prefer transcript_grep on long videos).",
+    schema: z.object({ slug }),
+    run: async ({ slug: projectSlug }) => {
+      const project = await loadProject(projectSlug);
+      return {
+        words: project.words.map((w, index) => ({
+          index,
+          id: w.id,
+          text: w.text,
+          startSec: samplesToSec(w.startSample),
+          endSec: samplesToSec(w.endSample),
+          deleted: w.deleted,
+        })),
+        total: project.words.length,
+        cut: project.words.filter((w) => w.deleted).length,
+      };
+    },
+  }),
+  defineQueryTool({
+    name: "template_list",
+    summary: "List edit templates (templates/*/skill.md).",
+    schema: z.object({}),
+    run: () => ({ templates: listTemplates() }),
+  }),
+  defineQueryTool({
+    name: "template_show",
+    summary: "Load an edit template skill file on demand.",
+    schema: z.object({ id: z.string().min(1) }),
+    run: ({ id }) => ({ id, skill: loadTemplateSkill(id) }),
+  }),
+  defineQueryTool({
+    name: "template_set",
+    summary: "Attach a template id to project.json.",
+    schema: z.object({ slug, id: z.string().min(1) }),
+    run: async ({ slug: projectSlug, id }) =>
+      mutateProject(projectSlug, (project) => {
+        applyProjectTemplate(project, id);
+        return { template: project.template };
+      }),
+  }),
+  defineQueryTool({
+    name: "title-add-phrase",
+    summary: "Place a title at the first spoken phrase match (min 2s span).",
+    schema: z.object({
+      slug,
+      spokenPhrase: z.string().min(1),
+      text: z.string().min(1),
+      position: z.enum(["lower", "center", "hero"]).default("lower"),
+    }),
+    run: async ({ slug: projectSlug, spokenPhrase, text, position }) =>
+      mutateProject(projectSlug, (project) => {
+        const span = spanForPhraseOverlay(project, spokenPhrase);
+        if (!span.matched) {
+          throw new Error(`no match for spoken phrase: "${spokenPhrase}"`);
+        }
+        return runAction("title-add", project, {
+          fromSec: span.fromSec,
+          toSec: span.toSec,
+          text: text.replace(/\\n/g, "\n"),
+          position,
+        });
+      }),
+  }),
+  defineQueryTool({
+    name: "zoom-add-phrase",
+    summary: "Push-in zoom at the first spoken phrase match.",
+    schema: z.object({
+      slug,
+      spokenPhrase: z.string().min(1),
+      scale: z.number().optional(),
+      rampSec: z.number().optional(),
+    }),
+    run: async ({ slug: projectSlug, spokenPhrase, scale, rampSec }) =>
+      mutateProject(projectSlug, (project) => {
+        const span = spanForPhraseOverlay(project, spokenPhrase);
+        if (!span.matched) {
+          throw new Error(`no match for spoken phrase: "${spokenPhrase}"`);
+        }
+        return runAction("zoom-add", project, {
+          fromSec: span.fromSec,
+          toSec: span.toSec,
+          scale,
+          rampSec,
+        });
+      }),
+  }),
+  defineQueryTool({
+    name: "broll-add-phrase",
+    summary: "B-roll cover at the first spoken phrase match.",
+    schema: z.object({
+      slug,
+      assetId: z.string().min(1),
+      spokenPhrase: z.string().min(1),
+    }),
+    run: async ({ slug: projectSlug, assetId, spokenPhrase }) =>
+      mutateProject(projectSlug, (project) => {
+        const span = spanForPhraseOverlay(project, spokenPhrase);
+        if (!span.matched) {
+          throw new Error(`no match for spoken phrase: "${spokenPhrase}"`);
+        }
+        return runAction("broll-add", project, {
+          assetId,
+          fromSec: span.fromSec,
+          toSec: span.toSec,
+        });
+      }),
+  }),
+  defineQueryTool({
+    name: "export",
+    summary: "Render the current cut to output/out.mp4.",
+    schema: z.object({
+      slug,
+      maxHeight: z.number().int().positive().optional(),
+    }),
+    run: async ({ slug: projectSlug, maxHeight }) =>
+      exportCut(projectSlug, { maxHeight }),
+  }),
+];
+
+const mutationTools = actions.map(mutationTool);
+
+const allTools: AgentToolDef[] = [...queryTools, ...mutationTools];
+
+const byName = new Map(allTools.map((t) => [t.name, t]));
+
+export function agentTools(surface?: Surface): AgentToolDef[] {
+  if (!surface) {
+    return allTools;
+  }
+  return allTools.filter((t) => t.surfaces.includes(surface));
+}
+
+export function agentToolNames(surface?: Surface): string[] {
+  return agentTools(surface).map((t) => t.name);
+}
+
+export function getAgentTool(name: string): AgentToolDef | undefined {
+  return byName.get(name);
+}
+
+export interface AgentToolManifestEntry {
+  inputSchema: unknown;
+  name: string;
+  summary: string;
+  surfaces: Surface[];
+}
+
+export function agentToolManifest(surface?: Surface): AgentToolManifestEntry[] {
+  return agentTools(surface).map((t) => ({
+    name: t.name,
+    summary: t.summary,
+    surfaces: t.surfaces,
+    inputSchema: z.toJSONSchema(t.schema),
+  }));
+}
+
+export async function callAgentTool(
+  name: string,
+  rawInput: unknown
+): Promise<unknown> {
+  const tool = getAgentTool(name);
+  if (!tool) {
+    const known = agentToolNames().join(", ");
+    throw new Error(`unknown agent tool "${name}". Known tools: ${known}`);
+  }
+  try {
+    return await tool.run(rawInput);
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      const detail = err.issues
+        .map((i) => {
+          const path = i.path.join(".");
+          return path ? `${path}: ${i.message}` : i.message;
+        })
+        .join("; ");
+      throw new Error(`invalid input for "${name}": ${detail}`);
+    }
+    throw err;
+  }
+}
+
+export function agentToolTable(surface?: Surface): string {
+  const rows = agentTools(surface).map(
+    (t) => `| \`${t.name}\` | ${t.summary} | ${t.surfaces.join(", ")} |`
+  );
+  return [
+    "| Tool | What it does | Surfaces |",
+    "| --- | --- | --- |",
+    ...rows,
+  ].join("\n");
+}

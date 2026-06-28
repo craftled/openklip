@@ -11,17 +11,7 @@ import {
   type Title,
   type Zoom,
 } from "./edl.ts";
-
-// Normalize text for phrase matching: lowercase, strip anything that isn't a
-// letter/number/space, collapse whitespace. Used by cutByText so "Hello, world!"
-// matches the words ["Hello", "world"].
-function normalizeText(s: string): string {
-  return s
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
+import { findPhraseRuns } from "./phrase-match.ts";
 
 // Mark words (by id) deleted (or, with deleted=false, restored).
 export function cutWords(
@@ -45,55 +35,13 @@ export function cutByText(
   project: Project,
   phrase: string
 ): { matched: boolean; ids: string[] } {
-  const target = normalizeText(phrase);
-  if (!target) {
+  const runs = findPhraseRuns(project, phrase, { all: false });
+  if (runs.length === 0) {
     return { matched: false, ids: [] };
   }
-
-  const tokens = project.words.map((w) => normalizeText(w.text));
-  const targetTokens = target.split(" ");
-
-  for (let i = 0; i < project.words.length; i++) {
-    if (project.words[i].deleted) {
-      continue;
-    }
-    // Walk forward accumulating non-empty normalized tokens until they equal
-    // the target token sequence. Tokens that normalize to "" (pure punctuation)
-    // are skipped so they don't break an otherwise-contiguous phrase.
-    const matchedIdx: number[] = [];
-    let cursor = 0; // index into targetTokens
-    let j = i;
-    while (j < project.words.length && cursor < targetTokens.length) {
-      if (project.words[j].deleted) {
-        break;
-      }
-      const tok = tokens[j];
-      if (tok === "") {
-        matchedIdx.push(j);
-        j++;
-        continue;
-      }
-      if (tok !== targetTokens[cursor]) {
-        break;
-      }
-      matchedIdx.push(j);
-      cursor++;
-      j++;
-    }
-    if (cursor === targetTokens.length) {
-      // Trim trailing empty-token words from the run (they belong to the gap).
-      while (
-        matchedIdx.length > 0 &&
-        tokens[matchedIdx[matchedIdx.length - 1]] === ""
-      ) {
-        matchedIdx.pop();
-      }
-      const ids = matchedIdx.map((k) => project.words[k].id);
-      cutWords(project, ids, true);
-      return { matched: true, ids };
-    }
-  }
-  return { matched: false, ids: [] };
+  const ids = runs[0].ids;
+  cutWords(project, ids, true);
+  return { matched: true, ids };
 }
 
 // Cut every contiguous run matching the phrase (kept words only). Returns how
