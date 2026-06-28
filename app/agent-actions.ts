@@ -17,6 +17,7 @@ import {
 import { analyzeAssets, assetCardLines } from "@engine/asset-cards";
 import { projectsRoot } from "@engine/paths";
 import { loadProject, mutateProject } from "@engine/projectStore";
+import { analyzeSceneLog, sceneLogLines } from "@engine/scene-log";
 
 // Re-export the type from source (type-only, never emits runtime code) so client
 // components import it from here without pulling the server-only driver into their
@@ -70,13 +71,20 @@ export async function suggestFillerCuts(
 }
 
 export type AnalyzeReply =
-  | { ok: true; analyzed: number; skipped: number; total: number }
+  | {
+      ok: true;
+      analyzed: number;
+      skipped: number;
+      total: number;
+      sceneLogged: boolean;
+    }
   | { ok: false; error: string };
 
-// Fan out one subagent per un-described asset (b-roll, stills) to write an
-// "asset card" : what it shows and where it belongs. The editing agent then
-// places media by meaning. `agent` is the GUI selector value. No-op (total 0)
-// once every asset is carded; re-run after dropping new media.
+// One "understand my media" pass: fan out one subagent per un-described asset
+// (b-roll, stills) to write an "asset card", and, if the main video has no scene
+// log yet, run one subagent over its frames to log what is on screen. The
+// editing agent then places media by meaning and targets b-roll opportunities.
+// `agent` is the GUI selector value. Idempotent: only missing work runs.
 export async function analyzeProjectAssets(
   slug: string,
   agent: string
@@ -87,15 +95,39 @@ export async function analyzeProjectAssets(
       { agent },
       { loadProject, mutateProject }
     );
+    const sceneLogged = await analyzeProjectSceneLog(slug, agent);
     return {
       ok: true,
       analyzed: res.analyzed.length,
       skipped: res.skipped.length,
       total: res.total,
+      sceneLogged,
     };
   } catch (e) {
     return { ok: false, error: (e as Error).message };
   }
+}
+
+// Generate the main-video scene log when absent. Best-effort and read-then-write
+// outside the asset lock; returns whether a log was produced this run.
+async function analyzeProjectSceneLog(
+  slug: string,
+  agent: string
+): Promise<boolean> {
+  const project = await loadProject(slug);
+  if (project.sceneLog) {
+    return false;
+  }
+  const log = await analyzeSceneLog(slug, project, { agent });
+  if (!log) {
+    return false;
+  }
+  await mutateProject(slug, (proj) => {
+    if (!proj.sceneLog) {
+      proj.sceneLog = log;
+    }
+  });
+  return true;
 }
 
 export type ChatReply =
@@ -115,9 +147,15 @@ export async function chatWithAgent(
   try {
     const project = await loadProject(slug);
     const assetCards = assetCardLines(project.assets);
+    const sceneLog = sceneLogLines(project.sceneLog);
     if (supportsToolEditing(agent)) {
       const prompt = buildEditPrompt(
-        { words: project.words, template: project.template, assetCards },
+        {
+          words: project.words,
+          template: project.template,
+          assetCards,
+          sceneLog,
+        },
         slug,
         message
       );
@@ -130,7 +168,12 @@ export async function chatWithAgent(
       return { ok: true, edited: true, text: text.trim() || "(done)" };
     }
     const prompt = buildChatPrompt(
-      { words: project.words, template: project.template, assetCards },
+      {
+        words: project.words,
+        template: project.template,
+        assetCards,
+        sceneLog,
+      },
       message
     );
     const { text } = await runAgentText(prompt, { agent });

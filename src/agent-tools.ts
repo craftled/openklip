@@ -141,6 +141,16 @@ const queryTools: AgentToolDef[] = [
     },
   }),
   defineQueryTool({
+    name: "scene_log",
+    summary:
+      "Subagent visual log of the main video: on-screen spans and b-roll openings.",
+    schema: z.object({ slug }),
+    run: async ({ slug: projectSlug }) => {
+      const project = await loadProject(projectSlug);
+      return { sceneLog: project.sceneLog ?? null };
+    },
+  }),
+  defineQueryTool({
     name: "project_status",
     summary: "Agent-friendly edit summary (words, ranges, overlays, look).",
     schema: z.object({ slug }),

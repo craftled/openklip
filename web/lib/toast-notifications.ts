@@ -305,25 +305,36 @@ export function findFillerPromiseMessages(providerLabel: string): {
 export function analyzeAssetsPromiseMessages(providerLabel: string): {
   error: (error: unknown) => { description?: string; message: string };
   loading: string;
-  success: (result: { analyzed: number; skipped: number; total: number }) => {
+  success: (result: {
+    analyzed: number;
+    sceneLogged?: boolean;
+    skipped: number;
+    total: number;
+  }) => {
     description?: string;
     message: string;
   };
 } {
   return {
-    loading: `${providerLabel} is describing assets…`,
+    loading: `${providerLabel} is reading your media…`,
     success: (result) => {
+      const scene = result.sceneLogged ? " Logged the video's scenes." : "";
       if (result.total === 0) {
-        return { message: "Assets already described" };
+        return result.sceneLogged
+          ? {
+              message: "Logged the video's scenes",
+              description: `${providerLabel} read the source frames.`,
+            }
+          : { message: "Media already described" };
       }
       const skipped = result.skipped > 0 ? ` (${result.skipped} skipped)` : "";
       return {
         message: `Described ${result.analyzed} of ${result.total} asset(s)`,
-        description: `${providerLabel} catalogued b-roll and stills${skipped}.`,
+        description: `${providerLabel} catalogued b-roll and stills${skipped}.${scene}`,
       };
     },
     error: (error) => ({
-      message: "Asset analysis failed",
+      message: "Media analysis failed",
       description: (error as Error).message,
     }),
   };

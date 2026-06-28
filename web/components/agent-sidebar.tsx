@@ -108,13 +108,6 @@ export function AgentSidebar({
     threads,
   } = useAgentChat();
 
-  // Only b-roll and stills get asset cards, so the analyze affordance is hidden
-  // until at least one such asset exists (music-only bins have nothing to do).
-  const hasCardableAssets = useMemo(
-    () => assets.some((a) => (a.kind ?? "broll") !== "music"),
-    [assets]
-  );
-
   const openProject = useCallback(
     (slug: string) => {
       if (slug !== activeSlug) {
@@ -293,11 +286,9 @@ export function AgentSidebar({
               sampleRate={sampleRate}
               slug={activeSlug}
             />
-            {hasCardableAssets ? (
-              <div className="px-1 pt-1.5">
-                <AnalyzeAssetsButton />
-              </div>
-            ) : null}
+            <div className="px-1 pt-1.5">
+              <AnalyzeAssetsButton />
+            </div>
           </div>
         </CollapsibleSidebarSection>
 
