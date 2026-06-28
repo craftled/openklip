@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Project } from "../../src/edl.ts";
 import { SAMPLE_RATE } from "../../src/edl.ts";
+import { projectsRoot } from "../../src/paths.ts";
 
 export function makeProject(overrides: Partial<Project> = {}): Project {
   const sec = (n: number) => n * SAMPLE_RATE;
@@ -55,18 +56,25 @@ export function makeProject(overrides: Partial<Project> = {}): Project {
 export async function withTempProjectsRoot<T>(
   fn: (ctx: { slug: string; root: string }) => T | Promise<T>
 ): Promise<T> {
-  const cwd = process.cwd();
   const root = mkdtempSync(join(tmpdir(), "openklip-projects-"));
   const slug = "fixture";
   const dir = join(root, "projects", slug);
   mkdirSync(dir, { recursive: true });
+  // Pin projectsRoot() to this temp tree explicitly so project path
+  // resolution doesn't depend on process.cwd() — Bun runs test files in
+  // parallel and a global chdir would race across files. Restore after.
+  const prevRoot = process.env.OPENKLIP_PROJECTS_ROOT;
   const prevSlug = process.env.OPENKLIP_SLUG;
+  process.env.OPENKLIP_PROJECTS_ROOT = join(root, "projects");
   delete process.env.OPENKLIP_SLUG;
-  process.chdir(root);
   try {
     return await fn({ slug, root });
   } finally {
-    process.chdir(cwd);
+    if (prevRoot === undefined) {
+      delete process.env.OPENKLIP_PROJECTS_ROOT;
+    } else {
+      process.env.OPENKLIP_PROJECTS_ROOT = prevRoot;
+    }
     if (prevSlug === undefined) {
       delete process.env.OPENKLIP_SLUG;
     } else {
@@ -77,7 +85,7 @@ export async function withTempProjectsRoot<T>(
 }
 
 export function writeFixtureProject(slug: string, project: Project): void {
-  const dir = join(process.cwd(), "projects", slug);
+  const dir = join(projectsRoot(), slug);
   mkdirSync(join(dir, "working"), { recursive: true });
   mkdirSync(join(dir, "assets"), { recursive: true });
   mkdirSync(join(dir, "output"), { recursive: true });

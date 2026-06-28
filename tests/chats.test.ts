@@ -39,7 +39,7 @@ test("chats persist under working/chats.json per project", async () => {
 });
 
 test("saveProjectChats writes atomically — no tmp file left behind", async () => {
-  await withTempProjectsRoot(async ({ slug }) => {
+  await withTempProjectsRoot(async ({ slug, root }) => {
     resetChatIdSequenceForTests();
     writeFixtureProject(slug, makeProject({ slug }));
 
@@ -49,7 +49,7 @@ test("saveProjectChats writes atomically — no tmp file left behind", async () 
       threads: [thread],
     });
 
-    const workingDir = join(process.cwd(), "projects", slug, "working");
+    const workingDir = join(root, "projects", slug, "working");
     const entries = readdirSync(workingDir).filter(
       (f) => f.startsWith("chats.json") && f !== "chats.json"
     );
@@ -58,9 +58,9 @@ test("saveProjectChats writes atomically — no tmp file left behind", async () 
 });
 
 test("corrupt chats.json is backed up and surfaces an error instead of wiping", async () => {
-  await withTempProjectsRoot(async ({ slug }) => {
+  await withTempProjectsRoot(async ({ slug, root }) => {
     writeFixtureProject(slug, makeProject({ slug }));
-    const workingDir = join(process.cwd(), "projects", slug, "working");
+    const workingDir = join(root, "projects", slug, "working");
     writeFileSync(join(workingDir, "chats.json"), "{not valid json");
 
     // loadProjectChats must reject (not silently return empty), otherwise the

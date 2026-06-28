@@ -13,9 +13,9 @@ import {
 } from "./helpers/projectFixture.ts";
 
 test("listAssetDropFiles lists only recognized files in assets/", async () => {
-  await withTempProjectsRoot(({ slug }) => {
+  await withTempProjectsRoot(({ slug, root }) => {
     writeFixtureProject(slug, makeProject({ slug, assets: [] }));
-    const assetsDir = join(process.cwd(), "projects", slug, "assets");
+    const assetsDir = join(root, "projects", slug, "assets");
     mkdirSync(assetsDir, { recursive: true });
     writeFileSync(join(assetsDir, "track.mp3"), "fake");
     writeFileSync(join(assetsDir, "notes.txt"), "skip");
@@ -28,9 +28,9 @@ test("listAssetDropFiles lists only recognized files in assets/", async () => {
 });
 
 test("syncAssetsFromFolder registers new drops in project.json", async () => {
-  await withTempProjectsRoot(async ({ slug }) => {
+  await withTempProjectsRoot(async ({ slug, root }) => {
     writeFixtureProject(slug, makeProject({ slug, assets: [] }));
-    const assetsDir = join(process.cwd(), "projects", slug, "assets");
+    const assetsDir = join(root, "projects", slug, "assets");
     mkdirSync(assetsDir, { recursive: true });
     writeFileSync(
       join(assetsDir, "incoming.png"),
@@ -46,9 +46,9 @@ test("syncAssetsFromFolder registers new drops in project.json", async () => {
 });
 
 test("syncAssetsFromFolder serializes overlapping calls (no lost updates)", async () => {
-  await withTempProjectsRoot(async ({ slug }) => {
+  await withTempProjectsRoot(async ({ slug, root }) => {
     writeFixtureProject(slug, makeProject({ slug, assets: [] }));
-    const assetsDir = join(process.cwd(), "projects", slug, "assets");
+    const assetsDir = join(root, "projects", slug, "assets");
     mkdirSync(assetsDir, { recursive: true });
     writeFileSync(join(assetsDir, "a.png"), Buffer.from([137, 80, 78, 71]));
     writeFileSync(join(assetsDir, "b.png"), Buffer.from([137, 80, 78, 71]));

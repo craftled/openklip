@@ -78,9 +78,9 @@ test("POST /api/projects/:slug/assets returns JSON error for missing file", asyn
 });
 
 test("GET /api/projects/:slug/assets is pure — does not register dropped files", async () => {
-  await withTempProjectsRoot(async ({ slug }) => {
+  await withTempProjectsRoot(async ({ slug, root }) => {
     writeFixtureProject(slug, makeProject({ slug, assets: [] }));
-    const assetsDir = join(process.cwd(), "projects", slug, "assets");
+    const assetsDir = join(root, "projects", slug, "assets");
     mkdirSync(assetsDir, { recursive: true });
     writeFileSync(
       join(assetsDir, "incoming.png"),
@@ -101,9 +101,9 @@ test("GET /api/projects/:slug/assets is pure — does not register dropped files
 });
 
 test("POST /api/projects/:slug/assets/sync registers new drops and returns them", async () => {
-  await withTempProjectsRoot(async ({ slug }) => {
+  await withTempProjectsRoot(async ({ slug, root }) => {
     writeFixtureProject(slug, makeProject({ slug, assets: [] }));
-    const assetsDir = join(process.cwd(), "projects", slug, "assets");
+    const assetsDir = join(root, "projects", slug, "assets");
     mkdirSync(assetsDir, { recursive: true });
     writeFileSync(
       join(assetsDir, "incoming.png"),
