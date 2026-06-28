@@ -15,6 +15,10 @@ import { cn } from "@/lib/utils";
 
 export const PLAYER_SPEEDS = [0.5, 1, 1.25, 1.5, 2] as const;
 
+const CTRL_ICON = "size-3.5";
+const TRANSPORT_NUM =
+  "shrink-0 font-black text-caption tabular-nums leading-none tracking-small";
+
 export function fmtClock(sec: number): string {
   if (!Number.isFinite(sec) || sec < 0) {
     return "0:00";
@@ -186,7 +190,7 @@ export function PlayerControls({
   return (
     <div
       className={cn(
-        "flex items-center gap-3 bg-gradient-to-t from-black/65 to-transparent px-4 pt-12 pb-3",
+        "flex items-center gap-2.5 bg-gradient-to-t from-black/65 to-transparent px-4 pt-12 pb-3",
         className
       )}
       data-preview-chrome
@@ -194,24 +198,26 @@ export function PlayerControls({
     >
       <CtrlButton label={playing ? "Pause" : "Play"} onClick={onPlayToggle}>
         {playing ? (
-          <Pause className="size-[18px] fill-current" />
+          <Pause className={cn(CTRL_ICON, "fill-current")} />
         ) : (
-          <Play className="size-[18px] fill-current" />
+          <Play className={cn(CTRL_ICON, "fill-current")} />
         )}
       </CtrlButton>
 
       <CtrlButton label={muted ? "Unmute" : "Mute"} onClick={onToggleMute}>
         {muted || volume === 0 ? (
-          <VolumeX className="size-[18px]" />
+          <VolumeX className={CTRL_ICON} />
         ) : (
-          <Volume2 className="size-[18px]" />
+          <Volume2 className={CTRL_ICON} />
         )}
       </CtrlButton>
 
-      <span className="shrink-0 text-ui text-white/85 tabular-nums">
+      <span className={cn(TRANSPORT_NUM, "text-white")}>
         {fmtClock(current)}
       </span>
-      <span className="shrink-0 text-ui text-white/30">•</span>
+      <span className="shrink-0 text-caption text-white/30 leading-none">
+        •
+      </span>
 
       {/* Hairline scrubber with dot handle + hover preview */}
       <div
@@ -260,23 +266,26 @@ export function PlayerControls({
           />
           <div
             className={cn(
-              "absolute top-1/2 size-3 -translate-y-1/2 rounded-full bg-white transition-opacity",
+              "absolute top-1/2 size-2.5 -translate-y-1/2 rounded-full bg-white transition-opacity",
               scrubbing
                 ? "opacity-100"
                 : "opacity-0 group-hover/scrub:opacity-100"
             )}
-            style={{ left: `calc(${pct}% - 6px)` }}
+            style={{ left: `calc(${pct}% - 5px)` }}
           />
         </div>
       </div>
 
-      <span className="shrink-0 text-ui text-white/55 tabular-nums">
+      <span className={cn(TRANSPORT_NUM, "text-white/70")}>
         -{fmtClock(remaining)}
       </span>
 
       <button
         aria-label="Playback speed"
-        className="shrink-0 cursor-pointer rounded-md px-1.5 py-1 text-ui text-white/75 tabular-nums transition-[transform,background-color,color] duration-150 ease-out fine-hover:hover:bg-white/10 fine-hover:hover:text-white active:scale-[0.97]"
+        className={cn(
+          TRANSPORT_NUM,
+          "cursor-pointer rounded-md px-1 py-0.5 text-white/90 transition-[transform,background-color,color] duration-150 ease-out fine-hover:hover:bg-white/10 fine-hover:hover:text-white active:scale-[0.97]"
+        )}
         onClick={onCycleSpeed}
         type="button"
       >
@@ -288,7 +297,7 @@ export function PlayerControls({
         label="Captions"
         onClick={onToggleCaptions}
       >
-        <Captions className="size-[18px]" />
+        <Captions className={CTRL_ICON} />
       </CtrlButton>
 
       {onTogglePip && (
@@ -297,7 +306,7 @@ export function PlayerControls({
           label="Picture in picture"
           onClick={onTogglePip}
         >
-          <PictureInPicture2 className="size-[18px]" />
+          <PictureInPicture2 className={CTRL_ICON} />
         </CtrlButton>
       )}
 
@@ -310,9 +319,9 @@ export function PlayerControls({
         onClick={onFullscreen}
       >
         {fullscreenActive ? (
-          <Minimize className="size-[18px]" />
+          <Minimize className={CTRL_ICON} />
         ) : (
-          <Maximize className="size-[18px]" />
+          <Maximize className={CTRL_ICON} />
         )}
       </CtrlButton>
     </div>
@@ -335,7 +344,7 @@ export function CtrlButton({
       aria-label={label}
       aria-pressed={active}
       className={cn(
-        "flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-white/75 transition-[transform,background-color,color] duration-150 ease-out fine-hover:hover:bg-white/10 fine-hover:hover:text-white active:scale-[0.97]",
+        "flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-white/75 transition-[transform,background-color,color] duration-150 ease-out fine-hover:hover:bg-white/10 fine-hover:hover:text-white active:scale-[0.97]",
         active && "text-white ring-1 ring-white/40 ring-inset"
       )}
       onClick={onClick}
