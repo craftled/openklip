@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.8.5 - 2026-06-28
+
+Chat does edits, not advice; editor layout puts chat in a resizable right column; plus asset cards and an icon pass.
+
+### Added
+- **Agentic chat edits**: for Claude, free-text chat now loads the openklip MCP server and calls the edit tools (cut, zoom, b-roll, title, template, export) to DO the edit, replying with a one-line confirmation instead of CLI instructions. Verified end-to-end (a chat "add a push-in zoom on hello world" wrote the zoom to project.json). Non-Claude agents fall back to a read-only answer.
+- **Resizable chat sidebar**: chat lives in a full-height right column, drag-adjustable (340–760px) via an edge handle, persisted to localStorage, keyboard-accessible.
+- **Asset cards / Analyze assets**: per-asset subagent descriptions so the editing agent places media by meaning (`src/asset-cards.ts`, `analyze-assets-button.tsx`, `analyzeProjectAssets` action).
+- **Phosphor fill icons**: replaced Lucide stroke icons with `@phosphor-icons/react` (fill weight) via a shared `web/lib/icon.tsx` wrapper across the editor shell.
+
+### Changed
+- **Editor layout**: chat moved from below the video to the right sidebar; Settings + Inspector ("Properties") moved below the video, toggled with the transcript. More vertical room for reading chat.
+- **Icon chrome**: default UI icon color uses `--icon-foreground` (55% foreground mix) so fill icons sit softer on grey chrome; icons inside buttons still inherit parent color.
+- **Prompts**: the chat assistant no longer emits CLI commands or how-to text.
+
+### Fixed
+- **Invisible chat text**: assistant messages used `text-secondary` (the 5%-opacity fill token); switched to `text-foreground`.
+
 ## 0.8.4 - 2026-06-28
 
 Free-text chat now drives the selected agent CLI for real, instead of replying with a canned hint.
