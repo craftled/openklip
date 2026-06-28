@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.8.7.1 - 2026-06-28
+
+Hotfix the 0.8.7.0 release: green up typecheck/CI, sync the version, and refine the player transport bar.
+
+### Fixed
+- **Typecheck**: `web/lib/timeline-zoom.ts` `sampleToPx` was missing `zoom` in its parameter type, so `tsc --noEmit` (and CI) failed on the 0.8.7.0 release.
+- **Version drift**: `package.json` was left at 0.8.6.0 while `VERSION` read 0.8.7.0; both now read 0.8.7.1.
+
+### Changed
+- **Player controls**: smaller transport icons and tighter spacing, bold tabular timecodes, slimmer scrubber handle.
+
 ## 0.8.7 - 2026-06-28
 
 Editable timeline with CLI parity, export verify loop, color grade/LUT, and inbox ingest.
