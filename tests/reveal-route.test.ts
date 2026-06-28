@@ -1,3 +1,4 @@
+import { mock } from "bun:test";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { POST } from "../app/api/projects/[slug]/reveal/route.ts";
@@ -9,6 +10,21 @@ import {
 
 function ctx(slug: string) {
   return { params: Promise.resolve({ slug }) };
+}
+
+function withMockReveal(run: () => Promise<void>) {
+  mock.module("@engine/reveal-path", () => ({
+    revealCommand: (targetPath: string) => ({
+      command: "true",
+      args: [targetPath],
+    }),
+    revealInFileManager: async () => {
+      // Headless CI has no file manager; route behavior is tested separately.
+    },
+  }));
+  return run().finally(() => {
+    mock.restore();
+  });
 }
 
 test("reveal route returns 404 for a missing project", async () => {
@@ -32,35 +48,39 @@ test("reveal route returns 400 for an invalid slug", async () => {
 });
 
 test("reveal route returns 200 for an existing project", async () => {
-  await withTempProjectsRoot(async ({ slug }) => {
-    writeFixtureProject(slug, makeProject({ slug }));
-    const res = await POST(new Request("http://localhost/reveal"), ctx(slug));
-    assert.equal(res.status, 200);
-    const body = (await res.json()) as { ok?: boolean; path?: string };
-    assert.equal(body.ok, true);
-    assert.match(body.path ?? "", new RegExp(`${slug}$`));
+  await withMockReveal(async () => {
+    await withTempProjectsRoot(async ({ slug }) => {
+      writeFixtureProject(slug, makeProject({ slug }));
+      const res = await POST(new Request("http://localhost/reveal"), ctx(slug));
+      assert.equal(res.status, 200);
+      const body = (await res.json()) as { ok?: boolean; path?: string };
+      assert.equal(body.ok, true);
+      assert.match(body.path ?? "", new RegExp(`${slug}$`));
+    });
   });
 });
 
 test("reveal route opens the assets folder", async () => {
-  await withTempProjectsRoot(async ({ slug }) => {
-    writeFixtureProject(slug, makeProject({ slug }));
-    const res = await POST(
-      new Request("http://localhost/reveal", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ target: "assets" }),
-      }),
-      ctx(slug)
-    );
-    assert.equal(res.status, 200);
-    const body = (await res.json()) as {
-      ok?: boolean;
-      path?: string;
-      target?: string;
-    };
-    assert.equal(body.ok, true);
-    assert.equal(body.target, "assets");
-    assert.match(body.path ?? "", /assets$/);
+  await withMockReveal(async () => {
+    await withTempProjectsRoot(async ({ slug }) => {
+      writeFixtureProject(slug, makeProject({ slug }));
+      const res = await POST(
+        new Request("http://localhost/reveal", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ target: "assets" }),
+        }),
+        ctx(slug)
+      );
+      assert.equal(res.status, 200);
+      const body = (await res.json()) as {
+        ok?: boolean;
+        path?: string;
+        target?: string;
+      };
+      assert.equal(body.ok, true);
+      assert.equal(body.target, "assets");
+      assert.match(body.path ?? "", /assets$/);
+    });
   });
 });
