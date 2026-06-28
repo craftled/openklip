@@ -5,7 +5,7 @@ import type * as React from "react";
 import { cn } from "@/lib/utils";
 
 const toggleVariants = cva(
-  "group/toggle inline-flex cursor-pointer items-center justify-center gap-1 whitespace-nowrap rounded-md font-medium text-xs outline-none transition-[background-color,border-color,color,box-shadow,transform] duration-150 ease-out fine-hover:hover:bg-muted fine-hover:hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 active:scale-[0.97] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 aria-pressed:bg-muted aria-invalid:border-destructive aria-invalid:ring-destructive/20 data-[state=on]:bg-muted dark:aria-invalid:ring-destructive/40 [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+  "group/toggle inline-flex cursor-pointer items-center justify-center gap-1 whitespace-nowrap rounded-md font-medium text-xs outline-none transition-[background-color,border-color,color,box-shadow,transform] duration-150 ease-out fine-hover:hover:bg-muted fine-hover:hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 active:scale-[0.97] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 aria-pressed:bg-foreground-5 aria-pressed:text-foreground aria-invalid:border-destructive aria-invalid:ring-destructive/20 data-[state=on]:bg-foreground-5 data-[state=on]:text-foreground dark:aria-invalid:ring-destructive/40 [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
   {
     variants: {
       variant: {

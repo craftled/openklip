@@ -12,6 +12,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import type { AgentThread } from "@/lib/agent-threads";
+import { toastRevealError } from "@/lib/app-toast";
 import {
   basenamePath,
   formatDurationSec,
@@ -56,18 +57,16 @@ function InfoRow({
 
 function FolderRow({ dirPath, slug }: { dirPath: string; slug: string }) {
   const [opening, setOpening] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const onOpen = useCallback(async () => {
     if (opening) {
       return;
     }
     setOpening(true);
-    setError(null);
     try {
       const result = await revealProjectFolderApi(slug);
       if (!result.ok) {
-        setError(result.error);
+        toastRevealError(result.error);
       }
     } finally {
       setOpening(false);
@@ -91,11 +90,6 @@ function FolderRow({ dirPath, slug }: { dirPath: string; slug: string }) {
           {opening ? "Opening…" : dirPath}
         </span>
       </button>
-      {error ? (
-        <p className="mt-0.5 truncate px-0.5 text-[11px] text-destructive">
-          {error}
-        </p>
-      ) : null}
     </div>
   );
 }
@@ -128,7 +122,7 @@ function ChatPreviewPanel({
 
   return createPortal(
     <div
-      className="popover-styled fixed z-[100] w-60 overflow-hidden rounded-lg p-3 shadow-lg"
+      className="popover-styled fixed z-[100] w-60 overflow-hidden rounded-lg p-3"
       onPointerEnter={onPointerEnter}
       onPointerLeave={onPointerLeave}
       style={{ left: position.left, top: position.top }}

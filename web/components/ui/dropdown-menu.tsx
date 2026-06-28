@@ -31,6 +31,9 @@ function DropdownMenuTrigger({
   );
 }
 
+/** Set on content when opened/closed via keyboard shortcut (skip animation). */
+export const MENU_INSTANT_ATTR = "data-menu-instant";
+
 function DropdownMenuContent({
   className,
   sideOffset = 4,

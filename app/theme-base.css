@@ -32,6 +32,7 @@
   --foreground-20: color-mix(in srgb, var(--foreground) 20%, var(--background));
   --foreground-30: color-mix(in srgb, var(--foreground) 30%, var(--background));
   --foreground-40: color-mix(in srgb, var(--foreground) 40%, var(--background));
+  --foreground-45: color-mix(in srgb, var(--foreground) 45%, var(--background));
   --foreground-50: color-mix(in srgb, var(--foreground) 50%, var(--background));
   --foreground-60: color-mix(in srgb, var(--foreground) 60%, var(--background));
   --foreground-70: color-mix(in srgb, var(--foreground) 70%, var(--background));
@@ -50,14 +51,17 @@
   --secondary: oklch(from var(--foreground) l c h / 0.05);
   --secondary-foreground: var(--foreground);
   --muted: oklch(from var(--foreground) l c h / 0.05);
-  --muted-foreground: var(--foreground-50);
+  --muted-foreground: var(--foreground-45);
   --card: var(--background);
   --card-foreground: var(--foreground);
   --popover: var(--background);
   --popover-foreground: var(--foreground);
-  --border: oklch(from var(--foreground) l c h / 0.05);
-  --input: oklch(from var(--foreground) l c h / 0.1);
-  --ring: oklch(from var(--foreground) l c h / 0.25);
+  --primary: var(--accent);
+  --primary-foreground: oklch(1 0 0);
+  --accent-foreground: oklch(1 0 0);
+  --border: oklch(from var(--foreground) l c h / 0.1);
+  --input: oklch(from var(--foreground) l c h / 0.12);
+  --ring: oklch(from var(--foreground) l c h / 0.22);
   --ring-width: 1px;
   --ring-offset: 0px;
 
@@ -66,19 +70,19 @@
 
   /* Timeline / inspector track colors (overridable per theme preset) */
   --live: var(--success);
-  --broll: oklch(0.78 0.09 196);
-  --zoom: oklch(0.84 0.11 84);
-  --title: oklch(0.76 0.13 10);
+  --broll: oklch(0.623 0.178 210);
+  --zoom: oklch(0.676 0.184 75);
+  --title: oklch(0.657 0.183 25);
 
-  --font-sans: var(--font-inter), sans-serif;
-  --font-default: var(--font-inter), sans-serif;
+  --font-sans: var(--font-inter), system-ui, -apple-system, sans-serif;
+  --font-default: var(--font-sans);
 
   --text-ui: 0.8667rem;
   --text-caption: 0.733rem;
   --font-size-base: 15px;
   --font-weight-normal: 400;
-  --font-weight-medium: 500;
-  --font-weight-semibold: 600;
+  --font-weight-medium: 450;
+  --font-weight-semibold: 550;
   --leading-ui: 1.45;
   --leading-tight: 1.25;
   --tracking-ui: -0.011em;
@@ -125,6 +129,7 @@ html[data-theme-mismatch]::before {
   --color-foreground-20: var(--foreground-20);
   --color-foreground-30: var(--foreground-30);
   --color-foreground-40: var(--foreground-40);
+  --color-foreground-45: var(--foreground-45);
   --color-foreground-50: var(--foreground-50);
   --color-foreground-60: var(--foreground-60);
   --color-foreground-70: var(--foreground-70);
@@ -139,8 +144,9 @@ html[data-theme-mismatch]::before {
   --color-broll: var(--broll);
   --color-zoom: var(--zoom);
   --color-title: var(--title);
-  --color-primary: var(--foreground);
-  --color-primary-foreground: var(--background);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent-foreground: var(--accent-foreground);
   --color-sidebar: var(--background);
   --color-sidebar-foreground: var(--foreground);
   --color-sidebar-primary: var(--foreground);
@@ -166,6 +172,8 @@ html[data-theme-mismatch]::before {
   --color-md-counters: var(--md-counters);
 
   --font-sans: var(--font-default);
+  --font-weight-medium: 450;
+  --font-weight-semibold: 550;
   --text-ui: var(--text-ui);
   --text-caption: var(--text-caption);
 
@@ -194,7 +202,9 @@ html[data-theme-mismatch]::before {
     font-family: var(--font-default);
     font-size: var(--font-size-base);
     font-optical-sizing: auto;
-    font-feature-settings: "cv01", "cv02", "cv03", "cv04", "case";
+    font-feature-settings: "liga" 1, "calt" 1;
+    font-variation-settings: normal;
+    text-rendering: optimizeLegibility;
     letter-spacing: var(--tracking-ui);
   }
 
@@ -237,6 +247,11 @@ html[data-theme-mismatch]::before {
   samp {
     font-family: var(--font-default);
     font-size: 0.933em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  code {
+    font-weight: var(--font-weight-medium);
   }
 
   ::-webkit-scrollbar {
@@ -328,12 +343,18 @@ html[data-theme-mismatch]::before {
     line-height: var(--leading-ui);
   }
 
+  .text-code {
+    font-size: var(--text-caption);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+
   .popover-styled {
     color: var(--foreground);
     background: var(--background);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    box-shadow: none;
+    box-shadow: 0 1px 2px oklch(from var(--foreground) l c h / 0.04);
   }
 
   [data-sidebar-instant] [data-slot="sidebar-gap"],

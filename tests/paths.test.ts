@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { withDefaultProjectsRoot } from "./helpers/pathsIsolation.ts";
 import {
   assertValidSlug,
   assetStoragePath,
@@ -9,6 +8,7 @@ import {
   slugFromVideo,
   slugify,
 } from "../src/paths.ts";
+import { withDefaultProjectsRoot } from "./helpers/pathsIsolation.ts";
 
 test("slugify normalizes names for project directories", () => {
   assert.equal(slugify("My Cool Video!!!"), "my-cool-video");

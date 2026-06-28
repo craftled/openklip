@@ -39,13 +39,13 @@ function Slider({
         data-slot="slider-track"
       >
         <SliderPrimitive.Range
-          className="absolute select-none bg-foreground data-horizontal:h-full data-vertical:w-full"
+          className="absolute select-none bg-foreground/35 data-horizontal:h-full data-vertical:w-full"
           data-slot="slider-range"
         />
       </SliderPrimitive.Track>
       {Array.from({ length: _values.length }, (_, index) => (
         <SliderPrimitive.Thumb
-          className="relative block size-3 shrink-0 select-none rounded-md border border-foreground/20 bg-background transition-colors after:absolute after:-inset-2 hover:ring-1 hover:ring-ring focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring active:ring-1 disabled:pointer-events-none disabled:opacity-50"
+          className="relative block size-3 shrink-0 select-none rounded-md border border-border bg-background transition-colors after:absolute after:-inset-2 hover:ring-1 hover:ring-ring focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring active:ring-1 disabled:pointer-events-none disabled:opacity-50"
           data-slot="slider-thumb"
           key={index}
         />

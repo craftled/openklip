@@ -48,7 +48,7 @@ function Row({
     <div
       className={cn(
         "flex items-center gap-1.5 rounded-md bg-foreground/5 px-2 py-1.5 text-xs",
-        active && "ring-1 ring-foreground",
+        active && "ring-1 ring-foreground/25",
         isDragging && "opacity-60"
       )}
       ref={setNodeRef}

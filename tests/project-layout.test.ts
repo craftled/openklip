@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { withDefaultProjectsRoot } from "./helpers/pathsIsolation.ts";
 import {
   assetProxyRelative,
   assetSourceRelative,
   projectPaths,
 } from "../src/paths.ts";
+import { withDefaultProjectsRoot } from "./helpers/pathsIsolation.ts";
 
 test("projectPaths separates user assets/ from working/ generated files", () => {
   withDefaultProjectsRoot(() => {
