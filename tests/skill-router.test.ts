@@ -6,7 +6,7 @@ test("routes filler-word intent to a multi-step cut plan", () => {
   const m = routeIntent("please cut all the filler words", "demo");
   assert.equal(m.id, "filler");
   assert.ok(m.steps.some((s) => s.includes('cut demo --text "um" --all')));
-  assert.ok(m.steps.some((s) => s.startsWith("openklip transcript demo")));
+  assert.ok(m.steps.some((s) => s.includes("transcript grep demo")));
   assert.ok(m.steps.some((s) => s.startsWith("openklip status demo")));
 });
 
@@ -26,11 +26,17 @@ test("routes captions off vs on by polarity", () => {
 test("routes zoom and export intents", () => {
   const zoom = routeIntent("add a push-in zoom", "demo");
   assert.equal(zoom.id, "zoom");
-  assert.ok(zoom.steps[0].startsWith("openklip zoom-add demo"));
+  assert.ok(zoom.steps[0].startsWith("openklip zoom-add-phrase demo"));
 
   const exp = routeIntent("render and export the final cut", "demo");
   assert.equal(exp.id, "export");
   assert.ok(exp.steps.some((s) => s === "openklip export demo"));
+});
+
+test("routes template playbook intent", () => {
+  const m = routeIntent("Apply template talking-head", "demo");
+  assert.equal(m.id, "template");
+  assert.ok(m.steps.some((s) => s.includes("template show talking-head")));
 });
 
 test("falls back to an orientation plan for unrecognized intent", () => {
