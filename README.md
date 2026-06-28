@@ -33,7 +33,7 @@ These follow from how the repo is actually built:
 
 **Sample-accurate time.** Word and overlay times are stored as integer samples at 48 kHz. CLI commands take seconds for overlay spans and convert internally.
 
-**User drop zone.** Original assets you add land in `assets/` (upload, drag-drop, or copy into the folder). Generated proxies land in `working/assets/`. The asset API can sync new files from `assets/` (`?sync=1`).
+**User drop zone.** Original assets you add land in `assets/` (upload, drag-drop, or copy into the folder). Generated proxies land in `working/assets/`. The asset API syncs new files from `assets/` via `POST /api/projects/:slug/assets/sync` (synced per-slug so overlapping polls/tabs don't race `project.json`).
 
 ---
 

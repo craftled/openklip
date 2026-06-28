@@ -1,4 +1,4 @@
-import { syncAssetsFromFolder } from "@engine/asset-scanner";
+import { withAssetLock } from "@engine/asset-lock";
 import { listAssetsByKind, registerAssetBytes } from "@engine/assets";
 import { type Asset, type AssetKind, AssetKindSchema } from "@engine/edl";
 import { loadProject } from "@engine/projectStore";
@@ -12,12 +12,9 @@ interface RouteParams {
   params: Promise<{ slug: string }>;
 }
 
-export async function GET(req: NextRequest, { params }: RouteParams) {
+export async function GET(_req: NextRequest, { params }: RouteParams) {
   const { slug } = await params;
   try {
-    if (req.nextUrl.searchParams.get("sync") === "1") {
-      await syncAssetsFromFolder(slug);
-    }
     const project = await loadProject(slug);
     return Response.json({
       assets: project.assets,
@@ -46,7 +43,11 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
       kind = parsed.data;
     }
     const bytes = new Uint8Array(await file.arrayBuffer());
-    const asset = await registerAssetBytes(slug, file.name, bytes, kind);
+    // Serialize against folder sync so an in-flight sync can't clobber the
+    // asset this upload registers (and vice versa) via project.json.
+    const asset = await withAssetLock(slug, () =>
+      registerAssetBytes(slug, file.name, bytes, kind)
+    );
     const project = await loadProject(slug);
     return Response.json({
       asset,

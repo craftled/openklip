@@ -240,16 +240,21 @@ try {
     }
     case "ingest": {
       if (!rest[0]) {
-        throw new Error("usage: openklip ingest <video> [--brand <name>]");
+        throw new Error(
+          "usage: openklip ingest <video> [--brand <name>] [--force]"
+        );
       }
       const brandName = flagValue(rest, "--brand");
+      const force = rest.includes("--force");
       const videoArg = rest.filter(
-        (a) => a !== "--brand" && a !== brandName
+        (a) => a !== "--brand" && a !== brandName && a !== "--force"
       )[0];
       if (!videoArg) {
-        throw new Error("usage: openklip ingest <video> [--brand <name>]");
+        throw new Error(
+          "usage: openklip ingest <video> [--brand <name>] [--force]"
+        );
       }
-      const ingestedSlug = await ingest(videoArg);
+      const ingestedSlug = await ingest(videoArg, { force });
       if (brandName) {
         const project = await loadProject(ingestedSlug);
         applyBrand(project, await loadBrand(brandName));

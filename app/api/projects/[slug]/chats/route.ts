@@ -58,11 +58,17 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
         body.role,
         body.content
       );
+      if (!thread) {
+        return Response.json({ error: "thread not found" }, { status: 404 });
+      }
       return Response.json({ thread });
     }
 
     if (action === "rename" && body.threadId && body.title) {
       const thread = await renameProjectThread(slug, body.threadId, body.title);
+      if (!thread) {
+        return Response.json({ error: "thread not found" }, { status: 404 });
+      }
       return Response.json({ thread });
     }
 
@@ -76,6 +82,9 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
         body.threadId,
         body.archived
       );
+      if (!thread) {
+        return Response.json({ error: "thread not found" }, { status: 404 });
+      }
       return Response.json({ thread });
     }
 
@@ -85,8 +94,15 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     }
 
     if (action === "setActive") {
-      await setActiveProjectThreadId(slug, body.threadId ?? null);
-      return Response.json({ activeThreadId: body.threadId ?? null });
+      const threadId = body.threadId ?? null;
+      if (threadId !== null) {
+        const { threads } = await loadProjectChats(slug);
+        if (!threads.some((t) => t.id === threadId)) {
+          return Response.json({ error: "thread not found" }, { status: 404 });
+        }
+      }
+      await setActiveProjectThreadId(slug, threadId);
+      return Response.json({ activeThreadId: threadId });
     }
 
     return Response.json({ error: "invalid action" }, { status: 400 });

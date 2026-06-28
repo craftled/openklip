@@ -11,7 +11,10 @@ interface RawChunk {
   text: string;
 }
 
-export async function ingest(videoArg: string): Promise<string> {
+export async function ingest(
+  videoArg: string,
+  opts?: { force?: boolean }
+): Promise<string> {
   const source = isAbsolute(videoArg)
     ? videoArg
     : resolve(process.cwd(), videoArg);
@@ -21,6 +24,14 @@ export async function ingest(videoArg: string): Promise<string> {
 
   const slug = slugFromVideo(source);
   const p = projectPaths(slug);
+  // Re-ingesting a slug wipes the whole project dir. Refuse unless the caller
+  // explicitly opts in with --force, so an accidental re-upload can't destroy
+  // an existing edit.
+  if (!opts?.force && existsSync(p.project)) {
+    throw new Error(
+      `project already exists: ${slug} (re-ingest would wipe it; pass --force to overwrite)`
+    );
+  }
   await rm(p.dir, { recursive: true, force: true });
   await mkdir(p.assets, { recursive: true });
   await mkdir(p.frames, { recursive: true });

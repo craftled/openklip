@@ -61,3 +61,48 @@ test("POST /api/projects ingests upload and returns slug", async () => {
     mock.restore();
   });
 });
+
+test("POST /api/projects returns 409 when the project already exists", async () => {
+  await withTempProjectsRoot(async () => {
+    mock.module("@engine/ingest", () => ({
+      ingest: () => {
+        throw new Error(
+          "project already exists: demo (re-ingest would wipe it; pass --force to overwrite)"
+        );
+      },
+    }));
+
+    const res = await POST(
+      ingestRequest(new File(["fake-bytes"], "demo.mp4", { type: "video/mp4" }))
+    );
+    assert.equal(res.status, 409);
+    const json = (await res.json()) as { error?: string };
+    assert.match(json.error ?? "", /already exists/i);
+
+    mock.restore();
+  });
+});
+
+test("POST /api/projects?force=1 passes force through to ingest", async () => {
+  await withTempProjectsRoot(async () => {
+    let receivedForce: boolean | undefined;
+    mock.module("@engine/ingest", () => ({
+      ingest: (_video: string, opts?: { force?: boolean }) => {
+        receivedForce = opts?.force;
+        return "force-demo";
+      },
+    }));
+
+    const form = new FormData();
+    form.append("file", new File(["fake-bytes"], "demo.mp4"));
+    const req = new Request("http://localhost/api/projects?force=1", {
+      method: "POST",
+      body: form,
+    }) as unknown as Parameters<typeof POST>[0];
+    const res = await POST(req);
+    assert.equal(res.status, 200);
+    assert.equal(receivedForce, true);
+
+    mock.restore();
+  });
+});

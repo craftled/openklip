@@ -104,3 +104,20 @@ test("registerAssetBytes keeps the uploaded source file on disk", async () => {
     assert.ok(asset.src.includes("/assets/incoming.png"));
   });
 });
+
+test("registerAsset copies an external still into assets/ (no ../../ proxy)", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug, assets: [] }));
+    // Source lives OUTSIDE the project's assets/ folder.
+    const external = join(process.cwd(), "external-pic.png");
+    writeFileSync(external, Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+
+    const asset = await registerAsset(slug, external, "still");
+    assert.equal(asset.kind, "still");
+    // proxy must be a portable in-project path, not a ../../external-pic.png.
+    assert.ok(asset.proxy.startsWith("assets/"));
+    assert.ok(!asset.proxy.includes(".."));
+    // The original was copied into the project's assets/ dir.
+    assert.ok(existsSync(join(process.cwd(), "projects", slug, asset.proxy)));
+  });
+});

@@ -11,15 +11,21 @@ Editor shell refresh: the asset bin, project chats, and theme picker now live in
 - **Theme engine** — swappable presets (OpenKlip, Catppuccin, GitHub, Nord, Dracula, Tokyo Night) with light/dark scheme and no-flash boot script.
 - **Keyboard shortcuts** — ⌘B toggles agent sidebar, ⌘I toggles inspector (`EditorSidebarShortcuts`).
 - **Asset folder scanner** — CLI/GUI parity when files land in `projects/<slug>/assets/` (`src/asset-scanner.ts`).
+- **Folder sync endpoint** — `POST /api/projects/:slug/assets/sync` registers any new files dropped into `assets/`. Sync is POST (not a mutating GET) and serialized per-slug so overlapping polls/tabs never race the `project.json` read-modify-write (`src/asset-lock.ts`).
 
 ### Changed
 - Removed the asset strip below the timeline; assets render only under **Assets** in the agent sidebar.
 - Agent threads moved from browser localStorage to per-project disk via the chats API.
 - Inspector settings grouped under a Paper-style right sidebar with theme and default-agent pickers.
 - Unified `registerAsset` path for b-roll, music, and stills; dropped standalone `src/broll.ts`.
+- `GET /api/projects/:slug/assets` is now read-only (the old `?sync=1` mutation moved to the POST sync endpoint). Upload and sync share a per-slug write lock.
 
 ### Fixed
 - Lint/test hygiene for theme re-exports, vendored agents-ui shader component, and `AgentModelSelect` extraction.
+- **`chats.json` no longer silently wipes on corruption.** `saveProjectChats` now writes atomically (tmp + rename) so a crash mid-write can't leave a half-file; `loadProjectChats` moves a corrupt/unreadable file to `chats.json.bad-<ts>` and throws instead of returning empty (which would have persisted `{}` on the next mutation and destroyed every thread).
+- **Chats API returns 404 for unknown threads.** `append`/`rename`/`archive` now respond 404 when `threadId` doesn't exist (previously 200 with `thread: undefined`); `setActive` validates the thread exists before pinning it.
+- **Stills from outside `assets/` are copied in.** `buildStillProxy` now copies an external still original into `assets/` instead of storing a `../../…` relative proxy that broke portability and leaked absolute structure. Stills already in `assets/` are still referenced in place.
+- **Re-ingest no longer silently wipes an existing project.** `ingest` refuses when the slug's `project.json` already exists unless `--force` is passed (CLI) or `?force=1` is sent (upload API, which returns 409 Conflict).
 
 ## 0.5.0 - 2026-06-26
 
