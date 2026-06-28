@@ -281,7 +281,7 @@ export async function exportCut(
   //     surface but the exporter builds the combined file directly for parity
   //     with titles — keep this duplication, do NOT route text graphics back
   //     through the per-overlay seam or the local/output timebase will mismatch).
-  //   - kind 'rich' -> an alpha WebM composited as one extra input after stills.
+  //   - kind 'rich' -> a transparent ProRes MOV composited as one extra input.
   // One planning pass: map each Graphic to its output window + manifest + merged
   // params. NO renderer-seam call here — text graphics are burned directly into
   // the combined graphics.ass below (parity with titles), so only rich graphics
@@ -346,7 +346,7 @@ export async function exportCut(
     );
   }
 
-  // Rich graphics each pay for a headless alpha-WebM render through the seam,
+  // Rich graphics each pay for a headless alpha-MOV render through the seam,
   // keyed by the overlay's UNIQUE id (g.id) so two overlays sharing a template
   // never collide on one file. Input-index invariant: physical -i order is
   // source(0), b-roll plans, stills, THEN rich graphics. The
@@ -527,7 +527,7 @@ export async function exportCut(
 
   // Rich graphics sit on top of the grade/vignette, just below the subtitle
   // burns (captions/titles/text-graphics) — same editorial layer as titles. The
-  // alpha WebM carries its own duration + transparency, so just PTS-offset to its
+  // alpha MOV carries its own duration + transparency, so just PTS-offset to its
   // output start, scale to the frame, and overlay within its enable window
   // (mirrors the still overlay loop above; eof_action=pass like b-roll/stills).
   for (const rg of richGraphics) {
@@ -571,9 +571,9 @@ export async function exportCut(
       "-i",
       sp.srcPath,
     ]),
-    // Rich-graphic alpha WebMs. MUST be appended AFTER stills to keep the
-    // 1 + plans.length + stillPlans.length + j index math above correct. VP9
-    // alpha (yuva420p) is auto-detected by ffmpeg; no input codec flag needed.
+    // Rich-graphic alpha MOVs. MUST be appended AFTER stills to keep the
+    // 1 + plans.length + stillPlans.length + j index math above correct. ProRes
+    // 4444 alpha (yuva444p) is auto-detected by ffmpeg; no input codec flag.
     ...richGraphics.flatMap((rg) => ["-i", rg.asset.assetPath]),
   ];
   await run(
