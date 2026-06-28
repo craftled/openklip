@@ -52,12 +52,12 @@ export function AgentSkillsMenu({
       className={cn(
         embedded
           ? "overflow-hidden rounded-lg bg-popover text-popover-foreground"
-          : "absolute right-0 bottom-full left-0 z-50 mb-2 overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-lg",
+          : "popover-styled absolute right-0 bottom-full left-0 z-50 mb-2 overflow-hidden",
         className
       )}
     >
       <div className="border-border border-b px-3 py-2">
-        <p className="font-medium text-muted-foreground text-xs">Skills</p>
+        <p className="text-section-label text-tertiary">Skills</p>
       </div>
       <PromptInputCommand shouldFilter={false}>
         <PromptInputCommandList className="max-h-72">
@@ -72,12 +72,12 @@ export function AgentSkillsMenu({
                 onSelect={() => onSelect(skill)}
                 value={`${skill.title} ${skill.description} ${skill.slash}`}
               >
-                <Box className="size-4 shrink-0 text-muted-foreground" />
+                <Box className="size-4 shrink-0 text-tertiary" />
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-medium text-sm">
                     {skill.title}
                   </div>
-                  <div className="truncate text-muted-foreground text-xs">
+                  <div className="truncate text-tertiary text-xs">
                     {skill.description}
                   </div>
                 </div>

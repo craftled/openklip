@@ -109,7 +109,7 @@ function AssetBinRow({
       <span className="min-w-0 flex-1 truncate">{asset.name}</span>
       {confirmDelete ? (
         <span className="flex shrink-0 items-center gap-1">
-          <span className="text-[11px] text-muted-foreground">Delete?</span>
+          <span className="text-[11px] text-tertiary">Delete?</span>
           <button
             aria-label={`Confirm delete ${asset.name}`}
             className="inline-flex size-5 cursor-pointer items-center justify-center rounded-sm text-destructive hover:bg-destructive/10 disabled:opacity-50"
@@ -124,7 +124,7 @@ function AssetBinRow({
           </button>
           <button
             aria-label={`Cancel delete ${asset.name}`}
-            className="inline-flex size-5 cursor-pointer items-center justify-center rounded-sm text-muted-foreground hover:bg-muted disabled:opacity-50"
+            className="inline-flex size-5 cursor-pointer items-center justify-center rounded-sm text-tertiary hover:bg-muted disabled:opacity-50"
             disabled={deleting}
             onClick={(e) => {
               e.stopPropagation();
@@ -139,7 +139,7 @@ function AssetBinRow({
         <>
           <button
             aria-label={`Delete ${asset.name}`}
-            className="inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-sm text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive focus-visible:opacity-100 group-hover/asset:opacity-100"
+            className="inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-sm text-tertiary opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive focus-visible:opacity-100 group-hover/asset:opacity-100"
             onClick={(e) => {
               e.stopPropagation();
               onRequestDelete();
@@ -148,7 +148,7 @@ function AssetBinRow({
           >
             <Trash2 className="size-3" />
           </button>
-          <span className="shrink-0 text-caption text-muted-foreground tabular-nums">
+          <span className="shrink-0 text-caption text-tertiary tabular-nums">
             {fmtDur(asset.durationSamples, sampleRate)}
           </span>
         </>
@@ -301,7 +301,7 @@ export function AssetBin({
         onDrop={onDrop}
         type="button"
       >
-        <Upload className="size-4 text-muted-foreground" />
+        <Upload className="size-4 text-tertiary" />
         <span className="font-medium text-xs">
           {uploading ? "Registering…" : "Drop or click to add"}
         </span>
@@ -330,7 +330,7 @@ export function AssetBin({
               className="min-w-0 overflow-hidden rounded-md border border-border bg-foreground/3 p-2.5"
               key={kind}
             >
-              <div className="mb-2 flex items-center gap-1.5 text-muted-foreground text-section-label">
+              <div className="mb-2 flex items-center gap-1.5 text-section-label text-tertiary">
                 <Icon className="size-3.5" />
                 {meta.label}
                 <Badge
@@ -341,7 +341,7 @@ export function AssetBin({
                 </Badge>
               </div>
               {items.length === 0 ? (
-                <p className="text-caption text-muted-foreground/70">
+                <p className="text-caption text-quaternary">
                   No {meta.label.toLowerCase()} yet
                 </p>
               ) : (

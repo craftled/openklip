@@ -9,5 +9,8 @@ test("menu instant attr matches globals.css selector", () => {
     new URL("../app/globals.css", import.meta.url),
     "utf8"
   );
-  assert.match(css, /\[data-menu-instant\]\[data-slot="dropdown-menu-content"\]/);
+  assert.match(
+    css,
+    /\[data-menu-instant\]\[data-slot="dropdown-menu-content"\]/
+  );
 });

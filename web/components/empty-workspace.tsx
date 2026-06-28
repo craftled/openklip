@@ -129,7 +129,7 @@ export function EmptyWorkspace() {
                   </div>
                   <div className="grid min-w-0 flex-1 text-left text-sm leading-tight">
                     <span className="truncate font-medium">No project yet</span>
-                    <span className="truncate text-muted-foreground text-xs">
+                    <span className="truncate text-tertiary text-xs">
                       {folderReady ? "Add a video to start" : "Choose a folder"}
                     </span>
                   </div>
@@ -162,20 +162,20 @@ export function EmptyWorkspace() {
         </Sidebar>
         <SidebarInset className="flex min-h-svh flex-col">
           <main className="flex flex-1 flex-col items-center justify-center gap-6 p-8 text-center">
-            <div className="flex size-14 items-center justify-center rounded-xl bg-foreground-5">
-              <Sparkles className="size-7 text-muted-foreground" />
+            <div className="flex size-14 items-center justify-center rounded-lg border border-border bg-surface-1">
+              <Sparkles className="size-7 text-tertiary" />
             </div>
             <div className="max-w-md space-y-2">
               <h1 className="font-semibold text-xl tracking-tight">
                 Welcome to OpenKlip
               </h1>
-              <p className="text-muted-foreground text-sm leading-relaxed">
+              <p className="text-sm text-tertiary leading-relaxed">
                 {folderReady
                   ? "Your workspace is ready. Add a video to transcribe, cut filler, and export."
                   : "Choose a folder for your projects, then add a video to get started."}
               </p>
               {workspace?.displayRoot ? (
-                <p className="truncate text-code text-muted-foreground">
+                <p className="truncate text-code text-tertiary">
                   {workspace.displayRoot}
                 </p>
               ) : null}
@@ -194,10 +194,9 @@ export function EmptyWorkspace() {
               )}
             </div>
             {!dialogOpen && folderReady ? (
-              <p className="max-w-sm text-muted-foreground text-xs">
+              <p className="max-w-sm text-tertiary text-xs">
                 Tip: drop a video anywhere in the new project dialog, or use{" "}
-                <code>openklip ingest &lt;video&gt;</code>{" "}
-                from the CLI.
+                <code>openklip ingest &lt;video&gt;</code> from the CLI.
               </p>
             ) : null}
           </main>

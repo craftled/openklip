@@ -144,7 +144,7 @@ function ExportOptionLabel({
 }) {
   return (
     <div className="mb-2 flex items-center gap-2 font-medium text-sm">
-      <Icon className="size-4 text-muted-foreground" />
+      <Icon className="size-4 text-tertiary" />
       {label}
     </div>
   );
@@ -240,7 +240,7 @@ export function ExportDialog({
                 ))}
               </SelectContent>
             </Select>
-            <p className="mt-1.5 text-caption text-muted-foreground">
+            <p className="mt-1.5 text-caption text-tertiary">
               Exports at source frame rate. Custom rates coming soon.
             </p>
           </div>
@@ -268,7 +268,7 @@ export function ExportDialog({
                 4K
               </ToggleGroupItem>
             </ToggleGroup>
-            <p className="mt-1.5 text-caption text-muted-foreground tabular-nums">
+            <p className="mt-1.5 text-caption text-tertiary tabular-nums">
               {dims.width}px × {dims.height}px
             </p>
           </div>
@@ -287,7 +287,7 @@ export function ExportDialog({
               <ToggleGroupItem value="web">Web</ToggleGroupItem>
               <ToggleGroupItem value="web-low">Web (Low)</ToggleGroupItem>
             </ToggleGroup>
-            <p className="mt-2 text-caption text-muted-foreground leading-relaxed">
+            <p className="mt-2 text-caption text-tertiary leading-relaxed">
               Compression presets coming soon. Exports use the default encoder
               settings.
             </p>
@@ -319,7 +319,7 @@ export function ExportDialog({
         </div>
 
         <AlertDialogFooter className="items-end gap-3 sm:justify-between">
-          <p className="text-caption text-muted-foreground sm:max-w-[55%] sm:text-left">
+          <p className="text-caption text-tertiary sm:max-w-[55%] sm:text-left">
             Estimation: Export time {formatDurationEstimate(exportTimeSec)}.
             Output size {formatBytes(outputBytes)}.
           </p>

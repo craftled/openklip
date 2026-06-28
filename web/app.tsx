@@ -49,9 +49,9 @@ import {
   type ExportDialogOptions,
 } from "@/components/export-dialog";
 import { FindFillerButton } from "@/components/find-filler-button";
-import { OverlaySortable } from "@/components/overlay-sortable";
 import { HeroTitleOverlay } from "@/components/hero-title-overlay";
 import { KeyboardHint } from "@/components/keyboard-hint";
+import { OverlaySortable } from "@/components/overlay-sortable";
 import { PLAYER_SPEEDS, PlayerControls } from "@/components/player-controls";
 import { TemplateSelect } from "@/components/template-select";
 import { Button } from "@/components/ui/button";

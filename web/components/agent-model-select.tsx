@@ -25,7 +25,7 @@ function badgeState(status?: AgentStatus): {
   if (!status) {
     return {
       dot: "bg-foreground/30",
-      text: "text-muted-foreground",
+      text: "text-tertiary",
       label: "Checking…",
       title: "Checking…",
     };
@@ -33,7 +33,7 @@ function badgeState(status?: AgentStatus): {
   if (!status.installed) {
     return {
       dot: "bg-foreground/40",
-      text: "text-muted-foreground",
+      text: "text-tertiary",
       label: "Not installed",
       title: `${status.cli} CLI not found on PATH`,
     };

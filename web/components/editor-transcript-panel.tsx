@@ -33,14 +33,12 @@ export function EditorTranscriptPanel({
     <ScrollArea className="h-full">
       <div className="px-6 pt-4 pb-12">
         <div className="mb-3 flex items-center gap-2">
-          <span className="font-medium text-muted-foreground text-xs">
-            Transcript
-          </span>
-          <span className="ml-auto text-caption text-muted-foreground/70">
+          <span className="text-section-label text-tertiary">Transcript</span>
+          <span className="ml-auto text-caption text-quaternary">
             Click to cut · shift-click to select
           </span>
         </div>
-        <p className="max-w-[60ch] text-base leading-[1.95]">
+        <p className="max-w-[60ch] text-ui leading-ui">
           {words.map((w, i) => {
             const active =
               curSample >= w.startSample &&
@@ -52,8 +50,7 @@ export function EditorTranscriptPanel({
               <span
                 className={cn(
                   "cursor-pointer rounded px-0.5 py-px transition-colors fine-hover:hover:bg-muted active:bg-muted/80",
-                  w.deleted &&
-                    "text-muted-foreground/60 line-through decoration-1",
+                  w.deleted && "text-quaternary line-through decoration-1",
                   active && "bg-live/15 text-live",
                   inBroll(w) &&
                     "underline decoration-2 decoration-broll/70 underline-offset-4",

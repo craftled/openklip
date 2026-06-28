@@ -60,7 +60,7 @@ function StepPill({
         "flex items-center gap-2 rounded-full border px-3 py-1 text-xs transition-colors",
         active
           ? "border-border bg-foreground/5 text-foreground"
-          : "border-transparent text-muted-foreground"
+          : "border-transparent text-tertiary"
       )}
     >
       <span
@@ -220,23 +220,23 @@ export function NewProjectDialog({
 
         {loadingWorkspace && !workspace ? (
           <div className="flex justify-center py-8">
-            <Spinner className="size-6 text-muted-foreground" />
+            <Spinner className="size-6 text-tertiary" />
           </div>
         ) : showFolderStep ? (
           <div className="space-y-4">
-            <div className="rounded-lg border border-dashed border-border bg-foreground-2 p-5">
+            <div className="rounded-lg border border-border border-dashed bg-foreground-2 p-5">
               <div className="flex items-start gap-3">
                 <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-foreground-5">
-                  <FolderOpen className="size-5 text-muted-foreground" />
+                  <FolderOpen className="size-5 text-tertiary" />
                 </div>
                 <div className="min-w-0 space-y-1">
                   <p className="font-medium text-sm">Workspace folder</p>
-                  <p className="text-muted-foreground text-xs leading-relaxed">
+                  <p className="text-tertiary text-xs leading-relaxed">
                     Projects, transcripts, and exports live here as plain
                     folders you can back up or sync.
                   </p>
                   {workspace?.displayRoot ? (
-                    <p className="truncate text-code text-muted-foreground">
+                    <p className="truncate text-code text-tertiary">
                       {workspace.displayRoot}
                     </p>
                   ) : null}
@@ -257,7 +257,7 @@ export function NewProjectDialog({
         ) : (
           <div className="space-y-4">
             {workspace?.displayRoot ? (
-              <p className="truncate text-code text-muted-foreground">
+              <p className="truncate text-code text-tertiary">
                 {workspace.displayRoot}
               </p>
             ) : null}
@@ -282,10 +282,10 @@ export function NewProjectDialog({
               onDrop={onDrop}
             >
               <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-full bg-foreground-5">
-                <Film className="size-6 text-muted-foreground" />
+                <Film className="size-6 text-tertiary" />
               </div>
               <p className="font-medium text-sm">Drop a video here</p>
-              <p className="mt-1 text-muted-foreground text-xs">
+              <p className="mt-1 text-tertiary text-xs">
                 MP4, MOV, or WebM. OpenKlip transcribes speech and builds your
                 edit.
               </p>
@@ -293,16 +293,16 @@ export function NewProjectDialog({
                 className="mt-4"
                 onClick={() => inputRef.current?.click()}
                 type="button"
-                variant="secondary"
+                variant="default"
               >
                 <Upload className="size-4" />
                 Choose video…
               </Button>
             </div>
             {workspace?.pickerSupported || workspace?.configured ? null : (
-              <p className="text-muted-foreground text-xs leading-relaxed">
-                Set <code>OPENKLIP_PROJECTS_ROOT</code> to
-                choose a custom projects directory on this platform.
+              <p className="text-tertiary text-xs leading-relaxed">
+                Set <code>OPENKLIP_PROJECTS_ROOT</code> to choose a custom
+                projects directory on this platform.
               </p>
             )}
           </div>

@@ -135,7 +135,8 @@ const RULES: SkillRule[] = [
     test: /\bapply template\b/i,
     build: (slug, intent) => {
       const id =
-        intent.match(/apply template ([a-z][a-z0-9-]*)/i)?.[1] ?? "talking-head";
+        intent.match(/apply template ([a-z][a-z0-9-]*)/i)?.[1] ??
+        "talking-head";
       return [
         ok(`template show ${id}`),
         ok(`transcript grep ${slug} "filler"`),

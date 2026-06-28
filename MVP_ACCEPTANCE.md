@@ -26,7 +26,7 @@ OpenKlip MVP is complete when a local user can turn a talking-head video into an
 ## Verification Evidence
 
 - `bun install --frozen-lockfile`: no changes needed.
-- `bun run ci`: check, typecheck, 38 tests, and production build passed.
+- `bun run ci`: check, typecheck, 387 tests, and production build passed.
 - Ingest smoke: `/tmp/openklip-ingest-smoke.mp4` created `projects/openklip-ingest-smoke` with 34 transcribed words.
 - Media smoke: `/media/proxy.mp4?slug=ok-sample` returned `206 Partial Content` for `Range: bytes=0-99`.
 - Browser smoke: local editor loaded, preview video advanced, transcript click persisted, export completed, and add-flow created zoom/title/b-roll entries.
@@ -37,3 +37,9 @@ OpenKlip MVP is complete when a local user can turn a talking-head video into an
 - Cuts are still word-boundary based; VAD silence snapping and equal-power audio crossfades are post-MVP hardening.
 - 4K export can be slow because ffmpeg still decodes the selected source stream.
 - Vertical shorts/reframing and automatic highlight detection are post-MVP features.
+- Export dialog compression, frame rate, and clipboard controls are UI-only until the ffmpeg pipeline supports them.
+- Workspace folder picker is macOS-only; other platforms need `OPENKLIP_PROJECTS_ROOT` or CLI ingest.
+- Glimm cut transitions are preview-only; exported MP4 hard-jumps between kept ranges.
+- Project write locks are in-process only; concurrent CLI + server processes can still race on the same slug.
+
+Post-MVP roadmap and gaps: **[TODO.md](./TODO.md)**.

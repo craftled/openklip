@@ -135,7 +135,7 @@ export function ProjectSwitcher({
                   <span className="truncate pr-4 font-medium">
                     {active.slug}
                   </span>
-                  <span className="truncate text-muted-foreground text-xs">
+                  <span className="truncate text-tertiary text-xs">
                     {creating ? (
                       "Creating project…"
                     ) : (
@@ -157,11 +157,11 @@ export function ProjectSwitcher({
               {...(menuInstant ? { [MENU_INSTANT_ATTR]: "" } : {})}
             >
               <DropdownMenuGroup>
-                <DropdownMenuLabel className="text-muted-foreground text-xs">
+                <DropdownMenuLabel className="text-tertiary text-xs">
                   Projects
                 </DropdownMenuLabel>
                 {projects.length === 0 && (
-                  <DropdownMenuItem className="text-muted-foreground" disabled>
+                  <DropdownMenuItem className="text-tertiary" disabled>
                     No projects yet
                   </DropdownMenuItem>
                 )}
@@ -251,7 +251,7 @@ export function ProjectSwitcher({
                   <div className="flex size-6 items-center justify-center rounded-md bg-foreground/5">
                     <Plus className="size-4" />
                   </div>
-                  <span className="font-medium text-muted-foreground">
+                  <span className="font-medium text-tertiary">
                     {creating ? "Creating…" : "Create new project"}
                   </span>
                 </DropdownMenuItem>

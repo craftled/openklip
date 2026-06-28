@@ -170,7 +170,7 @@ function TrackRow({
   return (
     <div className="flex border-foreground/10 border-b last:border-b-0">
       <div
-        className="flex shrink-0 items-center gap-1.5 border-foreground/10 border-r bg-foreground/3 px-2 text-caption text-muted-foreground"
+        className="flex shrink-0 items-center gap-1.5 border-border border-r bg-surface-1 px-2 text-caption text-tertiary"
         style={{ width: LABEL_W }}
       >
         <Icon className="size-3 shrink-0" />
@@ -223,7 +223,7 @@ export function EditTimeline({
             >
               {ticks.map((t) => (
                 <span
-                  className="absolute top-0 text-caption text-muted-foreground/80 tabular-nums"
+                  className="absolute top-0 text-caption text-quaternary tabular-nums"
                   key={t}
                   style={{
                     left: `${pct(t, durationSec)}%`,
@@ -286,7 +286,7 @@ export function EditTimeline({
             {broll.map((clip) => (
               <ClipBlock
                 active={selected?.kind === "broll" && selected.id === clip.id}
-                className="bg-broll/25 text-broll-foreground"
+                className="bg-broll/25 text-foreground"
                 clip={clip}
                 durationSec={durationSec}
                 key={clip.id}
@@ -322,7 +322,7 @@ export function EditTimeline({
             {titles.map((clip) => (
               <ClipBlock
                 active={selected?.kind === "title" && selected.id === clip.id}
-                className="bg-foreground/10 text-foreground"
+                className="border border-title/30 bg-title/15 text-foreground"
                 clip={clip}
                 durationSec={durationSec}
                 key={clip.id}
@@ -340,7 +340,7 @@ export function EditTimeline({
             >
               {libraryMusic.map((clip) => (
                 <LibraryBlock
-                  className="border-violet-400/40 bg-violet-500/10 text-foreground"
+                  className="border-info/40 bg-info/10 text-foreground"
                   clip={clip}
                   durationSec={durationSec}
                   key={clip.id}
@@ -358,7 +358,7 @@ export function EditTimeline({
             >
               {libraryStills.map((clip) => (
                 <LibraryBlock
-                  className="border-amber-400/40 bg-amber-500/10 text-foreground"
+                  className="border-zoom/40 bg-zoom/10 text-foreground"
                   clip={clip}
                   durationSec={durationSec}
                   key={clip.id}

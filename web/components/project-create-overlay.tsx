@@ -27,8 +27,8 @@ export function ProjectCreateOverlay({
       <div className="flex flex-col items-center gap-4 px-6 text-center">
         {phase === "creating" ? (
           <>
-            <Spinner className="size-10 text-muted-foreground" />
-            <p className="text-muted-foreground text-sm">Creating project…</p>
+            <Spinner className="size-10 text-tertiary" />
+            <p className="text-sm text-tertiary">Creating project…</p>
           </>
         ) : (
           <>

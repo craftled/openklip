@@ -116,9 +116,7 @@ export function CollapsibleSidebarMetaItem({
     <div className="flex h-7 items-center gap-2 px-2 text-sidebar-foreground text-xs">
       <Icon className="size-4 shrink-0 text-sidebar-accent-foreground" />
       <span className="min-w-0 flex-1 truncate">{label}</span>
-      <span className="shrink-0 text-muted-foreground tabular-nums">
-        {value}
-      </span>
+      <span className="shrink-0 text-tertiary tabular-nums">{value}</span>
     </div>
   );
 }

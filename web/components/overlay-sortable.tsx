@@ -56,7 +56,7 @@ function Row({
     >
       <button
         aria-label={`Drag ${label} to reorder`}
-        className="cursor-grab touch-none text-muted-foreground active:cursor-grabbing"
+        className="cursor-grab touch-none text-tertiary active:cursor-grabbing"
         type="button"
         {...attributes}
         {...listeners}

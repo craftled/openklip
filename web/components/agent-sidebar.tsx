@@ -188,7 +188,7 @@ export function AgentSidebar({
           </SidebarMenuItem>
           <SidebarMenuItem className="pb-0.5">
             <div className="relative">
-              <Search className="pointer-events-none absolute top-1/2 left-2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Search className="pointer-events-none absolute top-1/2 left-2 size-4 -translate-y-1/2 text-tertiary" />
               <SidebarInput
                 className="pl-8"
                 onChange={(e) => setSearch(e.target.value)}
@@ -210,7 +210,7 @@ export function AgentSidebar({
         >
           <SidebarMenu>
             {chatEmptyLabel && (
-              <p className="px-2 py-1 text-muted-foreground text-xs">
+              <p className="px-2 py-1 text-tertiary text-xs">
                 {chatEmptyLabel}
               </p>
             )}
@@ -236,9 +236,7 @@ export function AgentSidebar({
           </SidebarMenu>
           {filteredArchivedChats.length > 0 && (
             <>
-              <p className="mt-3 mb-1 px-2 text-muted-foreground text-xs">
-                Archived
-              </p>
+              <p className="mt-3 mb-1 px-2 text-tertiary text-xs">Archived</p>
               <SidebarMenu>
                 {filteredArchivedChats.map((t) => (
                   <ChatListItem

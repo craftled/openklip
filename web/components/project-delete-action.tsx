@@ -28,7 +28,7 @@ export function ProjectDeleteAction({
         className={cn("ml-auto flex shrink-0 items-center gap-1", className)}
         onClick={(e) => e.stopPropagation()}
       >
-        <span className="text-[11px] text-muted-foreground">Delete?</span>
+        <span className="text-[11px] text-tertiary">Delete?</span>
         <button
           aria-label={`Confirm delete project ${slug}`}
           className="inline-flex size-5 cursor-pointer items-center justify-center rounded-sm text-destructive hover:bg-destructive/10 disabled:opacity-50"
@@ -43,7 +43,7 @@ export function ProjectDeleteAction({
         </button>
         <button
           aria-label={`Cancel delete project ${slug}`}
-          className="inline-flex size-5 cursor-pointer items-center justify-center rounded-sm text-muted-foreground hover:bg-muted disabled:opacity-50"
+          className="inline-flex size-5 cursor-pointer items-center justify-center rounded-sm text-tertiary hover:bg-muted disabled:opacity-50"
           disabled={deleting}
           onClick={(e) => {
             e.stopPropagation();
@@ -61,7 +61,7 @@ export function ProjectDeleteAction({
     <button
       aria-label={`Delete project ${slug}`}
       className={cn(
-        "ml-auto inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-sm text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive focus-visible:opacity-100 group-hover/project:opacity-100",
+        "ml-auto inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-sm text-tertiary opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive focus-visible:opacity-100 group-hover/project:opacity-100",
         className
       )}
       onClick={(e) => {
