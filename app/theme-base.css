@@ -13,6 +13,10 @@
   --surface-2: color-mix(in oklch, var(--foreground) 4.5%, var(--background));
   --surface-3: color-mix(in oklch, var(--foreground) 7%, var(--background));
   --background-elevated: var(--surface-1);
+  /* Sidebars: slightly recessed vs main shell (darker in light and dark).
+     Named --sidebar-surface (not --sidebar) so Tailwind does not treat "black"
+     in the color-mix() as the sidebar theme color. */
+  --sidebar-surface: color-mix(in oklch, black 2.5%, var(--background));
 
   /* Text hierarchy (matched contrast in light and dark) */
   --text-primary: var(--foreground);
@@ -221,7 +225,7 @@ html[data-theme-mismatch]::before {
   --color-surface-3: var(--surface-3);
   --color-overlay: var(--overlay);
 
-  --color-sidebar: var(--surface-0);
+  --color-sidebar: var(--sidebar-surface);
   --color-sidebar-foreground: var(--text-primary);
   --color-sidebar-primary: var(--foreground);
   --color-sidebar-primary-foreground: var(--background);
