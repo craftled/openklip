@@ -16,13 +16,13 @@ import {
   toastAssetUploadFailed,
   toastAssetUploadSuccess,
 } from "@/lib/app-toast";
+import type { AssetBinUpdate } from "@/lib/asset-bin-update";
+import { deleteAssetApi } from "@/lib/asset-bin-update";
 import {
   type AssetCardLite,
   assetCardCaption,
   assetCardTooltip,
 } from "@/lib/asset-card-display";
-import type { AssetBinUpdate } from "@/lib/asset-bin-update";
-import { deleteAssetApi } from "@/lib/asset-bin-update";
 import { syncProjectAssets, uploadProjectAssets } from "@/lib/asset-upload";
 import { Film, ImageIcon, Music, Trash2, Upload, X } from "@/lib/icon";
 import { countNewAssetIds } from "@/lib/toast-notifications";
