@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { addStill, removeStill } from "../src/actions.ts";
+import { addStill, removeStill, updateStill } from "../src/actions.ts";
 import { makeProject } from "./helpers/projectFixture.ts";
 
 function stillProject() {
@@ -50,6 +50,21 @@ test("addStill honors custom scale and focus", () => {
   assert.equal(item.scale, 1.4);
   assert.equal(item.focusX, 0.2);
   assert.equal(item.focusY, 0.8);
+});
+
+test("updateStill patches span and Ken Burns look", () => {
+  const project = stillProject();
+  const item = addStill(project, { assetId: "shot1", fromSec: 1, toSec: 4 });
+  const updated = updateStill(project, item.id, {
+    fromSec: 2,
+    toSec: 5,
+    scale: 1.5,
+    focusX: 0.25,
+  });
+  assert.equal(updated.startSample, 48_000 * 2);
+  assert.equal(updated.endSample, 48_000 * 5);
+  assert.equal(updated.scale, 1.5);
+  assert.equal(updated.focusX, 0.25);
 });
 
 test("removeStill deletes by id", () => {

@@ -340,6 +340,27 @@ export function analyzeAssetsPromiseMessages(providerLabel: string): {
   };
 }
 
+export function verifyPromiseMessages(): {
+  error: (error: unknown) => { description?: string; message: string };
+  loading: string;
+  success: (result: { report: { ok: boolean }; verdict: string }) => {
+    description?: string;
+    message: string;
+  };
+} {
+  return {
+    loading: "Re-transcribing the rendered cut…",
+    success: (result) => ({
+      message: result.report.ok ? "Cut verified" : "Cut drift detected",
+      description: result.verdict,
+    }),
+    error: (error) => ({
+      message: "Verify failed",
+      description: (error as Error).message,
+    }),
+  };
+}
+
 export function exportPromiseMessages(): {
   error: (error: unknown) => { description?: string; message: string };
   loading: string;

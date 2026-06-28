@@ -94,11 +94,6 @@ export function AgentChatPanel({ onAssetsUpdated, slug }: AgentChatPanelProps) {
             onSubmitMessage={sendMessage}
             slug={slug}
           />
-          <p className="mt-2 text-caption text-quaternary leading-snug">
-            Chats live in working/chats.json. Skills invoke the same CLI loop as{" "}
-            <code className="text-caption">openklip tools</code> on{" "}
-            <code className="text-caption">project.json</code>.
-          </p>
         </div>
       </div>
     </div>

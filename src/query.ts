@@ -1,5 +1,5 @@
 import { summarize } from "./actions.ts";
-import type { Project } from "./edl.ts";
+import type { Grade, Project } from "./edl.ts";
 import { samplesToSec, survivingRanges } from "./edl.ts";
 import { findPhraseRuns, type PhraseRun } from "./phrase-match.ts";
 
@@ -68,7 +68,7 @@ export interface OverlayViews {
 export interface ProjectStatusJson {
   captions: { enabled: boolean; maxWords: number };
   keptDurationSec: number;
-  look: { vignette: boolean };
+  look: { vignette: boolean; grade: Grade; lut?: string };
   overlays: OverlayViews;
   padMs: number;
   ranges: Array<{ endSec: number; startSec: number }>;
@@ -226,7 +226,11 @@ export function projectStatus(project: Project): ProjectStatusJson {
       enabled: project.captions.enabled,
       maxWords: project.captions.maxWords ?? 6,
     },
-    look: { vignette: project.look?.vignette ?? false },
+    look: {
+      vignette: project.look?.vignette ?? false,
+      grade: project.look?.grade ?? "none",
+      ...(project.look?.lut ? { lut: project.look.lut } : {}),
+    },
     overlays: listOverlays(project),
   };
 }

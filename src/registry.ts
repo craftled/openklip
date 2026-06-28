@@ -26,12 +26,14 @@ import {
   setCaptionMaxWords,
   setCaptions,
   setLook,
+  setMotion,
   setPadMs,
   updateBroll,
+  updateStill,
   updateTitle,
   updateZoom,
 } from "./actions.ts";
-import type { Project } from "./edl.ts";
+import { GradeSchema, type Project } from "./edl.ts";
 
 // Where an action is exposed. The CLI dispatch, the editor's server actions, and
 // the agent-facing manifest each filter the registry by surface.
@@ -157,6 +159,21 @@ export const actions: ActionDef[] = [
     run: (p, i) => ({ removed: removeStill(p, i.id) }),
   }),
   defineAction({
+    name: "still-set",
+    summary: "Patch a still overlay (asset, span, Ken Burns look).",
+    surfaces: ["cli", "gui", "mcp"],
+    schema: z.object({
+      id: z.string(),
+      assetId: z.string().optional(),
+      fromSec: sec.optional(),
+      toSec: sec.optional(),
+      scale: z.number().optional(),
+      focusX: z.number().optional(),
+      focusY: z.number().optional(),
+    }),
+    run: (p, i) => updateStill(p, i.id, i),
+  }),
+  defineAction({
     name: "title-add",
     summary: "Burn a title card over a source-time span.",
     surfaces: ["cli", "gui", "mcp"],
@@ -258,6 +275,41 @@ export const actions: ActionDef[] = [
     run: (p, i) => {
       setLook(p, { vignette: i.vignette });
       return { vignette: i.vignette };
+    },
+  }),
+  defineAction({
+    name: "look-grade",
+    summary: "Set the color grade applied to the whole picture at export.",
+    surfaces: ["cli", "gui", "mcp"],
+    schema: z.object({ grade: GradeSchema }),
+    run: (p, i) => {
+      setLook(p, { grade: i.grade });
+      return { grade: p.look.grade };
+    },
+  }),
+  defineAction({
+    name: "look-lut",
+    summary: "Set or clear a named .cube LUT (empty string clears).",
+    surfaces: ["cli", "gui", "mcp"],
+    schema: z.object({ lut: z.string() }),
+    run: (p, i) => {
+      setLook(p, { lut: i.lut });
+      return { lut: p.look.lut ?? null };
+    },
+  }),
+  defineAction({
+    name: "motion",
+    summary: "Set the global animation feel (speed, fade, slide).",
+    surfaces: ["cli", "gui", "mcp"],
+    schema: z.object({
+      speed: z.number().min(0.25).max(4).optional(),
+      fadeMs: z.number().min(0).max(2000).optional(),
+      heroFadeMs: z.number().min(0).max(2000).optional(),
+      slideFrac: z.number().min(0).max(0.3).optional(),
+    }),
+    run: (p, i) => {
+      setMotion(p, i);
+      return { motion: p.motion };
     },
   }),
   defineAction({

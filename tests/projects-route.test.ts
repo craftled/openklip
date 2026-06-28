@@ -2,11 +2,26 @@ import { mock } from "bun:test";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { GET, POST } from "../app/api/projects/route.ts";
+import { getIngestJob, type IngestJob } from "../src/ingest-jobs.ts";
 import {
   makeProject,
   withTempProjectsRoot,
   writeFixtureProject,
 } from "./helpers/projectFixture.ts";
+
+// Ingest now runs as a background job; poll the registry until it settles.
+async function pollJob(id: string): Promise<IngestJob> {
+  for (let i = 0; i < 100; i += 1) {
+    const job = getIngestJob(id);
+    if (job && job.status !== "running") {
+      return job;
+    }
+    await new Promise((r) => {
+      setTimeout(r, 5);
+    });
+  }
+  throw new Error("ingest job did not finish");
+}
 
 function ingestRequest(file?: File) {
   const form = new FormData();
@@ -39,10 +54,8 @@ test("POST /api/projects returns 400 when file is missing", async () => {
   });
 });
 
-test("POST /api/projects ingests upload and returns slug", async () => {
-  await withTempProjectsRoot(async ({ slug }) => {
-    writeFixtureProject(slug, makeProject({ slug }));
-
+test("POST /api/projects starts an ingest job and returns its id + slug", async () => {
+  await withTempProjectsRoot(async () => {
     mock.module("@engine/ingest", () => ({
       ingest: async () => "uploaded-demo",
     }));
@@ -51,12 +64,14 @@ test("POST /api/projects ingests upload and returns slug", async () => {
       ingestRequest(new File(["fake-bytes"], "clip.mp4", { type: "video/mp4" }))
     );
     assert.equal(res.status, 200);
-    const json = (await res.json()) as {
-      slug?: string;
-      projects?: Array<{ slug: string }>;
-    };
-    assert.equal(json.slug, "uploaded-demo");
-    assert.ok(json.projects?.some((p) => p.slug === slug));
+    const json = (await res.json()) as { jobId?: string; slug?: string };
+    assert.ok(json.jobId);
+    assert.equal(json.slug, "clip"); // derived from the filename, returned now
+
+    // The job runs the (mocked) ingest to completion.
+    const done = await pollJob(json.jobId as string);
+    assert.equal(done.status, "done");
+    assert.equal(done.slug, "uploaded-demo");
 
     mock.restore();
   });
@@ -64,13 +79,8 @@ test("POST /api/projects ingests upload and returns slug", async () => {
 
 test("POST /api/projects returns 409 when the project already exists", async () => {
   await withTempProjectsRoot(async () => {
-    mock.module("@engine/ingest", () => ({
-      ingest: () => {
-        throw new Error(
-          "project already exists: demo (re-ingest would wipe it; pass --force to overwrite)"
-        );
-      },
-    }));
+    // The same-slug guard fires synchronously before any work starts.
+    writeFixtureProject("demo", makeProject({ slug: "demo" }));
 
     const res = await POST(
       ingestRequest(new File(["fake-bytes"], "demo.mp4", { type: "video/mp4" }))
@@ -78,8 +88,6 @@ test("POST /api/projects returns 409 when the project already exists", async () 
     assert.equal(res.status, 409);
     const json = (await res.json()) as { error?: string };
     assert.match(json.error ?? "", /already exists/i);
-
-    mock.restore();
   });
 });
 

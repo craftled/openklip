@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.8.7 - 2026-06-28
+
+Editable timeline with CLI parity, export verify loop, color grade/LUT, and inbox ingest.
+
+### Added
+- **Timeline editor**: drag overlay clips, trim edges, click words to cut/restore (shift for range select). Toolbar snap toggle and zoom (25%-400%). Snaps to word edges, overlay boundaries, and playhead.
+- **`still-set`**: patch still overlays on CLI and registry (GUI timeline writes the same mutations).
+- **Verify cut**: `openklip verify <slug>` re-transcribes `output/out.mp4` and diffs against the EDL (filler survivors, leaked cuts, coverage). **Verify cut** button in the editor runs the same loop locally.
+- **Color grade + LUT**: `openklip look <slug> grade <name>` and `openklip look <slug> lut <name>`; bundled `luts/` for portable `.cube` references.
+- **Motion feel**: `openklip motion <slug> --speed` scales overlay animation durations at export.
+- **Inbox ingest**: loose videos in the projects root auto-ingest via folder watch (`scan-inbox` API + GUI hook).
+
+### Changed
+- **Properties panel**: removed duplicate app settings (export height, theme, default agent); left sidebar Settings is the single source.
+- **Agent chat**: removed the `working/chats.json` footer under the chatbox (documented in README).
+
+### Tests
+- Timeline clip edit, snap, and zoom unit tests; verify, grade, LUT, inbox, and ingest-jobs coverage.
+
 ## 0.8.6 - 2026-06-28
 
 **Describe media** now logs the main video's scenes, not just b-roll cards.

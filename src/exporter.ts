@@ -20,7 +20,9 @@ import {
   totalDurationSec,
 } from "./edl.ts";
 import { FFMPEG, probe, run } from "./ffmpeg.ts";
+import { gradeFilter } from "./grade.ts";
 import { buildStillZoompan } from "./ken-burns.ts";
+import { lut3dExpr, lutPath } from "./lut.ts";
 import { projectPaths } from "./paths.ts";
 import { buildTitlesAss, type TitleItem } from "./titles.ts";
 import { buildZoompanZExpr, type ZoomWindow } from "./zoom-ramp.ts";
@@ -264,7 +266,11 @@ export async function exportCut(
     titlesAssPath = `${p.working}/titles.ass`;
     await Bun.write(
       titlesAssPath,
-      buildTitlesAss(titleItems, { width: outW, height: outH })
+      buildTitlesAss(titleItems, {
+        width: outW,
+        height: outH,
+        motion: project.motion,
+      })
     );
   }
 
@@ -343,6 +349,25 @@ export async function exportCut(
       `[${last}][sv${sp.inputIndex}]overlay=eof_action=pass:enable='between(t,${sec(sp.outStart)},${sec(sp.outEnd)})'[sov${sp.inputIndex}]`
     );
     last = `sov${sp.inputIndex}`;
+  }
+
+  // Technical LUT first (e.g. log → Rec.709), then the creative grade on top.
+  const lutName = project.look?.lut;
+  if (lutName) {
+    const lutAbs = lutPath(lutName);
+    if (!existsSync(lutAbs)) {
+      throw new Error(`LUT not found: ${lutName} (${lutAbs})`);
+    }
+    parts.push(`[${last}]${lut3dExpr(lutAbs)}[lut]`);
+    last = "lut";
+  }
+
+  // Color grade on the composited picture (the deck's "the final grade"), just
+  // before the vignette so edge darkening sits on top of the look.
+  const gradeChain = gradeFilter(project.look?.grade ?? "none");
+  if (gradeChain) {
+    parts.push(`[${last}]${gradeChain}[grd]`);
+    last = "grd";
   }
 
   const vignette = Boolean(project.look?.vignette);

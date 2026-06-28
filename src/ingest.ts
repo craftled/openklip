@@ -13,10 +13,52 @@ interface RawChunk {
   text: string;
 }
 
+export type IngestPhase =
+  | "probe"
+  | "proxy"
+  | "audio"
+  | "frames"
+  | "transcribe"
+  | "finalize"
+  | "done";
+
+export interface IngestProgress {
+  message: string;
+  phase: IngestPhase;
+  /** 1-based step index (the work phases, excluding "done"). */
+  step: number;
+  total: number;
+}
+
+// The ordered work phases, so progress is a stable step/total the UI can show.
+const INGEST_STEPS: Array<{ message: string; phase: IngestPhase }> = [
+  { phase: "probe", message: "Reading video" },
+  { phase: "proxy", message: "Building 720p preview" },
+  { phase: "audio", message: "Extracting audio" },
+  { phase: "frames", message: "Extracting frames" },
+  { phase: "transcribe", message: "Transcribing" },
+  { phase: "finalize", message: "Finishing" },
+];
+
 export async function ingest(
   videoArg: string,
-  opts?: { force?: boolean }
+  opts?: { force?: boolean; onProgress?: (p: IngestProgress) => void }
 ): Promise<string> {
+  const total = INGEST_STEPS.length;
+  const emit = (phase: IngestPhase) => {
+    if (!opts?.onProgress) {
+      return;
+    }
+    const i = INGEST_STEPS.findIndex((s) => s.phase === phase);
+    if (i >= 0) {
+      opts.onProgress({
+        phase,
+        message: INGEST_STEPS[i].message,
+        step: i + 1,
+        total,
+      });
+    }
+  };
   const source = isAbsolute(videoArg)
     ? videoArg
     : resolve(process.cwd(), videoArg);
@@ -36,11 +78,13 @@ export async function ingest(
   await mkdir(p.output, { recursive: true });
 
   console.log(`[ingest] ${source}`);
+  emit("probe");
   const meta = await probe(source);
   console.log(
     `[ingest] ${meta.width}x${meta.height} ${meta.fps}fps ${meta.durationSec.toFixed(1)}s`
   );
 
+  emit("proxy");
   console.log(
     "[ingest] building all-intra 720p proxy (fast seeks) + 48k audio..."
   );
@@ -79,6 +123,7 @@ export async function ingest(
     "ffmpeg(proxy)"
   );
 
+  emit("audio");
   console.log("[ingest] extracting 16k mono PCM for transcription...");
   await run(
     FFMPEG,
@@ -98,6 +143,7 @@ export async function ingest(
     "ffmpeg(audio)"
   );
 
+  emit("frames");
   console.log(
     "[ingest] extracting sample frames (for the agent layer later)..."
   );
@@ -118,6 +164,7 @@ export async function ingest(
     console.warn(`[ingest]   frames skipped: ${e.message}`)
   );
 
+  emit("transcribe");
   console.log(
     "[ingest] transcribing (first run downloads the Whisper model)..."
   );
@@ -151,6 +198,7 @@ export async function ingest(
     });
   });
 
+  emit("finalize");
   const project: Project = ProjectSchema.parse({
     version: 1,
     slug,
@@ -170,6 +218,7 @@ export async function ingest(
   await Bun.write(p.project, JSON.stringify(project, null, 2));
   await Bun.write(p.transcript, JSON.stringify({ words }, null, 2));
 
+  emit("done");
   console.log(`[ingest] done: ${words.length} words`);
   console.log(`[ingest] project -> ${p.dir}`);
   console.log(`\nNext:  bun run serve ${slug}`);

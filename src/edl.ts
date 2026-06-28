@@ -16,6 +16,15 @@ export type Word = z.infer<typeof WordSchema>;
 export const AssetKindSchema = z.enum(["broll", "music", "still"]);
 export type AssetKind = z.infer<typeof AssetKindSchema>;
 
+// Named color grade applied to the whole picture at export. The footage renders
+// flat off the camera; a grade is the finishing look (the deck's "log in,
+// picture out"). "none" is a no-op; the others expand to a deterministic ffmpeg
+// filter chain in grade.ts. "cool_desat" is the deck's neutral_cool_desat look.
+export const GradeSchema = z
+  .enum(["none", "neutral", "warm", "cool", "cool_desat", "filmic", "punchy"])
+  .default("none");
+export type Grade = z.infer<typeof GradeSchema>;
+
 // A subagent-produced description of an asset: what it shows and where it
 // belongs, so the editing agent can place media by meaning, not by guessing
 // from a filename. Written by the per-asset analyze pass; the EDL stays valid
@@ -120,6 +129,23 @@ export const SceneLogSchema = z.object({
 });
 export type SceneLog = z.infer<typeof SceneLogSchema>;
 
+// Global animation "feel": the deck's anim.tsx applied to OpenKlip. A handful of
+// knobs drive every overlay entrance, so "make it snappier" is a one-number
+// change. `speed` scales all durations (higher = shorter = snappier).
+export const MotionSchema = z
+  .object({
+    /** Fade in/out for lower-third and centered titles (ms). */
+    fadeMs: z.number().min(0).max(2000).default(180),
+    /** Fade in/out for hero cards (ms). */
+    heroFadeMs: z.number().min(0).max(2000).default(320),
+    /** Lower-third slide-in distance, as a fraction of frame height. */
+    slideFrac: z.number().min(0).max(0.3).default(0.04),
+    /** Global speed multiplier: durations are divided by this. */
+    speed: z.number().min(0.25).max(4).default(1),
+  })
+  .default({ fadeMs: 180, heroFadeMs: 320, slideFrac: 0.04, speed: 1 });
+export type Motion = z.infer<typeof MotionSchema>;
+
 export const ProjectSchema = z.object({
   version: z.literal(1),
   slug: z.string(),
@@ -140,8 +166,13 @@ export const ProjectSchema = z.object({
   assets: z.array(AssetSchema).default([]),
   broll: z.array(BrollSchema).default([]),
   look: z
-    .object({ vignette: z.boolean().default(false) })
-    .default({ vignette: false }),
+    .object({
+      vignette: z.boolean().default(false),
+      grade: GradeSchema,
+      /** Named .cube LUT in luts/ applied before the grade (absent = none). */
+      lut: z.string().optional(),
+    })
+    .default({ vignette: false, grade: "none" }),
   zooms: z.array(ZoomSchema).default([]),
   titles: z.array(TitleSchema).default([]),
   stills: z.array(StillSchema).default([]),
@@ -150,6 +181,8 @@ export const ProjectSchema = z.object({
   template: z.string().optional(),
   /** Subagent visual scene log of the main video (absent until analyzed). */
   sceneLog: SceneLogSchema.optional(),
+  /** Global animation feel for overlay entrances. */
+  motion: MotionSchema,
 });
 export type Project = z.infer<typeof ProjectSchema>;
 

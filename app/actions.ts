@@ -1,15 +1,19 @@
 "use server";
 
 import { existsSync } from "node:fs";
+import type { Grade, Motion } from "@engine/edl";
 import { exportCut } from "@engine/exporter";
 import { projectPaths } from "@engine/paths";
 import {
   applyBroll,
   applyLook,
+  applyMotion,
   applyProjectEdits,
+  applyStills,
   applyTitles,
   applyZooms,
   type clampBrollItems,
+  type clampStillItems,
   type clampTitleItems,
   type clampZoomItems,
 } from "@engine/projectMutations";
@@ -51,10 +55,22 @@ export async function saveProjectEdits(
 
 export async function saveLook(
   slug: string,
-  body: { vignette?: boolean }
+  body: { vignette?: boolean; grade?: Grade; lut?: string | null }
 ): Promise<ActionResult> {
   try {
     await mutateProject(slug, (project) => applyLook(project, body));
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function saveMotion(
+  slug: string,
+  body: Partial<Motion>
+): Promise<ActionResult> {
+  try {
+    await mutateProject(slug, (project) => applyMotion(project, body));
     return { ok: true };
   } catch (e) {
     return fail(e);
@@ -101,6 +117,21 @@ export async function saveTitles(
       return project.titles;
     });
     return { ok: true, data: { titles: items } };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function saveStills(
+  slug: string,
+  stills: unknown[]
+): Promise<ActionResult<{ stills: ReturnType<typeof clampStillItems> }>> {
+  try {
+    const items = await mutateProject(slug, (project) => {
+      applyStills(project, stills);
+      return project.stills;
+    });
+    return { ok: true, data: { stills: items } };
   } catch (e) {
     return fail(e);
   }

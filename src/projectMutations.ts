@@ -1,7 +1,11 @@
 import {
   type Broll,
   BrollSchema,
+  type Grade,
+  type Motion,
   type Project,
+  type Still,
+  StillSchema,
   type Title,
   TitleSchema,
   type Zoom,
@@ -44,11 +48,27 @@ export function applyProjectEdits(
 
 export function applyLook(
   project: Project,
-  body: { vignette?: boolean }
+  body: { vignette?: boolean; grade?: Grade; lut?: string | null }
 ): Project {
   if (typeof body.vignette === "boolean") {
     project.look = { ...project.look, vignette: body.vignette };
   }
+  if (body.grade !== undefined) {
+    project.look = { ...project.look, grade: body.grade };
+  }
+  if (body.lut !== undefined) {
+    if (body.lut === null || body.lut === "") {
+      const { lut: _omit, ...rest } = project.look;
+      project.look = rest;
+    } else {
+      project.look = { ...project.look, lut: body.lut };
+    }
+  }
+  return project;
+}
+
+export function applyMotion(project: Project, body: Partial<Motion>): Project {
+  project.motion = { ...project.motion, ...body };
   return project;
 }
 
@@ -107,5 +127,28 @@ export function clampTitleItems(project: Project, titles: unknown[]): Title[] {
 
 export function applyTitles(project: Project, titles: unknown[]): Project {
   project.titles = clampTitleItems(project, titles);
+  return project;
+}
+
+export function clampStillItems(project: Project, stills: unknown[]): Still[] {
+  const assetIds = new Set(
+    project.assets.filter((a) => a.kind === "still").map((a) => a.id)
+  );
+  const dur = project.durationSamples;
+  const items: Still[] = [];
+  for (const raw of stills) {
+    const still = StillSchema.parse(raw);
+    if (!assetIds.has(still.assetId)) {
+      continue;
+    }
+    const start = Math.max(0, Math.min(still.startSample, dur));
+    const end = Math.max(start + 1, Math.min(still.endSample, dur));
+    items.push({ ...still, startSample: start, endSample: end });
+  }
+  return items;
+}
+
+export function applyStills(project: Project, stills: unknown[]): Project {
+  project.stills = clampStillItems(project, stills);
   return project;
 }

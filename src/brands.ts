@@ -7,7 +7,7 @@
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { z } from "zod";
-import type { Project } from "./edl.ts";
+import { GradeSchema, type Project } from "./edl.ts";
 
 // brands/ lives at the repo root next to projects/.
 export function brandsRoot(): string {
@@ -25,7 +25,21 @@ export const BrandSchema = z
         maxWords: z.number().int().min(1).max(12).optional(),
       })
       .optional(),
-    look: z.object({ vignette: z.boolean().optional() }).optional(),
+    look: z
+      .object({
+        vignette: z.boolean().optional(),
+        grade: GradeSchema.optional(),
+        lut: z.string().optional(),
+      })
+      .optional(),
+    motion: z
+      .object({
+        speed: z.number().min(0.25).max(4).optional(),
+        fadeMs: z.number().min(0).max(2000).optional(),
+        heroFadeMs: z.number().min(0).max(2000).optional(),
+        slideFrac: z.number().min(0).max(0.3).optional(),
+      })
+      .optional(),
     padMs: z.number().min(0).max(500).optional(),
   })
   .strict();
@@ -64,6 +78,15 @@ export function applyBrand(project: Project, brand: Brand): Project {
   }
   if (brand.look?.vignette !== undefined) {
     project.look = { ...project.look, vignette: brand.look.vignette };
+  }
+  if (brand.look?.grade !== undefined) {
+    project.look = { ...project.look, grade: brand.look.grade };
+  }
+  if (brand.look?.lut !== undefined) {
+    project.look = { ...project.look, lut: brand.look.lut };
+  }
+  if (brand.motion) {
+    project.motion = { ...project.motion, ...brand.motion };
   }
   if (brand.padMs !== undefined) {
     project.padMs = brand.padMs;

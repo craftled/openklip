@@ -18,6 +18,7 @@ import {
   SidebarRail,
   SidebarSeparator,
 } from "@/components/ui/sidebar";
+import { useInboxWatch } from "@/hooks/use-inbox-watch";
 import { useProjectCreate } from "@/hooks/use-project-create";
 import {
   type AgentModelId,
@@ -82,10 +83,15 @@ export function EmptyWorkspace() {
     [router]
   );
 
-  const { createPhase, createdSlug, ingestVideo } = useProjectCreate({
+  const { createPhase, createdSlug, ingestVideo, progress } = useProjectCreate({
     onCreateProject: createProjectFromVideo,
     onProjectCreated,
   });
+
+  // Folder-watch: a video dropped into the projects root auto-ingests; refresh
+  // so the freshly created project takes over this empty view.
+  const onIngested = useCallback(() => router.refresh(), [router]);
+  const inboxJobs = useInboxWatch(onIngested);
 
   const folderReady = workspace?.configured || !workspace?.pickerSupported;
 
@@ -94,6 +100,7 @@ export function EmptyWorkspace() {
       {createPhase ? (
         <ProjectCreateOverlay
           phase={createPhase}
+          progress={progress}
           slug={createdSlug ?? undefined}
         />
       ) : null}
@@ -193,10 +200,22 @@ export function EmptyWorkspace() {
                 </Button>
               )}
             </div>
-            {!dialogOpen && folderReady ? (
+            {inboxJobs.length > 0 ? (
+              <div className="flex flex-col items-center gap-1 rounded-lg border border-border bg-surface-1 px-4 py-3">
+                {inboxJobs.map((job) => (
+                  <p className="text-sm text-tertiary" key={job.id}>
+                    Ingesting {job.filename}
+                    {job.progress
+                      ? ` — ${job.progress.message}… (${job.progress.step}/${job.progress.total})`
+                      : "…"}
+                  </p>
+                ))}
+              </div>
+            ) : null}
+            {!dialogOpen && folderReady && inboxJobs.length === 0 ? (
               <p className="max-w-sm text-tertiary text-xs">
-                Tip: drop a video anywhere in the new project dialog, or use{" "}
-                <code>openklip ingest &lt;video&gt;</code> from the CLI.
+                Tip: drop a video into your projects folder to auto-ingest it,
+                or use <code>openklip ingest &lt;video&gt;</code> from the CLI.
               </p>
             ) : null}
           </main>

@@ -1,5 +1,7 @@
 "use client";
 
+import type { Grade } from "@engine/edl";
+import { GRADE_OPTIONS } from "@engine/grade";
 import {
   createShader,
   playSweep,
@@ -20,7 +22,6 @@ import {
 } from "react";
 import { AgentChatProvider } from "@/components/agent-chat-context";
 import { AgentChatPanel } from "@/components/agent-chat-panel";
-import { AgentModelSelect } from "@/components/agent-model-select";
 import { AgentSidebar } from "@/components/agent-sidebar";
 import { withAssetKind } from "@/components/asset-bin";
 import {
@@ -29,7 +30,11 @@ import {
   readStoredChatWidth,
 } from "@/components/chat-resize-handle";
 import { CinemaPlayer } from "@/components/cinema-player";
-import { EditTimeline } from "@/components/edit-timeline";
+import {
+  EditTimeline,
+  type TimelineClipKind,
+  type TimelineTiming,
+} from "@/components/edit-timeline";
 import { EditorSidebarShortcuts } from "@/components/editor-sidebar-shortcuts";
 import { EditorTranscriptPanel } from "@/components/editor-transcript-panel";
 import {
@@ -64,7 +69,6 @@ import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
-  SidebarHeader,
   SidebarInset,
   SidebarMenu,
   SidebarMenuBadge,
@@ -78,19 +82,10 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Slider } from "@/components/ui/slider";
-import { Switch } from "@/components/ui/switch";
 import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { VerifyCutButton } from "@/components/verify-cut-button";
 import { useModShortcut } from "@/hooks/use-mod-shortcut";
-import { AgentProviderIcon } from "@/lib/agent-icons";
-import {
-  type AgentModelId,
-  DEFAULT_AGENT_MODEL,
-  getAgentModelLabel,
-  getDefaultAgentModel,
-  setDefaultAgentModel,
-  subscribeDefaultAgent,
-} from "@/lib/agent-preferences";
 import {
   toastNothingToPlay,
   toastPlaybackFailed,
@@ -99,15 +94,13 @@ import {
 } from "@/lib/app-toast";
 import {
   Captions,
-  Check,
   Clock3,
   Download,
   Film,
+  ImageIcon,
   Moon,
-  Palette,
   PanelLeft,
   PanelRight,
-  Settings2,
   Sparkles,
   Sun,
   Trash2,
@@ -122,15 +115,12 @@ import {
 } from "@/lib/preview-layout";
 import { buildProjectHoverContext } from "@/lib/project-context";
 import type { ProjectListing } from "@/lib/project-list";
-import { getThemeLabel, THEME_CATALOG } from "@/lib/theme-catalog";
 import {
-  type AppThemeId,
   applyAppTheme,
   applyColorScheme,
   type ColorScheme,
   getAppTheme,
   getColorScheme,
-  setAppTheme,
   setColorScheme,
   subscribeAppTheme,
   subscribeColorScheme,
@@ -142,7 +132,9 @@ import {
   exportProject,
   saveBroll,
   saveLook,
+  saveMotion,
   saveProjectEdits,
+  saveStills,
   saveTitles,
   saveZooms,
 } from "../app/actions.ts";
@@ -186,6 +178,15 @@ interface TitleItem {
   startSample: number;
   text: string;
 }
+interface StillItem {
+  assetId: string;
+  endSample: number;
+  focusX: number;
+  focusY: number;
+  id: string;
+  scale: number;
+  startSample: number;
+}
 interface Project {
   assets: Asset[];
   broll: BrollItem[];
@@ -194,21 +195,14 @@ interface Project {
   durationSamples: number;
   fps: number;
   height: number;
-  look?: { vignette: boolean };
+  look?: { vignette: boolean; grade?: Grade };
   mediaVersion?: number;
+  motion?: { speed?: number };
   padMs: number;
   sampleRate: number;
   slug: string;
   source: string;
-  stills?: Array<{
-    assetId: string;
-    endSample: number;
-    focusX: number;
-    focusY: number;
-    id: string;
-    scale: number;
-    startSample: number;
-  }>;
+  stills?: StillItem[];
   template?: string;
   titles: TitleItem[];
   width: number;
@@ -216,7 +210,7 @@ interface Project {
   zooms: ZoomItem[];
 }
 
-type Selected = { kind: "zoom" | "broll" | "title"; id: string } | null;
+type Selected = { kind: TimelineClipKind; id: string } | null;
 
 const ZOOM_PRESETS: Record<string, { scale: number; rampSec: number }> = {
   Subtle: { scale: 1.15, rampSec: 0.6 },
@@ -334,6 +328,12 @@ export function App({
   const [vignetteOn, setVignetteOn] = useState(
     initialProject.look?.vignette ?? false
   );
+  const [grade, setGradeState] = useState<Grade>(
+    initialProject.look?.grade ?? "none"
+  );
+  const [motionSpeed, setMotionSpeed] = useState<number>(
+    initialProject.motion?.speed ?? 1
+  );
   const [export1080, setExport1080] = useState(true);
   const [centerPanel, setCenterPanel] = useState<"properties" | "transcript">(
     "transcript"
@@ -345,8 +345,6 @@ export function App({
     setChatWidth(readStoredChatWidth());
   }, []);
   const [timelineOpen, setTimelineOpen] = useState(false);
-  const [defaultAgent, setDefaultAgent] =
-    useState<AgentModelId>(DEFAULT_AGENT_MODEL);
   const [cinema, setCinema] = useState(false);
   const [previewMuted, setPreviewMuted] = useState(false);
   const [previewRate, setPreviewRate] = useState(1);
@@ -357,6 +355,9 @@ export function App({
   const [chosenAsset, setChosenAsset] = useState(
     initialProject.assets?.find((a) => (a.kind ?? "broll") === "broll")?.id ??
       ""
+  );
+  const [chosenStillAsset, setChosenStillAsset] = useState(
+    initialProject.assets?.find((a) => a.kind === "still")?.id ?? ""
   );
   const [titleText, setTitleText] = useState("");
   const [titlePos, setTitlePos] = useState<"lower" | "center" | "hero">(
@@ -376,9 +377,6 @@ export function App({
   }, [loop]);
   const [pendingSaves, setPendingSaves] = useState(0);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [appTheme, setAppThemeState] = useState<AppThemeId>(() =>
-    getAppTheme()
-  );
   const [colorScheme, setColorSchemeState] = useState<ColorScheme>(() =>
     getColorScheme()
   );
@@ -386,7 +384,6 @@ export function App({
   useEffect(() => {
     applyColorScheme(getColorScheme());
     const unsubTheme = subscribeAppTheme((theme) => {
-      setAppThemeState(theme);
       applyAppTheme(theme, getColorScheme());
     });
     const unsubScheme = subscribeColorScheme((scheme) => {
@@ -401,10 +398,6 @@ export function App({
   const toggleColorScheme = useCallback(() => {
     setColorScheme(colorScheme === "dark" ? "light" : "dark");
   }, [colorScheme]);
-  useEffect(() => {
-    setDefaultAgent(getDefaultAgentModel());
-    return subscribeDefaultAgent(setDefaultAgent);
-  }, []);
   const videoRef = useRef<HTMLVideoElement>(null);
   const brollRef = useRef<HTMLVideoElement>(null);
   const transitionCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -547,6 +540,10 @@ export function App({
     project?.assets.find((a) => a.id === id)?.name ?? id;
   const brollAssets = useMemo(
     () => project?.assets.filter((a) => (a.kind ?? "broll") === "broll") ?? [],
+    [project?.assets]
+  );
+  const stillAssets = useMemo(
+    () => project?.assets.filter((a) => a.kind === "still") ?? [],
     [project?.assets]
   );
 
@@ -712,6 +709,29 @@ export function App({
     clearSel();
     setSelected({ kind: "title", id });
   };
+  const addStill = () => {
+    if (!(selRange && chosenStillAsset)) {
+      return;
+    }
+    const [a, b] = selRange;
+    const id = `s${Date.now()}`;
+    const stills = [
+      ...(project.stills ?? []),
+      {
+        id,
+        assetId: chosenStillAsset,
+        startSample: project.words[a].startSample,
+        endSample: project.words[b].endSample,
+        scale: 1.2,
+        focusX: 0.5,
+        focusY: 0.5,
+      },
+    ];
+    setProject({ ...project, stills });
+    enqueueSave(() => saveStills(project.slug, stills));
+    clearSel();
+    setSelected({ kind: "still", id });
+  };
 
   const updateZoom = (id: string, patch: Partial<ZoomItem>) => {
     const zooms = (project.zooms ?? []).map((z) =>
@@ -734,6 +754,63 @@ export function App({
     setProject({ ...project, broll });
     enqueueSave(() => saveBroll(project.slug, broll));
   };
+  const updateStill = (id: string, patch: Partial<StillItem>) => {
+    const stills = (project.stills ?? []).map((s) =>
+      s.id === id ? { ...s, ...patch } : s
+    );
+    setProject({ ...project, stills });
+    enqueueSave(() => saveStills(project.slug, stills));
+  };
+  const onClipTiming = useCallback(
+    (
+      kind: TimelineClipKind,
+      id: string,
+      timing: TimelineTiming,
+      commit: boolean
+    ) => {
+      const patch = {
+        startSample: timing.startSample,
+        endSample: timing.endSample,
+      };
+      setProject((prev) => {
+        if (kind === "zoom") {
+          const zooms = (prev.zooms ?? []).map((z) =>
+            z.id === id ? { ...z, ...patch } : z
+          );
+          if (commit) {
+            enqueueSave(() => saveZooms(prev.slug, zooms));
+          }
+          return { ...prev, zooms };
+        }
+        if (kind === "broll") {
+          const broll = (prev.broll ?? []).map((b) =>
+            b.id === id ? { ...b, ...patch } : b
+          );
+          if (commit) {
+            enqueueSave(() => saveBroll(prev.slug, broll));
+          }
+          return { ...prev, broll };
+        }
+        if (kind === "title") {
+          const titles = (prev.titles ?? []).map((t) =>
+            t.id === id ? { ...t, ...patch } : t
+          );
+          if (commit) {
+            enqueueSave(() => saveTitles(prev.slug, titles));
+          }
+          return { ...prev, titles };
+        }
+        const stills = (prev.stills ?? []).map((s) =>
+          s.id === id ? { ...s, ...patch } : s
+        );
+        if (commit) {
+          enqueueSave(() => saveStills(prev.slug, stills));
+        }
+        return { ...prev, stills };
+      });
+    },
+    [enqueueSave]
+  );
   // Reorder b-roll covers in paint order from a drag (array order = paint order;
   // a later index paints on top when covers overlap). Mirrors `openklip reorder`.
   const reorderBrollOrder = (orderedIds: string[]) => {
@@ -756,10 +833,14 @@ export function App({
       const broll = (project.broll ?? []).filter((b) => b.id !== selected.id);
       setProject({ ...project, broll });
       enqueueSave(() => saveBroll(project.slug, broll));
-    } else {
+    } else if (selected.kind === "title") {
       const titles = (project.titles ?? []).filter((t) => t.id !== selected.id);
       setProject({ ...project, titles });
       enqueueSave(() => saveTitles(project.slug, titles));
+    } else if (selected.kind === "still") {
+      const stills = (project.stills ?? []).filter((s) => s.id !== selected.id);
+      setProject({ ...project, stills });
+      enqueueSave(() => saveStills(project.slug, stills));
     }
     setSelected(null);
   };
@@ -773,6 +854,14 @@ export function App({
   const toggleVignette = (next: boolean) => {
     setVignetteOn(next);
     enqueueSave(() => saveLook(project.slug, { vignette: next }));
+  };
+  const changeGrade = (next: Grade) => {
+    setGradeState(next);
+    enqueueSave(() => saveLook(project.slug, { grade: next }));
+  };
+  const changeMotionSpeed = (next: number) => {
+    setMotionSpeed(next);
+    enqueueSave(() => saveMotion(project.slug, { speed: next }));
   };
   const setMaxWords = (n: number) => {
     setProject((p) => ({
@@ -910,25 +999,35 @@ export function App({
     };
   }, []);
 
-  const onTimelineSelect = useCallback(
-    (kind: "broll" | "title" | "zoom", id: string) => {
-      setSelAnchor(null);
-      setSelFocus(null);
-      setSelected({ kind, id });
-      const item =
-        kind === "broll"
-          ? projectRef.current?.broll.find((b) => b.id === id)
-          : kind === "zoom"
-            ? projectRef.current?.zooms.find((z) => z.id === id)
-            : projectRef.current?.titles.find((t) => t.id === id);
-      if (item) {
-        schedRef.current?.seek(
-          item.startSample / (projectRef.current?.sampleRate ?? 48_000)
-        );
-        setCurSample(item.startSample);
+  const onTimelineSelect = useCallback((kind: TimelineClipKind, id: string) => {
+    setSelAnchor(null);
+    setSelFocus(null);
+    setSelected({ kind, id });
+    const p = projectRef.current;
+    const item =
+      kind === "broll"
+        ? p?.broll.find((b) => b.id === id)
+        : kind === "zoom"
+          ? p?.zooms.find((z) => z.id === id)
+          : kind === "title"
+            ? p?.titles.find((t) => t.id === id)
+            : p?.stills?.find((s) => s.id === id);
+    if (item) {
+      schedRef.current?.seek(item.startSample / (p?.sampleRate ?? 48_000));
+      setCurSample(item.startSample);
+    }
+  }, []);
+  const onTimelineWordClick = useCallback(
+    (index: number, shiftKey: boolean) => {
+      if (shiftKey) {
+        setSelected(null);
+        setSelAnchor((prev) => (prev == null ? index : prev));
+        setSelFocus(index);
+        return;
       }
+      toggleWord(project.words[index].id);
     },
-    []
+    [project.words, toggleWord]
   );
 
   const onExport = async (options?: ExportDialogOptions) => {
@@ -980,6 +1079,10 @@ export function App({
     selected?.kind === "broll"
       ? project.broll.find((b) => b.id === selected.id)
       : undefined;
+  const selStill =
+    selected?.kind === "still"
+      ? project.stills?.find((s) => s.id === selected.id)
+      : undefined;
   const presetOf = (z: ZoomItem) =>
     Object.entries(ZOOM_PRESETS).find(
       ([, v]) =>
@@ -998,29 +1101,35 @@ export function App({
       ? Type
       : selBroll
         ? Film
-        : selRange
-          ? Sparkles
-          : Captions;
+        : selStill
+          ? ImageIcon
+          : selRange
+            ? Sparkles
+            : Captions;
   const inspectorLabel = selZoom
     ? "Push-in"
     : selTitle
       ? "Title card"
       : selBroll
         ? "B-roll"
-        : selRange
-          ? "Selection"
-          : "Captions";
+        : selStill
+          ? "Still"
+          : selRange
+            ? "Selection"
+            : "Captions";
   const inspectorBadge = selZoom
     ? fmt(selZoom.startSample / sr)
     : selTitle
       ? fmt(selTitle.startSample / sr)
       : selBroll
         ? fmt(selBroll.startSample / sr)
-        : selRange
-          ? `${selRange[1] - selRange[0] + 1}`
-          : captionsOn
-            ? "On"
-            : "Off";
+        : selStill
+          ? fmt(selStill.startSample / sr)
+          : selRange
+            ? `${selRange[1] - selRange[0] + 1}`
+            : captionsOn
+              ? "On"
+              : "Off";
   const inspectorMeta = selZoom
     ? [
         { icon: ZoomIn, label: "Scale", value: `${selZoom.scale.toFixed(2)}x` },
@@ -1048,33 +1157,57 @@ export function App({
               value: fmt(selBroll.startSample / sr),
             },
           ]
-        : selRange
+        : selStill
           ? [
               {
-                icon: Sparkles,
-                label: "Words",
-                value: `${selRange[1] - selRange[0] + 1}`,
+                icon: ImageIcon,
+                label: "Source",
+                value: assetName(selStill.assetId),
+              },
+              {
+                icon: ZoomIn,
+                label: "Scale",
+                value: `${selStill.scale.toFixed(2)}x`,
               },
               {
                 icon: Clock3,
-                label: "Start",
-                value: fmt(project.words[selRange[0]].startSample / sr),
+                label: "Starts",
+                value: fmt(selStill.startSample / sr),
               },
             ]
-          : [
-              {
-                icon: Captions,
-                label: "Per line",
-                value: String(project.captions?.maxWords ?? 6),
-              },
-              { icon: Clock3, label: "Pad", value: `${project.padMs ?? 50}ms` },
-            ];
+          : selRange
+            ? [
+                {
+                  icon: Sparkles,
+                  label: "Words",
+                  value: `${selRange[1] - selRange[0] + 1}`,
+                },
+                {
+                  icon: Clock3,
+                  label: "Start",
+                  value: fmt(project.words[selRange[0]].startSample / sr),
+                },
+              ]
+            : [
+                {
+                  icon: Captions,
+                  label: "Per line",
+                  value: String(project.captions?.maxWords ?? 6),
+                },
+                {
+                  icon: Clock3,
+                  label: "Pad",
+                  value: `${project.padMs ?? 50}ms`,
+                },
+              ];
 
   const timelineWords = useMemo(
     () =>
       project.words.map((w, index) => ({
         id: w.id,
         index,
+        startSample: w.startSample,
+        endSample: w.endSample,
         startSec: w.startSample / sr,
         endSec: w.endSample / sr,
         deleted: w.deleted,
@@ -1085,6 +1218,8 @@ export function App({
     () =>
       (project.broll ?? []).map((b) => ({
         id: b.id,
+        startSample: b.startSample,
+        endSample: b.endSample,
         startSec: b.startSample / sr,
         endSec: b.endSample / sr,
         label: assetName(b.assetId),
@@ -1095,6 +1230,8 @@ export function App({
     () =>
       (project.zooms ?? []).map((z) => ({
         id: z.id,
+        startSample: z.startSample,
+        endSample: z.endSample,
         startSec: z.startSample / sr,
         endSec: z.endSample / sr,
         label: `${z.scale.toFixed(2)}x`,
@@ -1105,11 +1242,25 @@ export function App({
     () =>
       (project.titles ?? []).map((t) => ({
         id: t.id,
+        startSample: t.startSample,
+        endSample: t.endSample,
         startSec: t.startSample / sr,
         endSec: t.endSample / sr,
         label: t.text.replace(/\n/g, " · "),
       })),
     [project.titles, sr]
+  );
+  const timelinePlacedStills = useMemo(
+    () =>
+      (project.stills ?? []).map((s) => ({
+        id: s.id,
+        startSample: s.startSample,
+        endSample: s.endSample,
+        startSec: s.startSample / sr,
+        endSec: s.endSample / sr,
+        label: assetName(s.assetId),
+      })),
+    [project.assets, project.stills, sr]
   );
   const timelineMusic = useMemo(
     () =>
@@ -1117,18 +1268,22 @@ export function App({
         .filter((a) => a.kind === "music")
         .map((a) => ({
           id: a.id,
+          startSample: 0,
+          endSample: a.durationSamples,
           startSec: 0,
           endSec: a.durationSamples / sr,
           label: a.name,
         })),
     [project.assets, sr]
   );
-  const timelineStills = useMemo(
+  const timelineLibraryStills = useMemo(
     () =>
       project.assets
         .filter((a) => a.kind === "still")
         .map((a) => ({
           id: a.id,
+          startSample: 0,
+          endSample: a.durationSamples,
           startSec: 0,
           endSec: a.durationSamples / sr,
           label: a.name,
@@ -1268,6 +1423,7 @@ export function App({
                   <div className="shrink-0 space-y-3 border-border border-b p-4">
                     <div className="mx-auto flex w-full max-w-2xl flex-wrap items-center gap-2">
                       <FindFillerButton />
+                      <VerifyCutButton />
                       <div className="flex items-center gap-0.5 rounded-lg border border-border bg-surface-2 p-0.5">
                         <Button
                           aria-pressed={centerPanel === "transcript"}
@@ -1311,14 +1467,19 @@ export function App({
                           <EditTimeline
                             broll={timelineBroll}
                             curSec={curSec}
+                            durationSamples={project.durationSamples}
                             durationSec={fullDur}
                             libraryMusic={timelineMusic}
-                            libraryStills={timelineStills}
+                            libraryStills={timelineLibraryStills}
+                            onClipTiming={onClipTiming}
                             onSeek={onSeek}
                             onSelect={onTimelineSelect}
+                            onWordClick={onTimelineWordClick}
                             ranges={ranges}
+                            sampleRate={sr}
                             selected={selected}
                             selRange={selRange}
+                            stills={timelinePlacedStills}
                             titles={timelineTitles}
                             wordSpans={timelineWords}
                             zooms={timelineZooms}
@@ -1507,9 +1668,43 @@ export function App({
                           </Button>
                         )}
                       </div>
+                      <Select
+                        onValueChange={(v) => changeMotionSpeed(Number(v))}
+                        value={String(motionSpeed)}
+                      >
+                        <SelectTrigger
+                          aria-label="Motion speed"
+                          className="ml-auto h-8 w-[8rem]"
+                        >
+                          <SelectValue placeholder="Motion" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="0.7">Slower</SelectItem>
+                          <SelectItem value="1">Default</SelectItem>
+                          <SelectItem value="1.4">Snappy</SelectItem>
+                          <SelectItem value="1.8">Snappier</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Select
+                        onValueChange={(v) => changeGrade(v as Grade)}
+                        value={grade}
+                      >
+                        <SelectTrigger
+                          aria-label="Color grade"
+                          className="h-8 w-[8.5rem]"
+                        >
+                          <SelectValue placeholder="Grade" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {GRADE_OPTIONS.map((g) => (
+                            <SelectItem key={g.id} value={g.id}>
+                              {g.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <Toggle
                         aria-label="Vignette"
-                        className="ml-auto"
                         onPressedChange={toggleVignette}
                         pressed={vignetteOn}
                         size="sm"
@@ -1523,87 +1718,6 @@ export function App({
                   <div className="flex min-h-0 flex-1 flex-col">
                     {centerPanel === "properties" ? (
                       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-                        <SidebarHeader className="border-border border-b">
-                          <SidebarMenu>
-                            <SidebarMenuItem>
-                              <SidebarMenuButton tooltip="Settings">
-                                <Settings2 />
-                                <span>Settings</span>
-                              </SidebarMenuButton>
-                              <SidebarMenuBadge>
-                                {getThemeLabel(appTheme)} ·{" "}
-                                {export1080 ? "1080p" : "Auto"}
-                              </SidebarMenuBadge>
-                              <SidebarMenuSub>
-                                <SidebarMenuSubItem>
-                                  <SidebarMenuSubButton asChild>
-                                    <label className="cursor-pointer">
-                                      <Switch
-                                        checked={export1080}
-                                        onCheckedChange={setExport1080}
-                                      />
-                                      <span>Limit to 1080p</span>
-                                    </label>
-                                  </SidebarMenuSubButton>
-                                </SidebarMenuSubItem>
-                                <SidebarMenuSubItem>
-                                  <span className="px-2 py-1 font-medium text-section-label text-tertiary">
-                                    Theme
-                                  </span>
-                                </SidebarMenuSubItem>
-                                {THEME_CATALOG.map((themeOption) => (
-                                  <SidebarMenuSubItem key={themeOption.id}>
-                                    <SidebarMenuSubButton
-                                      className="gap-2"
-                                      isActive={appTheme === themeOption.id}
-                                      onClick={() =>
-                                        setAppTheme(themeOption.id)
-                                      }
-                                    >
-                                      {appTheme === themeOption.id ? (
-                                        <Check className="size-3.5 shrink-0" />
-                                      ) : (
-                                        <Palette className="size-3.5 shrink-0 text-tertiary" />
-                                      )}
-                                      <span className="min-w-0 flex-1 truncate">
-                                        {themeOption.name}
-                                      </span>
-                                      {themeOption.supportedModes.length ===
-                                        1 &&
-                                      themeOption.supportedModes[0] ===
-                                        "dark" ? (
-                                        <span className="shrink-0 text-caption text-tertiary">
-                                          dark
-                                        </span>
-                                      ) : null}
-                                    </SidebarMenuSubButton>
-                                  </SidebarMenuSubItem>
-                                ))}
-                              </SidebarMenuSub>
-                            </SidebarMenuItem>
-                            <SidebarMenuItem>
-                              <SidebarMenuButton tooltip="Default agent">
-                                <AgentProviderIcon
-                                  className="size-4 shrink-0"
-                                  value={defaultAgent}
-                                />
-                                <span>Default agent</span>
-                              </SidebarMenuButton>
-                              <SidebarMenuBadge>
-                                {getAgentModelLabel(defaultAgent)}
-                              </SidebarMenuBadge>
-                              <SidebarMenuSub>
-                                <SidebarMenuSubItem className="px-2 pb-2">
-                                  <AgentModelSelect
-                                    onValueChange={setDefaultAgentModel}
-                                    value={defaultAgent}
-                                  />
-                                </SidebarMenuSubItem>
-                              </SidebarMenuSub>
-                            </SidebarMenuItem>
-                          </SidebarMenu>
-                        </SidebarHeader>
-
                         <SidebarContent>
                           <SidebarGroup>
                             <SidebarGroupLabel>Inspector</SidebarGroupLabel>
@@ -1631,7 +1745,8 @@ export function App({
                               </SidebarMenu>
                             </SidebarGroupContent>
                           </SidebarGroup>
-                          {selected && (selZoom || selTitle || selBroll) ? (
+                          {selected &&
+                          (selZoom || selTitle || selBroll || selStill) ? (
                             <div className="group-data-[collapsible=icon]:hidden">
                               <div className="px-3 py-3">
                                 <div className="flex items-center gap-2 font-medium text-ui">
@@ -1639,6 +1754,8 @@ export function App({
                                     <ZoomIn className="size-3.5 text-tertiary" />
                                   ) : selTitle ? (
                                     <Type className="size-3.5 text-tertiary" />
+                                  ) : selStill ? (
+                                    <ImageIcon className="size-3.5 text-tertiary" />
                                   ) : (
                                     <Film className="size-3.5 text-tertiary" />
                                   )}
@@ -1646,7 +1763,9 @@ export function App({
                                     ? "Push-in"
                                     : selTitle
                                       ? "Title card"
-                                      : "B-roll"}
+                                      : selStill
+                                        ? "Still"
+                                        : "B-roll"}
                                   <span className="ml-auto text-caption text-tertiary tabular-nums">
                                     {selZoom &&
                                       `${fmt(selZoom.startSample / sr)}–${fmt(selZoom.endSample / sr)}`}
@@ -1654,6 +1773,8 @@ export function App({
                                       `${fmt(selTitle.startSample / sr)}–${fmt(selTitle.endSample / sr)}`}
                                     {selBroll &&
                                       `${fmt(selBroll.startSample / sr)}–${fmt(selBroll.endSample / sr)}`}
+                                    {selStill &&
+                                      `${fmt(selStill.startSample / sr)}–${fmt(selStill.endSample / sr)}`}
                                   </span>
                                 </div>
                               </div>
@@ -1820,6 +1941,47 @@ export function App({
                                 </Section>
                               )}
 
+                              {selStill && stillAssets.length > 0 && (
+                                <>
+                                  <Section title="Source">
+                                    <Select
+                                      onValueChange={(v) =>
+                                        updateStill(selStill.id, { assetId: v })
+                                      }
+                                      value={selStill.assetId}
+                                    >
+                                      <SelectTrigger className="w-full">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {stillAssets.map((a) => (
+                                          <SelectItem key={a.id} value={a.id}>
+                                            {a.name}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </Section>
+                                  <Section title="Ken Burns">
+                                    <PropRow
+                                      label="Scale"
+                                      value={`${selStill.scale.toFixed(2)}×`}
+                                    >
+                                      <Slider
+                                        className={SLIDER}
+                                        max={3}
+                                        min={1}
+                                        onValueChange={([v]) =>
+                                          updateStill(selStill.id, { scale: v })
+                                        }
+                                        step={0.05}
+                                        value={[selStill.scale]}
+                                      />
+                                    </PropRow>
+                                  </Section>
+                                </>
+                              )}
+
                               <div className="p-3">
                                 <Button
                                   className="w-full"
@@ -1875,6 +2037,35 @@ export function App({
                                     variant="secondary"
                                   >
                                     <Film />
+                                  </Button>
+                                </div>
+                                <div className="mt-2 flex gap-2">
+                                  <Select
+                                    onValueChange={setChosenStillAsset}
+                                    value={chosenStillAsset}
+                                  >
+                                    <SelectTrigger
+                                      className="flex-1"
+                                      disabled={stillAssets.length === 0}
+                                    >
+                                      <SelectValue placeholder="No still" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {stillAssets.map((a) => (
+                                        <SelectItem key={a.id} value={a.id}>
+                                          {a.name}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <Button
+                                    aria-label="Add still"
+                                    disabled={stillAssets.length === 0}
+                                    onClick={addStill}
+                                    size="sm"
+                                    variant="secondary"
+                                  >
+                                    <ImageIcon />
                                   </Button>
                                 </div>
                               </Section>

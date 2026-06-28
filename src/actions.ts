@@ -4,6 +4,8 @@
 // are the operations an external coding agent drives from the terminal.
 import {
   type Broll,
+  type Grade,
+  type Motion,
   type Project,
   SAMPLE_RATE,
   type Still,
@@ -290,6 +292,78 @@ export function removeStill(project: Project, id: string): boolean {
   return project.stills.length < before;
 }
 
+function findStill(project: Project, id: string): Still {
+  const item = (project.stills ?? []).find((s) => s.id === id);
+  if (!item) {
+    throw new Error(`unknown still "${id}"`);
+  }
+  return item;
+}
+
+// Patch an existing still overlay. Omitted fields are unchanged.
+export function updateStill(
+  project: Project,
+  id: string,
+  patch: {
+    assetId?: string;
+    fromSec?: number;
+    toSec?: number;
+    scale?: number;
+    focusX?: number;
+    focusY?: number;
+  }
+): Still {
+  const item = findStill(project, id);
+  const assetId = patch.assetId ?? item.assetId;
+  const fromSec = patch.fromSec ?? item.startSample / SAMPLE_RATE;
+  const toSec = patch.toSec ?? item.endSample / SAMPLE_RATE;
+  const scale = patch.scale ?? item.scale;
+  const focusX = patch.focusX ?? item.focusX;
+  const focusY = patch.focusY ?? item.focusY;
+  if (![fromSec, toSec, scale, focusX, focusY].every(Number.isFinite)) {
+    throw new Error("still timing/look values must be finite numbers");
+  }
+  if (fromSec < 0 || toSec < 0) {
+    throw new Error("still timing values must be non-negative");
+  }
+  if (scale < 1 || scale > 3) {
+    throw new Error("still scale must be between 1 and 3");
+  }
+  if (focusX < 0 || focusX > 1 || focusY < 0 || focusY > 1) {
+    throw new Error("still focus must be between 0 and 1");
+  }
+  const asset = project.assets.find((a) => a.id === assetId);
+  if (!asset) {
+    const known = project.assets.map((a) => a.id).join(", ") || "(none)";
+    throw new Error(`unknown asset "${assetId}". Registered assets: ${known}`);
+  }
+  if (asset.kind !== "still") {
+    throw new Error(
+      `asset "${assetId}" is ${asset.kind}; still overlays require kind still`
+    );
+  }
+  if (toSec <= fromSec) {
+    throw new Error(
+      `still span is empty: toSec (${toSec}) must be greater than fromSec (${fromSec})`
+    );
+  }
+  const projectDurationSec = project.durationSamples / SAMPLE_RATE;
+  if (fromSec >= projectDurationSec) {
+    throw new Error("still span starts after the project ends");
+  }
+  const endSec = Math.min(toSec, projectDurationSec);
+  if (endSec <= fromSec) {
+    throw new Error("still span is empty after clamping to project duration");
+  }
+  item.assetId = assetId;
+  item.scale = scale;
+  item.focusX = focusX;
+  item.focusY = focusY;
+  item.startSample = Math.round(fromSec * SAMPLE_RATE);
+  item.endSample = Math.round(endSec * SAMPLE_RATE);
+  return item;
+}
+
 // Add a title card over a span of the source timeline. Converts seconds to
 // samples on the canonical 48 kHz grid; clamps end to project duration.
 export function addTitle(
@@ -425,11 +499,28 @@ export function setPadMs(project: Project, padMs: number): Project {
 // Toggle cinematic look flags (vignette).
 export function setLook(
   project: Project,
-  input: { vignette?: boolean }
+  input: { vignette?: boolean; grade?: Grade; lut?: string | null }
 ): Project {
   if (typeof input.vignette === "boolean") {
     project.look = { ...project.look, vignette: input.vignette };
   }
+  if (input.grade !== undefined) {
+    project.look = { ...project.look, grade: input.grade };
+  }
+  if (input.lut !== undefined) {
+    if (input.lut === null || input.lut === "") {
+      const { lut: _omit, ...rest } = project.look;
+      project.look = rest;
+    } else {
+      project.look = { ...project.look, lut: input.lut };
+    }
+  }
+  return project;
+}
+
+// Patch the global animation feel. Only the provided knobs change.
+export function setMotion(project: Project, input: Partial<Motion>): Project {
+  project.motion = { ...project.motion, ...input };
   return project;
 }
 
