@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.8.2 - 2026-06-28
+
+Full Linear-style UI refactor: semantic tokens wired through components, CTA hierarchy enforced, timeline colors aligned.
+
+### Changed
+- **CTA hierarchy** — Export and Choose video use primary blue; skill tokens stay grey (blue only when it matters).
+- **Semantic tokens** — `text-tertiary`, `text-quaternary`, `bg-surface-*` adopted across editor shell; `text-muted-foreground` removed from `web/`.
+- **Timeline tracks** — music, stills, and titles use theme tokens (`info`, `zoom`, `title`); violet and arbitrary Tailwind hues removed.
+- **Primitives** — inputs use `text-ui`, placeholders `text-quaternary`, focus rings normalized to 1px, hover-card and skills menu use `popover-styled`.
+- **Typography** — transcript and chat panels use `text-ui` / `text-section-label`; caption inactive words use `text-white/70` on player.
+
 ## 0.8.1 - 2026-06-28
 
 Linear-style design system: OKLCH surfaces, Inter Variable typography, and light/dark parity.
