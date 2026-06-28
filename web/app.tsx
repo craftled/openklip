@@ -8,23 +8,6 @@ import {
   type SweepOptions,
 } from "glimm";
 import {
-  Captions,
-  Check,
-  Clock3,
-  Download,
-  Film,
-  Moon,
-  Palette,
-  PanelLeft,
-  PanelRight,
-  Settings2,
-  Sparkles,
-  Sun,
-  Trash2,
-  Type,
-  ZoomIn,
-} from "lucide-react";
-import {
   type ComponentType,
   type CSSProperties,
   type MouseEvent,
@@ -40,6 +23,11 @@ import { AgentChatPanel } from "@/components/agent-chat-panel";
 import { AgentModelSelect } from "@/components/agent-model-select";
 import { AgentSidebar } from "@/components/agent-sidebar";
 import { withAssetKind } from "@/components/asset-bin";
+import {
+  CHAT_WIDTH_DEFAULT,
+  ChatResizeHandle,
+  readStoredChatWidth,
+} from "@/components/chat-resize-handle";
 import { CinemaPlayer } from "@/components/cinema-player";
 import { EditTimeline } from "@/components/edit-timeline";
 import { EditorSidebarShortcuts } from "@/components/editor-sidebar-shortcuts";
@@ -110,6 +98,23 @@ import {
   toastSaveError,
 } from "@/lib/app-toast";
 import {
+  Captions,
+  Check,
+  Clock3,
+  Download,
+  Film,
+  Moon,
+  Palette,
+  PanelLeft,
+  PanelRight,
+  Settings2,
+  Sparkles,
+  Sun,
+  Trash2,
+  Type,
+  ZoomIn,
+} from "@/lib/icon";
+import {
   clampLoopRegion,
   ORIENTATION_LABEL,
   ORIENTATION_RATIO,
@@ -153,6 +158,7 @@ interface Word {
   text: string;
 }
 interface Asset {
+  card?: { bestFor?: string[]; summary: string; tags?: string[] };
   durationSamples: number;
   id: string;
   kind?: "broll" | "music" | "still";
@@ -329,7 +335,15 @@ export function App({
     initialProject.look?.vignette ?? false
   );
   const [export1080, setExport1080] = useState(true);
-  const [centerPanel, setCenterPanel] = useState<"chat" | "transcript">("chat");
+  const [centerPanel, setCenterPanel] = useState<"properties" | "transcript">(
+    "transcript"
+  );
+  // Chat sidebar width (px), drag-adjustable. Default on server; the stored
+  // value is read after mount so SSR and first client render agree.
+  const [chatWidth, setChatWidth] = useState(CHAT_WIDTH_DEFAULT);
+  useEffect(() => {
+    setChatWidth(readStoredChatWidth());
+  }, []);
   const [timelineOpen, setTimelineOpen] = useState(false);
   const [defaultAgent, setDefaultAgent] =
     useState<AgentModelId>(DEFAULT_AGENT_MODEL);
@@ -1184,7 +1198,7 @@ export function App({
               keyboardShortcut={false}
               style={
                 {
-                  "--sidebar-width": "17rem",
+                  "--sidebar-width": `${chatWidth}px`,
                   "--sidebar-width-icon": "3.25rem",
                 } as CSSProperties
               }
@@ -1256,16 +1270,6 @@ export function App({
                       <FindFillerButton />
                       <div className="flex items-center gap-0.5 rounded-lg border border-border bg-surface-2 p-0.5">
                         <Button
-                          aria-pressed={centerPanel === "chat"}
-                          onClick={() => setCenterPanel("chat")}
-                          size="sm"
-                          variant={
-                            centerPanel === "chat" ? "secondary" : "ghost"
-                          }
-                        >
-                          Chat
-                        </Button>
-                        <Button
                           aria-pressed={centerPanel === "transcript"}
                           onClick={() => setCenterPanel("transcript")}
                           size="sm"
@@ -1274,6 +1278,16 @@ export function App({
                           }
                         >
                           Transcript
+                        </Button>
+                        <Button
+                          aria-pressed={centerPanel === "properties"}
+                          onClick={() => setCenterPanel("properties")}
+                          size="sm"
+                          variant={
+                            centerPanel === "properties" ? "secondary" : "ghost"
+                          }
+                        >
+                          Properties
                         </Button>
                       </div>
                       <Drawer
@@ -1507,31 +1521,474 @@ export function App({
                   </div>
 
                   <div className="flex min-h-0 flex-1 flex-col">
-                    {centerPanel === "chat" ? (
-                      <AgentChatPanel
-                        onAssetsUpdated={(update) => {
-                          setProject((p) => ({
-                            ...p,
-                            assets: update.assets,
-                            ...(update.broll === undefined
-                              ? {}
-                              : { broll: update.broll }),
-                            ...(update.stills === undefined
-                              ? {}
-                              : { stills: update.stills }),
-                          }));
-                          const nextBroll = update.assets.find(
-                            (a) => (a.kind ?? "broll") === "broll"
-                          );
-                          if (
-                            nextBroll &&
-                            !update.assets.some((a) => a.id === chosenAsset)
-                          ) {
-                            setChosenAsset(nextBroll.id);
-                          }
-                        }}
-                        slug={project.slug}
-                      />
+                    {centerPanel === "properties" ? (
+                      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+                        <SidebarHeader className="border-border border-b">
+                          <SidebarMenu>
+                            <SidebarMenuItem>
+                              <SidebarMenuButton tooltip="Settings">
+                                <Settings2 />
+                                <span>Settings</span>
+                              </SidebarMenuButton>
+                              <SidebarMenuBadge>
+                                {getThemeLabel(appTheme)} ·{" "}
+                                {export1080 ? "1080p" : "Auto"}
+                              </SidebarMenuBadge>
+                              <SidebarMenuSub>
+                                <SidebarMenuSubItem>
+                                  <SidebarMenuSubButton asChild>
+                                    <label className="cursor-pointer">
+                                      <Switch
+                                        checked={export1080}
+                                        onCheckedChange={setExport1080}
+                                      />
+                                      <span>Limit to 1080p</span>
+                                    </label>
+                                  </SidebarMenuSubButton>
+                                </SidebarMenuSubItem>
+                                <SidebarMenuSubItem>
+                                  <span className="px-2 py-1 font-medium text-section-label text-tertiary">
+                                    Theme
+                                  </span>
+                                </SidebarMenuSubItem>
+                                {THEME_CATALOG.map((themeOption) => (
+                                  <SidebarMenuSubItem key={themeOption.id}>
+                                    <SidebarMenuSubButton
+                                      className="gap-2"
+                                      isActive={appTheme === themeOption.id}
+                                      onClick={() =>
+                                        setAppTheme(themeOption.id)
+                                      }
+                                    >
+                                      {appTheme === themeOption.id ? (
+                                        <Check className="size-3.5 shrink-0" />
+                                      ) : (
+                                        <Palette className="size-3.5 shrink-0 text-tertiary" />
+                                      )}
+                                      <span className="min-w-0 flex-1 truncate">
+                                        {themeOption.name}
+                                      </span>
+                                      {themeOption.supportedModes.length ===
+                                        1 &&
+                                      themeOption.supportedModes[0] ===
+                                        "dark" ? (
+                                        <span className="shrink-0 text-caption text-tertiary">
+                                          dark
+                                        </span>
+                                      ) : null}
+                                    </SidebarMenuSubButton>
+                                  </SidebarMenuSubItem>
+                                ))}
+                              </SidebarMenuSub>
+                            </SidebarMenuItem>
+                            <SidebarMenuItem>
+                              <SidebarMenuButton tooltip="Default agent">
+                                <AgentProviderIcon
+                                  className="size-4 shrink-0"
+                                  value={defaultAgent}
+                                />
+                                <span>Default agent</span>
+                              </SidebarMenuButton>
+                              <SidebarMenuBadge>
+                                {getAgentModelLabel(defaultAgent)}
+                              </SidebarMenuBadge>
+                              <SidebarMenuSub>
+                                <SidebarMenuSubItem className="px-2 pb-2">
+                                  <AgentModelSelect
+                                    onValueChange={setDefaultAgentModel}
+                                    value={defaultAgent}
+                                  />
+                                </SidebarMenuSubItem>
+                              </SidebarMenuSub>
+                            </SidebarMenuItem>
+                          </SidebarMenu>
+                        </SidebarHeader>
+
+                        <SidebarContent>
+                          <SidebarGroup>
+                            <SidebarGroupLabel>Inspector</SidebarGroupLabel>
+                            <SidebarGroupContent>
+                              <SidebarMenu>
+                                <SidebarMenuItem>
+                                  <SidebarMenuButton tooltip={inspectorLabel}>
+                                    <InspectorIcon />
+                                    <span>{inspectorLabel}</span>
+                                  </SidebarMenuButton>
+                                  <SidebarMenuBadge>
+                                    {inspectorBadge}
+                                  </SidebarMenuBadge>
+                                  <SidebarMenuSub>
+                                    {inspectorMeta.map((item) => (
+                                      <InfoSubItem
+                                        icon={item.icon}
+                                        key={item.label}
+                                        label={item.label}
+                                        value={item.value}
+                                      />
+                                    ))}
+                                  </SidebarMenuSub>
+                                </SidebarMenuItem>
+                              </SidebarMenu>
+                            </SidebarGroupContent>
+                          </SidebarGroup>
+                          {selected && (selZoom || selTitle || selBroll) ? (
+                            <div className="group-data-[collapsible=icon]:hidden">
+                              <div className="px-3 py-3">
+                                <div className="flex items-center gap-2 font-medium text-ui">
+                                  {selZoom ? (
+                                    <ZoomIn className="size-3.5 text-tertiary" />
+                                  ) : selTitle ? (
+                                    <Type className="size-3.5 text-tertiary" />
+                                  ) : (
+                                    <Film className="size-3.5 text-tertiary" />
+                                  )}
+                                  {selZoom
+                                    ? "Push-in"
+                                    : selTitle
+                                      ? "Title card"
+                                      : "B-roll"}
+                                  <span className="ml-auto text-caption text-tertiary tabular-nums">
+                                    {selZoom &&
+                                      `${fmt(selZoom.startSample / sr)}–${fmt(selZoom.endSample / sr)}`}
+                                    {selTitle &&
+                                      `${fmt(selTitle.startSample / sr)}–${fmt(selTitle.endSample / sr)}`}
+                                    {selBroll &&
+                                      `${fmt(selBroll.startSample / sr)}–${fmt(selBroll.endSample / sr)}`}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {selZoom && (
+                                <>
+                                  <Section title="Parameters">
+                                    <PropRow
+                                      label="Scale"
+                                      value={`${selZoom.scale.toFixed(2)}×`}
+                                    >
+                                      <Slider
+                                        className={SLIDER}
+                                        max={3}
+                                        min={1}
+                                        onValueChange={([v]) =>
+                                          updateZoom(selZoom.id, { scale: v })
+                                        }
+                                        step={0.05}
+                                        value={[selZoom.scale]}
+                                      />
+                                    </PropRow>
+                                    <PropRow
+                                      label="Ramp"
+                                      value={`${selZoom.rampSec.toFixed(1)}s`}
+                                    >
+                                      <Slider
+                                        className={SLIDER}
+                                        max={5}
+                                        min={0}
+                                        onValueChange={([v]) =>
+                                          updateZoom(selZoom.id, { rampSec: v })
+                                        }
+                                        step={0.1}
+                                        value={[selZoom.rampSec]}
+                                      />
+                                    </PropRow>
+                                  </Section>
+                                  <Section title="Preset">
+                                    <ToggleGroup
+                                      className="w-full"
+                                      onValueChange={(v) =>
+                                        v &&
+                                        updateZoom(selZoom.id, ZOOM_PRESETS[v])
+                                      }
+                                      spacing={0}
+                                      type="single"
+                                      value={presetOf(selZoom)}
+                                      variant="outline"
+                                    >
+                                      {Object.keys(ZOOM_PRESETS).map((k) => (
+                                        <ToggleGroupItem
+                                          className="h-7 flex-1 text-xs"
+                                          key={k}
+                                          value={k}
+                                        >
+                                          {k}
+                                        </ToggleGroupItem>
+                                      ))}
+                                    </ToggleGroup>
+                                  </Section>
+                                </>
+                              )}
+
+                              {selTitle && (
+                                <Section title="Title">
+                                  {selTitle.position === "hero" ? (
+                                    <textarea
+                                      className="field-sizing-content min-h-16 w-full resize-y rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                                      onChange={(e) =>
+                                        updateTitle(selTitle.id, {
+                                          text: e.target.value,
+                                        })
+                                      }
+                                      placeholder={
+                                        "Headline\nSubtitle (optional second line)"
+                                      }
+                                      rows={3}
+                                      value={selTitle.text}
+                                    />
+                                  ) : (
+                                    <Input
+                                      onChange={(e) =>
+                                        updateTitle(selTitle.id, {
+                                          text: e.target.value,
+                                        })
+                                      }
+                                      placeholder="Title text"
+                                      value={selTitle.text}
+                                    />
+                                  )}
+                                  <div className="mt-2">
+                                    <Select
+                                      onValueChange={(v) =>
+                                        updateTitle(selTitle.id, {
+                                          position: v as
+                                            | "lower"
+                                            | "center"
+                                            | "hero",
+                                        })
+                                      }
+                                      value={selTitle.position}
+                                    >
+                                      <SelectTrigger className="w-full">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="lower">
+                                          Lower third
+                                        </SelectItem>
+                                        <SelectItem value="center">
+                                          Centered
+                                        </SelectItem>
+                                        <SelectItem value="hero">
+                                          Hero card
+                                        </SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                </Section>
+                              )}
+
+                              {selBroll && brollAssets.length > 0 && (
+                                <Section title="Source">
+                                  <Select
+                                    onValueChange={(v) =>
+                                      updateBroll(selBroll.id, { assetId: v })
+                                    }
+                                    value={selBroll.assetId}
+                                  >
+                                    <SelectTrigger className="w-full">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {brollAssets.map((a) => (
+                                        <SelectItem key={a.id} value={a.id}>
+                                          {a.name}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  {(project.broll ?? []).length > 1 && (
+                                    <div className="mt-3">
+                                      <span className="text-caption text-tertiary">
+                                        Paint order : drag to restack
+                                      </span>
+                                      <div className="mt-1.5">
+                                        <OverlaySortable
+                                          onReorder={reorderBrollOrder}
+                                          onSelect={(id) =>
+                                            setSelected({ kind: "broll", id })
+                                          }
+                                          rows={(project.broll ?? []).map(
+                                            (b) => ({
+                                              id: b.id,
+                                              label: assetName(b.assetId),
+                                            })
+                                          )}
+                                          selectedId={selected?.id}
+                                        />
+                                      </div>
+                                    </div>
+                                  )}
+                                </Section>
+                              )}
+
+                              <div className="p-3">
+                                <Button
+                                  className="w-full"
+                                  onClick={removeSelected}
+                                  size="sm"
+                                  variant="destructive"
+                                >
+                                  <Trash2 /> Remove effect
+                                </Button>
+                              </div>
+                            </div>
+                          ) : selRange ? (
+                            <div className="group-data-[collapsible=icon]:hidden">
+                              <div className="px-3 py-3 font-medium text-ui">
+                                Selection
+                                <span className="ml-2 text-caption text-tertiary">
+                                  {selRange[1] - selRange[0] + 1} words
+                                </span>
+                              </div>
+                              <Section title="Add effect">
+                                <Button
+                                  className="w-full justify-start"
+                                  onClick={addZoom}
+                                  size="sm"
+                                  variant="secondary"
+                                >
+                                  <ZoomIn /> Push in
+                                </Button>
+                                <div className="mt-2 flex gap-2">
+                                  <Select
+                                    onValueChange={setChosenAsset}
+                                    value={chosenAsset}
+                                  >
+                                    <SelectTrigger
+                                      className="flex-1"
+                                      disabled={brollAssets.length === 0}
+                                    >
+                                      <SelectValue placeholder="No b-roll" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {brollAssets.map((a) => (
+                                        <SelectItem key={a.id} value={a.id}>
+                                          {a.name}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <Button
+                                    aria-label="Add b-roll"
+                                    disabled={brollAssets.length === 0}
+                                    onClick={addBroll}
+                                    size="sm"
+                                    variant="secondary"
+                                  >
+                                    <Film />
+                                  </Button>
+                                </div>
+                              </Section>
+                              <Section title="Title">
+                                {titlePos === "hero" ? (
+                                  <textarea
+                                    className="field-sizing-content min-h-16 w-full resize-y rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                                    onChange={(e) =>
+                                      setTitleText(e.target.value)
+                                    }
+                                    placeholder={
+                                      "Headline\nSubtitle (optional second line)"
+                                    }
+                                    rows={3}
+                                    value={titleText}
+                                  />
+                                ) : (
+                                  <Input
+                                    onChange={(e) =>
+                                      setTitleText(e.target.value)
+                                    }
+                                    placeholder="Title text"
+                                    value={titleText}
+                                  />
+                                )}
+                                <div className="mt-2 flex gap-2">
+                                  <Select
+                                    onValueChange={(v) =>
+                                      setTitlePos(
+                                        v as "lower" | "center" | "hero"
+                                      )
+                                    }
+                                    value={titlePos}
+                                  >
+                                    <SelectTrigger className="flex-1">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="lower">
+                                        Lower third
+                                      </SelectItem>
+                                      <SelectItem value="center">
+                                        Centered
+                                      </SelectItem>
+                                      <SelectItem value="hero">
+                                        Hero card
+                                      </SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <Button
+                                    aria-label="Add title"
+                                    disabled={!titleText.trim()}
+                                    onClick={addTitle}
+                                    size="sm"
+                                    variant="secondary"
+                                  >
+                                    <Type />
+                                  </Button>
+                                </div>
+                              </Section>
+                              <div className="p-3">
+                                <Button
+                                  className="text-tertiary"
+                                  onClick={clearSel}
+                                  size="sm"
+                                  variant="ghost"
+                                >
+                                  Clear selection
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="group-data-[collapsible=icon]:hidden">
+                              <Section title="Captions">
+                                <PropRow
+                                  label="Per line"
+                                  value={String(
+                                    project.captions?.maxWords ?? 6
+                                  )}
+                                >
+                                  <Slider
+                                    className={SLIDER}
+                                    max={12}
+                                    min={1}
+                                    onValueChange={([v]) => setMaxWords(v)}
+                                    step={1}
+                                    value={[project.captions?.maxWords ?? 6]}
+                                  />
+                                </PropRow>
+                              </Section>
+                              <Section title="Timing">
+                                <PropRow
+                                  label="Pad"
+                                  value={`${project.padMs ?? 50}ms`}
+                                >
+                                  <Slider
+                                    className={SLIDER}
+                                    max={200}
+                                    min={0}
+                                    onValueChange={([v]) => setPad(v)}
+                                    step={5}
+                                    value={[project.padMs ?? 50]}
+                                  />
+                                </PropRow>
+                              </Section>
+                              <p className="px-3 py-3 text-tertiary text-xs leading-relaxed">
+                                Select a word range in the transcript to add a
+                                push-in, b-roll, or title. Click an effect to
+                                edit it here.
+                              </p>
+                            </div>
+                          )}
+                        </SidebarContent>
+                      </div>
                     ) : (
                       <EditorTranscriptPanel
                         curSample={curSample}
@@ -1546,442 +2003,38 @@ export function App({
                 </div>
               </SidebarInset>
 
-              {/* RIGHT : actions + inspector (Paper "properties" panel) */}
+              {/* RIGHT : agent chat (full-height reading column) */}
               <Sidebar
                 className="bg-background"
-                collapsible="icon"
+                collapsible="offcanvas"
                 side="right"
               >
-                <SidebarHeader className="border-border border-b">
-                  <SidebarMenu>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton tooltip="Settings">
-                        <Settings2 />
-                        <span>Settings</span>
-                      </SidebarMenuButton>
-                      <SidebarMenuBadge>
-                        {getThemeLabel(appTheme)} ·{" "}
-                        {export1080 ? "1080p" : "Auto"}
-                      </SidebarMenuBadge>
-                      <SidebarMenuSub>
-                        <SidebarMenuSubItem>
-                          <SidebarMenuSubButton asChild>
-                            <label className="cursor-pointer">
-                              <Switch
-                                checked={export1080}
-                                onCheckedChange={setExport1080}
-                              />
-                              <span>Limit to 1080p</span>
-                            </label>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                        <SidebarMenuSubItem>
-                          <span className="px-2 py-1 font-medium text-section-label text-tertiary">
-                            Theme
-                          </span>
-                        </SidebarMenuSubItem>
-                        {THEME_CATALOG.map((themeOption) => (
-                          <SidebarMenuSubItem key={themeOption.id}>
-                            <SidebarMenuSubButton
-                              className="gap-2"
-                              isActive={appTheme === themeOption.id}
-                              onClick={() => setAppTheme(themeOption.id)}
-                            >
-                              {appTheme === themeOption.id ? (
-                                <Check className="size-3.5 shrink-0" />
-                              ) : (
-                                <Palette className="size-3.5 shrink-0 text-tertiary" />
-                              )}
-                              <span className="min-w-0 flex-1 truncate">
-                                {themeOption.name}
-                              </span>
-                              {themeOption.supportedModes.length === 1 &&
-                              themeOption.supportedModes[0] === "dark" ? (
-                                <span className="shrink-0 text-caption text-tertiary">
-                                  dark
-                                </span>
-                              ) : null}
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
-                        ))}
-                      </SidebarMenuSub>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton tooltip="Default agent">
-                        <AgentProviderIcon
-                          className="size-4 shrink-0"
-                          value={defaultAgent}
-                        />
-                        <span>Default agent</span>
-                      </SidebarMenuButton>
-                      <SidebarMenuBadge>
-                        {getAgentModelLabel(defaultAgent)}
-                      </SidebarMenuBadge>
-                      <SidebarMenuSub>
-                        <SidebarMenuSubItem className="px-2 pb-2">
-                          <AgentModelSelect
-                            onValueChange={setDefaultAgentModel}
-                            value={defaultAgent}
-                          />
-                        </SidebarMenuSubItem>
-                      </SidebarMenuSub>
-                    </SidebarMenuItem>
-                  </SidebarMenu>
-                </SidebarHeader>
-
-                <SidebarContent>
-                  <SidebarGroup>
-                    <SidebarGroupLabel>Inspector</SidebarGroupLabel>
-                    <SidebarGroupContent>
-                      <SidebarMenu>
-                        <SidebarMenuItem>
-                          <SidebarMenuButton tooltip={inspectorLabel}>
-                            <InspectorIcon />
-                            <span>{inspectorLabel}</span>
-                          </SidebarMenuButton>
-                          <SidebarMenuBadge>{inspectorBadge}</SidebarMenuBadge>
-                          <SidebarMenuSub>
-                            {inspectorMeta.map((item) => (
-                              <InfoSubItem
-                                icon={item.icon}
-                                key={item.label}
-                                label={item.label}
-                                value={item.value}
-                              />
-                            ))}
-                          </SidebarMenuSub>
-                        </SidebarMenuItem>
-                      </SidebarMenu>
-                    </SidebarGroupContent>
-                  </SidebarGroup>
-                  {selected && (selZoom || selTitle || selBroll) ? (
-                    <div className="group-data-[collapsible=icon]:hidden">
-                      <div className="px-3 py-3">
-                        <div className="flex items-center gap-2 font-medium text-ui">
-                          {selZoom ? (
-                            <ZoomIn className="size-3.5 text-tertiary" />
-                          ) : selTitle ? (
-                            <Type className="size-3.5 text-tertiary" />
-                          ) : (
-                            <Film className="size-3.5 text-tertiary" />
-                          )}
-                          {selZoom
-                            ? "Push-in"
-                            : selTitle
-                              ? "Title card"
-                              : "B-roll"}
-                          <span className="ml-auto text-caption text-tertiary tabular-nums">
-                            {selZoom &&
-                              `${fmt(selZoom.startSample / sr)}–${fmt(selZoom.endSample / sr)}`}
-                            {selTitle &&
-                              `${fmt(selTitle.startSample / sr)}–${fmt(selTitle.endSample / sr)}`}
-                            {selBroll &&
-                              `${fmt(selBroll.startSample / sr)}–${fmt(selBroll.endSample / sr)}`}
-                          </span>
-                        </div>
-                      </div>
-
-                      {selZoom && (
-                        <>
-                          <Section title="Parameters">
-                            <PropRow
-                              label="Scale"
-                              value={`${selZoom.scale.toFixed(2)}×`}
-                            >
-                              <Slider
-                                className={SLIDER}
-                                max={3}
-                                min={1}
-                                onValueChange={([v]) =>
-                                  updateZoom(selZoom.id, { scale: v })
-                                }
-                                step={0.05}
-                                value={[selZoom.scale]}
-                              />
-                            </PropRow>
-                            <PropRow
-                              label="Ramp"
-                              value={`${selZoom.rampSec.toFixed(1)}s`}
-                            >
-                              <Slider
-                                className={SLIDER}
-                                max={5}
-                                min={0}
-                                onValueChange={([v]) =>
-                                  updateZoom(selZoom.id, { rampSec: v })
-                                }
-                                step={0.1}
-                                value={[selZoom.rampSec]}
-                              />
-                            </PropRow>
-                          </Section>
-                          <Section title="Preset">
-                            <ToggleGroup
-                              className="w-full"
-                              onValueChange={(v) =>
-                                v && updateZoom(selZoom.id, ZOOM_PRESETS[v])
-                              }
-                              spacing={0}
-                              type="single"
-                              value={presetOf(selZoom)}
-                              variant="outline"
-                            >
-                              {Object.keys(ZOOM_PRESETS).map((k) => (
-                                <ToggleGroupItem
-                                  className="h-7 flex-1 text-xs"
-                                  key={k}
-                                  value={k}
-                                >
-                                  {k}
-                                </ToggleGroupItem>
-                              ))}
-                            </ToggleGroup>
-                          </Section>
-                        </>
-                      )}
-
-                      {selTitle && (
-                        <Section title="Title">
-                          {selTitle.position === "hero" ? (
-                            <textarea
-                              className="field-sizing-content min-h-16 w-full resize-y rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                              onChange={(e) =>
-                                updateTitle(selTitle.id, {
-                                  text: e.target.value,
-                                })
-                              }
-                              placeholder={
-                                "Headline\nSubtitle (optional second line)"
-                              }
-                              rows={3}
-                              value={selTitle.text}
-                            />
-                          ) : (
-                            <Input
-                              onChange={(e) =>
-                                updateTitle(selTitle.id, {
-                                  text: e.target.value,
-                                })
-                              }
-                              placeholder="Title text"
-                              value={selTitle.text}
-                            />
-                          )}
-                          <div className="mt-2">
-                            <Select
-                              onValueChange={(v) =>
-                                updateTitle(selTitle.id, {
-                                  position: v as "lower" | "center" | "hero",
-                                })
-                              }
-                              value={selTitle.position}
-                            >
-                              <SelectTrigger className="w-full">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="lower">
-                                  Lower third
-                                </SelectItem>
-                                <SelectItem value="center">Centered</SelectItem>
-                                <SelectItem value="hero">Hero card</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </Section>
-                      )}
-
-                      {selBroll && brollAssets.length > 0 && (
-                        <Section title="Source">
-                          <Select
-                            onValueChange={(v) =>
-                              updateBroll(selBroll.id, { assetId: v })
-                            }
-                            value={selBroll.assetId}
-                          >
-                            <SelectTrigger className="w-full">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {brollAssets.map((a) => (
-                                <SelectItem key={a.id} value={a.id}>
-                                  {a.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          {(project.broll ?? []).length > 1 && (
-                            <div className="mt-3">
-                              <span className="text-caption text-tertiary">
-                                Paint order : drag to restack
-                              </span>
-                              <div className="mt-1.5">
-                                <OverlaySortable
-                                  onReorder={reorderBrollOrder}
-                                  onSelect={(id) =>
-                                    setSelected({ kind: "broll", id })
-                                  }
-                                  rows={(project.broll ?? []).map((b) => ({
-                                    id: b.id,
-                                    label: assetName(b.assetId),
-                                  }))}
-                                  selectedId={selected?.id}
-                                />
-                              </div>
-                            </div>
-                          )}
-                        </Section>
-                      )}
-
-                      <div className="p-3">
-                        <Button
-                          className="w-full"
-                          onClick={removeSelected}
-                          size="sm"
-                          variant="destructive"
-                        >
-                          <Trash2 /> Remove effect
-                        </Button>
-                      </div>
-                    </div>
-                  ) : selRange ? (
-                    <div className="group-data-[collapsible=icon]:hidden">
-                      <div className="px-3 py-3 font-medium text-ui">
-                        Selection
-                        <span className="ml-2 text-caption text-tertiary">
-                          {selRange[1] - selRange[0] + 1} words
-                        </span>
-                      </div>
-                      <Section title="Add effect">
-                        <Button
-                          className="w-full justify-start"
-                          onClick={addZoom}
-                          size="sm"
-                          variant="secondary"
-                        >
-                          <ZoomIn /> Push in
-                        </Button>
-                        <div className="mt-2 flex gap-2">
-                          <Select
-                            onValueChange={setChosenAsset}
-                            value={chosenAsset}
-                          >
-                            <SelectTrigger
-                              className="flex-1"
-                              disabled={brollAssets.length === 0}
-                            >
-                              <SelectValue placeholder="No b-roll" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {brollAssets.map((a) => (
-                                <SelectItem key={a.id} value={a.id}>
-                                  {a.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <Button
-                            aria-label="Add b-roll"
-                            disabled={brollAssets.length === 0}
-                            onClick={addBroll}
-                            size="sm"
-                            variant="secondary"
-                          >
-                            <Film />
-                          </Button>
-                        </div>
-                      </Section>
-                      <Section title="Title">
-                        {titlePos === "hero" ? (
-                          <textarea
-                            className="field-sizing-content min-h-16 w-full resize-y rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                            onChange={(e) => setTitleText(e.target.value)}
-                            placeholder={
-                              "Headline\nSubtitle (optional second line)"
-                            }
-                            rows={3}
-                            value={titleText}
-                          />
-                        ) : (
-                          <Input
-                            onChange={(e) => setTitleText(e.target.value)}
-                            placeholder="Title text"
-                            value={titleText}
-                          />
-                        )}
-                        <div className="mt-2 flex gap-2">
-                          <Select
-                            onValueChange={(v) =>
-                              setTitlePos(v as "lower" | "center" | "hero")
-                            }
-                            value={titlePos}
-                          >
-                            <SelectTrigger className="flex-1">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="lower">Lower third</SelectItem>
-                              <SelectItem value="center">Centered</SelectItem>
-                              <SelectItem value="hero">Hero card</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <Button
-                            aria-label="Add title"
-                            disabled={!titleText.trim()}
-                            onClick={addTitle}
-                            size="sm"
-                            variant="secondary"
-                          >
-                            <Type />
-                          </Button>
-                        </div>
-                      </Section>
-                      <div className="p-3">
-                        <Button
-                          className="text-tertiary"
-                          onClick={clearSel}
-                          size="sm"
-                          variant="ghost"
-                        >
-                          Clear selection
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="group-data-[collapsible=icon]:hidden">
-                      <Section title="Captions">
-                        <PropRow
-                          label="Per line"
-                          value={String(project.captions?.maxWords ?? 6)}
-                        >
-                          <Slider
-                            className={SLIDER}
-                            max={12}
-                            min={1}
-                            onValueChange={([v]) => setMaxWords(v)}
-                            step={1}
-                            value={[project.captions?.maxWords ?? 6]}
-                          />
-                        </PropRow>
-                      </Section>
-                      <Section title="Timing">
-                        <PropRow label="Pad" value={`${project.padMs ?? 50}ms`}>
-                          <Slider
-                            className={SLIDER}
-                            max={200}
-                            min={0}
-                            onValueChange={([v]) => setPad(v)}
-                            step={5}
-                            value={[project.padMs ?? 50]}
-                          />
-                        </PropRow>
-                      </Section>
-                      <p className="px-3 py-3 text-tertiary text-xs leading-relaxed">
-                        Select a word range in the transcript to add a push-in,
-                        b-roll, or title. Click an effect to edit it here.
-                      </p>
-                    </div>
-                  )}
+                <ChatResizeHandle onResize={setChatWidth} width={chatWidth} />
+                <SidebarContent className="overflow-hidden p-0">
+                  <AgentChatPanel
+                    onAssetsUpdated={(update) => {
+                      setProject((p) => ({
+                        ...p,
+                        assets: update.assets,
+                        ...(update.broll === undefined
+                          ? {}
+                          : { broll: update.broll }),
+                        ...(update.stills === undefined
+                          ? {}
+                          : { stills: update.stills }),
+                      }));
+                      const nextBroll = update.assets.find(
+                        (a) => (a.kind ?? "broll") === "broll"
+                      );
+                      if (
+                        nextBroll &&
+                        !update.assets.some((a) => a.id === chosenAsset)
+                      ) {
+                        setChosenAsset(nextBroll.id);
+                      }
+                    }}
+                    slug={project.slug}
+                  />
                 </SidebarContent>
                 <SidebarRail />
               </Sidebar>

@@ -1,16 +1,9 @@
 "use client";
 
-import {
-  FolderOpen,
-  MessageSquare,
-  MessageSquarePlus,
-  PanelLeft,
-  Search,
-  Settings2,
-} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAgentChat } from "@/components/agent-chat-context";
+import { AnalyzeAssetsButton } from "@/components/analyze-assets-button";
 import {
   AssetBin,
   type AssetBinUpdate,
@@ -45,6 +38,14 @@ import {
   subscribeDefaultAgent,
 } from "@/lib/agent-preferences";
 import { chatListEmptyLabel, filterThreadsByQuery } from "@/lib/chat-list";
+import {
+  FolderOpen,
+  MessageSquare,
+  MessageSquarePlus,
+  PanelLeft,
+  Search,
+  Settings2,
+} from "@/lib/icon";
 import type { ProjectHoverContext } from "@/lib/project-context";
 import { createProjectFromVideo } from "@/lib/project-create";
 import type { ProjectListing } from "@/lib/project-list";
@@ -106,6 +107,13 @@ export function AgentSidebar({
     selectThread,
     threads,
   } = useAgentChat();
+
+  // Only b-roll and stills get asset cards, so the analyze affordance is hidden
+  // until at least one such asset exists (music-only bins have nothing to do).
+  const hasCardableAssets = useMemo(
+    () => assets.some((a) => (a.kind ?? "broll") !== "music"),
+    [assets]
+  );
 
   const openProject = useCallback(
     (slug: string) => {
@@ -285,6 +293,11 @@ export function AgentSidebar({
               sampleRate={sampleRate}
               slug={activeSlug}
             />
+            {hasCardableAssets ? (
+              <div className="px-1 pt-1.5">
+                <AnalyzeAssetsButton />
+              </div>
+            ) : null}
           </div>
         </CollapsibleSidebarSection>
 
