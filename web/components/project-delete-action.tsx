@@ -1,6 +1,6 @@
 "use client";
 
-import { Trash2, X } from "lucide-react";
+import { Trash2, X } from "@/lib/icon";
 import { cn } from "@/lib/utils";
 
 interface ProjectDeleteActionProps {

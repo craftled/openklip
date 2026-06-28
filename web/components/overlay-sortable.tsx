@@ -16,8 +16,8 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical } from "lucide-react";
 import { applyDragReorder } from "@/lib/dnd-reorder";
+import { GripVertical } from "@/lib/icon";
 import { cn } from "@/lib/utils";
 
 export interface SortableRow {

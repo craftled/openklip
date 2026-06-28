@@ -1,6 +1,5 @@
 "use client";
 
-import { Download, Play, X } from "lucide-react";
 import {
   type ReactNode,
   useCallback,
@@ -12,6 +11,7 @@ import {
   PlayerControls,
   PLAYER_SPEEDS as SPEEDS,
 } from "@/components/player-controls";
+import { Download, Play, X } from "@/lib/icon";
 import { cn } from "@/lib/utils";
 
 const HIDE_DELAY_MS = 2600;

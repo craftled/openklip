@@ -1,7 +1,7 @@
 "use client";
 
-import { Film, ImageIcon, Music, Scissors, Type, ZoomIn } from "lucide-react";
 import type { ComponentType, MouseEvent, ReactNode } from "react";
+import { Film, ImageIcon, Music, Scissors, Type, ZoomIn } from "@/lib/icon";
 import { cn } from "@/lib/utils";
 
 export interface TimelineClip {

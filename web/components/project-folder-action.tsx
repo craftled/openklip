@@ -1,8 +1,8 @@
 "use client";
 
-import { FolderOpen } from "lucide-react";
 import { type MouseEvent, useState } from "react";
 import { toastRevealError } from "@/lib/app-toast";
+import { FolderOpen } from "@/lib/icon";
 import {
   type RevealTarget,
   revealProjectFolderApi,

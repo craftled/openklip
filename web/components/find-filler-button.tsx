@@ -1,8 +1,8 @@
 "use client";
 
-import { Sparkles } from "lucide-react";
 import { useAgentChat } from "@/components/agent-chat-context";
 import { Button } from "@/components/ui/button";
+import { Sparkles } from "@/lib/icon";
 import { cn } from "@/lib/utils";
 
 export function FindFillerButton() {

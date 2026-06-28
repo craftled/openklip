@@ -1,6 +1,5 @@
 "use client";
 
-import { Check, ChevronsUpDown, Plus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { NewProjectDialog } from "@/components/new-project-dialog";
 import { ProjectCreateOverlay } from "@/components/project-create-overlay";
@@ -26,6 +25,7 @@ import {
 } from "@/components/ui/sidebar";
 import { useProjectCreate } from "@/hooks/use-project-create";
 import { toastProjectDeleted, toastProjectDeleteFailed } from "@/lib/app-toast";
+import { Check, ChevronsUpDown, Plus } from "@/lib/icon";
 import type { ProjectListing } from "@/lib/project-list";
 import {
   findActiveProject,

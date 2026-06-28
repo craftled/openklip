@@ -1,6 +1,5 @@
 "use client";
 
-import { Film, FolderOpen, Plus, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { NewProjectDialog } from "@/components/new-project-dialog";
@@ -27,6 +26,7 @@ import {
   setDefaultAgentModel,
   subscribeDefaultAgent,
 } from "@/lib/agent-preferences";
+import { Film, FolderOpen, Plus, Sparkles } from "@/lib/icon";
 import { createProjectFromVideo } from "@/lib/project-create";
 import {
   type AppThemeId,

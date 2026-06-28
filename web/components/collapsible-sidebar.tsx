@@ -1,6 +1,5 @@
 "use client";
 
-import { ChevronRight } from "lucide-react";
 import type { ComponentType, ReactNode } from "react";
 import {
   Collapsible,
@@ -18,6 +17,7 @@ import {
   SidebarMenuItem,
   SidebarMenuSub,
 } from "@/components/ui/sidebar";
+import { ChevronRight } from "@/lib/icon";
 import { cn } from "@/lib/utils";
 
 /** sidebar-08 nav-main pattern: menu row + chevron action + collapsible sub panel. */

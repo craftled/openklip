@@ -1,6 +1,5 @@
 "use client";
 
-import { LayoutTemplate } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import {
   Select,
@@ -10,6 +9,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toastError } from "@/lib/app-toast";
+import { LayoutTemplate } from "@/lib/icon";
 import { saveProjectEdits } from "../../app/actions.ts";
 
 export interface TemplateOption {

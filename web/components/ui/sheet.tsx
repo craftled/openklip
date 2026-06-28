@@ -1,10 +1,9 @@
 "use client";
 
-import { X } from "lucide-react";
 import { Dialog as SheetPrimitive } from "radix-ui";
 import type * as React from "react";
-
 import { Button } from "@/components/ui/button";
+import { X } from "@/lib/icon";
 import { cn } from "@/lib/utils";
 
 function Sheet({ ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {

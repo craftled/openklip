@@ -1,6 +1,6 @@
 {
   "name": "openklip",
-  "version": "0.8.2.0",
+  "version": "0.8.5.0",
   "license": "MIT",
   "private": true,
   "type": "module",
@@ -36,6 +36,7 @@
     "@huggingface/transformers": "4.2.0",
     "@livekit/components-react": "^2.0.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
+    "@phosphor-icons/react": "^2.1.10",
     "ai": "^7.0.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -44,7 +45,6 @@
     "ffprobe-static": "^3.1.0",
     "glimm": "0.1.4",
     "livekit-client": "^2.0.0",
-    "lucide-react": "^1.21.0",
     "motion": "^12.42.0",
     "nanoid": "^5.1.16",
     "next": "^16.2.9",

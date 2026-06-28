@@ -1,5 +1,6 @@
 "use client";
 
+import { type ReactNode, useCallback, useRef, useState } from "react";
 import {
   Captions,
   Maximize,
@@ -9,8 +10,7 @@ import {
   Play,
   Volume2,
   VolumeX,
-} from "lucide-react";
-import { type ReactNode, useCallback, useRef, useState } from "react";
+} from "@/lib/icon";
 import { cn } from "@/lib/utils";
 
 export const PLAYER_SPEEDS = [0.5, 1, 1.25, 1.5, 2] as const;

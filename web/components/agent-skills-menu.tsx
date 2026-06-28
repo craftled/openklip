@@ -1,6 +1,5 @@
 "use client";
 
-import { Box } from "lucide-react";
 import {
   type KeyboardEvent,
   useCallback,
@@ -17,6 +16,7 @@ import {
   PromptInputCommandList,
 } from "@/components/ai-elements/prompt-input";
 import { Badge } from "@/components/ui/badge";
+import { Box } from "@/lib/icon";
 import {
   filterSkills,
   type SkillEntry,

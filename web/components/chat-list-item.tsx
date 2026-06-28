@@ -1,14 +1,6 @@
 "use client";
 
 import {
-  Archive,
-  MessageSquare,
-  MoreHorizontal,
-  Pencil,
-  RotateCcw,
-  Trash2,
-} from "lucide-react";
-import {
   type KeyboardEvent,
   type ReactNode,
   useEffect,
@@ -31,6 +23,14 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import type { AgentThread } from "@/lib/agent-threads";
+import {
+  Archive,
+  MessageSquare,
+  MoreHorizontal,
+  Pencil,
+  RotateCcw,
+  Trash2,
+} from "@/lib/icon";
 import type { ProjectHoverContext } from "@/lib/project-context";
 import { cn } from "@/lib/utils";
 

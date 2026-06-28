@@ -1,6 +1,5 @@
 "use client";
 
-import { Bot, Check, Download, Palette } from "lucide-react";
 import { AgentModelSelect } from "@/components/agent-model-select";
 import { SidebarSettingsLabel } from "@/components/collapsible-sidebar";
 import {
@@ -10,6 +9,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Switch } from "@/components/ui/switch";
 import type { AgentModelId } from "@/lib/agent-preferences";
+import { Bot, Check, Download, Palette } from "@/lib/icon";
 import { THEME_CATALOG } from "@/lib/theme-catalog";
 import { type AppThemeId, setAppTheme } from "@/lib/theme-preferences";
 

@@ -1,6 +1,5 @@
 "use client";
 
-import { Clock3, Film, FolderOpen, MessageSquare } from "lucide-react";
 import {
   type PointerEvent,
   type ReactNode,
@@ -13,6 +12,7 @@ import {
 import { createPortal } from "react-dom";
 import type { AgentThread } from "@/lib/agent-threads";
 import { toastRevealError } from "@/lib/app-toast";
+import { Clock3, Film, FolderOpen, MessageSquare } from "@/lib/icon";
 import {
   basenamePath,
   formatDurationSec,

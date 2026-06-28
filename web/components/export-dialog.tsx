@@ -1,15 +1,5 @@
 "use client";
 
-import {
-  Aperture,
-  Copy,
-  Download,
-  Film,
-  Scan,
-  Spline,
-  Upload,
-  Video,
-} from "lucide-react";
 import { type ComponentType, type ReactNode, useMemo, useState } from "react";
 import {
   AlertDialog,
@@ -31,6 +21,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import {
+  Aperture,
+  Copy,
+  Download,
+  Film,
+  Scan,
+  Spline,
+  Upload,
+  Video,
+} from "@/lib/icon";
 import { cn } from "@/lib/utils";
 
 export type ExportResolution = "720" | "1080" | "4k";

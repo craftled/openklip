@@ -1,10 +1,10 @@
 "use client";
 
-import { Music } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { BinAsset } from "@/components/asset-bin";
 import { MediaAudioVisualizerWave } from "@/components/media-audio-visualizer-wave";
+import { Music } from "@/lib/icon";
 import { cn } from "@/lib/utils";
 
 const PREVIEW_WIDTH = 192;

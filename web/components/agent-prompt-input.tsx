@@ -1,6 +1,5 @@
 "use client";
 
-import { Plus, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAgentChat } from "@/components/agent-chat-context";
 import { AgentSkillTokenField } from "@/components/agent-skill-token-field";
@@ -45,6 +44,7 @@ import {
 } from "@/lib/app-toast";
 import type { AssetBinUpdate } from "@/lib/asset-bin-update";
 import { syncProjectAssets, uploadProjectAssets } from "@/lib/asset-upload";
+import { Plus, Sparkles } from "@/lib/icon";
 import {
   buildSkillCatalog,
   buildSkillMessage,

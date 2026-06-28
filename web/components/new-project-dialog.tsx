@@ -1,6 +1,5 @@
 "use client";
 
-import { Check, Film, FolderOpen, Upload } from "lucide-react";
 import {
   type DragEvent,
   useCallback,
@@ -23,6 +22,7 @@ import {
   toastError,
   toastWorkspacePickFailed,
 } from "@/lib/app-toast";
+import { Check, Film, FolderOpen, Upload } from "@/lib/icon";
 import { workspacePickerToasts } from "@/lib/toast-notifications";
 import { cn } from "@/lib/utils";
 import {

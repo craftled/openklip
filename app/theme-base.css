@@ -35,6 +35,12 @@
     var(--foreground) 40%,
     var(--background)
   );
+  /* Fill icons: same weight as tertiary labels */
+  --icon-foreground: color-mix(
+    in oklch,
+    var(--foreground) 55%,
+    var(--background)
+  );
   --foreground-dimmed: var(--text-secondary);
 
   --user-message-bubble: oklch(from var(--foreground) l c h / 0.05);
@@ -219,6 +225,7 @@ html[data-theme-mismatch]::before {
   --color-text-secondary: var(--text-secondary);
   --color-text-tertiary: var(--text-tertiary);
   --color-text-quaternary: var(--text-quaternary);
+  --color-icon: var(--icon-foreground);
   --color-surface-0: var(--surface-0);
   --color-surface-1: var(--surface-1);
   --color-surface-2: var(--surface-2);
@@ -363,6 +370,14 @@ html[data-theme-mismatch]::before {
     --tw-ring-width: var(--ring-width);
     --tw-ring-color: var(--ring);
     outline: none;
+  }
+
+  :where([data-ui-icon]) {
+    color: var(--icon-foreground);
+  }
+
+  :where(button, [role="button"]) :where([data-ui-icon]) {
+    color: inherit;
   }
 }
 

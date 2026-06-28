@@ -1,8 +1,8 @@
 "use client";
 
-import { Box } from "lucide-react";
 import { type KeyboardEvent, useEffect, useRef } from "react";
 import { PromptInputTextarea } from "@/components/ai-elements/prompt-input";
+import { Box } from "@/lib/icon";
 import type { SkillEntry } from "@/lib/skills-catalog";
 import { cn } from "@/lib/utils";
 
