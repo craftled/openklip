@@ -95,7 +95,7 @@ export function TemplateSelect({
         aria-label="Edit template"
         className="h-8 w-[min(100%,11rem)] gap-1.5 text-xs"
       >
-        <LayoutTemplate className="size-3.5 shrink-0 text-muted-foreground" />
+        <LayoutTemplate className="size-3.5 shrink-0 text-tertiary" />
         <SelectValue placeholder="Template">
           {active?.label ?? value}
         </SelectValue>
@@ -106,7 +106,7 @@ export function TemplateSelect({
             <div className="flex flex-col gap-0.5">
               <span>{opt.label}</span>
               {opt.description ? (
-                <span className="text-muted-foreground text-xs leading-snug">
+                <span className="text-tertiary text-xs leading-snug">
                   {opt.description}
                 </span>
               ) : null}

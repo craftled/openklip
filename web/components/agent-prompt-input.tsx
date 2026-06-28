@@ -182,7 +182,7 @@ function AgentPromptInputInner({
         skills={skills}
       />
       <PromptInput
-        className="rounded-xl"
+        className="rounded-lg"
         inputGroupClassName="items-stretch overflow-visible"
         onSubmit={onSubmit}
       >
@@ -203,106 +203,111 @@ function AgentPromptInputInner({
           )}
         </PromptInputBody>
         <PromptInputFooter>
-        <PromptInputTools>
-          <PromptInputButton
-            aria-label="Upload assets"
-            disabled={uploadingAssets}
-            onClick={() => uploadInputRef.current?.click()}
-            tooltip="Upload b-roll, music, or stills"
-          >
-            <Plus className="size-4" />
-          </PromptInputButton>
-          <input
-            accept="video/*,audio/*,image/*"
-            className="hidden"
-            multiple
-            onChange={(e) => {
-              void onUploadAssets(e.target.files);
-              e.target.value = "";
-            }}
-            ref={uploadInputRef}
-            type="file"
-          />
-          <ProjectFolderButton slug={slug} />
-          <DropdownMenu
-            onOpenChange={setSkillsOpen}
-            open={skillsOpen && !slashMenu.menuOpen}
-          >
-            <DropdownMenuTrigger asChild>
-              <PromptInputButton
-                aria-label="Skills"
-                tooltip="Browse edit skills"
+          <PromptInputTools>
+            <PromptInputButton
+              aria-label="Upload assets"
+              disabled={uploadingAssets}
+              onClick={() => uploadInputRef.current?.click()}
+              tooltip="Upload b-roll, music, or stills"
+            >
+              <Plus className="size-4" />
+            </PromptInputButton>
+            <input
+              accept="video/*,audio/*,image/*"
+              className="hidden"
+              multiple
+              onChange={(e) => {
+                void onUploadAssets(e.target.files);
+                e.target.value = "";
+              }}
+              ref={uploadInputRef}
+              type="file"
+            />
+            <ProjectFolderButton slug={slug} />
+            <DropdownMenu
+              onOpenChange={setSkillsOpen}
+              open={skillsOpen && !slashMenu.menuOpen}
+            >
+              <DropdownMenuTrigger asChild>
+                <PromptInputButton
+                  aria-label="Skills"
+                  tooltip="Browse edit skills"
+                >
+                  <Sparkles className="size-4" />
+                  <span className="sr-only sm:not-sr-only sm:inline">
+                    Skills
+                  </span>
+                </PromptInputButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="start"
+                className="w-[min(100vw-2rem,28rem)] p-0"
+                side="top"
               >
-                <Sparkles className="size-4" />
-                <span className="sr-only sm:not-sr-only sm:inline">Skills</span>
-              </PromptInputButton>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="start"
-              className="w-[min(100vw-2rem,28rem)] p-0"
-              side="top"
+                <AgentSkillsMenu
+                  embedded
+                  onSelect={selectSkill}
+                  open
+                  query=""
+                  skills={skills}
+                />
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <PromptInputSelect
+              onValueChange={(value) => setAgent(value as AgentModelId)}
+              value={agent}
             >
-              <AgentSkillsMenu
-                embedded
-                onSelect={selectSkill}
-                open
-                query=""
-                skills={skills}
-              />
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <PromptInputSelect
-            onValueChange={(value) => setAgent(value as AgentModelId)}
-            value={agent}
-          >
-            <PromptInputSelectTrigger
-              aria-label={`Model: ${getAgentModelLabel(agent)}`}
-              className="max-w-[11rem]"
-            >
-              <AgentProviderIcon className="size-3.5 shrink-0" value={agent} />
-              <span className="truncate">{getAgentModelLabel(agent)}</span>
-            </PromptInputSelectTrigger>
-            <PromptInputSelectContent>
-              {AGENT_MODEL_GROUPS.map((group) => {
-                const Icon = AGENT_GROUP_ICONS[group.id];
-                return (
-                  <SelectGroup key={group.id}>
-                    <SelectLabel className="flex items-center gap-2 text-section-label">
-                      <Icon className="size-3.5 shrink-0" />
-                      {group.label}
-                    </SelectLabel>
-                    {group.models.map((model) => (
-                      <PromptInputSelectItem
-                        key={model.value}
-                        textValue={model.label}
-                        value={model.value}
-                      >
-                        <span className="flex w-full items-center gap-2">
-                          <Icon className="size-3.5 shrink-0" />
-                          <span className="min-w-0 flex-1 truncate">
-                            {model.label}
+              <PromptInputSelectTrigger
+                aria-label={`Model: ${getAgentModelLabel(agent)}`}
+                className="max-w-[11rem]"
+              >
+                <AgentProviderIcon
+                  className="size-3.5 shrink-0"
+                  value={agent}
+                />
+                <span className="truncate">{getAgentModelLabel(agent)}</span>
+              </PromptInputSelectTrigger>
+              <PromptInputSelectContent>
+                {AGENT_MODEL_GROUPS.map((group) => {
+                  const Icon = AGENT_GROUP_ICONS[group.id];
+                  return (
+                    <SelectGroup key={group.id}>
+                      <SelectLabel className="flex items-center gap-2 text-section-label">
+                        <Icon className="size-3.5 shrink-0" />
+                        {group.label}
+                      </SelectLabel>
+                      {group.models.map((model) => (
+                        <PromptInputSelectItem
+                          key={model.value}
+                          textValue={model.label}
+                          value={model.value}
+                        >
+                          <span className="flex w-full items-center gap-2">
+                            <Icon className="size-3.5 shrink-0" />
+                            <span className="min-w-0 flex-1 truncate">
+                              {model.label}
+                            </span>
+                            {defaultAgent === model.value && (
+                              <Badge
+                                className="h-4 shrink-0 px-1.5 font-normal text-caption"
+                                variant="secondary"
+                              >
+                                Default
+                              </Badge>
+                            )}
                           </span>
-                          {defaultAgent === model.value && (
-                            <Badge
-                              className="h-4 shrink-0 px-1.5 font-normal text-caption"
-                              variant="secondary"
-                            >
-                              Default
-                            </Badge>
-                          )}
-                        </span>
-                      </PromptInputSelectItem>
-                    ))}
-                  </SelectGroup>
-                );
-              })}
-            </PromptInputSelectContent>
-          </PromptInputSelect>
-        </PromptInputTools>
-        <PromptInputSubmit
-          disabled={isRunning || chatsLoading || uploadingAssets}
-          status={isRunning || uploadingAssets ? "submitted" : undefined}
-        />
+                        </PromptInputSelectItem>
+                      ))}
+                    </SelectGroup>
+                  );
+                })}
+              </PromptInputSelectContent>
+            </PromptInputSelect>
+          </PromptInputTools>
+          <PromptInputSubmit
+            disabled={isRunning || chatsLoading || uploadingAssets}
+            status={isRunning || uploadingAssets ? "submitted" : undefined}
+          />
         </PromptInputFooter>
       </PromptInput>
     </div>

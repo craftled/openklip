@@ -29,19 +29,17 @@ export function AgentChatPanel({ onAssetsUpdated, slug }: AgentChatPanelProps) {
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col">
         <div className="flex shrink-0 items-center justify-between gap-3 border-border border-b px-6 py-3">
-          <span className="font-medium text-muted-foreground text-xs">
-            Chat
-          </span>
+          <span className="text-section-label text-tertiary">Chat</span>
           <div className="flex min-w-0 items-center gap-3">
             <span
-              className="flex shrink-0 items-center gap-1.5 text-caption text-muted-foreground"
+              className="flex shrink-0 items-center gap-1.5 text-caption text-tertiary"
               title={getAgentModelLabel(agent)}
             >
               <AgentProviderIcon className="size-3.5 shrink-0" value={agent} />
               <span className="truncate">{getAgentModelLabel(agent)}</span>
             </span>
             {activeThread && (
-              <span className="truncate text-caption text-muted-foreground/70">
+              <span className="truncate text-caption text-quaternary">
                 {activeThread.title}
               </span>
             )}
@@ -51,10 +49,10 @@ export function AgentChatPanel({ onAssetsUpdated, slug }: AgentChatPanelProps) {
         <ScrollArea className="min-h-0 flex-1">
           <div className="flex w-full flex-col gap-2 px-6 py-4 text-left">
             {chatsLoading && (
-              <p className="text-muted-foreground text-sm">Loading chats…</p>
+              <p className="text-sm text-tertiary">Loading chats…</p>
             )}
             {!(chatsLoading || activeThread?.messages.length) && (
-              <p className="text-muted-foreground text-sm leading-relaxed">
+              <p className="text-sm text-tertiary leading-relaxed">
                 Type <span className="text-foreground">/</span> for edit skills,
                 or ask about cuts, filler, and overlays. Use{" "}
                 <span className="text-foreground">Find filler</span> above the
@@ -64,14 +62,14 @@ export function AgentChatPanel({ onAssetsUpdated, slug }: AgentChatPanelProps) {
             {activeThread?.messages.map((m) => (
               <div
                 className={cn(
-                  "rounded-lg px-3 py-2.5 text-sm leading-relaxed",
+                  "rounded-lg px-3 py-2.5 text-ui leading-relaxed",
                   m.role === "user"
                     ? "bg-user-message-bubble text-foreground"
-                    : "bg-transparent text-muted-foreground"
+                    : "bg-transparent text-secondary"
                 )}
                 key={m.id}
               >
-                <div className="mb-0.5 text-muted-foreground text-section-label">
+                <div className="mb-0.5 text-section-label text-tertiary">
                   {m.role === "user" ? "You" : "Agent"}
                 </div>
                 <pre className="whitespace-pre-wrap text-left font-sans">
@@ -91,7 +89,7 @@ export function AgentChatPanel({ onAssetsUpdated, slug }: AgentChatPanelProps) {
             onSubmitMessage={sendMessage}
             slug={slug}
           />
-          <p className="mt-2 text-caption text-muted-foreground leading-snug">
+          <p className="mt-2 text-caption text-quaternary leading-snug">
             Chats live in working/chats.json. Skills invoke the same CLI loop as{" "}
             <code className="text-caption">openklip tools</code> on{" "}
             <code className="text-caption">project.json</code>.

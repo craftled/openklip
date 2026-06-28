@@ -53,7 +53,7 @@ function MusicPreview({ src }: { src: string }) {
   }, [src]);
 
   return (
-    <div className="relative flex h-full flex-col items-center justify-center gap-2 bg-gradient-to-b from-zinc-900 to-black">
+    <div className="relative flex h-full flex-col items-center justify-center gap-2 bg-black">
       {playing ? (
         <MediaAudioVisualizerWave
           active={playing}
@@ -143,9 +143,7 @@ function AssetPreviewPanel({
           />
         )}
       </div>
-      <p className="truncate px-2 py-1.5 text-muted-foreground text-xs">
-        {asset.name}
-      </p>
+      <p className="truncate px-2 py-1.5 text-tertiary text-xs">{asset.name}</p>
     </div>,
     document.body
   );

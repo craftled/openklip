@@ -133,7 +133,7 @@ export function ChatListItem({
               <MessageSquare className="size-4 shrink-0" />
             )}
             <span className="min-w-0 flex-1 truncate">{thread.title}</span>
-            <span className="text-caption text-muted-foreground tabular-nums">
+            <span className="text-caption text-tertiary tabular-nums">
               {timeLabel}
             </span>
           </SidebarMenuButton>
@@ -157,7 +157,7 @@ export function ChatListItem({
               {confirmDelete ? (
                 <>
                   <DropdownMenuItem
-                    className="text-muted-foreground text-xs focus:bg-transparent"
+                    className="text-tertiary text-xs focus:bg-transparent"
                     disabled
                   >
                     Delete &ldquo;{thread.title}&rdquo;?

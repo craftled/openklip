@@ -49,7 +49,7 @@ export function FindFillerButton() {
       variant="outline"
     >
       <Sparkles
-        className={cn("size-3.5", isRunning && "animate-pulse text-muted-foreground")}
+        className={cn("size-3.5", isRunning && "animate-pulse text-tertiary")}
       />
       {label}
     </Button>

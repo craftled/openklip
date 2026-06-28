@@ -62,7 +62,7 @@ export function ProjectInlineFolderAction({
     <button
       aria-label={label}
       className={cn(
-        "inline-flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-sm text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100 disabled:opacity-50",
+        "inline-flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-sm text-tertiary opacity-0 transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100 disabled:opacity-50",
         hoverClass,
         className
       )}
@@ -92,7 +92,7 @@ export function ProjectFolderButton({
     <button
       aria-label={label}
       className={cn(
-        "inline-flex h-8 max-w-[10rem] shrink-0 cursor-pointer items-center gap-1.5 rounded-md px-2 font-medium text-muted-foreground text-sm transition-colors hover:bg-foreground/3 hover:text-foreground disabled:opacity-50",
+        "inline-flex h-8 max-w-[10rem] shrink-0 cursor-pointer items-center gap-1.5 rounded-md px-2 font-medium text-sm text-tertiary transition-colors hover:bg-foreground/3 hover:text-foreground disabled:opacity-50",
         className
       )}
       disabled={opening}

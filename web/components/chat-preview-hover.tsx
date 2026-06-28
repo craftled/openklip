@@ -44,11 +44,11 @@ function InfoRow({
 }) {
   return (
     <div className="flex items-start gap-2.5">
-      <Icon className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+      <Icon className="mt-0.5 size-3.5 shrink-0 text-tertiary" />
       <div className="min-w-0">
         <p className="truncate text-foreground text-xs">{label}</p>
         {detail ? (
-          <p className="truncate text-[11px] text-muted-foreground">{detail}</p>
+          <p className="truncate text-[11px] text-tertiary">{detail}</p>
         ) : null}
       </div>
     </div>
@@ -85,7 +85,7 @@ function FolderRow({ dirPath, slug }: { dirPath: string; slug: string }) {
         }}
         type="button"
       >
-        <FolderOpen className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+        <FolderOpen className="mt-0.5 size-3.5 shrink-0 text-tertiary" />
         <span className="min-w-0 truncate text-foreground text-xs underline-offset-2 hover:underline">
           {opening ? "Opening…" : dirPath}
         </span>

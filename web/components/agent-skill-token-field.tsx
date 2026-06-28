@@ -1,7 +1,7 @@
 "use client";
 
 import { Box } from "lucide-react";
-import { useEffect, useRef, type KeyboardEvent } from "react";
+import { type KeyboardEvent, useEffect, useRef } from "react";
 import { PromptInputTextarea } from "@/components/ai-elements/prompt-input";
 import type { SkillEntry } from "@/lib/skills-catalog";
 import { cn } from "@/lib/utils";
@@ -55,10 +55,7 @@ export function AgentSkillTokenField({
       )}
       ref={containerRef}
     >
-      <span
-        aria-label={`Skill: ${skill.title}`}
-        className="inline-flex shrink-0 items-center gap-1.5 text-primary"
-      >
+      <span className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-muted px-1.5 py-0.5 text-foreground">
         <Box aria-hidden className="size-4 shrink-0" />
         <span className="font-medium text-sm">{skill.title}</span>
       </span>
