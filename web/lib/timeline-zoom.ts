@@ -61,6 +61,7 @@ export function sampleToPx({
   sample: number;
   durationSamples: number;
   sampleRate: number;
+  zoom: number;
 }): number {
   if (durationSamples <= 0) {
     return 0;
