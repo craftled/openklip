@@ -170,11 +170,6 @@ export function ProjectSwitcher({
                     <DropdownMenuItem
                       className="group/project relative gap-2 p-2"
                       key={project.slug}
-                      onSelect={(e) => {
-                        if (confirming || deleting) {
-                          e.preventDefault();
-                        }
-                      }}
                       onClick={(e) => {
                         if (
                           confirming ||
@@ -186,6 +181,11 @@ export function ProjectSwitcher({
                           return;
                         }
                         onSelectProject(project.slug);
+                      }}
+                      onSelect={(e) => {
+                        if (confirming || deleting) {
+                          e.preventDefault();
+                        }
                       }}
                     >
                       <div className="flex size-6 items-center justify-center rounded-md bg-foreground/5 font-medium text-xs">

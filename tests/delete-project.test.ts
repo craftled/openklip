@@ -2,8 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { deleteProject } from "../src/delete-project.ts";
-import { listProjects } from "../src/projectStore.ts";
 import { projectDir } from "../src/paths.ts";
+import { listProjects } from "../src/projectStore.ts";
 import {
   makeProject,
   withTempProjectsRoot,
@@ -26,13 +26,17 @@ describe("deleteProject", () => {
 
   test("throws when the project does not exist", async () => {
     await withTempProjectsRoot(async () => {
-      await expect(deleteProject("missing")).rejects.toThrow(/project not found/);
+      await expect(deleteProject("missing")).rejects.toThrow(
+        /project not found/
+      );
     });
   });
 
   test("rejects invalid slugs before touching disk", async () => {
     await withTempProjectsRoot(async () => {
-      await expect(deleteProject("../escape")).rejects.toThrow(/invalid project slug/);
+      await expect(deleteProject("../escape")).rejects.toThrow(
+        /invalid project slug/
+      );
     });
   });
 

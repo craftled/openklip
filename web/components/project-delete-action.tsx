@@ -7,10 +7,10 @@ interface ProjectDeleteActionProps {
   className?: string;
   confirming: boolean;
   deleting: boolean;
-  slug: string;
   onCancel: () => void;
   onConfirm: () => void;
   onRequestDelete: () => void;
+  slug: string;
 }
 
 export function ProjectDeleteAction({
@@ -25,10 +25,7 @@ export function ProjectDeleteAction({
   if (confirming) {
     return (
       <span
-        className={cn(
-          "ml-auto flex shrink-0 items-center gap-1",
-          className
-        )}
+        className={cn("ml-auto flex shrink-0 items-center gap-1", className)}
         onClick={(e) => e.stopPropagation()}
       >
         <span className="text-[11px] text-muted-foreground">Delete?</span>

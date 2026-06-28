@@ -33,7 +33,7 @@ describe("loadEditorProject", () => {
     await withTempProjectsRoot(async ({ slug }) => {
       writeFixtureProject(slug, makeProject({ slug, assets: [] }));
       mock.module("@engine/asset-scanner", () => ({
-        syncAssetsFromFolder: async () => {
+        syncAssetsFromFolder: () => {
           throw new Error("ffmpeg proxy build failed");
         },
       }));

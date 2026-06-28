@@ -5,7 +5,11 @@ import { test } from "node:test";
 import { GET, POST } from "../app/api/projects/[slug]/assets/route.ts";
 import { POST as SYNC_POST } from "../app/api/projects/[slug]/assets/sync/route.ts";
 import { FFMPEG } from "../src/ffmpeg.ts";
-import { brollClipFor, orphanBrollAsset, TINY_PNG } from "./helpers/assetFixture.ts";
+import {
+  brollClipFor,
+  orphanBrollAsset,
+  TINY_PNG,
+} from "./helpers/assetFixture.ts";
 import {
   makeProject,
   withTempProjectsRoot,

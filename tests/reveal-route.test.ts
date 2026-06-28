@@ -13,14 +13,20 @@ function ctx(slug: string) {
 
 test("reveal route returns 404 for a missing project", async () => {
   await withTempProjectsRoot(async () => {
-    const res = await POST(new Request("http://localhost/reveal"), ctx("missing"));
+    const res = await POST(
+      new Request("http://localhost/reveal"),
+      ctx("missing")
+    );
     assert.equal(res.status, 404);
   });
 });
 
 test("reveal route returns 400 for an invalid slug", async () => {
   await withTempProjectsRoot(async () => {
-    const res = await POST(new Request("http://localhost/reveal"), ctx("../../etc"));
+    const res = await POST(
+      new Request("http://localhost/reveal"),
+      ctx("../../etc")
+    );
     assert.equal(res.status, 400);
   });
 });

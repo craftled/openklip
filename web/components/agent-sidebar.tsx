@@ -16,7 +16,11 @@ import {
   useState,
 } from "react";
 import { AgentModelSelect } from "@/components/agent-model-select";
-import { AssetBin, type AssetBinUpdate, type BinAsset } from "@/components/asset-bin";
+import {
+  AssetBin,
+  type AssetBinUpdate,
+  type BinAsset,
+} from "@/components/asset-bin";
 import { ChatListItem } from "@/components/chat-list-item";
 import { KeyboardHint } from "@/components/keyboard-hint";
 import { ProjectInlineFolderAction } from "@/components/project-folder-action";
@@ -556,9 +560,7 @@ export function AgentSidebar({
         />
         <Button
           className="h-8 w-full justify-start gap-2 px-2 text-sm"
-          disabled={
-            runningThreadId !== null || !agentUsable || chatsLoading
-          }
+          disabled={runningThreadId !== null || !agentUsable || chatsLoading}
           onClick={onFindFiller}
           size="sm"
           title={

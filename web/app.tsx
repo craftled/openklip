@@ -171,7 +171,6 @@ interface Project {
   sampleRate: number;
   slug: string;
   source: string;
-  titles: TitleItem[];
   stills?: Array<{
     assetId: string;
     endSample: number;
@@ -181,6 +180,7 @@ interface Project {
     scale: number;
     startSample: number;
   }>;
+  titles: TitleItem[];
   words: Word[];
   zooms: ZoomItem[];
 }
@@ -1118,8 +1118,8 @@ export function App({
           setProject((p) => ({
             ...p,
             assets: update.assets,
-            ...(update.broll !== undefined ? { broll: update.broll } : {}),
-            ...(update.stills !== undefined ? { stills: update.stills } : {}),
+            ...(update.broll === undefined ? {} : { broll: update.broll }),
+            ...(update.stills === undefined ? {} : { stills: update.stills }),
           }));
           const nextBroll = update.assets.find(
             (a) => (a.kind ?? "broll") === "broll"

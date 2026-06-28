@@ -23,7 +23,9 @@ export async function DELETE(_req: Request, { params }: RouteParams) {
   }
 
   try {
-    const project = await withProjectLock(slug, () => deleteAsset(slug, assetId));
+    const project = await withProjectLock(slug, () =>
+      deleteAsset(slug, assetId)
+    );
     return Response.json({
       assets: project.assets,
       broll: project.broll,

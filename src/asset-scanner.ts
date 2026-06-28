@@ -48,11 +48,7 @@ export function pruneStaleAssets(slug: string, project: Project): boolean {
   let changed = false;
   for (const asset of [...project.assets]) {
     const src = asset.src;
-    if (
-      !src ||
-      !isAssetSrcInDropZone(slug, src) ||
-      !existsSync(resolve(src))
-    ) {
+    if (!(src && isAssetSrcInDropZone(slug, src) && existsSync(resolve(src)))) {
       removeAsset(project, asset.id);
       changed = true;
     }

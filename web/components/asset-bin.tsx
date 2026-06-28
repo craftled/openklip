@@ -69,7 +69,9 @@ function fmtDur(samples: number, sr: number): string {
   return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 }
 
-async function readJsonResponse(res: Response): Promise<Record<string, unknown>> {
+async function readJsonResponse(
+  res: Response
+): Promise<Record<string, unknown>> {
   const text = await res.text();
   try {
     return JSON.parse(text) as Record<string, unknown>;
@@ -91,8 +93,11 @@ async function readUploadResponse(res: Response): Promise<{
   return data as { assets?: BinAsset[]; error?: string };
 }
 
-function parseSyncResponse(res: Response, data: Record<string, unknown>): AssetBinUpdate | null {
-  if (!res.ok || !Array.isArray(data.assets)) {
+function parseSyncResponse(
+  res: Response,
+  data: Record<string, unknown>
+): AssetBinUpdate | null {
+  if (!(res.ok && Array.isArray(data.assets))) {
     return null;
   }
   return {

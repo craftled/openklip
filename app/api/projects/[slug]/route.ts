@@ -1,5 +1,6 @@
-import { deleteProject, listProjects } from "@engine/projectStore";
+import { deleteProject } from "@engine/delete-project";
 import { assertValidSlug } from "@engine/paths";
+import { listProjects } from "@engine/projectStore";
 import type { NextRequest } from "next/server";
 
 export const runtime = "nodejs";

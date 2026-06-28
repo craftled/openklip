@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { isModKeyOnly, modShortcut, modShortcutNeutral } from "../web/lib/keyboard-shortcuts.ts";
+import {
+  isModKeyOnly,
+  modShortcut,
+  modShortcutNeutral,
+} from "../web/lib/keyboard-shortcuts.ts";
 
 test("modShortcutNeutral uses a stable Mod+ prefix", () => {
   assert.equal(modShortcutNeutral("b"), "Mod+B");

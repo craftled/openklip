@@ -1,7 +1,12 @@
 import { existsSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { resolve, sep } from "node:path";
-import { assertValidSlug, projectDir, projectPaths, projectsRoot } from "./paths.ts";
+import {
+  assertValidSlug,
+  projectDir,
+  projectPaths,
+  projectsRoot,
+} from "./paths.ts";
 import { withProjectLock } from "./project-lock.ts";
 
 /** Permanently remove a project directory from disk. */
