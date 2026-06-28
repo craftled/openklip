@@ -105,6 +105,19 @@ Defined in `themes/openklip.json` (`editor` block) and `app/theme-base.css` fall
 - **Max content width:** Full viewport (editor tool, not marketing)
 - **Border radius:** `--radius: 0.5rem` (8px) default; `--radius-sm` 6px for controls
 
+## Icons
+
+- **Library:** [Phosphor](https://phosphoricons.com) via `@phosphor-icons/react`, **fill** weight only in chrome.
+- **Import path:** `@/lib/icon` (`web/lib/icon.tsx`). Do not import `lucide-react` or Phosphor directly in components.
+- **Wrapper:** Every export sets `weight="fill"` and `data-ui-icon` for default chrome coloring.
+- **Sizes:** `size-3` (12px) for dense lists; `size-3.5` (14px) for sidebar rows and timeline track glyphs; `size-4` (16px) for controls and menus. Match existing component scale; do not oversize fill icons.
+- **Color:**
+  - Standalone chrome icons: `--icon-foreground` (55% foreground mix, same step as `--text-tertiary`). Applied via `[data-ui-icon]` in `app/theme-base.css`.
+  - Icons inside `<button>` / `[role="button"]`: `color: inherit` so primary, ghost, and destructive buttons keep correct contrast.
+  - Explicit overrides: `text-tertiary`, `text-destructive`, `text-white/75` (player chrome) beat the default when needed.
+- **Exceptions:** Agent provider logos stay custom SVGs in `web/components/ui/svgs/` (`AgentProviderIcon`). Timeline track colors stay semantic (green/cyan/amber/tomato), not icon-library decoration.
+- **Adding an icon:** Export a new Lucide-compatible name from `web/lib/icon.tsx` mapping to the Phosphor glyph; keep fill default.
+
 ## Motion
 
 - **Approach:** Minimal-functional
@@ -137,3 +150,4 @@ Defined in `themes/openklip.json` (`editor` block) and `app/theme-base.css` fall
 | 2026-06-28 | System blue primary only | #007AFF / #0A84FF on primary CTAs; grey everything else in chrome |
 | 2026-06-28 | Linear-style typography | Inter Variable, weights 510/590, cv01+ss03, opsz auto, 1.6 leading, JetBrains Mono for code |
 | 2026-06-28 | Light/dark chrome parity | OKLCH surface ladder, text hierarchy tokens, Linear-aligned base fg/bg, shared overlay |
+| 2026-06-28 | Phosphor fill icons | Solid glyphs at 55% `--icon-foreground` soften monochrome chrome vs Lucide strokes; buttons inherit parent color |
