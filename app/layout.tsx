@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { THEME_NO_FLASH_SCRIPT } from "../web/lib/theme-preferences";
-import { inter } from "./fonts";
+import { inter, jetbrainsMono } from "./fonts";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html
-      className={`${inter.variable} font-sans antialiased`}
+      className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased`}
       lang="en"
       suppressHydrationWarning
     >
