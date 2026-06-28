@@ -69,22 +69,25 @@ Agent sidebar chats use `working/chats.json`, not `localStorage` (theme and defa
 
 ## What works today
 
-Verified against the current codebase (303 tests):
+Verified against the current codebase (387 tests, v0.8.2.0):
 
 - **Ingest**: video → local transcript + preview proxy + `project.json` (`openklip ingest`; refuses re-ingest unless `--force`)
 - **Transcript editing**: click words to toggle `deleted`; `openklip cut` / `cut --text` / `restore` on CLI
+- **Bounded transcript reads**: `openklip transcript grep`, `span`, `phrase` for agent discovery without dumping full transcripts
 - **Preview**: all-intra proxy; scheduler plays kept ranges only; compact center column (`max-w-2xl`)
-- **Center panel**: Chat (agent threads + prompt input) or Transcript toggle; timeline in a bottom drawer
+- **Center panel**: Chat (agent threads + prompt input, `/` skills menu, inline skill tokens) or Transcript toggle; timeline in a bottom drawer
 - **Cinema player**: fullscreen overlay with Linear-parity transport bar (`web/components/cinema-player.tsx`, `player-controls.tsx`)
 - **Preview cut transitions**: Glimm WebGL sweep when `prefers-reduced-motion` is not set
 - **Captions**: preview overlay + ASS burn-in on export
 - **Assets**: register b-roll, music, stills; sidebar asset bin with upload + `assets/` folder sync; upload from chat `+`
-- **Overlays**: b-roll cover, Ken Burns stills, push-in zooms, title cards (lower / center / hero), vignette
+- **Overlays**: b-roll cover, Ken Burns stills, push-in zooms, title cards (lower / center / hero), vignette; phrase helpers (`*-add-phrase`) on CLI
 - **Export**: ffmpeg composes kept ranges + overlays + captions; GUI export dialog picks max height (720p / 1080p / 4K)
-- **Workspace**: macOS folder picker on empty landing; projects root persisted in `.openklip/projects-root`
-- **CLI**: full edit surface; `openklip actions --json` capability manifest
+- **Workspace**: macOS folder picker on empty landing; inline project create; projects root persisted in `.openklip/projects-root`
+- **CLI**: full edit surface; `openklip actions --json` mutations manifest; `openklip tools --json` full agent tool list
+- **MCP server**: `openklip mcp` (stdio) exposes 35 tools with CLI/GUI parity; `.cursor/mcp.json` wired for Cursor
+- **Edit templates**: `templates/<id>/skill.md` playbooks; `openklip template set`; brand presets at ingest (`openklip brand`)
 - **Agent selector**: drive filler cuts via Claude Code, Codex, Cursor, or Grok subscription CLIs
-- **Theme engine**: swappable presets with light/dark scheme (`web/lib/theme-engine.ts`)
+- **Design system**: Linear-style Inter Variable + OKLCH surfaces ([DESIGN.md](./DESIGN.md)); swappable theme presets with light/dark scheme
 - **Agent demo**: `bun run agent-demo` (phrase list → cut → status → optional export)
 
 Phrase-based cutting is CLI-only today (`openklip cut --text`). The transcript UI is word click, not phrase search. First project on a machine: use `openklip ingest` from the CLI, or pick a folder in the GUI (macOS) that already contains ingested projects.
@@ -116,11 +119,13 @@ OPENKLIP_SLUG=<slug> bun run dev       # pin project when using serve-style env
 Typical external-agent sequence (no LLM inside OpenKlip):
 
 ```text
-openklip transcript <slug>
-openklip status <slug>
+openklip status <slug> --json
+openklip transcript grep <slug> "phrase"
 openklip cut <slug> --text "phrase to remove"
 openklip export <slug>
 ```
+
+In Cursor, enable the bundled MCP server (`.cursor/mcp.json`) and call the same tools without shelling out. Tool manifest: `openklip tools --json --surface mcp`.
 
 Deterministic script:
 
@@ -128,7 +133,7 @@ Deterministic script:
 bun run agent-demo <slug> --phrases scripts/example-phrases.txt --export
 ```
 
-Command reference: **[AGENTS.md](./AGENTS.md)**. Registry manifest: `openklip actions --json`.
+Command reference: **[AGENTS.md](./AGENTS.md)**. Mutation manifest: `openklip actions --json`.
 
 ---
 

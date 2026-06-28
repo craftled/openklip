@@ -4,7 +4,7 @@
 
 OpenKlip is a lean, local-first **agent-native video toolchain**: external agents drive the edit loop via CLI; humans review in the browser. Both read/write the same `project.json` on disk.
 
-**Current release:** v0.8.0 (2026-06-28). Working local editor: cut → captions → b-roll → vignette → push-in zoom → titles → export; cinema player; center chat panel with skills slash menu; MCP agent tools; edit templates; export dialog; macOS workspace folder picker; multi-agent filler cuts; sidebar asset bin with folder sync; 387 tests; MIT.
+**Current release:** v0.8.2.0 (2026-06-28). Working local editor: cut → captions → b-roll → vignette → push-in zoom → titles → export; cinema player; center chat panel with skills slash menu; MCP agent tools (35 tools); edit templates; Linear-style UI (Inter Variable + OKLCH); export dialog; macOS workspace folder picker; multi-agent filler cuts; sidebar asset bin with folder sync; 387 tests; MIT.
 
 Preview cuts get a Glimm WebGL sweep in the browser; exported MP4s still hard-cut until the ffmpeg transition graph lands.
 
@@ -35,14 +35,19 @@ Preview cuts get a Glimm WebGL sweep in the browser; exported MP4s still hard-cu
 - [x] **Editor shell refresh** (sidebar asset bin, project switcher, persisted chats, theme engine, keyboard shortcuts)
 - [x] **Project write serialization** (`src/project-lock.ts`, `mutateProject()`; in-process per-slug locks for `project.json` and `chats.json`)
 - [x] **Chats + asset hardening** (atomic `chats.json` writes, POST folder sync, re-ingest guard with `--force`, external still copy-in)
-- [x] **Design system: Geist (Vercel)** (light theme + light/dark toggle; swappable theme presets)
-- [x] **TDD test suite** (`bun test`: 303 tests across actions, captions, EDL, exporter, project lock, chats, assets, workspace, and more)
+- [x] **Design system: Inter Variable + OKLCH** ([DESIGN.md](./DESIGN.md): Linear-style surfaces, semantic tokens, blue-only-when-it-matters CTA hierarchy; swappable theme presets)
+- [x] **TDD test suite** (`bun test`: 387 tests across actions, captions, EDL, exporter, project lock, chats, assets, workspace, agent-tools, templates, and more)
 - [x] **GitHub Actions CI** (`check`, `typecheck`, `test`, `build`)
 - [x] **Open-sourced** (public GitHub repo, MIT license, source media gitignored + purged from history)
 - [x] **Center chat panel** (agent threads + prompt input in center column; chat list in left sidebar; PR #12)
 - [x] **Export options dialog** (720p / 1080p / 4K max height from toolbar; PR #13)
 - [x] **Workspace folder picker** (macOS `osascript`, `.openklip/projects-root`, `GET/POST /api/workspace`; PR #13)
 - [x] **Timeline drawer + compact preview** (bottom drawer timeline, `max-w-2xl` center column; PR #12)
+- [x] **Agent query layer + MCP** (bounded `transcript grep/span/phrase`, `openklip tools`, stdio MCP server, phrase placement helpers; PR #14)
+- [x] **Skills chat UX** (`/` slash menu, inline skill tokens, skills catalog; PR #14)
+- [x] **Edit templates + brand presets** (`templates/`, `openklip template set`, `openklip brand`; PR #14)
+- [x] **Empty workspace + project create flow** (folder picker landing, new-project dialog, Sonner toasts; PR #14)
+- [x] **Linear UI refactor v0.8.1–v0.8.2** (DESIGN.md, semantic `text-tertiary`/`bg-surface-*` tokens, timeline track colors, CTA hierarchy)
 
 ## Architecture & Key Decisions
 
@@ -116,7 +121,7 @@ Preview cuts get a Glimm WebGL sweep in the browser; exported MP4s still hard-cu
 - Workspace folder picker is **macOS-only**; Linux/Windows need `OPENKLIP_PROJECTS_ROOT` or CLI ingest. Empty landing no longer uploads video from the browser.
 - Whisper word timestamps are ~100 ms loose; cuts can clip a phoneme until VAD-snapping lands.
 - Glimm cut transitions are preview-only; exported MP4 hard-jumps between kept ranges.
-- Vertical shorts (9:16 reframe), highlight detection, and MCP server are not implemented.
+- Vertical shorts (9:16 reframe) and highlight detection are not implemented.
 - GUI server actions do not dispatch through `runAction()`: CLI uses `src/registry.ts`; GUI uses `app/actions.ts` + `projectMutations` (same `project.json`, separate code paths).
 - Project write locks are in-process only. Two concurrent **processes** writing the same slug (e.g. CLI agent + running editor server) can still race.
 - Reload the browser after CLI edits to see changes in the editor.

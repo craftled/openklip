@@ -6,7 +6,10 @@ import {
 } from "../web/components/ui/sidebar.tsx";
 
 test("sidebar menu button avoids layout property transitions", () => {
-  assert.match(SIDEBAR_MENU_BUTTON_MOTION, /transition-\[color,opacity,transform\]/);
+  assert.match(
+    SIDEBAR_MENU_BUTTON_MOTION,
+    /transition-\[color,opacity,transform\]/
+  );
   assert.doesNotMatch(SIDEBAR_MENU_BUTTON_MOTION, /width|height|padding/);
   assert.match(SIDEBAR_MENU_BUTTON_MOTION, /active:scale-\[0\.98\]/);
 });
