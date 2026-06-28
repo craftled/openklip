@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { ScanSearch } from "@/lib/icon";
 import { cn } from "@/lib/utils";
 
-// Triggers the per-asset subagent pass: one agent run per un-described b-roll /
-// still writes an "asset card" (summary, tags, bestFor) so the editing agent can
-// place media by meaning. Mirrors FindFillerButton: same agent gating + states.
+// Triggers the "understand my media" subagent pass: one agent run per
+// un-described b-roll / still writes an "asset card", and one run over the main
+// video's frames logs what is on screen. The editing agent then places media by
+// meaning and targets b-roll opportunities. Mirrors FindFillerButton's gating.
 export function AnalyzeAssetsButton() {
   const {
     activeStatus,
@@ -19,14 +20,14 @@ export function AnalyzeAssetsButton() {
 
   const label = (() => {
     if (analyzingAssets) {
-      return `${providerLabel} is describing assets…`;
+      return `${providerLabel} is reading your media…`;
     }
     if (!agentUsable) {
       return activeStatus?.installed
         ? `Run \`${activeStatus.signInCmd}\` to connect`
         : `${providerLabel} : not installed`;
     }
-    return `Describe assets with ${providerLabel}`;
+    return `Describe media with ${providerLabel}`;
   })();
 
   return (
@@ -37,7 +38,7 @@ export function AnalyzeAssetsButton() {
       size="sm"
       title={
         agentUsable
-          ? "Describe b-roll and stills so the agent can place them by meaning"
+          ? "Describe b-roll and stills and log the video's scenes so the agent can place media by meaning"
           : activeStatus?.installed
             ? `Sign in first : run: ${activeStatus.signInCmd}`
             : `${providerLabel} CLI is not installed`
