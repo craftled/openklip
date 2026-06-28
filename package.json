@@ -1,6 +1,6 @@
 {
   "name": "openklip",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "license": "MIT",
   "private": true,
   "type": "module",
@@ -11,13 +11,15 @@
   },
   "description": "Agent-native video editor — CLI edit loop, browser review, plain files on disk.",
   "bin": {
-    "openklip": "./src/cli.ts"
+    "openklip": "./src/cli.ts",
+    "openklip-mcp": "./src/mcp-server.ts"
   },
   "scripts": {
     "dev": "bun --bun next dev -p 4399",
     "build": "bun --bun next build",
     "start": "bun --bun next start -p 4399",
     "serve": "bun run src/cli.ts serve",
+    "mcp": "bun run src/mcp-server.ts",
     "ingest": "bun run src/cli.ts ingest",
     "export": "bun run src/cli.ts export",
     "agent-demo": "bun run scripts/agent-demo.ts",
@@ -33,6 +35,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@huggingface/transformers": "4.2.0",
     "@livekit/components-react": "^2.0.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "ai": "^7.0.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -49,6 +52,7 @@
     "react": "19",
     "react-dom": "19",
     "shadcn": "4.11.1",
+    "sonner": "^2.0.7",
     "tailwind-merge": "^3.6.0",
     "vaul": "^1.1.2",
     "zod": "4.4.3"
