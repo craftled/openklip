@@ -11,9 +11,9 @@ import { cn } from "@/lib/utils";
 function useRevealProjectPath(slug: string, target: RevealTarget = "project") {
   const [opening, setOpening] = useState(false);
 
-  const reveal = async (e: MouseEvent<HTMLButtonElement>) => {
-    e.stopPropagation();
-    e.preventDefault();
+  const reveal = async (e?: MouseEvent<HTMLElement>) => {
+    e?.stopPropagation();
+    e?.preventDefault();
     if (opening) {
       return;
     }
@@ -34,10 +34,12 @@ const REVEAL_LABEL: Record<RevealTarget, string> = {
 };
 
 export function ProjectInlineFolderAction({
+  className,
   revealGroup = "menu-item",
   slug,
   target = "project",
 }: {
+  className?: string;
   revealGroup?: "assets" | "menu-item" | "project";
   slug: string;
   target?: RevealTarget;
@@ -57,7 +59,8 @@ export function ProjectInlineFolderAction({
       aria-label={label}
       className={cn(
         "inline-flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-sm text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100 disabled:opacity-50",
-        hoverClass
+        hoverClass,
+        className
       )}
       disabled={opening}
       onClick={reveal}
@@ -65,6 +68,36 @@ export function ProjectInlineFolderAction({
       type="button"
     >
       <FolderOpen className="size-3" />
+    </button>
+  );
+}
+
+export function ProjectFolderButton({
+  className,
+  slug,
+  target = "project",
+}: {
+  className?: string;
+  slug: string;
+  target?: RevealTarget;
+}) {
+  const { opening, reveal } = useRevealProjectPath(slug, target);
+  const label = `Open ${slug} ${REVEAL_LABEL[target]}`;
+
+  return (
+    <button
+      aria-label={label}
+      className={cn(
+        "inline-flex h-8 max-w-[10rem] shrink-0 cursor-pointer items-center gap-1.5 rounded-md px-2 font-medium text-muted-foreground text-sm transition-colors hover:bg-foreground/3 hover:text-foreground disabled:opacity-50",
+        className
+      )}
+      disabled={opening}
+      onClick={reveal}
+      title={label}
+      type="button"
+    >
+      <FolderOpen className="size-3.5 shrink-0" />
+      <span className="truncate">{slug}</span>
     </button>
   );
 }

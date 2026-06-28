@@ -1,6 +1,7 @@
 "use client";
 
-import { useModShortcut } from "@/hooks/use-mod-shortcut";
+import { Kbd, KbdGroup } from "@/components/ui/kbd";
+import { useModShortcutParts } from "@/hooks/use-mod-shortcut";
 import { cn } from "@/lib/utils";
 
 export function KeyboardHint({
@@ -10,16 +11,12 @@ export function KeyboardHint({
   className?: string;
   shortcutKey: string;
 }) {
-  const label = useModShortcut(shortcutKey);
+  const { modifier, key } = useModShortcutParts(shortcutKey);
 
   return (
-    <kbd
-      className={cn(
-        "rounded border border-border bg-foreground/5 px-1 py-0.5 font-medium text-caption text-muted-foreground tabular-nums leading-none",
-        className
-      )}
-    >
-      {label}
-    </kbd>
+    <KbdGroup className={cn(className)}>
+      <Kbd>{modifier}</Kbd>
+      <Kbd>{key}</Kbd>
+    </KbdGroup>
   );
 }

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Script from "next/script";
 import type { ReactNode } from "react";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { THEME_NO_FLASH_SCRIPT } from "../web/lib/theme-preferences";
 import { inter } from "./fonts";
 import "./globals.css";
@@ -18,7 +19,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           {THEME_NO_FLASH_SCRIPT}
         </Script>
       </head>
-      <body className={inter.className}>{children}</body>
+      <body className={inter.className}>
+        <TooltipProvider>{children}</TooltipProvider>
+      </body>
     </html>
   );
 }

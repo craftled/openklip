@@ -4,10 +4,16 @@ import {
   isModKeyOnly,
   modShortcut,
   modShortcutNeutral,
+  modShortcutParts,
+  modShortcutPartsNeutral,
 } from "../web/lib/keyboard-shortcuts.ts";
 
 test("modShortcutNeutral uses a stable Mod+ prefix", () => {
   assert.equal(modShortcutNeutral("b"), "Mod+B");
+});
+
+test("modShortcutPartsNeutral uses stable Mod and key parts", () => {
+  assert.deepEqual(modShortcutPartsNeutral("b"), { modifier: "Mod", key: "B" });
 });
 
 test("modShortcut uses Mod+ when navigator is unavailable", () => {
@@ -30,6 +36,7 @@ test("modShortcut uses Ctrl+ prefix off Apple platforms", () => {
     value: "Windows NT 10.0",
   });
   assert.equal(modShortcut("b"), "Ctrl+B");
+  assert.deepEqual(modShortcutParts("b"), { modifier: "Ctrl", key: "B" });
   Object.defineProperty(globalThis.navigator, "userAgent", {
     configurable: true,
     value: original,

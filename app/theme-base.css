@@ -145,7 +145,7 @@ html[data-theme-mismatch]::before {
   --color-sidebar-foreground: var(--foreground);
   --color-sidebar-primary: var(--foreground);
   --color-sidebar-primary-foreground: var(--background);
-  --color-sidebar-accent: var(--foreground-5);
+  --color-sidebar-accent: var(--muted);
   --color-sidebar-accent-foreground: var(--foreground);
   --color-sidebar-border: var(--border);
   --color-sidebar-ring: var(--ring);

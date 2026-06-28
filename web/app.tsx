@@ -177,6 +177,7 @@ interface Project {
   sampleRate: number;
   slug: string;
   source: string;
+  width: number;
   stills?: Array<{
     assetId: string;
     endSample: number;
