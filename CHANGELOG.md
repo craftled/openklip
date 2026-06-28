@@ -11,6 +11,10 @@ Full Linear-style UI refactor: semantic tokens wired through components, CTA hie
 - **Primitives**: inputs use `text-ui`, placeholders `text-quaternary`, focus rings normalized to 1px, hover-card and skills menu use `popover-styled`.
 - **Typography**: transcript and chat panels use `text-ui` / `text-section-label`; caption inactive words use `text-white/70` on player.
 
+### Fixed
+- **Typecheck**: `defineQueryTool` generics, MCP `ZodRawShapeCompat`, and `StepPill` boolean props (`agent-tools.ts`, `mcp-server.ts`, `new-project-dialog.tsx`).
+- **Asset folder sync loop**: `AssetBin` stores `onAssetsUpdated` in a ref so parent re-renders no longer retrigger hundreds of sync polls per second.
+
 ## 0.8.1 - 2026-06-28
 
 Linear-style design system: OKLCH surfaces, Inter Variable typography, and light/dark parity.
