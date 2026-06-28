@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { projectPaths } from "./paths.ts";
 
 export interface ThreadMessage {
@@ -43,14 +43,39 @@ export async function loadProjectChats(
   if (!existsSync(fp)) {
     return { ...EMPTY };
   }
+  let raw: string;
   try {
-    const parsed = JSON.parse(await readFile(fp, "utf8")) as ProjectChatsFile;
-    return {
-      activeThreadId: parsed.activeThreadId ?? null,
-      threads: Array.isArray(parsed.threads) ? parsed.threads : [],
-    };
+    raw = await readFile(fp, "utf8");
   } catch {
     return { ...EMPTY };
+  }
+  let parsed: ProjectChatsFile;
+  try {
+    parsed = JSON.parse(raw) as ProjectChatsFile;
+  } catch (e) {
+    // A corrupt chats.json must NOT be silently treated as empty: the next
+    // mutation would persist {} and destroy every thread. Move the bad file
+    // aside (recoverable) and surface a real error so the caller stops.
+    await backupCorruptChats(fp);
+    throw new Error(
+      `chats.json is corrupt and was backed up: ${(e as Error).message}`
+    );
+  }
+  if (!Array.isArray(parsed.threads)) {
+    await backupCorruptChats(fp);
+    throw new Error("chats.json is corrupt (threads is not an array)");
+  }
+  return {
+    activeThreadId: parsed.activeThreadId ?? null,
+    threads: parsed.threads,
+  };
+}
+
+async function backupCorruptChats(fp: string): Promise<void> {
+  try {
+    await rename(fp, `${fp}.bad-${Date.now()}`);
+  } catch {
+    // A concurrent load may have already moved it; nothing to do.
   }
 }
 
@@ -60,7 +85,13 @@ export async function saveProjectChats(
 ): Promise<void> {
   const p = projectPaths(slug);
   await mkdir(p.working, { recursive: true });
-  await writeFile(p.chats, JSON.stringify(data, null, 2));
+  // Atomic write: a crash mid-write leaves chats.json intact (the old file)
+  // rather than a truncated half-file that the next load would treat as
+  // corrupt. rename is atomic on POSIX; the temp name is pid-suffixed so two
+  // processes can't collide on the tmp file.
+  const tmp = `${p.chats}.tmp-${process.pid}`;
+  await writeFile(tmp, JSON.stringify(data, null, 2));
+  await rename(tmp, p.chats);
 }
 
 export async function listProjectThreads(slug: string): Promise<AgentThread[]> {

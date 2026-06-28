@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
+import { withAssetLock } from "./asset-lock.ts";
 import { isRecognizedAssetFile, registerAsset } from "./assets.ts";
 import type { Asset } from "./edl.ts";
 import { projectPaths } from "./paths.ts";
@@ -32,19 +33,21 @@ export function listAssetDropFiles(slug: string): string[] {
 }
 
 /** Register any files in assets/ that are not yet in project.json. */
-export async function syncAssetsFromFolder(slug: string): Promise<Asset[]> {
-  const p = projectPaths(slug);
-  await mkdir(p.assets, { recursive: true });
-  const project = await loadProject(slug);
-  const knownSrc = new Set(project.assets.map((a) => a.src));
-  const dropFiles = listAssetDropFiles(slug);
+export function syncAssetsFromFolder(slug: string): Promise<Asset[]> {
+  return withAssetLock(slug, async () => {
+    const p = projectPaths(slug);
+    await mkdir(p.assets, { recursive: true });
+    const project = await loadProject(slug);
+    const knownSrc = new Set(project.assets.map((a) => a.src));
+    const dropFiles = listAssetDropFiles(slug);
 
-  for (const filePath of dropFiles) {
-    if (!knownSrc.has(filePath)) {
-      await registerAsset(slug, filePath);
+    for (const filePath of dropFiles) {
+      if (!knownSrc.has(filePath)) {
+        await registerAsset(slug, filePath);
+      }
     }
-  }
 
-  const refreshed = await loadProject(slug);
-  return refreshed.assets;
+    const refreshed = await loadProject(slug);
+    return refreshed.assets;
+  });
 }

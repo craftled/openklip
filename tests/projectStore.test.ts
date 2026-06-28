@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { test } from "node:test";
 import {
   listProjects,
@@ -59,11 +60,14 @@ test("loadProject throws for missing slug", async () => {
 });
 
 test("saveProject writes pretty JSON to disk", async () => {
-  await withTempProjectsRoot(async ({ slug }) => {
+  await withTempProjectsRoot(async ({ slug, root }) => {
     const project = makeProject({ slug });
     writeFixtureProject(slug, project);
     await saveProject(slug, project);
-    const raw = readFileSync(`projects/${slug}/project.json`, "utf8");
+    const raw = readFileSync(
+      join(root, "projects", slug, "project.json"),
+      "utf8"
+    );
     assert.match(raw, /{\n {2}"version": 1/);
   });
 });

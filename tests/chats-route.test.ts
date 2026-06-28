@@ -52,3 +52,38 @@ test("POST /api/projects/:slug/chats creates a thread on disk", async () => {
     assert.equal(data.threads?.length, 1);
   });
 });
+
+test("POST /api/projects/:slug/chats append returns 404 for unknown thread", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const res = await POST(
+      new Request(`http://localhost/api/projects/${slug}/chats`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          action: "append",
+          threadId: "nope",
+          role: "user",
+          content: "hi",
+        }),
+      }) as Parameters<typeof POST>[0],
+      ctx(slug)
+    );
+    assert.equal(res.status, 404);
+  });
+});
+
+test("POST /api/projects/:slug/chats setActive returns 404 for unknown thread", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const res = await POST(
+      new Request(`http://localhost/api/projects/${slug}/chats`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "setActive", threadId: "nope" }),
+      }) as Parameters<typeof POST>[0],
+      ctx(slug)
+    );
+    assert.equal(res.status, 404);
+  });
+});

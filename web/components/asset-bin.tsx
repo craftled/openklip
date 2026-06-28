@@ -94,10 +94,16 @@ export function AssetBin({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const syncingRef = useRef(false);
   const syncFromFolder = useCallback(async () => {
+    if (syncingRef.current) {
+      return;
+    }
+    syncingRef.current = true;
     try {
       const res = await fetch(
-        `/api/projects/${encodeURIComponent(slug)}/assets?sync=1`
+        `/api/projects/${encodeURIComponent(slug)}/assets/sync`,
+        { method: "POST" }
       );
       const data = await readUploadResponse(res);
       if (res.ok && data.assets) {
@@ -105,6 +111,8 @@ export function AssetBin({
       }
     } catch {
       // folder sync is best-effort
+    } finally {
+      syncingRef.current = false;
     }
   }, [onAssetsUpdated, slug]);
 

@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { test } from "node:test";
-import { POST } from "../app/api/projects/[slug]/assets/route.ts";
+import { GET, POST } from "../app/api/projects/[slug]/assets/route.ts";
+import { POST as SYNC_POST } from "../app/api/projects/[slug]/assets/sync/route.ts";
 import { FFMPEG } from "../src/ffmpeg.ts";
 import {
   makeProject,
@@ -72,5 +74,53 @@ test("POST /api/projects/:slug/assets returns JSON error for missing file", asyn
     assert.equal(res.status, 400);
     const data = (await res.json()) as { error?: string };
     assert.match(data.error ?? "", /missing file/i);
+  });
+});
+
+test("GET /api/projects/:slug/assets is pure — does not register dropped files", async () => {
+  await withTempProjectsRoot(async ({ slug, root }) => {
+    writeFixtureProject(slug, makeProject({ slug, assets: [] }));
+    const assetsDir = join(root, "projects", slug, "assets");
+    mkdirSync(assetsDir, { recursive: true });
+    writeFileSync(
+      join(assetsDir, "incoming.png"),
+      Buffer.from([137, 80, 78, 71])
+    );
+
+    const res = await GET(
+      new Request(`http://localhost/api/projects/${slug}/assets`) as Parameters<
+        typeof GET
+      >[0],
+      ctx(slug)
+    );
+    const data = (await res.json()) as { assets?: unknown[] };
+    assert.equal(res.status, 200);
+    // The dropped PNG must NOT be registered by a GET.
+    assert.equal(data.assets?.length, 0);
+  });
+});
+
+test("POST /api/projects/:slug/assets/sync registers new drops and returns them", async () => {
+  await withTempProjectsRoot(async ({ slug, root }) => {
+    writeFixtureProject(slug, makeProject({ slug, assets: [] }));
+    const assetsDir = join(root, "projects", slug, "assets");
+    mkdirSync(assetsDir, { recursive: true });
+    writeFileSync(
+      join(assetsDir, "incoming.png"),
+      Buffer.from([137, 80, 78, 71])
+    );
+
+    const res = await SYNC_POST(
+      new Request(`http://localhost/api/projects/${slug}/assets/sync`, {
+        method: "POST",
+      }) as Parameters<typeof SYNC_POST>[0],
+      ctx(slug)
+    );
+    const data = (await res.json()) as {
+      assets?: { kind: string; src: string }[];
+    };
+    assert.equal(res.status, 200);
+    assert.equal(data.assets?.length, 1);
+    assert.equal(data.assets?.[0]?.kind, "still");
   });
 });

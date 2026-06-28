@@ -74,16 +74,19 @@ test("ProjectSchema defaults missing asset kind to broll", () => {
 });
 
 test("registerAsset copies a still into the project asset bin", async () => {
-  await withTempProjectsRoot(async ({ slug }) => {
+  await withTempProjectsRoot(async ({ slug, root }) => {
     writeFixtureProject(slug, makeProject({ slug, assets: [] }));
-    const assetsDir = join(process.cwd(), "projects", slug, "assets");
+    const assetsDir = join(root, "projects", slug, "assets");
     mkdirSync(assetsDir, { recursive: true });
     const stillPath = join(assetsDir, "incoming.png");
     writeFileSync(stillPath, Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
     const asset = await registerAsset(slug, stillPath, "still");
     assert.equal(asset.kind, "still");
     assert.equal(asset.proxy, "assets/incoming.png");
-    const raw = readFileSync(`projects/${slug}/project.json`, "utf8");
+    const raw = readFileSync(
+      join(root, "projects", slug, "project.json"),
+      "utf8"
+    );
     const project = ProjectSchema.parse(JSON.parse(raw));
     assert.equal(project.assets.length, 1);
     assert.equal(project.assets[0]?.id, asset.id);
@@ -102,5 +105,22 @@ test("registerAssetBytes keeps the uploaded source file on disk", async () => {
     assert.equal(asset.kind, "still");
     assert.ok(existsSync(asset.src));
     assert.ok(asset.src.includes("/assets/incoming.png"));
+  });
+});
+
+test("registerAsset copies an external still into assets/ (no ../../ proxy)", async () => {
+  await withTempProjectsRoot(async ({ slug, root }) => {
+    writeFixtureProject(slug, makeProject({ slug, assets: [] }));
+    // Source lives OUTSIDE the project's assets/ folder.
+    const external = join(root, "external-pic.png");
+    writeFileSync(external, Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+
+    const asset = await registerAsset(slug, external, "still");
+    assert.equal(asset.kind, "still");
+    // proxy must be a portable in-project path, not a ../../external-pic.png.
+    assert.ok(asset.proxy.startsWith("assets/"));
+    assert.ok(!asset.proxy.includes(".."));
+    // The original was copied into the project's assets/ dir.
+    assert.ok(existsSync(join(root, "projects", slug, asset.proxy)));
   });
 });

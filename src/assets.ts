@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { mkdir, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, writeFile } from "node:fs/promises";
 import { basename, extname, isAbsolute, relative, resolve } from "node:path";
 import {
   type Asset,
@@ -138,15 +138,43 @@ async function buildMusicProxy(
   };
 }
 
-function buildStillProxy(
+async function buildStillProxy(
   slug: string,
   _id: string,
   src: string
-): { proxy: string; durationSamples: number } {
-  const rel = relative(projectPaths(slug).dir, src).replace(/\\/g, "/");
+): Promise<{ proxy: string; durationSamples: number }> {
+  const p = projectPaths(slug);
+  const durationSamples = Math.round(STILL_HOLD_SEC * SAMPLE_RATE);
+  const relToAssets = relative(p.assets, src).replace(/\\/g, "/");
+  // Source already lives in the user assets/ drop folder — reference it in place.
+  if (
+    relToAssets &&
+    !relToAssets.startsWith("..") &&
+    !isAbsolute(relToAssets)
+  ) {
+    return {
+      proxy: relative(p.dir, src).replace(/\\/g, "/"),
+      durationSamples,
+    };
+  }
+  // Source is outside assets/ (e.g. a CLI path like ~/Pictures/x.png). Copy it
+  // in so project.json stays portable — a "../../…" proxy would break the
+  // moment the project dir moves and would leak absolute structure.
+  const safeName = basename(src).replace(/[^a-zA-Z0-9._-]/g, "_") || "still";
+  let dest = resolve(p.assets, safeName);
+  if (existsSync(dest)) {
+    const ext = extname(safeName);
+    const stem = basename(safeName, ext) || "still";
+    let n = 2;
+    while (existsSync(dest)) {
+      dest = resolve(p.assets, `${stem}-${n}${ext}`);
+      n += 1;
+    }
+  }
+  await copyFile(src, dest);
   return {
-    proxy: rel,
-    durationSamples: Math.round(STILL_HOLD_SEC * SAMPLE_RATE),
+    proxy: relative(p.dir, dest).replace(/\\/g, "/"),
+    durationSamples,
   };
 }
 
@@ -178,7 +206,7 @@ export async function registerAsset(
     built = await buildMusicProxy(slug, id, src);
   } else if (resolvedKind === "still") {
     console.log("[asset] copying still...");
-    built = buildStillProxy(slug, id, src);
+    built = await buildStillProxy(slug, id, src);
   } else {
     console.log("[asset] building video proxy...");
     built = await buildVideoProxy(slug, id, src);

@@ -3,6 +3,7 @@ import { mkdir, rm } from "node:fs/promises";
 import { isAbsolute, resolve } from "node:path";
 import { type Project, ProjectSchema, SAMPLE_RATE, type Word } from "./edl.ts";
 import { FFMPEG, probe, run } from "./ffmpeg.ts";
+import { assertProjectCanBeIngested } from "./ingest-guard.ts";
 import { projectPaths, slugFromVideo } from "./paths.ts";
 
 interface RawChunk {
@@ -11,7 +12,10 @@ interface RawChunk {
   text: string;
 }
 
-export async function ingest(videoArg: string): Promise<string> {
+export async function ingest(
+  videoArg: string,
+  opts?: { force?: boolean }
+): Promise<string> {
   const source = isAbsolute(videoArg)
     ? videoArg
     : resolve(process.cwd(), videoArg);
@@ -21,6 +25,10 @@ export async function ingest(videoArg: string): Promise<string> {
 
   const slug = slugFromVideo(source);
   const p = projectPaths(slug);
+  // Re-ingesting a slug wipes the whole project dir. Refuse unless the caller
+  // explicitly opts in with --force, so an accidental re-upload can't destroy
+  // an existing edit.
+  assertProjectCanBeIngested(slug, opts?.force);
   await rm(p.dir, { recursive: true, force: true });
   await mkdir(p.assets, { recursive: true });
   await mkdir(p.frames, { recursive: true });
