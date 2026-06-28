@@ -1,6 +1,6 @@
 # GitHub release notes (draft)
 
-Use these bodies when publishing releases. Each section matches a tag in `CHANGELOG.md` without duplicating the full changelog.
+Use these bodies when publishing releases. Each section matches a tag in `CHANGELOG.md` without duplicating the full changelog. **Known gaps:** always link to [TODO.md](../TODO.md#known-limitations); do not duplicate the list here.
 
 ---
 
@@ -15,7 +15,8 @@ Use these bodies when publishing releases. Each section matches a tag in `CHANGE
 - Inputs, focus rings, popovers, and chat/transcript typography aligned to [DESIGN.md](../DESIGN.md)
 
 ### Known gaps
-- Same as v0.8.0 (export dialog extras, macOS-only folder picker, in-process write locks)
+
+See [TODO.md](../TODO.md#known-limitations) for the full list (current).
 
 **Full changelog:** [CHANGELOG.md](../CHANGELOG.md#082---2026-06-28)
 
@@ -48,10 +49,8 @@ Use these bodies when publishing releases. Each section matches a tag in `CHANGE
 - 387 tests (84 new for query, MCP, templates, skills, motion, toasts)
 
 ### Known gaps
-- Export dialog compression, frame rate, and clipboard controls are UI-only (disabled) until ffmpeg supports them
-- Folder picker is macOS-only; use `OPENKLIP_PROJECTS_ROOT` or `openklip ingest` elsewhere
-- Write locks remain in-process only (concurrent CLI + server can still race)
-- Glimm cut transitions are preview-only; exported MP4 hard-jumps between kept ranges
+
+See [TODO.md](../TODO.md#known-limitations) for the full list (current).
 
 **Full changelog:** [CHANGELOG.md](../CHANGELOG.md#080---2026-06-28)
 
@@ -69,9 +68,8 @@ Use these bodies when publishing releases. Each section matches a tag in `CHANGE
 - Collapsible sidebar (chats, assets, settings); shared asset upload from chat `+`
 
 ### Known gaps
-- Export dialog compression, frame rate, and clipboard controls are UI-only (disabled) until ffmpeg supports them
-- Folder picker is macOS-only; use `OPENKLIP_PROJECTS_ROOT` or `openklip ingest` elsewhere
-- Write locks remain in-process only (concurrent CLI + server can still race)
+
+See [TODO.md](../TODO.md#known-limitations) (as of v0.7.0).
 
 **Full changelog:** [CHANGELOG.md](../CHANGELOG.md#070---2026-06-28)
 
@@ -90,7 +88,8 @@ Use these bodies when publishing releases. Each section matches a tag in `CHANGE
 - Page load and find-filler edge cases hardened (best-effort sync, chats loading)
 
 ### Known gaps
-- Write locks are in-process only. Concurrent CLI + server writes on the same slug still need OS-level file locking.
+
+See [TODO.md](../TODO.md#known-limitations) (as of v0.6.2).
 
 **Full changelog:** [CHANGELOG.md](../CHANGELOG.md#062---2026-06-28)
 
@@ -108,7 +107,8 @@ Use these bodies when publishing releases. Each section matches a tag in `CHANGE
 - Sidebar asset bin no longer horizontal-scrolls on long filenames
 
 ### Known gaps
-- Write locks are in-process only. Concurrent CLI + server writes on the same slug still need OS-level file locking.
+
+See [TODO.md](../TODO.md#known-limitations) (as of v0.6.1).
 
 **Full changelog:** [CHANGELOG.md](../CHANGELOG.md#061---2026-06-28)
 

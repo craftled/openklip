@@ -90,7 +90,7 @@ Verified against the current codebase (387 tests, v0.8.2.0):
 - **Design system**: Linear-style Inter Variable + OKLCH surfaces ([DESIGN.md](./DESIGN.md)); swappable theme presets with light/dark scheme
 - **Agent demo**: `bun run agent-demo` (phrase list → cut → status → optional export)
 
-Phrase-based cutting is CLI-only today (`openklip cut --text`). The transcript UI is word click, not phrase search. First project on a machine: use `openklip ingest` from the CLI, or pick a folder in the GUI (macOS) that already contains ingested projects.
+Phrase-based cutting is CLI/MCP-only today (`openklip cut --text`). The transcript UI is word click, not phrase search. First project on a machine: use `openklip ingest` from the CLI, or pick a folder in the GUI (macOS) that already contains ingested projects. Known gaps: **[TODO.md](./TODO.md)**.
 
 ---
 

@@ -116,16 +116,47 @@ Preview cuts get a Glimm WebGL sweep in the browser; exported MP4s still hard-cu
 
 ## Known Limitations
 
+Single list of current gaps (code is truth). README and release notes point here for detail.
+
+### Export & media
+
 - 4K export re-decodes the whole source (slow) even for a short cut.
 - Export dialog shows compression, frame rate, and clipboard options but only **resolution** affects export today.
-- Workspace folder picker is **macOS-only**; Linux/Windows need `OPENKLIP_PROJECTS_ROOT` or CLI ingest. Empty landing no longer uploads video from the browser.
-- Whisper word timestamps are ~100 ms loose; cuts can clip a phoneme until VAD-snapping lands.
 - Glimm cut transitions are preview-only; exported MP4 hard-jumps between kept ranges.
-- Vertical shorts (9:16 reframe) and highlight detection are not implemented.
+- B-roll is full-cover only (no PiP mode or b-roll audio ducking yet).
+- HyperFrames post-export (`openklip package`) is opt-in: requires separate `hyperframes` npm install and Chrome; not bundled.
+
+### Editing & transcript
+
+- Phrase-based cutting (`openklip cut --text`, `transcript grep`) is CLI/MCP-only; transcript UI uses per-word click, not phrase search.
+- Whisper word timestamps are ~100 ms loose; cuts can clip a phoneme until VAD-snapping lands.
+- Cuts are word-boundary based; no VAD snap-to-silence or equal-power audio crossfade at boundaries yet.
+
+### Workspace & platform
+
+- Workspace folder picker is **macOS-only**; Linux/Windows need `OPENKLIP_PROJECTS_ROOT` or CLI ingest. Empty landing does not upload video from the browser.
+- Ingester plugins are manifest + CLI discovery only (`openklip ingesters`); no GUI URL/batch ingest flow.
+
+### Agent & chat
+
+- OpenKlip ships **no bundled LLM** for the core edit loop; external agent, MCP, or manual CLI drives mutations.
+- Skills chat routes intent to suggested CLI command sequences; it does not execute them in-process (except **Find filler**, which shells out to the selected agent CLI).
+- **Find filler** needs the chosen agent CLI on PATH and signed in; Cursor requires one-time `cursor-agent login`.
+
+### Architecture & parity
+
 - GUI server actions do not dispatch through `runAction()`: CLI uses `src/registry.ts`; GUI uses `app/actions.ts` + `projectMutations` (same `project.json`, separate code paths).
 - Project write locks are in-process only. Two concurrent **processes** writing the same slug (e.g. CLI agent + running editor server) can still race.
 - Reload the browser after CLI edits to see changes in the editor.
 - A local `.openklip/projects-root` affects `projectsRoot()` for CLI and server started from that cwd (intentional; isolate tests with a clean temp cwd).
+
+### Not implemented (see Roadmap / Pending)
+
+- Vertical shorts (9:16 reframe) and LLM highlight detection.
+- Filler/dead-air batch pipeline beyond the current Find filler action.
+- OpenCLIP semantic b-roll matching.
+- OS-level file locking for concurrent CLI + server writes.
+- Demo gif + repo topics.
 
 ## README policy
 

@@ -1,4 +1,4 @@
-# Design System — OpenKlip
+# Design System: OpenKlip
 
 ## Product Context
 

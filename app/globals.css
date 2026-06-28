@@ -61,7 +61,7 @@
   transition: none;
 }
 
-/* Transitions.dev — Success check */
+/* Transitions.dev: Success check */
 :root {
   --check-opacity-dur: 500ms;
   --check-rotate-dur: 500ms;

@@ -11,7 +11,7 @@ OpenKlip MVP is complete when a local user can turn a talking-head video into an
 - [x] Clicking transcript words cuts/restores them and persists to `project.json`.
 - [x] Shift-selecting a span can add b-roll, push-in zoom, and a title.
 - [x] Preview playback skips deleted ranges and shows captions, b-roll, zoom, titles, and vignette.
-- [x] Export waits for pending saves and writes `projects/<slug>/out.mp4`.
+- [x] Export waits for pending saves and writes `projects/<slug>/output/out.mp4`.
 - [x] Export works from original media when available and falls back to project proxies when originals moved.
 
 ## Quality Gates
@@ -30,16 +30,8 @@ OpenKlip MVP is complete when a local user can turn a talking-head video into an
 - Ingest smoke: `/tmp/openklip-ingest-smoke.mp4` created `projects/openklip-ingest-smoke` with 34 transcribed words.
 - Media smoke: `/media/proxy.mp4?slug=ok-sample` returned `206 Partial Content` for `Range: bytes=0-99`.
 - Browser smoke: local editor loaded, preview video advanced, transcript click persisted, export completed, and add-flow created zoom/title/b-roll entries.
-- Headless export smoke: `bun run export ok-sample` wrote `projects/ok-sample/out.mp4`.
+- Headless export smoke: `bun run export ok-sample` wrote `projects/ok-sample/output/out.mp4`.
 
 ## Known MVP Limits
 
-- Cuts are still word-boundary based; VAD silence snapping and equal-power audio crossfades are post-MVP hardening.
-- 4K export can be slow because ffmpeg still decodes the selected source stream.
-- Vertical shorts/reframing and automatic highlight detection are post-MVP features.
-- Export dialog compression, frame rate, and clipboard controls are UI-only until the ffmpeg pipeline supports them.
-- Workspace folder picker is macOS-only; other platforms need `OPENKLIP_PROJECTS_ROOT` or CLI ingest.
-- Glimm cut transitions are preview-only; exported MP4 hard-jumps between kept ranges.
-- Project write locks are in-process only; concurrent CLI + server processes can still race on the same slug.
-
-Post-MVP roadmap and gaps: **[TODO.md](./TODO.md)**.
+All current gaps and roadmap items live in **[TODO.md](./TODO.md)** (Known Limitations + Roadmap / Pending). Do not duplicate them here.

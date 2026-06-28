@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Asset, Broll, Project } from "../../src/edl.ts";
 
-/** Minimal PNG header — enough for `isRecognizedAssetFile` and still registration. */
+/** Minimal PNG header: enough for `isRecognizedAssetFile` and still registration. */
 export const TINY_PNG = Buffer.from([137, 80, 78, 71]);
 
 export function projectAssetsDir(root: string, slug: string): string {
