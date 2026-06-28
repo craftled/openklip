@@ -43,11 +43,11 @@ import {
 } from "@/components/export-dialog";
 import { FindFillerButton } from "@/components/find-filler-button";
 import { GradeControlRoom } from "@/components/grade-control-room";
-import { type GraphicItem, GraphicOverlay } from "@/components/graphic-overlay";
-import { HeroTitleOverlay } from "@/components/hero-title-overlay";
+import type { GraphicItem } from "@/components/graphic-overlay";
 import { KeyboardHint } from "@/components/keyboard-hint";
 import { OverlaySortable } from "@/components/overlay-sortable";
 import { PLAYER_SPEEDS, PlayerControls } from "@/components/player-controls";
+import { PreviewOverlays } from "@/components/preview-overlays";
 import { Button } from "@/components/ui/button";
 import {
   Drawer,
@@ -511,12 +511,6 @@ export function App({
       }));
     return groupCaptions(kept, project.captions?.maxWords ?? 6);
   }, [project, sr]);
-  const activeGroup = captionsOn
-    ? captionGroups.find(
-        (g) => curSec >= g.startSec - 0.05 && curSec <= g.endSec + 0.25
-      )
-    : undefined;
-
   const activeBroll = project?.broll?.find(
     (b) => curSample >= b.startSample && curSample < b.endSample
   );
@@ -535,18 +529,6 @@ export function App({
     [project, ranges, sr]
   );
   const zoomScale = activeBroll ? 1 : zoomFactorAtSec(outPos, zoomWindows);
-  const activeTitle = project?.titles?.find(
-    (t) => curSample >= t.startSample && curSample < t.endSample
-  );
-  const heroTitle = activeTitle?.position === "hero" ? activeTitle : null;
-  const standardTitle =
-    activeTitle && activeTitle.position !== "hero" ? activeTitle : null;
-  const captionsRaised = standardTitle?.position === "lower";
-  // Graphics can stack (multiple tracks), so collect all active ones rather than
-  // a single find. Each is keyed on the same source sample grid as titles/broll.
-  const activeGraphics = (project?.graphics ?? []).filter(
-    (g) => curSample >= g.startSample && curSample < g.endSample
-  );
   const assetName = (id: string) =>
     project?.assets.find((a) => a.id === id)?.name ?? id;
   const brollAssets = useMemo(
@@ -1338,6 +1320,16 @@ export function App({
             onClose={() => setCinema(false)}
             onExport={onExport}
             onToggleCaptions={toggleCaptions}
+            overlay={(curSec) => (
+              <PreviewOverlays
+                captionGroups={captionGroups}
+                captionsOn={captionsOn}
+                curSample={Math.round(curSec * sr)}
+                graphics={project.graphics ?? []}
+                sampleRate={sr}
+                titles={project.titles ?? []}
+              />
+            )}
             projectName={project.slug}
             src={`/media/proxy.mp4?v=${project.mediaVersion ?? 0}`}
           />
@@ -1559,65 +1551,14 @@ export function App({
                             }}
                           />
                         )}
-                        <HeroTitleOverlay title={heroTitle} />
-                        {activeGraphics.map((g) => (
-                          <GraphicOverlay
-                            curSample={curSample}
-                            graphic={g}
-                            key={g.id}
-                            sampleRate={sr}
-                          />
-                        ))}
-                        {standardTitle && (
-                          <div
-                            className={cn(
-                              "pointer-events-none absolute inset-x-0 z-[3] flex justify-center",
-                              standardTitle.position === "center"
-                                ? "top-1/2 -translate-y-1/2"
-                                : "bottom-[16%]"
-                            )}
-                            key={standardTitle.id}
-                          >
-                            <span
-                              className={cn(
-                                "max-w-[80%] rounded-md bg-black/60 px-4 py-2 text-center font-medium text-white backdrop-blur",
-                                standardTitle.position === "center"
-                                  ? "text-[clamp(22px,4vw,52px)]"
-                                  : "text-[clamp(16px,2.6vw,32px)]"
-                              )}
-                            >
-                              {standardTitle.text}
-                            </span>
-                          </div>
-                        )}
-                        {activeGroup && !heroTitle && (
-                          <div
-                            className={cn(
-                              "pointer-events-none absolute inset-x-0 z-[3] flex justify-center",
-                              captionsRaised ? "bottom-[28%]" : "bottom-[9%]"
-                            )}
-                          >
-                            <div className="max-w-[82%] rounded-md bg-black/55 px-3.5 py-1.5 text-center font-medium text-[clamp(15px,2.3vw,30px)] text-white leading-tight backdrop-blur">
-                              {activeGroup.words.map((w, i) => {
-                                const next =
-                                  activeGroup.words[i + 1]?.startSec ??
-                                  activeGroup.endSec;
-                                const on =
-                                  curSec >= w.startSec - 0.02 && curSec < next;
-                                return (
-                                  <span
-                                    className={cn(
-                                      on ? "text-live" : "text-white/70"
-                                    )}
-                                    key={`${w.text}-${i}`}
-                                  >
-                                    {w.text}{" "}
-                                  </span>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        )}
+                        <PreviewOverlays
+                          captionGroups={captionGroups}
+                          captionsOn={captionsOn}
+                          curSample={curSample}
+                          graphics={project.graphics ?? []}
+                          sampleRate={sr}
+                          titles={project.titles ?? []}
+                        />
                         <canvas
                           className="pointer-events-none absolute inset-0 z-[4] h-full w-full"
                           ref={transitionCanvasRef}
