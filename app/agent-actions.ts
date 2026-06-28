@@ -4,12 +4,18 @@
 // the user's Claude subscription (via `claude -p`) to suggest + apply cuts on
 // the same project.json the editor reads. No API keys. Kept in its own file so
 // it doesn't touch the hand-written action surface.
+import { join } from "node:path";
 import {
   buildChatPrompt,
+  buildEditPrompt,
   detectAgents,
   runAgentText,
+  runClaudeEdit,
   runFillerAgent,
+  supportsToolEditing,
 } from "@engine/agent-driver";
+import { analyzeAssets, assetCardLines } from "@engine/asset-cards";
+import { projectsRoot } from "@engine/paths";
 import { loadProject, mutateProject } from "@engine/projectStore";
 
 // Re-export the type from source (type-only, never emits runtime code) so client
@@ -63,13 +69,43 @@ export async function suggestFillerCuts(
   }
 }
 
-export type ChatReply =
-  | { ok: true; text: string }
+export type AnalyzeReply =
+  | { ok: true; analyzed: number; skipped: number; total: number }
   | { ok: false; error: string };
 
-// Free-text chat: hand the selected agent the project transcript + the user's
-// message and return its reply. Read-only (no project mutation) so it can run
-// without the project lock while edits proceed. `agent` is the GUI selector
+// Fan out one subagent per un-described asset (b-roll, stills) to write an
+// "asset card" : what it shows and where it belongs. The editing agent then
+// places media by meaning. `agent` is the GUI selector value. No-op (total 0)
+// once every asset is carded; re-run after dropping new media.
+export async function analyzeProjectAssets(
+  slug: string,
+  agent: string
+): Promise<AnalyzeReply> {
+  try {
+    const res = await analyzeAssets(
+      slug,
+      { agent },
+      { loadProject, mutateProject }
+    );
+    return {
+      ok: true,
+      analyzed: res.analyzed.length,
+      skipped: res.skipped.length,
+      total: res.total,
+    };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+export type ChatReply =
+  | { ok: true; edited: boolean; text: string }
+  | { ok: false; error: string };
+
+// Free-text chat. For tool-capable agents (Claude) the model is given the
+// openklip MCP tools and DOES the edit the user asked for, replying with a
+// short confirmation; `edited` tells the GUI to refresh the project. Other
+// agents fall back to a read-only text answer. `agent` is the GUI selector
 // value (claude-opus-4-8, gpt-5-5, composer-2-5, grok-build).
 export async function chatWithAgent(
   slug: string,
@@ -78,12 +114,27 @@ export async function chatWithAgent(
 ): Promise<ChatReply> {
   try {
     const project = await loadProject(slug);
+    const assetCards = assetCardLines(project.assets);
+    if (supportsToolEditing(agent)) {
+      const prompt = buildEditPrompt(
+        { words: project.words, template: project.template, assetCards },
+        slug,
+        message
+      );
+      const { text } = await runClaudeEdit(prompt, {
+        agent,
+        slug,
+        projectsRoot: projectsRoot(),
+        mcpServerPath: join(process.cwd(), "src", "mcp-server.ts"),
+      });
+      return { ok: true, edited: true, text: text.trim() || "(done)" };
+    }
     const prompt = buildChatPrompt(
-      { words: project.words, template: project.template },
+      { words: project.words, template: project.template, assetCards },
       message
     );
     const { text } = await runAgentText(prompt, { agent });
-    return { ok: true, text: text.trim() || "(no response)" };
+    return { ok: true, edited: false, text: text.trim() || "(no response)" };
   } catch (e) {
     return { ok: false, error: (e as Error).message };
   }

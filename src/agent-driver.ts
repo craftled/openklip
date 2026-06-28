@@ -229,7 +229,11 @@ export function buildFillerPrompt(words: PromptWord[]): string {
 // so latency and context stay sane on every agent CLI. The transcript is the
 // kept words only (deleted = cut), joined as plain text.
 export function buildChatPrompt(
-  ctx: { template?: string; words: Array<{ deleted?: boolean; text: string }> },
+  ctx: {
+    assetCards?: string;
+    template?: string;
+    words: Array<{ deleted?: boolean; text: string }>;
+  },
   question: string,
   opts: { maxChars?: number } = {}
 ): string {
@@ -246,13 +250,63 @@ export function buildChatPrompt(
   const templateLine = ctx.template
     ? `\nThis project uses the "${ctx.template}" edit template.`
     : "";
-  return `You are OpenKlip's editing assistant for a spoken-video project. Answer the user's question concisely and concretely, grounded in the transcript below. When they ask for an edit, say what to change and which \`openklip\` CLI commands achieve it (e.g. \`openklip cut\`, \`openklip zoom-add-phrase\`, \`openklip broll-add-phrase\`). Never invent transcript content. Reply with the answer only: no preamble, no restating the question, no narration of your reasoning.${templateLine}
+  return `You are OpenKlip's editing assistant for a spoken-video project. Answer the user's question concisely and concretely, grounded in the transcript below. Never invent transcript content. Reply with the answer only: no preamble, no CLI commands, no step-by-step instructions, no narration of your reasoning.${templateLine}
 
 Transcript:
 """
 ${transcript}
 """
+${assetBlock(ctx.assetCards)}
+User: ${question}`;
+}
 
+// Render the analyzed-asset bin for a prompt, or "" when nothing is carded yet.
+function assetBlock(assetCards?: string): string {
+  const cards = assetCards?.trim();
+  if (!cards) {
+    return "";
+  }
+  return `
+Available media assets (reference by id):
+${cards}
+`;
+}
+
+// Edit prompt for the tool-calling path: the model has the openklip MCP tools
+// and is expected to DO the edit (not describe it). Reply is a short past-tense
+// confirmation of what changed, never CLI commands or how-to.
+export function buildEditPrompt(
+  ctx: {
+    assetCards?: string;
+    template?: string;
+    words: Array<{ deleted?: boolean; text: string }>;
+  },
+  slug: string,
+  question: string,
+  opts: { maxChars?: number } = {}
+): string {
+  const maxChars = opts.maxChars ?? 12_000;
+  const full = ctx.words
+    .filter((w) => !w.deleted)
+    .map((w) => w.text)
+    .join(" ")
+    .trim();
+  const transcript =
+    full.length > maxChars
+      ? `${full.slice(0, maxChars)}… [transcript truncated]`
+      : full || "[no transcript yet]";
+  const templateLine = ctx.template
+    ? `\nCurrent template: "${ctx.template}".`
+    : "";
+  return `You are OpenKlip's video editor working on the project with slug "${slug}". You have openklip tools that DIRECTLY edit this project: cut filler, cut words by text, add push-in zooms, titles, and b-roll on spoken phrases, set the edit template, and export. Pass slug "${slug}" to every tool.
+
+When the user asks for a change, DO it by calling the tools. Never print CLI commands and never explain how to do it yourself. After editing, reply with ONE short past-tense sentence naming exactly what you changed (e.g. "Cut 3 filler words." or "Added a push-in zoom on 'hello world'."). If you could not do it, say why in one line. If the user only asks a question, answer briefly from the transcript and make no edits.${templateLine}
+
+Transcript:
+"""
+${transcript}
+"""
+${assetBlock(ctx.assetCards)}
 User: ${question}`;
 }
 
@@ -400,6 +454,105 @@ export async function runAgentText(
       } catch {
         // best-effort cleanup
       }
+    }
+  }
+}
+
+// Agents whose CLI can load an MCP server and call its tools headlessly. Only
+// these can run the tool-editing chat path; others fall back to a text answer.
+export function supportsToolEditing(agent: string): boolean {
+  try {
+    return resolveAgent(agent).id === "claude";
+  } catch {
+    return false;
+  }
+}
+
+export interface AgentEditRun {
+  agent: string;
+  raw: string;
+  text: string;
+}
+
+// Tool-editing chat path (Claude): run headless with the openklip MCP server
+// loaded so the model actually CALLS the edit tools against the project instead
+// of describing CLI commands. Reuses the same stdio server the CLI and Cursor
+// use; OPENKLIP_PROJECTS_ROOT + OPENKLIP_SLUG scope it to the active project.
+export async function runClaudeEdit(
+  prompt: string,
+  opts: {
+    agent: string;
+    mcpServerPath: string;
+    projectsRoot: string;
+    slug: string;
+    timeoutMs?: number;
+  }
+): Promise<AgentEditRun> {
+  const spec = resolveAgent(opts.agent);
+  const cli = Bun.which(spec.cli);
+  if (!cli) {
+    throw new Error(
+      `${spec.label} CLI ("${spec.cli}") not found on PATH : install it to use this agent`
+    );
+  }
+  const cfgPath = join(
+    tmpdir(),
+    `openklip-mcp-${process.pid}-${Date.now()}.json`
+  );
+  await Bun.write(
+    cfgPath,
+    JSON.stringify({
+      mcpServers: {
+        openklip: {
+          command: "bun",
+          args: ["run", opts.mcpServerPath],
+          env: {
+            OPENKLIP_PROJECTS_ROOT: opts.projectsRoot,
+            OPENKLIP_SLUG: opts.slug,
+          },
+        },
+      },
+    })
+  );
+  const args = [
+    "-p",
+    prompt,
+    "--output-format",
+    "json",
+    "--mcp-config",
+    cfgPath,
+    "--strict-mcp-config",
+    "--allowedTools",
+    "mcp__openklip",
+    "--permission-mode",
+    "acceptEdits",
+    ...(spec.usesModelFlag ? ["--model", opts.agent] : []),
+  ];
+  const proc = Bun.spawn([cli, ...args], {
+    stdin: "ignore",
+    stdout: "pipe",
+    stderr: "pipe",
+    env: sanitizedEnv(),
+  });
+  // Tool-calling is multi-turn, so allow more wall-clock than a single answer.
+  const timer = setTimeout(() => proc.kill(), opts.timeoutMs ?? 240_000);
+  try {
+    const stdout = await new Response(proc.stdout).text();
+    await proc.exited;
+    if (proc.exitCode !== 0) {
+      const err = await new Response(proc.stderr).text();
+      throw new Error(
+        `${spec.label} failed (exit ${proc.exitCode}): ${err.trim().slice(-400) || "no output"}`
+      );
+    }
+    const text = extractModelText("envelope", stdout, "");
+    return { text, raw: stdout, agent: spec.label };
+  } finally {
+    clearTimeout(timer);
+    try {
+      await Bun.file(cfgPath).delete();
+    } catch {
+      // best-effort cleanup
     }
   }
 }

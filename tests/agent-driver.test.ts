@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   buildChatPrompt,
+  buildEditPrompt,
   buildFillerPrompt,
   extractModelText,
   isConnected,
@@ -10,6 +11,7 @@ import {
   resolveAgent,
   signInCommand,
   stripBunNodeOptions,
+  supportsToolEditing,
 } from "../src/agent-driver.ts";
 
 // ---- chat prompt (grounding) ----
@@ -36,6 +38,49 @@ test("buildChatPrompt truncates an oversized transcript", () => {
   const words = Array.from({ length: 5000 }, () => ({ text: "word" }));
   const prompt = buildChatPrompt({ words }, "hi", { maxChars: 100 });
   assert.match(prompt, /transcript truncated/);
+});
+
+test("buildChatPrompt no longer suggests CLI commands or how-to", () => {
+  const prompt = buildChatPrompt({ words: [{ text: "hi" }] }, "cut the intro");
+  assert.doesNotMatch(prompt, /openklip /);
+  assert.match(prompt, /no CLI commands/i);
+});
+
+test("buildEditPrompt names the slug and tells the model to do the edit", () => {
+  const prompt = buildEditPrompt(
+    { words: [{ text: "hello" }, { text: "world" }] },
+    "demo",
+    "cut the word world"
+  );
+  assert.match(prompt, /slug "demo"/);
+  assert.match(prompt, /DO it by calling the tools|DIRECTLY edit/);
+  assert.match(prompt, /Never print CLI commands/i);
+  assert.match(prompt, /User: cut the word world/);
+});
+
+test("buildEditPrompt injects analyzed asset cards when present", () => {
+  const prompt = buildEditPrompt(
+    {
+      words: [{ text: "hello" }],
+      assetCards: "- broll-1 (broll): Drone over coast [aerial]",
+    },
+    "demo",
+    "add b-roll over the intro"
+  );
+  assert.match(prompt, /Available media assets/);
+  assert.match(prompt, /broll-1 \(broll\): Drone over coast/);
+});
+
+test("buildChatPrompt omits the asset block when nothing is carded", () => {
+  const prompt = buildChatPrompt({ words: [{ text: "hi" }] }, "what is this?");
+  assert.doesNotMatch(prompt, /Available media assets/);
+});
+
+test("supportsToolEditing is true for Claude, false otherwise", () => {
+  assert.equal(supportsToolEditing("claude-opus-4-8"), true);
+  assert.equal(supportsToolEditing("gpt-5-5"), false);
+  assert.equal(supportsToolEditing("grok-build"), false);
+  assert.equal(supportsToolEditing("nonsense"), false);
 });
 
 // ---- connection detection (per auth strategy) ----
