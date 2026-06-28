@@ -231,6 +231,7 @@ export function buildFillerPrompt(words: PromptWord[]): string {
 export function buildChatPrompt(
   ctx: {
     assetCards?: string;
+    sceneLog?: string;
     template?: string;
     words: Array<{ deleted?: boolean; text: string }>;
   },
@@ -256,7 +257,7 @@ Transcript:
 """
 ${transcript}
 """
-${assetBlock(ctx.assetCards)}
+${assetBlock(ctx.assetCards)}${sceneBlock(ctx.sceneLog)}
 User: ${question}`;
 }
 
@@ -272,12 +273,25 @@ ${cards}
 `;
 }
 
+// Render the main-video scene log for a prompt, or "" when not analyzed yet.
+function sceneBlock(sceneLog?: string): string {
+  const log = sceneLog?.trim();
+  if (!log) {
+    return "";
+  }
+  return `
+Visual scene log of the source video (source-time spans):
+${log}
+`;
+}
+
 // Edit prompt for the tool-calling path: the model has the openklip MCP tools
 // and is expected to DO the edit (not describe it). Reply is a short past-tense
 // confirmation of what changed, never CLI commands or how-to.
 export function buildEditPrompt(
   ctx: {
     assetCards?: string;
+    sceneLog?: string;
     template?: string;
     words: Array<{ deleted?: boolean; text: string }>;
   },
@@ -306,7 +320,7 @@ Transcript:
 """
 ${transcript}
 """
-${assetBlock(ctx.assetCards)}
+${assetBlock(ctx.assetCards)}${sceneBlock(ctx.sceneLog)}
 User: ${question}`;
 }
 

@@ -50,7 +50,7 @@ Time is integer audio samples at 48 kHz. The CLI takes seconds where a human num
 | Cut / restore words | `openklip cut`, `openklip restore` |
 | Register b-roll file | `openklip broll <slug> <file>` |
 | List b-roll assets | `openklip assets <slug>` |
-| Describe assets (subagents) | `openklip analyze <slug>` |
+| Describe media (subagents) | `openklip analyze <slug>` |
 | Place / patch / remove b-roll | `openklip broll-add`, `broll-set`, `broll-rm`, `broll-add-phrase` |
 | Place / remove still (Ken Burns) | `openklip still-add`, `still-rm` |
 | Place / patch / remove title | `openklip title-add`, `title-set`, `title-rm`, `title-add-phrase` |
@@ -83,7 +83,7 @@ Run as `bun run src/cli.ts <command>` (or the `openklip` bin).
 | --- | --- |
 | `openklip list` | List all projects, most recent first. |
 | `openklip assets <slug>` | List registered b-roll assets with ids and durations. |
-| `openklip analyze <slug> [--agent <model>]` | Fan out one subagent per un-described asset (b-roll, stills): reads reference frames and writes an "asset card" (summary, tags, bestFor) onto the asset so the editing agent can place media by meaning. Idempotent: only un-carded assets are analyzed. |
+| `openklip analyze <slug> [--agent <model>]` | One "understand my media" pass: fan out one subagent per un-described asset (b-roll, stills) to write an "asset card", and (if absent) one subagent over the main video's ingest frames to write a `sceneLog` on `project.json` (what is on screen, b-roll opportunities). Idempotent: only missing work runs. |
 
 ### Transcript (read)
 

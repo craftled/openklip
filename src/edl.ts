@@ -95,6 +95,31 @@ export const TitleSchema = z.object({
 });
 export type Title = z.infer<typeof TitleSchema>;
 
+// A subagent-produced "visual scene log" of the MAIN video: what is on screen
+// across spans of source time, so the editing agent knows where the footage is
+// already visually interesting (speaker, slide, screen-share) versus where it
+// wants b-roll cover. Built from the sample frames extracted at ingest.
+export const SceneSegmentSchema = z.object({
+  fromSec: z.number().nonnegative(),
+  toSec: z.number().nonnegative(),
+  /** One concise sentence of what is on screen in this span. */
+  summary: z.string(),
+  /** What dominates the frame: the talker, a slide, a screen-share, or other. */
+  onScreen: z.enum(["speaker", "slide", "screen", "other"]).optional(),
+  /** True when this span is visually static and a good candidate for b-roll. */
+  brollOpportunity: z.boolean().optional(),
+});
+export type SceneSegment = z.infer<typeof SceneSegmentSchema>;
+
+export const SceneLogSchema = z.object({
+  segments: z.array(SceneSegmentSchema).default([]),
+  /** ISO timestamp of the analysis run. */
+  analyzedAt: z.string(),
+  /** Agent label that produced the log (e.g. "Claude"). */
+  agent: z.string().optional(),
+});
+export type SceneLog = z.infer<typeof SceneLogSchema>;
+
 export const ProjectSchema = z.object({
   version: z.literal(1),
   slug: z.string(),
@@ -123,6 +148,8 @@ export const ProjectSchema = z.object({
   words: z.array(WordSchema),
   /** Edit template id (templates/<id>/skill.md). */
   template: z.string().optional(),
+  /** Subagent visual scene log of the main video (absent until analyzed). */
+  sceneLog: SceneLogSchema.optional(),
 });
 export type Project = z.infer<typeof ProjectSchema>;
 

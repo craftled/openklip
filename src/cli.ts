@@ -52,6 +52,7 @@ import {
   runAction,
   type Surface,
 } from "./registry.ts";
+import { analyzeSceneLog } from "./scene-log.ts";
 import {
   applyProjectTemplate,
   listTemplates,
@@ -267,27 +268,47 @@ try {
       }
       const slug = rest[0];
       const agent = flagValue(rest, "--agent") ?? "claude-opus-4-8";
-      console.log(`[analyze] describing assets with ${agent}...`);
+      console.log(`[analyze] reading media with ${agent}...`);
       const res = await analyzeAssets(
         slug,
         { agent },
         { loadProject: storeLoadProject, mutateProject }
       );
-      if (res.total === 0) {
-        console.log("[analyze] no un-described assets (b-roll/stills).");
+      let sceneLogged = false;
+      const project = await storeLoadProject(slug);
+      if (!project.sceneLog) {
+        const log = await analyzeSceneLog(slug, project, { agent });
+        if (log) {
+          await mutateProject(slug, (proj) => {
+            if (!proj.sceneLog) {
+              proj.sceneLog = log;
+            }
+          });
+          sceneLogged = true;
+          console.log(
+            `[analyze] scene log: ${log.segments.length} segment(s) on the main video`
+          );
+        }
+      }
+      if (res.total === 0 && !sceneLogged) {
+        console.log(
+          "[analyze] nothing to do (assets already described, scene log present or frames missing)."
+        );
         break;
       }
-      for (const a of res.analyzed) {
-        console.log(`  ${a.id.padEnd(16)}  ${a.summary}`);
-      }
-      if (res.skipped.length > 0) {
+      if (res.total > 0) {
+        for (const a of res.analyzed) {
+          console.log(`  ${a.id.padEnd(16)}  ${a.summary}`);
+        }
+        if (res.skipped.length > 0) {
+          console.log(
+            `[analyze] skipped (not described): ${res.skipped.join(", ")}`
+          );
+        }
         console.log(
-          `[analyze] skipped (not described): ${res.skipped.join(", ")}`
+          `[analyze] ${res.analyzed.length}/${res.total} asset(s) described.`
         );
       }
-      console.log(
-        `[analyze] ${res.analyzed.length}/${res.total} asset(s) described.`
-      );
       break;
     }
     case "ingest": {
