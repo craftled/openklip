@@ -176,7 +176,7 @@ All MCP tools route through `src/agent-tools.ts` → `mutateProject` / `runActio
 
 | Layer | MCP tool names | Same as CLI |
 | --- | --- | --- |
-| Query | `list_projects`, `transcript_grep`, `transcript_phrase`, `project_status`, `project_overlays`, … | `openklip transcript grep`, `status --json`, `overlays --json` |
+| Query | `list_projects`, `transcript_grep`, `transcript_phrase`, `scene_log`, `project_status`, `project_overlays`, … | `openklip transcript grep`, `status --json`, `overlays --json` |
 | Mutate | `cut`, `cut-text`, `broll-add`, `title-set`, … | `openklip cut`, `broll-add`, … |
 | Phrase compose | `title-add-phrase`, `zoom-add-phrase`, `broll-add-phrase` | `openklip title-add-phrase`, … |
 | Render | `export` | `openklip export` |

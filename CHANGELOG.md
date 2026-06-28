@@ -6,6 +6,7 @@
 
 ### Added
 - **Scene log**: `openklip analyze` and **Describe media** run a subagent over ingest frames (`working/frames/`) to write `sceneLog` on `project.json`: what is on screen per span, optional `onScreen` type, and `brollOpportunity` flags. Chat and MCP edit prompts include the log so the agent targets cover opportunities.
+- **MCP query `scene_log`**: agents can read the persisted scene log without dumping `project.json`.
 
 ### Changed
 - **Describe media** button always visible (scene log can run even with no b-roll in the bin). Label copy: "reading your media" / "Describe media".

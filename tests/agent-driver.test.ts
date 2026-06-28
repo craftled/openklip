@@ -76,6 +76,24 @@ test("buildChatPrompt omits the asset block when nothing is carded", () => {
   assert.doesNotMatch(prompt, /Available media assets/);
 });
 
+test("buildEditPrompt injects the scene log when present", () => {
+  const prompt = buildEditPrompt(
+    {
+      words: [{ text: "hello" }],
+      sceneLog: "- 0.0-10.0s [speaker]: Talking head (b-roll opportunity)",
+    },
+    "demo",
+    "add b-roll where the speaker is static"
+  );
+  assert.match(prompt, /Visual scene log of the source video/);
+  assert.match(prompt, /Talking head \(b-roll opportunity\)/);
+});
+
+test("buildChatPrompt omits the scene block when no scene log", () => {
+  const prompt = buildChatPrompt({ words: [{ text: "hi" }] }, "what is this?");
+  assert.doesNotMatch(prompt, /Visual scene log/);
+});
+
 test("supportsToolEditing is true for Claude, false otherwise", () => {
   assert.equal(supportsToolEditing("claude-opus-4-8"), true);
   assert.equal(supportsToolEditing("gpt-5-5"), false);
