@@ -25,6 +25,14 @@ projects/<slug>/
   output/out.mp4          the rendered export
 ```
 
+Edit templates (repo root, not per project):
+
+```
+templates/<id>/skill.md   agent playbook (cuts, overlays, export loop)
+```
+
+Optional `template` field on `project.json` points at a template id (e.g. `talking-head`).
+
 **`project.json` IS the edit.** It holds every transcribed word with a `deleted` flag, b-roll overlays, still (Ken Burns) overlays, push-in zooms, title cards, captions settings, and look flags. Everything under `working/` and `output/` is regenerated from it. The GUI editor and these CLI commands both read and write this same file; they are **equivalent (parity)**. Edit it through the CLI; the browser editor will show the same result, and vice-versa.
 
 Time is integer audio samples at 48 kHz. The CLI takes seconds where a human number is natural (overlay spans) and converts for you.
@@ -36,24 +44,31 @@ Time is integer audio samples at 48 kHz. The CLI takes seconds where a human num
 | List projects | `openklip list` |
 | Ingest a video | `openklip ingest <video> [--force]` |
 | Open editor | `openklip serve [slug]` |
-| Read transcript | `openklip transcript <slug>` |
+| Read transcript (full) | `openklip transcript <slug>` |
+| Grep transcript | `openklip transcript grep`, `span`, `phrase` |
+| Review edit (JSON) | `openklip status <slug> --json`, `ranges`, `overlays` |
 | Cut / restore words | `openklip cut`, `openklip restore` |
 | Register b-roll file | `openklip broll <slug> <file>` |
 | List b-roll assets | `openklip assets <slug>` |
-| Place / patch / remove b-roll | `openklip broll-add`, `broll-set`, `broll-rm` |
+| Place / patch / remove b-roll | `openklip broll-add`, `broll-set`, `broll-rm`, `broll-add-phrase` |
 | Place / remove still (Ken Burns) | `openklip still-add`, `still-rm` |
-| Add / patch / remove title | `openklip title-add`, `title-set`, `title-rm` |
-| Add / patch / remove zoom | `openklip zoom-add`, `zoom-set`, `zoom-rm` |
+| Place / patch / remove title | `openklip title-add`, `title-set`, `title-rm`, `title-add-phrase` |
+| Add / patch / remove zoom | `openklip zoom-add`, `zoom-set`, `zoom-rm`, `zoom-add-phrase` |
 | Reorder overlay (paint order) | `openklip reorder <slug> <broll\|title\|zoom> <id> <toIndex>` |
 | Apply brand preset (look defaults) | `openklip brand <slug> <name>` |
+| Set edit template (agent skill) | `openklip template set <slug> <id>` |
+| List / show edit templates | `openklip template list`, `openklip template show <id>` |
 | Toggle captions | `openklip captions <slug> on\|off` |
 | Caption line length | `openklip captions-max <slug> <n>` |
 | Toggle vignette | `openklip look <slug> vignette on\|off` |
 | Cut boundary padding | `openklip pad <slug> <ms>` |
-| Review edit | `openklip status <slug>` |
+| Review edit | `openklip status <slug>` (`--json` for agents) |
+| Kept ranges / overlays | `openklip ranges <slug>`, `openklip overlays <slug>` |
 | Check environment / project health | `openklip doctor [slug]` |
 | List ingester plugins | `openklip ingesters` |
-| List the action registry (capability manifest) | `openklip actions` |
+| List the action registry (mutations only) | `openklip actions` |
+| List all agent tools (query + mutate + export) | `openklip tools` |
+| MCP server (stdio) | `openklip mcp` or `bun run mcp` |
 | Export MP4 | `openklip export <slug>` |
 | Post-export packaging (HyperFrames) | `openklip package <slug> <pass>` |
 
@@ -67,6 +82,17 @@ Run as `bun run src/cli.ts <command>` (or the `openklip` bin).
 | --- | --- |
 | `openklip list` | List all projects, most recent first. |
 | `openklip assets <slug>` | List registered b-roll assets with ids and durations. |
+
+### Transcript (read)
+
+Prefer bounded reads over dumping the full transcript. Use `--json` for machine parsing.
+
+| Command | What it does |
+| --- | --- |
+| `openklip transcript <slug>` | Print every word as `index  id  mm:ss  text  [cut]`. Use on short clips only. |
+| `openklip transcript grep <slug> "phrase" [--all] [--json]` | Find phrase runs: word ids, seconds, matched text. |
+| `openklip transcript span <slug> <w12\|w12-w20> [--context N] [--json]` | Slice words around ids (default context 0). |
+| `openklip transcript phrase <slug> "phrase" [--json]` | First match span (`fromSec`, `toSec`, ids) for overlay placement. |
 
 ### Transcript edits
 
@@ -85,12 +111,15 @@ Run as `bun run src/cli.ts <command>` (or the `openklip` bin).
 | --- | --- |
 | `openklip broll <slug> <file>` | Register a b-roll clip (builds preview proxy, returns asset id). |
 | `openklip broll-add <slug> <assetId> <fromSec> <toSec>` | Cover a source-time span with a registered asset. |
+| `openklip broll-add-phrase <slug> <assetId> "spoken phrase"` | Cover the span of the first spoken phrase match. |
 | `openklip broll-set <slug> <brollId>` | Patch b-roll: `--asset`, `--from`, `--to`, `--src-in` (seconds). |
 | `openklip broll-rm <slug> <brollId>` | Remove a b-roll clip. |
 | `openklip title-add <slug> <fromSec> <toSec> <text>` | Burn a title card. `--position lower\|center\|hero` (default lower). Use `\n` for two lines. |
+| `openklip title-add-phrase <slug> "spoken" "title text"` | Place a title at the first spoken phrase match (min 2s span). |
 | `openklip title-set <slug> <titleId>` | Patch title: `--text`, `--position`, `--from`, `--to`. |
 | `openklip title-rm <slug> <titleId>` | Remove a title card. |
 | `openklip zoom-add <slug> <fromSec> <toSec>` | Push-in zoom. `--scale 1.15` (1–3), `--ramp 0.6` (0–5 sec). |
+| `openklip zoom-add-phrase <slug> "spoken phrase"` | Push-in zoom at the first spoken phrase match. |
 | `openklip zoom-set <slug> <zoomId>` | Patch zoom: `--scale`, `--ramp`, `--from`, `--to`. |
 | `openklip zoom-rm <slug> <zoomId>` | Remove a push-in zoom. |
 | `openklip still-add <slug> <assetId> <fromSec> <toSec>` | Overlay a registered **still** image with a Ken Burns push-in. `--scale 1.2` (1–3), `--focus-x 0.5` / `--focus-y 0.5` (0–1 image coords). |
@@ -106,33 +135,60 @@ Run as `bun run src/cli.ts <command>` (or the `openklip` bin).
 | `openklip look <slug> vignette <on\|off>` | Toggle vignette. |
 | `openklip pad <slug> <ms>` | Symmetric padding around kept ranges (0–500 ms). |
 | `openklip brand <slug> <name>` | Apply a brand preset (`brands/<name>.json`): sets caption/vignette/pad **defaults** only. `project.json` stays the edit; words and overlays are untouched. Also available at ingest: `openklip ingest <video> --brand <name>`. |
+| `openklip template list` | List edit templates (`templates/<id>/skill.md`): agent playbooks for cuts, overlays, and export. |
+| `openklip template show <id>` | Print a template skill file. |
+| `openklip template set <slug> <id>` | Attach a template id to `project.json` (GUI template dropdown writes the same field). |
 
 ### Review & export
 
 | Command | What it does |
 | --- | --- |
 | `openklip status <slug>` | Full edit summary: words, ranges, overlays, look, captions, runtime. |
+| `openklip status <slug> --json` | Same data as compact JSON (preferred for agents). |
+| `openklip ranges <slug> [--json]` | Kept source-time segments after cuts and pad. |
+| `openklip overlays <slug> [--json]` | All b-roll, titles, zooms, stills with ids and spans. |
 | `openklip export <slug>` | Render the current cut to `out.mp4`. `--height 1080` for max output height. |
 | `openklip doctor [slug]` | Health check: ffmpeg/ffprobe binaries, Whisper script, and (with a slug) the project's `project.json`, source/proxy media, and asset proxies. Exits non-zero if any check fails. Run it when the agent loop fails deep inside a subprocess. |
 | `openklip ingesters` | List ingester plugins (`ingesters/<id>/ingester.json`): declarative seams for non-file media import (URL, batch, etc.). |
-| `openklip actions` | Print the unified action registry: every `project.json` mutation (cut, broll, title, zoom, still, captions, look, pad, reorder) as one named, Zod-schema'd entry. `--json` emits a machine-readable manifest (schemas render to JSON Schema, the MCP `inputSchema` shape); `--surface cli\|gui\|mcp` filters by surface. The CLI routes every edit command through this same registry, so the manifest is exactly what runs. |
+| `openklip actions` | **Mutations only:** every `project.json` edit action (cut, broll, title, zoom, still, captions, look, pad, reorder). `--json` emits JSON Schema (`inputSchema` shape). |
+| `openklip tools` | **Full agent surface:** query tools (`transcript_grep`, `project_status`, …), registry mutations, phrase-add helpers, and `export`. Same manifest the MCP server exposes. `--json`; `--surface mcp` filters. |
+| `openklip mcp` | Start the MCP stdio server (`src/mcp-server.ts`). Cursor: `.cursor/mcp.json` in repo root. Set `OPENKLIP_PROJECTS_ROOT` in the server env if projects live outside the repo. |
 | `openklip package <slug> <pass>` | Optional post-export pass on `output/out.mp4` via the HyperFrames CLI: `remove-background` (→ transparent `.webm`, the matte primitive for embed-behind-subject) or `transcribe` (→ `.srt`). Uses the local `node_modules/.bin/hyperframes` if installed (`bun add -d hyperframes`); runs Chrome + our bundled ffmpeg. Fails with install instructions if absent. |
 
 ## Recommended workflow
 
 1. **Discover.** `openklip list` to pick a project, or `openklip ingest <video>` to create one. Re-ingest requires `--force` (wipes the project).
-2. **Read first.** `openklip transcript <slug>`: see words, ids, times, and what's already cut.
+2. **Read first.** `openklip transcript grep <slug> "phrase"` or `transcript phrase` for spans; use full `transcript` only on short clips. `openklip status <slug> --json` for edit health.
 3. **Decide cuts.** Identify filler, false starts, and tangents. Prefer cutting whole sentences, not single words.
 4. **Edit.** `openklip cut <slug> w12-w20` (or `--text "the part to remove"`). Add overlays with `broll-add`, `title-add`, `zoom-add`. Patch with `*-set` commands. Toggle look with `look` and `captions`.
 5. **Check.** `openklip status <slug>`: confirm runtime, overlay ids, and range count look right.
 6. **Export.** `openklip export <slug>` when the cut is good.
+
+## MCP (Cursor, Claude Desktop, Codex)
+
+All MCP tools route through `src/agent-tools.ts` → `mutateProject` / `runAction` / query helpers. The browser GUI writes the same `project.json`; reload the editor after MCP edits.
+
+**Enable in Cursor:** the repo ships `.cursor/mcp.json`. Restart MCP or reload the window after pulling.
+
+**Tool layers:**
+
+| Layer | MCP tool names | Same as CLI |
+| --- | --- | --- |
+| Query | `list_projects`, `transcript_grep`, `transcript_phrase`, `project_status`, `project_overlays`, … | `openklip transcript grep`, `status --json`, `overlays --json` |
+| Mutate | `cut`, `cut-text`, `broll-add`, `title-set`, … | `openklip cut`, `broll-add`, … |
+| Phrase compose | `title-add-phrase`, `zoom-add-phrase`, `broll-add-phrase` | `openklip title-add-phrase`, … |
+| Render | `export` | `openklip export` |
+
+**Inspect the manifest:** `openklip tools --json --surface mcp`
+
+**Parity rule:** every registry action with `surfaces` including `mcp` is an MCP tool with `{ slug, … }` input. Query tools use snake_case names; mutations keep registry kebab-case names (`broll-add`).
 
 ## Agent loop
 
 OpenKlip ships no LLM. An external agent (Claude Code, Codex, Cursor, Grok) drives the loop:
 
 ```
-read  → openklip list / status / transcript
+read  → openklip list / status --json / transcript grep / overlays
 plan  → decide phrases, spans, overlays (agent judgment)
 act   → openklip cut / broll-add / zoom-add / …
 verify→ openklip status
@@ -165,7 +221,9 @@ When working on a project, gather state before editing:
 ```
 openklip list                          # which projects exist
 openklip status <slug>                 # current edit health + overlay ids
-openklip transcript <slug>             # word ids and cut state
+openklip transcript grep <slug> "phrase"  # bounded read (prefer over full dump)
+openklip status <slug> --json             # edit health + overlay ids
+openklip overlays <slug> --json           # structured overlay list
 openklip assets <slug>                 # b-roll asset ids (if adding b-roll)
 ```
 

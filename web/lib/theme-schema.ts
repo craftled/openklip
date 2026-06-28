@@ -28,9 +28,9 @@ export const DEFAULT_EDITOR_COLORS: Required<
   Record<keyof EditorColors, string>
 > = {
   live: "var(--success)",
-  broll: "oklch(0.78 0.09 196)",
-  zoom: "oklch(0.84 0.11 84)",
-  title: "oklch(0.76 0.13 10)",
+  broll: "oklch(0.623 0.178 210)",
+  zoom: "oklch(0.676 0.184 75)",
+  title: "oklch(0.657 0.183 25)",
 };
 
 export const EDITOR_COLOR_KEYS = [

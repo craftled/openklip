@@ -6,6 +6,7 @@ import { test } from "node:test";
 import { GET, POST } from "../app/api/workspace/route.ts";
 import { projectsRoot } from "../src/paths.ts";
 import {
+  isWorkspaceConfigured,
   readConfiguredProjectsRoot,
   writeConfiguredProjectsRoot,
 } from "../src/workspace-config.ts";
@@ -34,14 +35,35 @@ test("writeConfiguredProjectsRoot persists and projectsRoot reads it", () => {
   }
 });
 
+test("isWorkspaceConfigured is false before folder pick", () => {
+  const prevRoot = process.env.OPENKLIP_PROJECTS_ROOT;
+  delete process.env.OPENKLIP_PROJECTS_ROOT;
+  try {
+    assert.equal(
+      isWorkspaceConfigured(),
+      readConfiguredProjectsRoot() !== null
+    );
+  } finally {
+    if (prevRoot === undefined) {
+      delete process.env.OPENKLIP_PROJECTS_ROOT;
+    } else {
+      process.env.OPENKLIP_PROJECTS_ROOT = prevRoot;
+    }
+  }
+});
+
 test("GET /api/workspace returns the active projects root", async () => {
   const prevRoot = process.env.OPENKLIP_PROJECTS_ROOT;
   process.env.OPENKLIP_PROJECTS_ROOT = "/tmp/openklip-workspace-root";
   try {
     const res = GET();
     assert.equal(res.status, 200);
-    const json = (await res.json()) as { root?: string };
+    const json = (await res.json()) as {
+      configured?: boolean;
+      root?: string;
+    };
     assert.equal(json.root, "/tmp/openklip-workspace-root");
+    assert.equal(json.configured, true);
   } finally {
     if (prevRoot === undefined) {
       delete process.env.OPENKLIP_PROJECTS_ROOT;

@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "openklip": {
+      "command": "bun",
+      "args": ["run", "src/mcp-server.ts"],
+      "env": {}
+    }
+  }
+}

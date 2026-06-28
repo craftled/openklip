@@ -30,6 +30,13 @@ function DialogClose({
   return <DialogPrimitive.Close data-slot="dialog-close" {...props} />;
 }
 
+/** Enter slower than exit: orient on open, snap on dismiss. */
+export const MODAL_OVERLAY_MOTION =
+  "data-[state=open]:duration-200 data-[state=closed]:duration-150";
+
+export const MODAL_CONTENT_MOTION =
+  "data-[state=open]:duration-200 data-[state=closed]:duration-150";
+
 function DialogOverlay({
   className,
   ...props
@@ -37,7 +44,7 @@ function DialogOverlay({
   return (
     <DialogPrimitive.Overlay
       className={cn(
-        "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50 data-[state=closed]:animate-out data-[state=open]:animate-in",
+        `${MODAL_OVERLAY_MOTION} data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-overlay data-[state=closed]:animate-out data-[state=open]:animate-in`,
         className
       )}
       data-slot="dialog-overlay"
@@ -59,7 +66,7 @@ function DialogContent({
       <DialogOverlay />
       <DialogPrimitive.Content
         className={cn(
-          "data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border bg-background p-6 shadow-lg outline-none duration-200 data-[state=closed]:animate-out data-[state=open]:animate-in sm:max-w-lg",
+          `${MODAL_CONTENT_MOTION} data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border border-border bg-background p-6 shadow-sm outline-none data-[state=closed]:animate-out data-[state=open]:animate-in sm:max-w-lg`,
           className
         )}
         data-slot="dialog-content"

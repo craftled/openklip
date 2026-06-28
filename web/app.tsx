@@ -49,10 +49,11 @@ import {
   type ExportDialogOptions,
 } from "@/components/export-dialog";
 import { FindFillerButton } from "@/components/find-filler-button";
+import { OverlaySortable } from "@/components/overlay-sortable";
 import { HeroTitleOverlay } from "@/components/hero-title-overlay";
 import { KeyboardHint } from "@/components/keyboard-hint";
-import { OverlaySortable } from "@/components/overlay-sortable";
 import { PLAYER_SPEEDS, PlayerControls } from "@/components/player-controls";
+import { TemplateSelect } from "@/components/template-select";
 import { Button } from "@/components/ui/button";
 import {
   Drawer,
@@ -104,6 +105,12 @@ import {
   subscribeDefaultAgent,
 } from "@/lib/agent-preferences";
 import {
+  toastNothingToPlay,
+  toastPlaybackFailed,
+  toastPromise,
+  toastSaveError,
+} from "@/lib/app-toast";
+import {
   clampLoopRegion,
   ORIENTATION_LABEL,
   ORIENTATION_RATIO,
@@ -124,6 +131,7 @@ import {
   subscribeAppTheme,
   subscribeColorScheme,
 } from "@/lib/theme-preferences";
+import { exportPromiseMessages } from "@/lib/toast-notifications";
 import { cn } from "@/lib/utils";
 import type { ActionResult } from "../app/actions.ts";
 import {
@@ -196,6 +204,7 @@ interface Project {
     scale: number;
     startSample: number;
   }>;
+  template?: string;
   titles: TitleItem[];
   width: number;
   words: Word[];
@@ -300,10 +309,14 @@ function sourceAtOutput(ranges: Range[], outSec: number): number {
 const fmt = (s: number): string =>
   `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 
+import type { EditorChatsSnapshot } from "../app/lib/editor-chats.ts";
+
 export function App({
+  initialChats,
   initialProject,
   projects,
 }: {
+  initialChats: EditorChatsSnapshot;
   initialProject: Project;
   projects: ProjectListing[];
 }) {
@@ -337,7 +350,6 @@ export function App({
     "lower"
   );
   const [exporting, setExporting] = useState(false);
-  const [exportMsg, setExportMsg] = useState<string | null>(null);
   const [orientation, setOrientation] = useState<Orientation>("landscape");
   // In/out work area: when set, playback loops within [inSec, outSec] (source
   // time) so a single b-roll span or transition can be tightened on repeat.
@@ -573,6 +585,7 @@ export function App({
           const message = (e as Error).message;
           saveErrorRef.current = message;
           setSaveError(message);
+          toastSaveError(message);
           throw e;
         } finally {
           setPendingSaves((n) => Math.max(0, n - 1));
@@ -775,11 +788,11 @@ export function App({
         const didStart = await s.play();
         setPlaying(didStart);
         if (!didStart) {
-          setExportMsg("Nothing to play: all words are cut.");
+          toastNothingToPlay();
         }
       } catch (e) {
         setPlaying(false);
-        setExportMsg(`Playback error: ${(e as Error).message}`);
+        toastPlaybackFailed((e as Error).message);
       }
     }
   }, [playing]);
@@ -913,22 +926,24 @@ export function App({
       );
     }
     setExporting(true);
-    setExportMsg(null);
     try {
-      await saveChainRef.current;
-      if (saveErrorRef.current) {
-        throw new Error(`Save failed: ${saveErrorRef.current}`);
-      }
-      const r = await exportProject(project.slug, maxHeight);
-      setExportMsg(
-        r.ok
-          ? `Exported ${r.data.ranges} cuts @ ${r.data.height}p (${r.data.durationSec.toFixed(1)}s) to ${r.data.out}`
-          : `Error: ${r.error}`
+      await toastPromise(
+        (async () => {
+          await saveChainRef.current;
+          if (saveErrorRef.current) {
+            throw new Error(saveErrorRef.current);
+          }
+          const r = await exportProject(project.slug, maxHeight);
+          if (!r.ok) {
+            throw new Error(r.error);
+          }
+          return r.data;
+        })(),
+        exportPromiseMessages()
       );
-    } catch (e) {
-      setExportMsg(`Error: ${(e as Error).message}`);
+    } finally {
+      setExporting(false);
     }
-    setExporting(false);
   };
 
   const fullDur = project.durationSamples / project.sampleRate;
@@ -1109,7 +1124,11 @@ export function App({
   );
 
   return (
-    <AgentChatProvider activeSlug={project.slug}>
+    <AgentChatProvider
+      activeSlug={project.slug}
+      initialChats={initialChats}
+      projectTemplate={project.template}
+    >
       <SidebarProvider
         className="min-h-screen flex-col overflow-auto bg-background text-foreground md:h-screen md:min-h-0 md:flex-row md:overflow-hidden"
         cookieName="openklip_sidebar_agent"
@@ -1181,7 +1200,7 @@ export function App({
                   <div className="h-4 w-px bg-foreground/10" />
                   <div className="min-w-0">
                     <div className="font-medium text-ui">Editor</div>
-                    <div className="truncate text-caption text-muted-foreground">
+                    <div className="truncate text-caption text-tertiary">
                       {ranges.length} cuts · {fmt(keptDuration)} /{" "}
                       {fmt(fullDur)}
                     </div>
@@ -1199,13 +1218,13 @@ export function App({
                       <Button
                         disabled={exportDisabled}
                         size="sm"
-                        variant="secondary"
+                        variant="default"
                       >
                         <Download />
                         {exportLabel}
                       </Button>
                     </ExportDialog>
-                    <div className="flex items-center gap-0.5 rounded-lg border border-border bg-muted/50 p-0.5">
+                    <div className="flex items-center gap-0.5 rounded-lg border border-border bg-surface-2 p-0.5">
                       {(
                         ["landscape", "portrait", "square"] as Orientation[]
                       ).map((o) => (
@@ -1233,10 +1252,10 @@ export function App({
                   </div>
                 </div>
                 <div className="flex min-h-0 flex-1 flex-col">
-                  <div className="shrink-0 space-y-3 border-foreground/10 border-b p-4">
+                  <div className="shrink-0 space-y-3 border-border border-b p-4">
                     <div className="mx-auto flex w-full max-w-2xl flex-wrap items-center gap-2">
                       <FindFillerButton />
-                      <div className="flex items-center gap-0.5 rounded-lg border border-border bg-muted/50 p-0.5">
+                      <div className="flex items-center gap-0.5 rounded-lg border border-border bg-surface-2 p-0.5">
                         <Button
                           aria-pressed={centerPanel === "chat"}
                           onClick={() => setCenterPanel("chat")}
@@ -1271,7 +1290,7 @@ export function App({
                           <DrawerHeader className="pb-2">
                             <DrawerTitle className="flex items-center justify-between font-medium text-sm">
                               <span>Timeline</span>
-                              <span className="font-normal text-muted-foreground tabular-nums">
+                              <span className="font-normal text-tertiary tabular-nums">
                                 {fmt(curSec)} / {fmt(fullDur)}
                               </span>
                             </DrawerTitle>
@@ -1293,6 +1312,13 @@ export function App({
                           />
                         </DrawerContent>
                       </Drawer>
+                      <TemplateSelect
+                        onTemplateChange={(templateId) =>
+                          setProject((p) => ({ ...p, template: templateId }))
+                        }
+                        slug={project.slug}
+                        template={project.template}
+                      />
                     </div>
                     <div className="mx-auto w-full max-w-2xl">
                       <div
@@ -1384,7 +1410,7 @@ export function App({
                                 return (
                                   <span
                                     className={cn(
-                                      on ? "text-live" : "text-zinc-100"
+                                      on ? "text-live" : "text-white/70"
                                     )}
                                     key={`${w.text}-${i}`}
                                   >
@@ -1402,9 +1428,7 @@ export function App({
                         {(exporting || pendingSaves > 0) && (
                           <div className="pointer-events-none absolute top-2 right-2 z-[5] flex items-center gap-1.5 rounded-md bg-black/70 px-2 py-1 font-medium text-caption text-white backdrop-blur">
                             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
-                            {exporting
-                              ? (exportMsg ?? "Exporting…")
-                              : "Rebuilding…"}
+                            {exporting ? "Exporting…" : "Rebuilding…"}
                           </div>
                         )}
                         {/* Linear-parity transport, shared with the cinema overlay */}
@@ -1433,7 +1457,7 @@ export function App({
 
                     {/* OpenKlip-specific controls (no Linear analogue) */}
                     <div className="mx-auto flex w-full max-w-2xl flex-wrap items-center gap-2 md:flex-nowrap md:gap-3">
-                      <span className="shrink-0 text-muted-foreground text-xs tabular-nums">
+                      <span className="shrink-0 text-tertiary text-xs tabular-nums">
                         {fmt(outPos)} / {fmt(keptDuration)}
                       </span>
                       <div className="flex shrink-0 items-center gap-1">
@@ -1465,7 +1489,7 @@ export function App({
                         {loop && (
                           <Button
                             aria-label="Clear loop region"
-                            className="text-caption text-muted-foreground"
+                            className="text-caption text-tertiary"
                             onClick={() => {
                               setLoop(null);
                               setLoopInPending(null);
@@ -1519,11 +1543,9 @@ export function App({
                     ) : (
                       <EditorTranscriptPanel
                         curSample={curSample}
-                        exportMsg={exportMsg}
                         inBroll={inBroll}
                         inZoom={inZoom}
                         onWordClick={onWordClick}
-                        saveError={saveError}
                         selRange={selRange}
                         words={project.words}
                       />
@@ -1562,7 +1584,7 @@ export function App({
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
                         <SidebarMenuSubItem>
-                          <span className="px-2 py-1 font-medium text-muted-foreground text-section-label">
+                          <span className="px-2 py-1 font-medium text-section-label text-tertiary">
                             Theme
                           </span>
                         </SidebarMenuSubItem>
@@ -1576,14 +1598,14 @@ export function App({
                               {appTheme === themeOption.id ? (
                                 <Check className="size-3.5 shrink-0" />
                               ) : (
-                                <Palette className="size-3.5 shrink-0 text-muted-foreground" />
+                                <Palette className="size-3.5 shrink-0 text-tertiary" />
                               )}
                               <span className="min-w-0 flex-1 truncate">
                                 {themeOption.name}
                               </span>
                               {themeOption.supportedModes.length === 1 &&
                               themeOption.supportedModes[0] === "dark" ? (
-                                <span className="shrink-0 text-caption text-muted-foreground">
+                                <span className="shrink-0 text-caption text-tertiary">
                                   dark
                                 </span>
                               ) : null}
@@ -1645,18 +1667,18 @@ export function App({
                       <div className="px-3 py-3">
                         <div className="flex items-center gap-2 font-medium text-ui">
                           {selZoom ? (
-                            <ZoomIn className="size-3.5 text-muted-foreground" />
+                            <ZoomIn className="size-3.5 text-tertiary" />
                           ) : selTitle ? (
-                            <Type className="size-3.5 text-muted-foreground" />
+                            <Type className="size-3.5 text-tertiary" />
                           ) : (
-                            <Film className="size-3.5 text-muted-foreground" />
+                            <Film className="size-3.5 text-tertiary" />
                           )}
                           {selZoom
                             ? "Push-in"
                             : selTitle
                               ? "Title card"
                               : "B-roll"}
-                          <span className="ml-auto text-caption text-muted-foreground tabular-nums">
+                          <span className="ml-auto text-caption text-tertiary tabular-nums">
                             {selZoom &&
                               `${fmt(selZoom.startSample / sr)}–${fmt(selZoom.endSample / sr)}`}
                             {selTitle &&
@@ -1798,7 +1820,7 @@ export function App({
                           </Select>
                           {(project.broll ?? []).length > 1 && (
                             <div className="mt-3">
-                              <span className="text-caption text-muted-foreground">
+                              <span className="text-caption text-tertiary">
                                 Paint order : drag to restack
                               </span>
                               <div className="mt-1.5">
@@ -1834,7 +1856,7 @@ export function App({
                     <div className="group-data-[collapsible=icon]:hidden">
                       <div className="px-3 py-3 font-medium text-ui">
                         Selection
-                        <span className="ml-2 text-caption text-muted-foreground">
+                        <span className="ml-2 text-caption text-tertiary">
                           {selRange[1] - selRange[0] + 1} words
                         </span>
                       </div>
@@ -1924,7 +1946,7 @@ export function App({
                       </Section>
                       <div className="p-3">
                         <Button
-                          className="text-muted-foreground"
+                          className="text-tertiary"
                           onClick={clearSel}
                           size="sm"
                           variant="ghost"
@@ -1962,7 +1984,7 @@ export function App({
                           />
                         </PropRow>
                       </Section>
-                      <p className="px-3 py-3 text-muted-foreground text-xs leading-relaxed">
+                      <p className="px-3 py-3 text-tertiary text-xs leading-relaxed">
                         Select a word range in the transcript to add a push-in,
                         b-roll, or title. Click an effect to edit it here.
                       </p>
@@ -1992,9 +2014,9 @@ function InfoSubItem({
     <SidebarMenuSubItem>
       <SidebarMenuSubButton asChild>
         <span>
-          <Icon className="size-3.5 shrink-0 text-muted-foreground" />
+          <Icon className="size-3.5 shrink-0 text-tertiary" />
           <span className="min-w-0 flex-1 truncate">{label}</span>
-          <span className="ml-auto shrink-0 text-caption text-muted-foreground/70 tabular-nums">
+          <span className="ml-auto shrink-0 text-caption text-quaternary tabular-nums">
             {value}
           </span>
         </span>
@@ -2050,8 +2072,8 @@ function RightSidebarTrigger({ className }: { className?: string }) {
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <SidebarGroup className="border-foreground/10 border-t px-3 py-3">
-      <SidebarGroupLabel className="mb-2.5 h-auto px-0 font-medium text-muted-foreground">
+    <SidebarGroup className="border-border border-t px-3 py-3">
+      <SidebarGroupLabel className="mb-2.5 h-auto px-0 font-medium text-tertiary">
         {title}
       </SidebarGroupLabel>
       <SidebarGroupContent>{children}</SidebarGroupContent>
@@ -2070,7 +2092,7 @@ function PropRow({
 }) {
   return (
     <div className="grid h-7 grid-cols-[4.25rem_1fr_2.5rem] items-center gap-2.5">
-      <span className="text-muted-foreground text-xs">{label}</span>
+      <span className="text-tertiary text-xs">{label}</span>
       {children}
       <span className="text-right text-xs tabular-nums">{value}</span>
     </div>

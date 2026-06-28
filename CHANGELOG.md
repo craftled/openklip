@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.8.1 - 2026-06-28
+
+Linear-style design system: OKLCH surfaces, Inter Variable typography, and light/dark parity.
+
+### Added
+- **DESIGN.md** — design source of truth for typography, color, spacing, and motion.
+- **CLAUDE.md** — points agents at DESIGN.md before any UI work.
+- **JetBrains Mono** — mono font for timestamps, paths, and CLI snippets.
+- **Surface ladder** — `--surface-0` through `--surface-3` and text hierarchy tokens (`--text-primary` through `--text-quaternary`).
+
+### Changed
+- **Inter Variable** — smooth 400-900 weights with Linear recipe (510/590/680, cv01+ss03, opsz auto).
+- **OpenKlip preset** — light/dark foreground and background tuned for parity (~#fff / ~#08090a).
+- **OKLCH mixes** — foreground shades and semantic text colors use oklch instead of srgb/oklab.
+- **Modal overlays** — dialog, sheet, drawer, and alert-dialog use `bg-overlay` token.
+
+## 0.8.0 - 2026-06-28
+
+Agent query layer, MCP server, edit templates, and Codex-style skills in chat.
+
+### Added
+- **Bounded query reads** — `openklip transcript grep/span/phrase`, `ranges --json`, `overlays --json`, `status --json` for agent discovery without loading full transcripts.
+- **Phrase placement helpers** — `title-add-phrase`, `zoom-add-phrase`, `broll-add-phrase` locate spoken spans and place overlays in one step.
+- **MCP server** — `openklip mcp` (stdio) exposes 35 tools with CLI/GUI parity on `project.json`; `.cursor/mcp.json` wired for Cursor.
+- **Edit templates** — `templates/` playbooks (e.g. talking-head), `openklip brand` / ingest `--brand`, template API route, and template skills in chat.
+- **Skills chat UX** — `/` slash menu, Skills dropdown, and Codex-style inline skill tokens with follow-up text before send.
+- **Empty workspace flow** — folder picker landing, new-project dialog, project create overlay, and Sonner toasts for uploads and actions.
+- **84 new tests** — query, phrase-match, cli-query, agent-tools, skills-catalog, templates, motion, and toast coverage (387 total).
+
+### Changed
+- **AGENTS.md** — capability map for query commands, MCP, and phrase helpers.
+- **Theme polish** — OpenKlip preset refresh, Geist typography, sidebar/chat motion, relative timestamps on chat list.
+- **Project switcher** — inline create flow replaces `no-projects.tsx` empty state.
+
+### Fixed
+- **`projectMutations.ts`** — restore `edl.ts` schema imports broken when template support landed.
+
 ## 0.7.0 - 2026-06-28
 
 Editor layout refresh, export options dialog, and configurable projects root (PR #12, PR #13).

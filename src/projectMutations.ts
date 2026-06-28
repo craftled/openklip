@@ -7,6 +7,7 @@ import {
   type Zoom,
   ZoomSchema,
 } from "./edl.ts";
+import { applyProjectTemplate } from "./templates.ts";
 
 export function applyProjectEdits(
   project: Project,
@@ -14,6 +15,7 @@ export function applyProjectEdits(
     words?: Array<{ id: string; deleted: boolean }>;
     captions?: { enabled?: boolean; maxWords?: number };
     padMs?: number;
+    template?: string | null;
   }
 ): Project {
   if (body.words) {
@@ -33,6 +35,9 @@ export function applyProjectEdits(
   }
   if (typeof body.padMs === "number") {
     project.padMs = Math.max(0, Math.min(500, Math.round(body.padMs)));
+  }
+  if (body.template !== undefined) {
+    applyProjectTemplate(project, body.template);
   }
   return project;
 }

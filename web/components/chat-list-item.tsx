@@ -8,7 +8,13 @@ import {
   RotateCcw,
   Trash2,
 } from "lucide-react";
-import { type KeyboardEvent, useEffect, useRef, useState } from "react";
+import {
+  type KeyboardEvent,
+  type ReactNode,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { ChatPreviewRow } from "@/components/chat-preview-hover";
 import { ChatProgressIndicator } from "@/components/chat-progress-indicator";
 import {
@@ -39,7 +45,7 @@ interface ChatListItemProps {
   onUnarchive?: () => void;
   project: ProjectHoverContext;
   thread: AgentThread;
-  timeLabel: string;
+  timeLabel: ReactNode;
 }
 
 export function ChatListItem({

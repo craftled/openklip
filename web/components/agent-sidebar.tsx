@@ -21,6 +21,7 @@ import { CollapsibleSidebarSection } from "@/components/collapsible-sidebar";
 import { KeyboardHint } from "@/components/keyboard-hint";
 import { ProjectInlineFolderAction } from "@/components/project-folder-action";
 import { ProjectSwitcher } from "@/components/project-switcher";
+import { RelativeTimeLabel } from "@/components/relative-time-label";
 import { SidebarSettingsPanel } from "@/components/sidebar-settings";
 import { Button } from "@/components/ui/button";
 import {
@@ -45,8 +46,10 @@ import {
 } from "@/lib/agent-preferences";
 import { chatListEmptyLabel, filterThreadsByQuery } from "@/lib/chat-list";
 import type { ProjectHoverContext } from "@/lib/project-context";
+import { createProjectFromVideo } from "@/lib/project-create";
 import type { ProjectListing } from "@/lib/project-list";
 import { deleteProjectApi } from "@/lib/projects-client";
+import { relativeTimeShort } from "@/lib/relative-time";
 import {
   type AppThemeId,
   getAppTheme,
@@ -64,22 +67,6 @@ interface AgentSidebarProps {
   projectHover: ProjectHoverContext;
   projects: ProjectListing[];
   sampleRate: number;
-}
-
-function relativeTime(ms: number): string {
-  const diff = Date.now() - ms;
-  const min = Math.floor(diff / 60_000);
-  if (min < 1) {
-    return "now";
-  }
-  if (min < 60) {
-    return `${min}m`;
-  }
-  const hr = Math.floor(min / 60);
-  if (hr < 24) {
-    return `${hr}h`;
-  }
-  return `${Math.floor(hr / 24)}d`;
 }
 
 export function AgentSidebar({
@@ -129,19 +116,17 @@ export function AgentSidebar({
     [activeSlug, router]
   );
 
-  const onCreateProject = useCallback(
-    async (file: File) => {
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await fetch("/api/projects", { method: "POST", body: fd });
-      const data = (await res.json()) as { error?: string; slug?: string };
-      if (!(res.ok && data.slug)) {
-        throw new Error(data.error ?? `Create project failed (${res.status})`);
-      }
-      router.push(`/?slug=${encodeURIComponent(data.slug)}`);
+  const onProjectCreated = useCallback(
+    (slug: string) => {
+      router.push(`/?slug=${encodeURIComponent(slug)}`);
       router.refresh();
     },
     [router]
+  );
+
+  const onCreateProject = useCallback(
+    (file: File) => createProjectFromVideo(file),
+    []
   );
 
   const onDeleteProject = useCallback(
@@ -190,6 +175,7 @@ export function AgentSidebar({
           activeSlug={activeSlug}
           onCreateProject={onCreateProject}
           onDeleteProject={onDeleteProject}
+          onProjectCreated={onProjectCreated}
           onSelectProject={openProject}
           projects={projects}
         />
@@ -239,7 +225,12 @@ export function AgentSidebar({
                 onSelect={() => void selectThread(t.id)}
                 project={projectHover}
                 thread={t}
-                timeLabel={relativeTime(t.updatedAt)}
+                timeLabel={
+                  <RelativeTimeLabel
+                    format={relativeTimeShort}
+                    ms={t.updatedAt}
+                  />
+                }
               />
             ))}
           </SidebarMenu>
@@ -261,7 +252,12 @@ export function AgentSidebar({
                     onUnarchive={() => void onUnarchiveThread(t.id)}
                     project={projectHover}
                     thread={t}
-                    timeLabel={relativeTime(t.updatedAt)}
+                    timeLabel={
+                      <RelativeTimeLabel
+                        format={relativeTimeShort}
+                        ms={t.updatedAt}
+                      />
+                    }
                   />
                 ))}
               </SidebarMenu>

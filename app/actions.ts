@@ -38,6 +38,7 @@ export async function saveProjectEdits(
     words?: Array<{ id: string; deleted: boolean }>;
     captions?: { enabled?: boolean; maxWords?: number };
     padMs?: number;
+    template?: string | null;
   }
 ): Promise<ActionResult> {
   try {

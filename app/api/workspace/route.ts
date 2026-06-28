@@ -1,8 +1,12 @@
 import { platform } from "node:os";
+import { formatDisplayPath } from "@engine/display-path";
 import { projectsRoot } from "@engine/paths";
 import { pickFolder } from "@engine/pick-folder";
 import { listProjects } from "@engine/projectStore";
-import { writeConfiguredProjectsRoot } from "@engine/workspace-config";
+import {
+  isWorkspaceConfigured,
+  writeConfiguredProjectsRoot,
+} from "@engine/workspace-config";
 import { z } from "zod";
 
 function folderPickerSupported(): boolean {
@@ -19,9 +23,12 @@ const WorkspaceRequestSchema = z
   .strict();
 
 export function GET(): Response {
+  const root = projectsRoot();
   return Response.json({
+    configured: isWorkspaceConfigured(),
+    displayRoot: formatDisplayPath(root),
     pickerSupported: folderPickerSupported(),
-    root: projectsRoot(),
+    root,
   });
 }
 
@@ -45,12 +52,19 @@ export async function POST(req: Request): Promise<Response> {
   try {
     const picked = await pickFolder("Choose a folder to work in");
     if (!picked) {
-      return Response.json({ cancelled: true, root: projectsRoot() });
+      const root = projectsRoot();
+      return Response.json({
+        cancelled: true,
+        displayRoot: formatDisplayPath(root),
+        root,
+      });
     }
     writeConfiguredProjectsRoot(picked);
+    const root = projectsRoot();
     return Response.json({
-      root: projectsRoot(),
+      displayRoot: formatDisplayPath(root),
       projects: listProjects(),
+      root,
     });
   } catch (e) {
     return Response.json({ error: (e as Error).message }, { status: 500 });

@@ -7,57 +7,118 @@
 
 :root,
 .dark {
-  --background-elevated: color-mix(
-    in srgb,
-    var(--foreground) 1.5%,
+  /* Surface ladder (Linear-style parity: same steps, mode-aware base/fg) */
+  --surface-0: var(--background);
+  --surface-1: color-mix(in oklch, var(--foreground) 2.5%, var(--background));
+  --surface-2: color-mix(in oklch, var(--foreground) 4.5%, var(--background));
+  --surface-3: color-mix(in oklch, var(--foreground) 7%, var(--background));
+  --background-elevated: var(--surface-1);
+
+  /* Text hierarchy (matched contrast in light and dark) */
+  --text-primary: var(--foreground);
+  --text-secondary: color-mix(
+    in oklch,
+    var(--foreground) 78%,
     var(--background)
   );
-  --foreground-dimmed: color-mix(
-    in srgb,
-    var(--foreground) 80%,
+  --text-tertiary: color-mix(
+    in oklch,
+    var(--foreground) 55%,
     var(--background)
   );
+  --text-quaternary: color-mix(
+    in oklch,
+    var(--foreground) 40%,
+    var(--background)
+  );
+  --foreground-dimmed: var(--text-secondary);
+
   --user-message-bubble: oklch(from var(--foreground) l c h / 0.05);
   --user-message-bubble-dimmed: oklch(from var(--foreground) l c h / 0.03);
 
   --foreground-1-5: color-mix(
-    in srgb,
+    in oklch,
     var(--foreground) 1.5%,
     var(--background)
   );
-  --foreground-2: color-mix(in srgb, var(--foreground) 2%, var(--background));
-  --foreground-3: color-mix(in srgb, var(--foreground) 3%, var(--background));
-  --foreground-5: color-mix(in srgb, var(--foreground) 5%, var(--background));
-  --foreground-10: color-mix(in srgb, var(--foreground) 10%, var(--background));
-  --foreground-20: color-mix(in srgb, var(--foreground) 20%, var(--background));
-  --foreground-30: color-mix(in srgb, var(--foreground) 30%, var(--background));
-  --foreground-40: color-mix(in srgb, var(--foreground) 40%, var(--background));
-  --foreground-50: color-mix(in srgb, var(--foreground) 50%, var(--background));
-  --foreground-60: color-mix(in srgb, var(--foreground) 60%, var(--background));
-  --foreground-70: color-mix(in srgb, var(--foreground) 70%, var(--background));
-  --foreground-80: color-mix(in srgb, var(--foreground) 80%, var(--background));
-  --foreground-90: color-mix(in srgb, var(--foreground) 90%, var(--background));
-  --foreground-95: color-mix(in srgb, var(--foreground) 95%, var(--background));
+  --foreground-2: color-mix(in oklch, var(--foreground) 2%, var(--background));
+  --foreground-3: color-mix(in oklch, var(--foreground) 3%, var(--background));
+  --foreground-5: color-mix(in oklch, var(--foreground) 5%, var(--background));
+  --foreground-10: color-mix(
+    in oklch,
+    var(--foreground) 10%,
+    var(--background)
+  );
+  --foreground-20: color-mix(
+    in oklch,
+    var(--foreground) 20%,
+    var(--background)
+  );
+  --foreground-30: color-mix(
+    in oklch,
+    var(--foreground) 30%,
+    var(--background)
+  );
+  --foreground-40: color-mix(
+    in oklch,
+    var(--foreground) 40%,
+    var(--background)
+  );
+  --foreground-45: var(--text-quaternary);
+  --foreground-50: color-mix(
+    in oklch,
+    var(--foreground) 50%,
+    var(--background)
+  );
+  --foreground-60: color-mix(
+    in oklch,
+    var(--foreground) 60%,
+    var(--background)
+  );
+  --foreground-70: color-mix(
+    in oklch,
+    var(--foreground) 70%,
+    var(--background)
+  );
+  --foreground-80: color-mix(
+    in oklch,
+    var(--foreground) 80%,
+    var(--background)
+  );
+  --foreground-90: color-mix(
+    in oklch,
+    var(--foreground) 90%,
+    var(--background)
+  );
+  --foreground-95: color-mix(
+    in oklch,
+    var(--foreground) 95%,
+    var(--background)
+  );
 
-  --success-text: color-mix(in oklab, var(--success) 50%, var(--foreground));
+  --success-text: color-mix(in oklch, var(--success) 50%, var(--foreground));
   --destructive-text: color-mix(
-    in oklab,
+    in oklch,
     var(--destructive) 50%,
     var(--foreground)
   );
-  --info-text: color-mix(in oklab, var(--info) 50%, var(--foreground));
+  --info-text: color-mix(in oklch, var(--info) 50%, var(--foreground));
 
   --secondary: oklch(from var(--foreground) l c h / 0.05);
-  --secondary-foreground: var(--foreground);
-  --muted: oklch(from var(--foreground) l c h / 0.05);
-  --muted-foreground: var(--foreground-50);
-  --card: var(--background);
-  --card-foreground: var(--foreground);
-  --popover: var(--background);
-  --popover-foreground: var(--foreground);
-  --border: oklch(from var(--foreground) l c h / 0.05);
-  --input: oklch(from var(--foreground) l c h / 0.1);
-  --ring: oklch(from var(--foreground) l c h / 0.25);
+  --secondary-foreground: var(--text-primary);
+  --muted: var(--surface-2);
+  --muted-foreground: var(--text-tertiary);
+  --card: var(--surface-0);
+  --card-foreground: var(--text-primary);
+  --popover: var(--surface-0);
+  --popover-foreground: var(--text-primary);
+  --primary: var(--accent);
+  --primary-foreground: oklch(1 0 0);
+  --accent-foreground: oklch(1 0 0);
+  --border: oklch(from var(--foreground) l c h / 0.1);
+  --input: oklch(from var(--foreground) l c h / 0.12);
+  --ring: oklch(from var(--foreground) l c h / 0.22);
+  --overlay: oklch(0 0 0 / 0.5);
   --ring-width: 1px;
   --ring-offset: 0px;
 
@@ -66,22 +127,29 @@
 
   /* Timeline / inspector track colors (overridable per theme preset) */
   --live: var(--success);
-  --broll: oklch(0.78 0.09 196);
-  --zoom: oklch(0.84 0.11 84);
-  --title: oklch(0.76 0.13 10);
+  --broll: oklch(0.623 0.178 210);
+  --zoom: oklch(0.676 0.184 75);
+  --title: oklch(0.657 0.183 25);
 
-  --font-sans: var(--font-inter), sans-serif;
-  --font-default: var(--font-inter), sans-serif;
+  --font-sans:
+    var(--font-inter), "SF Pro Display", system-ui, -apple-system, sans-serif;
+  --font-monospace:
+    var(--font-mono-src), ui-monospace, "SF Mono", Menlo, monospace;
+  --font-default: var(--font-sans);
+  --font-settings: "cv01", "ss03";
+  --font-variations: "opsz" auto;
 
-  --text-ui: 0.8667rem;
-  --text-caption: 0.733rem;
+  --text-ui: 0.9375rem;
+  --text-caption: 0.8125rem;
   --font-size-base: 15px;
   --font-weight-normal: 400;
-  --font-weight-medium: 500;
-  --font-weight-semibold: 600;
-  --leading-ui: 1.45;
+  --font-weight-medium: 510;
+  --font-weight-semibold: 590;
+  --font-weight-bold: 680;
+  --leading-ui: 1.6;
   --leading-tight: 1.25;
   --tracking-ui: -0.011em;
+  --tracking-small: -0.013em;
   --tracking-label: 0.04em;
   --radius: 0.5rem;
   --spacing: 0.25rem;
@@ -125,6 +193,7 @@ html[data-theme-mismatch]::before {
   --color-foreground-20: var(--foreground-20);
   --color-foreground-30: var(--foreground-30);
   --color-foreground-40: var(--foreground-40);
+  --color-foreground-45: var(--foreground-45);
   --color-foreground-50: var(--foreground-50);
   --color-foreground-60: var(--foreground-60);
   --color-foreground-70: var(--foreground-70);
@@ -139,10 +208,20 @@ html[data-theme-mismatch]::before {
   --color-broll: var(--broll);
   --color-zoom: var(--zoom);
   --color-title: var(--title);
-  --color-primary: var(--foreground);
-  --color-primary-foreground: var(--background);
-  --color-sidebar: var(--background);
-  --color-sidebar-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+  --color-text-quaternary: var(--text-quaternary);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-overlay: var(--overlay);
+
+  --color-sidebar: var(--surface-0);
+  --color-sidebar-foreground: var(--text-primary);
   --color-sidebar-primary: var(--foreground);
   --color-sidebar-primary-foreground: var(--background);
   --color-sidebar-accent: var(--muted);
@@ -166,6 +245,10 @@ html[data-theme-mismatch]::before {
   --color-md-counters: var(--md-counters);
 
   --font-sans: var(--font-default);
+  --font-mono: var(--font-monospace);
+  --font-weight-medium: 510;
+  --font-weight-semibold: 590;
+  --font-weight-bold: 680;
   --text-ui: var(--text-ui);
   --text-caption: var(--text-caption);
 
@@ -193,9 +276,13 @@ html[data-theme-mismatch]::before {
   html {
     font-family: var(--font-default);
     font-size: var(--font-size-base);
+    font-variation-settings: var(--font-variations);
+    font-weight: var(--font-weight-normal);
     font-optical-sizing: auto;
-    font-feature-settings: "cv01", "cv02", "cv03", "cv04", "case";
+    font-feature-settings: var(--font-settings);
+    color: var(--text-primary);
     letter-spacing: var(--tracking-ui);
+    background: var(--surface-0);
   }
 
   html,
@@ -208,11 +295,15 @@ html[data-theme-mismatch]::before {
   body {
     font-family: var(--font-default);
     font-weight: var(--font-weight-normal);
+    font-feature-settings: var(--font-settings);
+    font-variation-settings: var(--font-variations);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    -webkit-text-size-adjust: none;
     line-height: var(--leading-ui);
-    color: var(--foreground);
-    background: var(--background);
+    color: var(--text-primary);
+    background: var(--surface-0);
   }
 
   h1,
@@ -235,8 +326,13 @@ html[data-theme-mismatch]::before {
   kbd,
   pre,
   samp {
-    font-family: var(--font-default);
-    font-size: 0.933em;
+    font-family: var(--font-monospace);
+    font-size: 0.9em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  code {
+    font-weight: var(--font-weight-medium);
   }
 
   ::-webkit-scrollbar {
@@ -328,12 +424,19 @@ html[data-theme-mismatch]::before {
     line-height: var(--leading-ui);
   }
 
+  .text-code {
+    font-family: var(--font-monospace);
+    font-size: var(--text-caption);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+
   .popover-styled {
     color: var(--foreground);
     background: var(--background);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    box-shadow: none;
+    box-shadow: 0 1px 2px oklch(from var(--foreground) l c h / 0.04);
   }
 
   [data-sidebar-instant] [data-slot="sidebar-gap"],

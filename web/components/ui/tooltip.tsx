@@ -5,9 +5,12 @@ import type * as React from "react";
 
 import { cn } from "@/lib/utils";
 
+/** Ms to skip open delay when moving between adjacent tooltip triggers. */
+export const TOOLTIP_SKIP_DELAY_MS = 300;
+
 function TooltipProvider({
   delayDuration = 400,
-  skipDelayDuration = 0,
+  skipDelayDuration = TOOLTIP_SKIP_DELAY_MS,
   ...props
 }: React.ComponentProps<typeof TooltipPrimitive.Provider>) {
   return (

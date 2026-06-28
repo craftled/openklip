@@ -4,7 +4,7 @@
 
 OpenKlip is a lean, local-first **agent-native video toolchain**: external agents drive the edit loop via CLI; humans review in the browser. Both read/write the same `project.json` on disk.
 
-**Current release:** v0.7.0 (2026-06-28). Working local editor: cut → captions → b-roll → vignette → push-in zoom → titles → export; cinema player; center chat panel; export dialog; macOS workspace folder picker; multi-agent filler cuts; sidebar asset bin with folder sync; 303 tests; MIT.
+**Current release:** v0.8.0 (2026-06-28). Working local editor: cut → captions → b-roll → vignette → push-in zoom → titles → export; cinema player; center chat panel with skills slash menu; MCP agent tools; edit templates; export dialog; macOS workspace folder picker; multi-agent filler cuts; sidebar asset bin with folder sync; 387 tests; MIT.
 
 Preview cuts get a Glimm WebGL sweep in the browser; exported MP4s still hard-cut until the ffmpeg transition graph lands.
 
@@ -88,7 +88,7 @@ Preview cuts get a Glimm WebGL sweep in the browser; exported MP4s still hard-cu
 - [x] End-to-end agent-loop demo (`bun run agent-demo`: phrase list → cut → status → export).
 - [x] `openklip doctor` env/project health check (ffmpeg, Whisper, proxy/source/asset media).
 - [x] Multi-agent filler-cut driver (Claude, Codex, Cursor, Grok).
-- [ ] Optional MCP server exposing the editing tools (registry manifest exists; wiring remains).
+- [x] MCP server exposing the unified agent tool manifest (`src/agent-tools.ts`, `openklip mcp`, `.cursor/mcp.json`).
 
 ### Infra
 

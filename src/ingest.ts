@@ -5,6 +5,7 @@ import { type Project, ProjectSchema, SAMPLE_RATE, type Word } from "./edl.ts";
 import { FFMPEG, probe, run } from "./ffmpeg.ts";
 import { assertProjectCanBeIngested } from "./ingest-guard.ts";
 import { projectPaths, slugFromVideo } from "./paths.ts";
+import { defaultTemplateId } from "./templates.ts";
 
 interface RawChunk {
   end: number | null;
@@ -161,6 +162,7 @@ export async function ingest(
     height: meta.height,
     durationSamples: Math.round(meta.durationSec * SAMPLE_RATE),
     padMs: 50,
+    template: defaultTemplateId(),
     captions: { enabled: true, maxWords: 6 },
     words,
   });

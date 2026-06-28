@@ -1,0 +1,55 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import {
+  buildSkillCatalog,
+  buildSkillMessage,
+  filterSkills,
+  parseSlashQuery,
+} from "../web/lib/skills-catalog.ts";
+
+test("parseSlashQuery detects leading slash queries", () => {
+  assert.deepEqual(parseSlashQuery("/filler"), { query: "filler" });
+  assert.deepEqual(parseSlashQuery("/talking-head"), { query: "talking-head" });
+  assert.equal(parseSlashQuery("hello /filler"), null);
+  assert.equal(parseSlashQuery("filler"), null);
+});
+
+test("buildSkillCatalog merges workflow and template skills", () => {
+  const catalog = buildSkillCatalog([
+    {
+      id: "talking-head",
+      label: "Talking head",
+      description: "Solo short-form edit playbook.",
+    },
+  ]);
+  assert.ok(catalog.some((s) => s.id === "filler" && s.kind === "workflow"));
+  assert.ok(
+    catalog.some(
+      (s) => s.id === "template:talking-head" && s.kind === "template"
+    )
+  );
+});
+
+test("filterSkills matches title slash and description", () => {
+  const catalog = buildSkillCatalog([]);
+  const filtered = filterSkills(catalog, "filler");
+  assert.ok(filtered.some((s) => s.id === "filler"));
+  assert.equal(filterSkills(catalog, "zzzz-not-found").length, 0);
+});
+
+test("buildSkillMessage composes invoke text with optional follow-up", () => {
+  const skill = {
+    id: "filler",
+    title: "Cut filler words",
+    description: "",
+    slash: "filler",
+    invokeText: "Cut all filler words",
+    kind: "workflow" as const,
+  };
+  assert.equal(buildSkillMessage(skill), "Cut all filler words");
+  assert.equal(
+    buildSkillMessage(skill, "focus on um and uh"),
+    "Cut all filler words. focus on um and uh"
+  );
+  assert.equal(buildSkillMessage(skill, "   "), "Cut all filler words");
+});

@@ -29,12 +29,23 @@ import {
   renameThreadApi,
   setActiveThreadApi,
 } from "@/lib/agent-threads-client";
+import {
+  toastChatArchiveFailed,
+  toastChatDeleteFailed,
+  toastChatEnsureFailed,
+  toastChatRenameFailed,
+  toastChatSendFailed,
+  toastChatUnarchiveFailed,
+  toastPromise,
+} from "@/lib/app-toast";
 import { resolveThreadAfterRemove } from "@/lib/chat-list";
+import { findFillerPromiseMessages } from "@/lib/toast-notifications";
 import {
   type AgentStatus,
   getAgentStatuses,
   suggestFillerCuts,
 } from "../../app/agent-actions.ts";
+import type { EditorChatsSnapshot } from "../../app/lib/editor-chats.ts";
 
 interface AgentChatContextValue {
   activeSlug: string;
@@ -66,15 +77,25 @@ const AgentChatContext = createContext<AgentChatContextValue | null>(null);
 export function AgentChatProvider({
   activeSlug,
   children,
+  initialChats,
+  projectTemplate,
 }: {
   activeSlug: string;
   children: ReactNode;
+  initialChats?: EditorChatsSnapshot;
+  projectTemplate?: string;
 }) {
   const router = useRouter();
-  const [threads, setThreads] = useState<AgentThread[]>([]);
-  const [archivedThreads, setArchivedThreads] = useState<AgentThread[]>([]);
-  const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
-  const [chatsLoading, setChatsLoading] = useState(true);
+  const [threads, setThreads] = useState<AgentThread[]>(
+    () => initialChats?.threads ?? []
+  );
+  const [archivedThreads, setArchivedThreads] = useState<AgentThread[]>(
+    () => initialChats?.archived ?? []
+  );
+  const [activeThreadId, setActiveThreadId] = useState<string | null>(
+    () => initialChats?.activeThreadId ?? null
+  );
+  const [chatsLoading, setChatsLoading] = useState(() => initialChats == null);
   const [defaultAgent, setDefaultAgent] =
     useState<AgentModelId>(DEFAULT_AGENT_MODEL);
   const [runningThreadId, setRunningThreadId] = useState<string | null>(null);
@@ -167,41 +188,60 @@ export function AgentChatProvider({
 
   const onRenameThread = useCallback(
     async (threadId: string, title: string) => {
-      await renameThreadApi(activeSlug, threadId, title);
-      await refreshThreads();
+      try {
+        await renameThreadApi(activeSlug, threadId, title);
+        await refreshThreads();
+      } catch (e) {
+        toastChatRenameFailed((e as Error).message);
+      }
     },
     [activeSlug, refreshThreads]
   );
 
   const onArchiveThread = useCallback(
     async (threadId: string) => {
-      await archiveThreadApi(activeSlug, threadId, true);
-      await refreshThreads();
-      await focusThreadAfterRemoval(threadId);
+      try {
+        await archiveThreadApi(activeSlug, threadId, true);
+        await refreshThreads();
+        await focusThreadAfterRemoval(threadId);
+      } catch (e) {
+        toastChatArchiveFailed((e as Error).message);
+      }
     },
     [activeSlug, focusThreadAfterRemoval, refreshThreads]
   );
 
   const onUnarchiveThread = useCallback(
     async (threadId: string) => {
-      await archiveThreadApi(activeSlug, threadId, false);
-      await refreshThreads();
+      try {
+        await archiveThreadApi(activeSlug, threadId, false);
+        await refreshThreads();
+      } catch (e) {
+        toastChatUnarchiveFailed((e as Error).message);
+      }
     },
     [activeSlug, refreshThreads]
   );
 
   const onDeleteThread = useCallback(
     async (threadId: string) => {
-      await deleteThreadApi(activeSlug, threadId);
-      await refreshThreads();
-      await focusThreadAfterRemoval(threadId);
+      try {
+        await deleteThreadApi(activeSlug, threadId);
+        await refreshThreads();
+        await focusThreadAfterRemoval(threadId);
+      } catch (e) {
+        toastChatDeleteFailed((e as Error).message);
+      }
     },
     [activeSlug, focusThreadAfterRemoval, refreshThreads]
   );
 
   useEffect(() => {
     let alive = true;
-    setChatsLoading(true);
+    const hydrated = initialChats != null;
+    if (!hydrated) {
+      setChatsLoading(true);
+    }
     void (async () => {
       try {
         await ensureThreadApi(activeSlug);
@@ -221,7 +261,7 @@ export function AgentChatProvider({
     return () => {
       alive = false;
     };
-  }, [activeSlug]);
+  }, [activeSlug, initialChats]);
 
   const activeThread = useMemo(
     () =>
@@ -253,14 +293,16 @@ export function AgentChatProvider({
           activeSlug,
           threadId,
           "assistant",
-          assistantHint(activeSlug, trimmed)
+          assistantHint(activeSlug, trimmed, projectTemplate)
         );
         await refreshThreads();
+      } catch (e) {
+        toastChatSendFailed((e as Error).message);
       } finally {
         setRunningThreadId(null);
       }
     },
-    [activeSlug, activeThreadId, refreshThreads]
+    [activeSlug, activeThreadId, projectTemplate, refreshThreads]
   );
 
   const onFindFiller = useCallback(async () => {
@@ -277,13 +319,22 @@ export function AgentChatProvider({
         }
         setThreads(ensured.threads);
         setActiveThreadId(threadId);
-      } catch {
+      } catch (e) {
+        toastChatEnsureFailed((e as Error).message);
         return;
       }
     }
     setRunningThreadId(threadId);
     try {
-      const res = await suggestFillerCuts(activeSlug, agent);
+      const run = (async () => {
+        const result = await suggestFillerCuts(activeSlug, agent);
+        if (!result.ok) {
+          throw new Error(result.error);
+        }
+        return result;
+      })();
+      void toastPromise(run, findFillerPromiseMessages(providerLabel));
+      const res = await run;
       await appendMessageApi(
         activeSlug,
         threadId,
@@ -294,13 +345,11 @@ export function AgentChatProvider({
         activeSlug,
         threadId,
         "assistant",
-        res.ok
-          ? `${providerLabel} cut ${res.cut} filler word(s)${
-              res.words.length
-                ? `: ${res.words.map((w) => `${w.id} "${w.text}"`).join(", ")}`
-                : " : none found"
-            }`
-          : `Error: ${res.error}`
+        `${providerLabel} cut ${res.cut} filler word(s)${
+          res.words.length
+            ? `: ${res.words.map((w) => `${w.id} "${w.text}"`).join(", ")}`
+            : " : none found"
+        }`
       );
       await refreshThreads();
       router.refresh();

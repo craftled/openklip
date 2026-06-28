@@ -2,6 +2,7 @@
 
 import { FolderOpen } from "lucide-react";
 import { type MouseEvent, useState } from "react";
+import { toastRevealError } from "@/lib/app-toast";
 import {
   type RevealTarget,
   revealProjectFolderApi,
@@ -19,7 +20,10 @@ function useRevealProjectPath(slug: string, target: RevealTarget = "project") {
     }
     setOpening(true);
     try {
-      await revealProjectFolderApi(slug, target);
+      const result = await revealProjectFolderApi(slug, target);
+      if (!result.ok) {
+        toastRevealError(result.error);
+      }
     } finally {
       setOpening(false);
     }

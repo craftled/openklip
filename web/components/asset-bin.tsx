@@ -10,9 +10,17 @@ import {
 } from "react";
 import { AssetPreviewRow } from "@/components/asset-preview-hover";
 import { Badge } from "@/components/ui/badge";
+import {
+  toastAssetRemoved,
+  toastAssetRemoveFailed,
+  toastAssetsSynced,
+  toastAssetUploadFailed,
+  toastAssetUploadSuccess,
+} from "@/lib/app-toast";
 import type { AssetBinUpdate } from "@/lib/asset-bin-update";
 import { deleteAssetApi } from "@/lib/asset-bin-update";
 import { syncProjectAssets, uploadProjectAssets } from "@/lib/asset-upload";
+import { countNewAssetIds } from "@/lib/toast-notifications";
 import { cn } from "@/lib/utils";
 
 export type { AssetBinUpdate } from "@/lib/asset-bin-update";
@@ -159,10 +167,11 @@ export function AssetBin({
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  const knownAssetIdsRef = useRef<Set<string>>(new Set());
+  const initialSyncDoneRef = useRef(false);
   const syncingRef = useRef(false);
   const syncFromFolder = useCallback(async () => {
     if (syncingRef.current) {
@@ -172,7 +181,18 @@ export function AssetBin({
     try {
       const update = await syncProjectAssets(slug);
       if (update) {
+        const newIds = countNewAssetIds(
+          knownAssetIdsRef.current,
+          update.assets
+        );
+        for (const asset of update.assets) {
+          knownAssetIdsRef.current.add(asset.id);
+        }
         onAssetsUpdated(update);
+        if (initialSyncDoneRef.current && newIds.length > 0) {
+          toastAssetsSynced(newIds.length);
+        }
+        initialSyncDoneRef.current = true;
       }
     } catch {
       // folder sync is best-effort
@@ -180,6 +200,11 @@ export function AssetBin({
       syncingRef.current = false;
     }
   }, [onAssetsUpdated, slug]);
+
+  useEffect(() => {
+    knownAssetIdsRef.current = new Set(assets.map((asset) => asset.id));
+    initialSyncDoneRef.current = false;
+  }, [slug]);
 
   useEffect(() => {
     void syncFromFolder();
@@ -199,15 +224,15 @@ export function AssetBin({
         return;
       }
       setUploading(true);
-      setError(null);
       try {
         const latest = await uploadProjectAssets(slug, files);
         if (latest.length > 0) {
           onAssetsUpdated({ assets: latest });
         }
         await syncFromFolder();
+        toastAssetUploadSuccess(list.length);
       } catch (e) {
-        setError((e as Error).message);
+        toastAssetUploadFailed((e as Error).message);
       } finally {
         setUploading(false);
       }
@@ -218,7 +243,7 @@ export function AssetBin({
   const onDeleteAsset = useCallback(
     async (assetId: string) => {
       setDeletingId(assetId);
-      setError(null);
+      const asset = assets.find((a) => a.id === assetId);
       try {
         const result = await deleteAssetApi(slug, assetId);
         if ("error" in result) {
@@ -226,8 +251,9 @@ export function AssetBin({
         }
         onAssetsUpdated(result);
         setConfirmDeleteId(null);
+        toastAssetRemoved(asset?.name);
       } catch (e) {
-        setError((e as Error).message);
+        toastAssetRemoveFailed((e as Error).message);
       } finally {
         setDeletingId(null);
       }
@@ -293,12 +319,6 @@ export function AssetBin({
           type="file"
         />
       </button>
-
-      {error && (
-        <p className="px-1 pb-2 text-destructive text-xs">
-          {error.startsWith("Upload failed") ? error : `Asset error: ${error}`}
-        </p>
-      )}
 
       <div className="flex flex-col gap-2 pb-1">
         {(Object.keys(KIND_META) as AssetKind[]).map((kind) => {

@@ -32,3 +32,11 @@ export function writeConfiguredProjectsRoot(root: string): void {
   mkdirSync(configDir(), { recursive: true });
   writeFileSync(configPath(), `${resolved}\n`, "utf8");
 }
+
+/** True when the projects root was set explicitly (env or folder picker). */
+export function isWorkspaceConfigured(): boolean {
+  if (process.env.OPENKLIP_PROJECTS_ROOT) {
+    return true;
+  }
+  return readConfiguredProjectsRoot() !== null;
+}

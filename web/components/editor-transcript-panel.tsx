@@ -14,22 +14,18 @@ interface TranscriptWord {
 
 interface EditorTranscriptPanelProps {
   curSample: number;
-  exportMsg: string | null;
   inBroll: (word: TranscriptWord) => boolean;
   inZoom: (word: TranscriptWord) => boolean;
   onWordClick: (index: number, event: MouseEvent<HTMLSpanElement>) => void;
-  saveError: string | null;
   selRange: readonly [number, number] | null;
   words: TranscriptWord[];
 }
 
 export function EditorTranscriptPanel({
   curSample,
-  exportMsg,
   inBroll,
   inZoom,
   onWordClick,
-  saveError,
   selRange,
   words,
 }: EditorTranscriptPanelProps) {
@@ -72,16 +68,6 @@ export function EditorTranscriptPanel({
             );
           })}
         </p>
-        {exportMsg && (
-          <p className="mt-6 max-w-[60ch] break-words border-foreground/10 border-t pt-3 text-muted-foreground text-xs">
-            {exportMsg}
-          </p>
-        )}
-        {saveError && (
-          <p className="mt-2 max-w-[60ch] break-words text-destructive text-xs">
-            Save failed: {saveError}
-          </p>
-        )}
       </div>
     </ScrollArea>
   );

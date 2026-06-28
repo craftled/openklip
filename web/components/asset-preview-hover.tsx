@@ -112,7 +112,7 @@ function AssetPreviewPanel({
 
   return createPortal(
     <div
-      className="fixed z-[100] w-48 overflow-hidden rounded-lg border border-border bg-background shadow-lg"
+      className="fixed z-[100] w-48 overflow-hidden rounded-lg border border-border bg-background shadow-sm"
       onPointerEnter={onPointerEnter}
       onPointerLeave={onPointerLeave}
       style={{ left: position.left, top: position.top }}

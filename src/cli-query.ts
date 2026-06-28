@@ -1,0 +1,159 @@
+import type { Project } from "./edl.ts";
+import {
+  grepTranscript,
+  listOverlays,
+  listRanges,
+  phraseSpan,
+  projectStatus,
+  wordSpan,
+} from "./query.ts";
+
+function jsonOut(value: unknown): string {
+  return `${JSON.stringify(value, null, 2)}\n`;
+}
+
+export function formatGrepHuman(
+  result: ReturnType<typeof grepTranscript>
+): string {
+  if (result.matches.length === 0) {
+    return `no matches for "${result.phrase}"\n`;
+  }
+  const lines = result.matches.map(
+    (m) =>
+      `  ${m.fromSec.toFixed(3)}s-${m.toSec.toFixed(3)}s  ${m.ids.join(", ")}  ${m.text}`
+  );
+  return `${result.matches.length} match(es) for "${result.phrase}":\n${lines.join("\n")}\n`;
+}
+
+export function formatWordSpanHuman(
+  result: ReturnType<typeof wordSpan>
+): string {
+  const lines = result.words.map(
+    (w) =>
+      `${String(w.index).padStart(4)}  ${w.id.padEnd(6)}  ${w.startSec.toFixed(3)}s  ${w.text}${w.deleted ? "  [cut]" : ""}`
+  );
+  return `span ${result.token} (${result.words.length} words):\n${lines.join("\n")}\n`;
+}
+
+export function formatPhraseSpanHuman(
+  result: ReturnType<typeof phraseSpan>,
+  phrase: string
+): string {
+  if (!result.matched) {
+    return `no match for "${phrase}"\n`;
+  }
+  return `phrase "${phrase}" → ${result.fromSec.toFixed(3)}s-${result.toSec.toFixed(3)}s  ${result.ids.join(", ")}\n`;
+}
+
+export function formatRangesHuman(
+  ranges: ReturnType<typeof listRanges>
+): string {
+  if (ranges.length === 0) {
+    return "no kept ranges\n";
+  }
+  const lines = ranges.map(
+    (r, i) =>
+      `  ${i + 1}. ${r.startSec.toFixed(3)}s-${r.endSec.toFixed(3)}s (${(r.endSec - r.startSec).toFixed(3)}s)`
+  );
+  return `${ranges.length} kept range(s):\n${lines.join("\n")}\n`;
+}
+
+export function runTranscriptGrep(
+  project: Project,
+  phrase: string,
+  options: { all?: boolean; json?: boolean }
+): string {
+  const result = grepTranscript(project, phrase, { all: options.all });
+  return options.json ? jsonOut(result) : formatGrepHuman(result);
+}
+
+export function runTranscriptSpan(
+  project: Project,
+  token: string,
+  options: { context?: number; json?: boolean }
+): string {
+  const result = wordSpan(project, token, { context: options.context });
+  return options.json ? jsonOut(result) : formatWordSpanHuman(result);
+}
+
+export function runTranscriptPhrase(
+  project: Project,
+  phrase: string,
+  options: { json?: boolean }
+): string {
+  const result = phraseSpan(project, phrase);
+  return options.json
+    ? jsonOut({ phrase, ...result })
+    : formatPhraseSpanHuman(result, phrase);
+}
+
+export function runRanges(
+  project: Project,
+  options: { json?: boolean }
+): string {
+  const ranges = listRanges(project);
+  return options.json ? jsonOut({ ranges }) : formatRangesHuman(ranges);
+}
+
+export function runOverlays(
+  project: Project,
+  options: { json?: boolean }
+): string {
+  const overlays = listOverlays(project);
+  if (options.json) {
+    return jsonOut(overlays);
+  }
+  const lines: string[] = [];
+  lines.push(`b-roll (${overlays.broll.length}):`);
+  for (const b of overlays.broll) {
+    lines.push(
+      `  ${b.id}  asset ${b.assetId}  ${b.fromSec.toFixed(3)}s-${b.toSec.toFixed(3)}s`
+    );
+  }
+  lines.push(`titles (${overlays.titles.length}):`);
+  for (const t of overlays.titles) {
+    const preview = t.text.replace(/\n/g, "\\n").slice(0, 40);
+    lines.push(
+      `  ${t.id}  ${t.position}  ${t.fromSec.toFixed(3)}s-${t.toSec.toFixed(3)}s  "${preview}"`
+    );
+  }
+  lines.push(`zooms (${overlays.zooms.length}):`);
+  for (const z of overlays.zooms) {
+    lines.push(
+      `  ${z.id}  ${z.scale}x  ramp ${z.rampSec}s  ${z.fromSec.toFixed(3)}s-${z.toSec.toFixed(3)}s`
+    );
+  }
+  lines.push(`stills (${overlays.stills.length}):`);
+  for (const s of overlays.stills) {
+    lines.push(
+      `  ${s.id}  asset ${s.assetId}  ${s.fromSec.toFixed(3)}s-${s.toSec.toFixed(3)}s`
+    );
+  }
+  return `${lines.join("\n")}\n`;
+}
+
+export function runStatusJson(project: Project): string {
+  return jsonOut(projectStatus(project));
+}
+
+// Minimum overlay duration when placing from a short spoken phrase (seconds).
+const MIN_PHRASE_OVERLAY_SEC = 2;
+
+export function spanForPhraseOverlay(
+  project: Project,
+  phrase: string
+): { fromSec: number; matched: boolean; toSec: number } {
+  const span = phraseSpan(project, phrase);
+  if (!span.matched) {
+    return { matched: false, fromSec: 0, toSec: 0 };
+  }
+  const dur = span.toSec - span.fromSec;
+  const toSec =
+    dur >= MIN_PHRASE_OVERLAY_SEC
+      ? span.toSec
+      : Math.min(
+          project.durationSamples / project.sampleRate,
+          span.fromSec + MIN_PHRASE_OVERLAY_SEC
+        );
+  return { matched: true, fromSec: span.fromSec, toSec };
+}
