@@ -2,13 +2,25 @@
 
 ## 0.8.8.0 - 2026-06-28
 
-Grade control room: continuous color knobs on top of the base grade, with a live single-frame preview, across CLI, GUI, and MCP.
+Two features land together, both with full CLI / GUI / MCP parity: a live color grade "control room" and native HTML/CSS graphics templates. This release also unbreaks the editor bundle and carries the v0.8.7.1 typecheck hotfix onto `main` (which had been sitting on the broken v0.8.7.0 build).
 
 ### Added
-- **Color adjust (`look.color`)**: five continuous knobs layered on the named grade: temperature, tint, brightness, contrast, saturation. Maps to a deterministic ffmpeg chain: colorbalance (temp/tint), then eq (contrast/brightness/saturation), in the deck's order. Absent or all-neutral emits no filter and is dropped from the EDL.
+
+**Grade control room (color grading)**
+- **Color adjust (`look.color`)**: five continuous knobs layered on the named grade: temperature, tint, brightness, contrast, saturation. Maps to a deterministic ffmpeg chain: colorbalance (temp/tint), then eq (contrast/brightness/saturation), in the export filtergraph order. Absent or all-neutral emits no filter and is dropped from the EDL.
 - **`openklip look <slug> color`**: set any subset of knobs (`--temp`, `--tint`, `--bright`, `--contrast`, `--sat`) or `--reset`. Only the passed knobs change. Mirrored as the `look-color` registry action, so the GUI and an MCP agent drive the same mutation.
 - **Grade control room (GUI)**: a dialog with the five knobs as live sliders, a base-grade picker, and hold-to-compare. Each slider previews on a real frame and writes `project.json` on release: no "copy a prompt" round trip, unlike the source deck. The agent can set the look from chat; the human nudges here.
 - **Preview-frame endpoint** (`GET /api/projects/<slug>/preview-frame`): renders one graded frame (LUT then grade then color, the exact export order) so tuning is instant. Query overrides let the GUI preview unsaved values; with no overrides it shows the committed look.
+
+**Native graphics templates**
+- **Graphic overlays (`project.graphics`)**: native HTML/CSS graphic templates composited over a source-time span, keyed to a sample range and a track. ffmpeg stays the master compositor via the render seam (`src/graphic-render.ts`); the HTML engine only emits an overlay asset.
+- **Built-in templates** (under `graphics/`): `title-card`, `lower-third`, `kinetic-caption`, each with a declared param manifest (caller params win; unset params fall back to the manifest defaults).
+- **`openklip graphic-add | graphic-set | graphic-rm`**: add, patch, or remove a graphic overlay with `--param key=value`, a span, and `--track broll|title|zoom`. Mirrored as the `graphic-add` / `graphic-set` / `graphic-rm` registry actions (CLI / GUI / MCP), with a GUI overlay renderer and runtime.
+
+### Fixed
+- **Editor rendered blank** under the graphics track: the pure `summarize` / `ProjectSummary` were split into a client-safe `src/summary.ts`, so the browser bundle no longer drags `src/actions.ts` → `src/graphics.ts` (`node:fs`) into the client.
+- **Turbopack could not bundle the graphics renderer**: `@hyperframes/producer` (which ships an `esbuild` native binary and non-JS assets) and `esbuild` are now in `serverExternalPackages`, so they load at runtime on the server instead of being traced.
+- Carries the **v0.8.7.1 typecheck hotfix** (`web/lib/timeline-zoom.ts` `sampleToPx`) onto `main`, which had shipped broken in the v0.8.7.0 merge.
 
 ## 0.8.7.1 - 2026-06-28
 
