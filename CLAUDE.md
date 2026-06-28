@@ -1,6 +1,6 @@
 # OpenKlip - agent skill
 
-OpenKlip is a local-first, agent-native video editor: you **edit video by editing text**.
+OpenKlip is a local-first, agent-native video editor: external agents run the edit loop via CLI; the browser reviews the same `project.json`.
 
 ## The file model (read this first)
 

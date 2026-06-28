@@ -1,149 +1,148 @@
 # OpenKlip
 
-**Edit video by editing text.**
+**Video editing your agent can drive.**
 
-OpenKlip is a local-first, agent-native video editor for talking-head content. You cut filler, place b-roll, add titles and zooms, and export MP4 — by clicking words in a transcript or by running CLI commands an external agent can drive. No database, no cloud, no bundled LLM.
+OpenKlip is a local-first, agent-native editor for talking-head video. An external agent (Cursor, Claude Code, Codex, your scripts) runs the edit loop through CLI commands; the browser is where you review the cut, tweak overlays, and export. Every project is plain files — `project.json` is the contract between agent and editor. No bundled LLM, no database, no cloud.
+
+The transcript is how the edit is *represented*: words, timestamps, and a `deleted` flag agents can read and mutate deterministically. That is the mechanism, not the product category.
 
 ---
 
 ## Philosophy
 
-Most video tools treat the timeline as the source of truth. OpenKlip treats the **transcript** as truth: if you can read what was said, you can edit what was kept.
+Most video tools assume a human at the timeline and bolt on “AI features.” OpenKlip assumes an **agent at the terminal** and a human at the browser — both on the same folder.
 
-That inversion matters for two audiences:
+- **Agents** read `openklip transcript`, cut filler, place b-roll, check `openklip status`, run `openklip export`. The action registry (`openklip actions --json`) is the capability manifest.
+- **Humans** preview the result, click words to adjust cuts, drag overlays in the inspector, drop assets into `assets/`.
 
-- **Humans** get a familiar text surface — click a word to cut it, search for a phrase, skim the whole take in seconds.
-- **Agents** get a deterministic file loop — read transcript, decide cuts, mutate one JSON document, verify, export. No screen scraping, no proprietary project format.
-
-The editor is a **view** over an edit, not a walled garden. The browser and terminal are peers.
+The GUI is not a walled garden. It is a peer surface on the same `project.json` the CLI writes.
 
 ---
 
 ## Principles
 
-**Local-first.** Projects are plain folders on disk. Your media never leaves your machine unless you put it there. Transcription runs locally (Transformers.js + Whisper). ffmpeg/ffprobe ship with the repo.
+These follow from how the repo is actually built:
 
-**One edit, one file.** `project.json` is the EDL — words, cuts, asset registry, overlays, captions, look flags. Everything under `working/` and `output/` is **derived** and safe to regenerate. You never hand-edit generated paths to “fix” an edit; you change `project.json` (via GUI or CLI) and re-export.
+**Local-first.** Projects live under `projects/<slug>/` as plain files. Ingest transcribes with Transformers.js (Whisper). Export and proxies use bundled `ffmpeg-static` / `ffprobe-static`.
 
-**CLI ↔ GUI parity.** Every mutation the GUI can make routes through the same action registry the CLI uses. An agent running `openklip cut` sees the same result as a click in the browser after refresh. If a command exists, use it — don’t patch JSON by hand.
+**One edit, one file.** `project.json` holds words, cuts, the asset registry, b-roll/title/zoom/still overlays, captions, and look flags. Paths under `working/` and `output/` are derived (proxy, transcript, ffmpeg asset proxies, `chats.json`, export).
 
-**Agent-native, not agent-bundled.** OpenKlip ships no LLM. Cursor, Claude Code, Codex, or your own script drives the loop. The sidebar suggests CLI steps; you (or your agent) run them against the same project files.
+**Same file, two surfaces.** The CLI applies edits through `runAction()` in `src/registry.ts`. The GUI applies edits through Next.js server actions in `app/actions.ts` (word toggles, overlays, look). Both persist to the same `project.json`. Reload the browser after external CLI edits.
 
-**Sample-accurate time.** Edits are stored on a 48 kHz integer-sample grid. Overlays and cuts align to what was actually spoken, not approximate frame boundaries.
+**Agent-native, not agent-bundled.** No in-app LLM. The agent sidebar maps chat text to suggested `openklip …` command sequences (`web/lib/skill-router.ts`). Optional: wire an external agent (Cursor, Claude Code, Codex) or run `bun run agent-demo`.
 
-**Flat user surface, layered guts.** You drop files into `assets/` and edit `project.json`. Proxies, transcripts, chat history, and scratch files live under `working/`. Exports land in `output/`. No legacy layouts, no migration shims — we iterate fast toward MVP.
+**Sample-accurate time.** Word and overlay times are stored as integer samples at 48 kHz. CLI commands take seconds for overlay spans and convert internally.
 
-**Cut thoughts, not syllables.** Removing a single word mid-sentence usually sounds wrong. Prefer cutting whole phrases or sentences; the tools support word-level precision when you need it, but the workflow nudges toward clean jumps.
+**User drop zone.** Original assets you add land in `assets/` (upload, drag-drop, or copy into the folder). Generated proxies land in `working/assets/`. The asset API can sync new files from `assets/` (`?sync=1`).
 
 ---
 
 ## Project layout
 
-Each project is a directory under `projects/<slug>/` (override the root with `OPENKLIP_PROJECTS_ROOT`):
+Default root: `projects/` (override with `OPENKLIP_PROJECTS_ROOT`).
 
 ```text
 projects/<slug>/
-  project.json       ← the edit (words, cuts, overlays, captions, asset registry)
-  assets/            ← your drop zone: drop b-roll, music, stills here (flat)
-  working/           ← generated: proxy, transcript, asset proxies, chats, frames…
-  output/            ← rendered export (out.mp4)
+  project.json       ← edit (EDL)
+  assets/            ← user originals (flat)
+  working/           ← generated cache
+  output/out.mp4     ← export
 ```
 
-| Path | Role |
+| Path | In code |
 | --- | --- |
-| `project.json` | Source of truth. The only file that *is* the edit. |
-| `assets/` | Originals you add (upload, drag-drop, or copy from Finder). |
-| `working/` | Regeneratable cache — preview proxy, Whisper transcript, ffmpeg proxies, `chats.json`. |
-| `output/` | Final MP4 from `openklip export`. |
+| `project.json` | Loaded by `loadProject()` / saved by GUI and CLI |
+| `assets/` | `projectPaths(slug).assets` — `registerAsset`, folder scanner |
+| `working/proxy.mp4` | Preview proxy from ingest |
+| `working/transcript.json` | Whisper output |
+| `working/assets/` | ffmpeg proxies for video/audio assets |
+| `working/chats.json` | Agent sidebar threads (`src/chats.ts`, `/api/projects/[slug]/chats`) |
+| `output/out.mp4` | `openklip export` / export API |
 
-Chats in the agent sidebar persist to `working/chats.json`, not the browser’s localStorage.
+Agent sidebar chats use `working/chats.json`, not `localStorage` (theme and default-agent preferences still use `localStorage` in the browser).
 
 ---
 
-## What ships in the MVP
+## What works today
 
-- **Transcript editing** — click words to cut/restore; phrase search via CLI.
-- **Fast preview** — all-intra proxy; player jumps across kept ranges only.
-- **Cut transitions** — Glimm WebGL sweeps at preview boundaries (respects reduced motion).
-- **Captions** — live preview + ASS/libass burn-in on export.
-- **Assets** — b-roll, music, stills (Ken Burns); register via UI or CLI, sync from `assets/`.
-- **Overlays** — b-roll covers, push-in zooms, lower-third / center / hero titles, vignette.
-- **Export** — ffmpeg re-encodes kept ranges with overlays and captions.
-- **Agent loop** — `openklip transcript` → `cut` / overlays → `status` → `export`; GUI stays in sync.
+Verified against the current codebase:
+
+- **Transcript editing** — click words to toggle `deleted`; `openklip cut` / `cut --text` / `restore` on CLI
+- **Preview** — all-intra proxy; scheduler plays kept ranges only (`web/app.tsx`)
+- **Preview cut transitions** — Glimm WebGL sweep when `prefers-reduced-motion` is not set
+- **Captions** — preview overlay + ASS burn-in on export
+- **Assets** — register b-roll, music, stills; UI upload + `assets/` folder sync
+- **Overlays** — b-roll cover, Ken Burns stills, push-in zooms, title cards (lower / center / hero), vignette
+- **Export** — ffmpeg composes kept ranges + overlays + captions
+- **CLI** — full edit surface; `openklip actions --json` capability manifest
+- **Agent demo** — `bun run agent-demo` (phrase list → cut → status → optional export)
+
+Phrase-based cutting is CLI-only today (`openklip cut --text`). The transcript UI is word click, not phrase search.
 
 ---
 
 ## Quick start
 
-**Requirements:** [Bun](https://bun.sh) 1.3.14+, Node 24+. ffmpeg/ffprobe are bundled. First ingest downloads the Whisper model cache.
+**Requirements:** Bun 1.3.14+, Node 24+ (`package.json` `engines`).
 
 ```bash
 bun install
-
-# Ingest: transcribe + build preview proxy + create project.json
-bun run ingest /path/to/talking-head.mp4
-
-# Open the editor (or: bun run dev)
-bun run serve <slug>
-
-# Export
+bun run ingest /path/to/talking-head.mp4   # creates projects/<slug>/
+bun run serve <slug>                        # opens editor (sets OPENKLIP_SLUG)
 bun run export <slug>
 ```
 
-`bun run dev` serves the editor on port 4399 and opens the latest project. Pin one with `OPENKLIP_SLUG=<slug> bun run dev`.
+Dev server (port 4399):
+
+```bash
+bun run dev                                 # latest project, or ?slug= in URL
+OPENKLIP_SLUG=<slug> bun run dev            # pin project when using serve-style env
+```
 
 ---
 
 ## Agent loop
 
-OpenKlip does not call an LLM. You (or an external agent) run:
+Typical external-agent sequence (no LLM inside OpenKlip):
 
 ```text
-read  → openklip list / status / transcript
-plan  → decide phrases, spans, overlays
-act   → openklip cut / broll-add / title-add / …
-verify→ openklip status
-done  → openklip export
+openklip transcript <slug>
+openklip status <slug>
+openklip cut <slug> --text "phrase to remove"
+openklip export <slug>
 ```
 
-Deterministic demo (no LLM):
+Deterministic script:
 
 ```bash
 bun run agent-demo <slug> --phrases scripts/example-phrases.txt --export
 ```
 
-Full command reference and guardrails: **[CLAUDE.md](./CLAUDE.md)** (agent skill). Capability manifest: `openklip actions --json`.
+Command reference: **[CLAUDE.md](./CLAUDE.md)**. Registry manifest: `openklip actions --json`.
 
 ---
 
-## How it works (brief)
+## How it works
 
-- **Cut spine** — deleted words split the transcript into surviving source-time ranges; preview and export follow that spine.
-- **Preview** — native `<video>` on the all-intra proxy; scheduler seeks across kept ranges.
-- **Export** — ffmpeg selects ranges, composites b-roll/stills, applies zoom/vignette, burns captions/titles.
-- **Time** — CLI accepts seconds for human-facing spans; storage uses 48 kHz samples.
+- **Cut spine** — `deleted` words → kept source-time ranges (`compileTimeline`, preview scheduler, exporter).
+- **Preview** — `<video>` on `working/proxy.mp4`; seeks across kept ranges.
+- **Export** — ffmpeg `filter_complex`: range concat, b-roll/still cover, zoompan, vignette, libass captions/titles.
+- **Export source** — prefers original media; can fall back to project proxies when source files are missing (see exporter).
 
 ---
 
 ## Development
 
 ```bash
-bun run check      # lint/format (Ultracite)
+bun run check
 bun run typecheck
-bun test           # 240+ unit/integration tests
+bun test
 bun run build
 ```
 
-CI runs the same gates on push and PR.
+GitHub Actions (`.github/workflows/ci.yml`): `check`, `typecheck`, `test`, `build` on push/PR to `main`.
 
----
-
-## Current limits
-
-- Word-boundary cuts can clip phonemes; VAD snap and crossfades are on the roadmap.
-- Glimm transitions are preview-only; export still hard-jumps between ranges.
-- 4K export can be slow on the current ffmpeg path.
-- Vertical shorts, highlight detection, and MCP server automation are post-MVP.
+Roadmap, known gaps, and post-MVP ideas: **[TODO.md](./TODO.md)**.
 
 ---
 

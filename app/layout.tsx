@@ -7,7 +7,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "OpenKlip",
-  description: "Edit video by editing text.",
+  description: "Agent-native video editing — CLI edit loop, browser review.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

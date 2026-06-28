@@ -38,7 +38,7 @@ import {
 const [cmd, ...rest] = process.argv.slice(2);
 
 function help(): void {
-  console.log(`OpenKlip - edit video by editing text
+  console.log(`OpenKlip - agent-native video editing on plain files
 
 Discovery
   openklip list                      list projects (most recent first)
