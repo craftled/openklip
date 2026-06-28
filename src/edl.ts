@@ -97,6 +97,8 @@ export const ProjectSchema = z.object({
   titles: z.array(TitleSchema).default([]),
   stills: z.array(StillSchema).default([]),
   words: z.array(WordSchema),
+  /** Edit template id (templates/<id>/skill.md). */
+  template: z.string().optional(),
 });
 export type Project = z.infer<typeof ProjectSchema>;
 

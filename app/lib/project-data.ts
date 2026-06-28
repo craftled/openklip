@@ -1,19 +1,8 @@
 import { statSync } from "node:fs";
-import { homedir } from "node:os";
 import { syncAssetsFromFolder } from "@engine/asset-scanner";
+import { formatDisplayPath } from "@engine/display-path";
 import { projectPaths } from "@engine/paths";
 import { loadProject, resolveSlug } from "@engine/projectStore";
-
-export function formatDisplayPath(absPath: string): string {
-  const home = homedir();
-  if (absPath === home) {
-    return "~";
-  }
-  if (absPath.startsWith(`${home}/`)) {
-    return `~${absPath.slice(home.length)}`;
-  }
-  return absPath;
-}
 
 export async function loadEditorProject(slugParam?: string | null) {
   const slug = resolveSlug(slugParam);

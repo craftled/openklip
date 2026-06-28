@@ -1,9 +1,12 @@
 "use client";
 
 import { Check, ChevronsUpDown, Plus } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { NewProjectDialog } from "@/components/new-project-dialog";
+import { ProjectCreateOverlay } from "@/components/project-create-overlay";
 import { ProjectDeleteAction } from "@/components/project-delete-action";
 import { ProjectInlineFolderAction } from "@/components/project-folder-action";
+import { RelativeTimeLabel } from "@/components/relative-time-label";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,6 +16,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuShortcut,
   DropdownMenuTrigger,
+  MENU_INSTANT_ATTR,
 } from "@/components/ui/dropdown-menu";
 import {
   SidebarMenu,
@@ -20,52 +24,43 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { useProjectCreate } from "@/hooks/use-project-create";
+import { toastProjectDeleted, toastProjectDeleteFailed } from "@/lib/app-toast";
 import type { ProjectListing } from "@/lib/project-list";
 import {
   findActiveProject,
   projectAtShortcutIndex,
   projectInitial,
 } from "@/lib/project-list";
-
-function relativeTime(ms: number): string {
-  const diff = Date.now() - ms;
-  const min = Math.floor(diff / 60_000);
-  if (min < 1) {
-    return "just now";
-  }
-  if (min < 60) {
-    return `${min}m ago`;
-  }
-  const hr = Math.floor(min / 60);
-  if (hr < 24) {
-    return `${hr}h ago`;
-  }
-  return `${Math.floor(hr / 24)}d ago`;
-}
+import { relativeTimeAgo } from "@/lib/relative-time";
 
 export function ProjectSwitcher({
   activeSlug,
   onCreateProject,
   onDeleteProject,
+  onProjectCreated,
   onSelectProject,
   projects,
 }: {
   activeSlug: string;
-  onCreateProject: (file: File) => Promise<void>;
+  onCreateProject: (file: File) => Promise<string>;
   onDeleteProject: (slug: string) => Promise<void>;
+  onProjectCreated: (slug: string) => void;
   onSelectProject: (slug: string) => void;
   projects: ProjectListing[];
 }) {
   const { isMobile } = useSidebar();
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [creating, setCreating] = useState(false);
-  const [createError, setCreateError] = useState<string | null>(null);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [newProjectOpen, setNewProjectOpen] = useState(false);
+  const { createPhase, createdSlug, creating, ingestVideo } = useProjectCreate({
+    onCreateProject,
+    onProjectCreated,
+  });
   const [confirmDeleteSlug, setConfirmDeleteSlug] = useState<string | null>(
     null
   );
   const [deletingSlug, setDeletingSlug] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [menuInstant, setMenuInstant] = useState(false);
 
   const active = findActiveProject(projects, activeSlug);
 
@@ -78,34 +73,27 @@ export function ProjectSwitcher({
       const project = projectAtShortcutIndex(projects, index);
       if (project) {
         e.preventDefault();
+        setMenuInstant(true);
+        setMenuOpen(false);
         onSelectProject(project.slug);
+        requestAnimationFrame(() => {
+          setMenuInstant(false);
+        });
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [onSelectProject, projects]);
 
-  const onPickVideo = async (file: File) => {
-    setCreating(true);
-    setCreateError(null);
-    try {
-      await onCreateProject(file);
-    } catch (e) {
-      setCreateError((e as Error).message);
-    } finally {
-      setCreating(false);
-    }
-  };
-
   const onConfirmDelete = async (slug: string) => {
     setDeletingSlug(slug);
-    setDeleteError(null);
     try {
       await onDeleteProject(slug);
+      toastProjectDeleted();
       setConfirmDeleteSlug(null);
       setMenuOpen(false);
     } catch (e) {
-      setDeleteError((e as Error).message);
+      toastProjectDeleteFailed((e as Error).message);
     } finally {
       setDeletingSlug(null);
     }
@@ -113,6 +101,17 @@ export function ProjectSwitcher({
 
   return (
     <>
+      {createPhase ? (
+        <ProjectCreateOverlay
+          phase={createPhase}
+          slug={createdSlug ?? undefined}
+        />
+      ) : null}
+      <NewProjectDialog
+        onOpenChange={setNewProjectOpen}
+        onVideoSelected={ingestVideo}
+        open={newProjectOpen}
+      />
       <SidebarMenu>
         <SidebarMenuItem className="group/project-trigger">
           <DropdownMenu
@@ -120,7 +119,6 @@ export function ProjectSwitcher({
               setMenuOpen(open);
               if (!open) {
                 setConfirmDeleteSlug(null);
-                setDeleteError(null);
               }
             }}
             open={menuOpen}
@@ -130,7 +128,7 @@ export function ProjectSwitcher({
                 className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
                 size="lg"
               >
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-foreground font-medium text-background text-sm">
+                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-foreground-5 font-medium text-foreground text-sm">
                   {projectInitial(active.slug)}
                 </div>
                 <div className="grid min-w-0 flex-1 text-left text-sm leading-tight">
@@ -138,9 +136,14 @@ export function ProjectSwitcher({
                     {active.slug}
                   </span>
                   <span className="truncate text-muted-foreground text-xs">
-                    {creating
-                      ? "Creating project…"
-                      : relativeTime(active.mtimeMs)}
+                    {creating ? (
+                      "Creating project…"
+                    ) : (
+                      <RelativeTimeLabel
+                        format={relativeTimeAgo}
+                        ms={active.mtimeMs}
+                      />
+                    )}
                   </span>
                 </div>
                 <ChevronsUpDown className="ml-auto size-4 shrink-0" />
@@ -151,6 +154,7 @@ export function ProjectSwitcher({
               className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg"
               side={isMobile ? "bottom" : "right"}
               sideOffset={4}
+              {...(menuInstant ? { [MENU_INSTANT_ATTR]: "" } : {})}
             >
               <DropdownMenuGroup>
                 <DropdownMenuLabel className="text-muted-foreground text-xs">
@@ -239,7 +243,10 @@ export function ProjectSwitcher({
                 <DropdownMenuItem
                   className="gap-2 p-2"
                   disabled={creating}
-                  onClick={() => inputRef.current?.click()}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setNewProjectOpen(true);
+                  }}
                 >
                   <div className="flex size-6 items-center justify-center rounded-md bg-foreground/5">
                     <Plus className="size-4" />
@@ -258,25 +265,6 @@ export function ProjectSwitcher({
           />
         </SidebarMenuItem>
       </SidebarMenu>
-      {createError && (
-        <p className="px-3 text-destructive text-xs">{createError}</p>
-      )}
-      {deleteError && (
-        <p className="px-3 text-destructive text-xs">{deleteError}</p>
-      )}
-      <input
-        accept="video/*"
-        className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) {
-            void onPickVideo(file);
-          }
-          e.target.value = "";
-        }}
-        ref={inputRef}
-        type="file"
-      />
     </>
   );
 }

@@ -51,8 +51,8 @@ import {
 import { FindFillerButton } from "@/components/find-filler-button";
 import { HeroTitleOverlay } from "@/components/hero-title-overlay";
 import { KeyboardHint } from "@/components/keyboard-hint";
-import { OverlaySortable } from "@/components/overlay-sortable";
 import { PLAYER_SPEEDS, PlayerControls } from "@/components/player-controls";
+import { TemplateSelect } from "@/components/template-select";
 import { Button } from "@/components/ui/button";
 import {
   Drawer,
@@ -104,6 +104,12 @@ import {
   subscribeDefaultAgent,
 } from "@/lib/agent-preferences";
 import {
+  toastNothingToPlay,
+  toastPlaybackFailed,
+  toastPromise,
+  toastSaveError,
+} from "@/lib/app-toast";
+import {
   clampLoopRegion,
   ORIENTATION_LABEL,
   ORIENTATION_RATIO,
@@ -124,6 +130,7 @@ import {
   subscribeAppTheme,
   subscribeColorScheme,
 } from "@/lib/theme-preferences";
+import { exportPromiseMessages } from "@/lib/toast-notifications";
 import { cn } from "@/lib/utils";
 import type { ActionResult } from "../app/actions.ts";
 import {
@@ -196,6 +203,7 @@ interface Project {
     scale: number;
     startSample: number;
   }>;
+  template?: string;
   titles: TitleItem[];
   width: number;
   words: Word[];
@@ -300,10 +308,14 @@ function sourceAtOutput(ranges: Range[], outSec: number): number {
 const fmt = (s: number): string =>
   `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 
+import type { EditorChatsSnapshot } from "../app/lib/editor-chats.ts";
+
 export function App({
+  initialChats,
   initialProject,
   projects,
 }: {
+  initialChats: EditorChatsSnapshot;
   initialProject: Project;
   projects: ProjectListing[];
 }) {
@@ -337,7 +349,6 @@ export function App({
     "lower"
   );
   const [exporting, setExporting] = useState(false);
-  const [exportMsg, setExportMsg] = useState<string | null>(null);
   const [orientation, setOrientation] = useState<Orientation>("landscape");
   // In/out work area: when set, playback loops within [inSec, outSec] (source
   // time) so a single b-roll span or transition can be tightened on repeat.
@@ -573,6 +584,7 @@ export function App({
           const message = (e as Error).message;
           saveErrorRef.current = message;
           setSaveError(message);
+          toastSaveError(message);
           throw e;
         } finally {
           setPendingSaves((n) => Math.max(0, n - 1));
@@ -775,11 +787,11 @@ export function App({
         const didStart = await s.play();
         setPlaying(didStart);
         if (!didStart) {
-          setExportMsg("Nothing to play: all words are cut.");
+          toastNothingToPlay();
         }
       } catch (e) {
         setPlaying(false);
-        setExportMsg(`Playback error: ${(e as Error).message}`);
+        toastPlaybackFailed((e as Error).message);
       }
     }
   }, [playing]);
@@ -913,22 +925,24 @@ export function App({
       );
     }
     setExporting(true);
-    setExportMsg(null);
     try {
-      await saveChainRef.current;
-      if (saveErrorRef.current) {
-        throw new Error(`Save failed: ${saveErrorRef.current}`);
-      }
-      const r = await exportProject(project.slug, maxHeight);
-      setExportMsg(
-        r.ok
-          ? `Exported ${r.data.ranges} cuts @ ${r.data.height}p (${r.data.durationSec.toFixed(1)}s) to ${r.data.out}`
-          : `Error: ${r.error}`
+      await toastPromise(
+        (async () => {
+          await saveChainRef.current;
+          if (saveErrorRef.current) {
+            throw new Error(saveErrorRef.current);
+          }
+          const r = await exportProject(project.slug, maxHeight);
+          if (!r.ok) {
+            throw new Error(r.error);
+          }
+          return r.data;
+        })(),
+        exportPromiseMessages()
       );
-    } catch (e) {
-      setExportMsg(`Error: ${(e as Error).message}`);
+    } finally {
+      setExporting(false);
     }
-    setExporting(false);
   };
 
   const fullDur = project.durationSamples / project.sampleRate;
@@ -1109,7 +1123,11 @@ export function App({
   );
 
   return (
-    <AgentChatProvider activeSlug={project.slug}>
+    <AgentChatProvider
+      activeSlug={project.slug}
+      initialChats={initialChats}
+      projectTemplate={project.template}
+    >
       <SidebarProvider
         className="min-h-screen flex-col overflow-auto bg-background text-foreground md:h-screen md:min-h-0 md:flex-row md:overflow-hidden"
         cookieName="openklip_sidebar_agent"
@@ -1233,7 +1251,7 @@ export function App({
                   </div>
                 </div>
                 <div className="flex min-h-0 flex-1 flex-col">
-                  <div className="shrink-0 space-y-3 border-foreground/10 border-b p-4">
+                  <div className="shrink-0 space-y-3 border-border border-b p-4">
                     <div className="mx-auto flex w-full max-w-2xl flex-wrap items-center gap-2">
                       <FindFillerButton />
                       <div className="flex items-center gap-0.5 rounded-lg border border-border bg-muted/50 p-0.5">
@@ -1293,6 +1311,13 @@ export function App({
                           />
                         </DrawerContent>
                       </Drawer>
+                      <TemplateSelect
+                        onTemplateChange={(templateId) =>
+                          setProject((p) => ({ ...p, template: templateId }))
+                        }
+                        slug={project.slug}
+                        template={project.template}
+                      />
                     </div>
                     <div className="mx-auto w-full max-w-2xl">
                       <div
@@ -1402,9 +1427,7 @@ export function App({
                         {(exporting || pendingSaves > 0) && (
                           <div className="pointer-events-none absolute top-2 right-2 z-[5] flex items-center gap-1.5 rounded-md bg-black/70 px-2 py-1 font-medium text-caption text-white backdrop-blur">
                             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
-                            {exporting
-                              ? (exportMsg ?? "Exporting…")
-                              : "Rebuilding…"}
+                            {exporting ? "Exporting…" : "Rebuilding…"}
                           </div>
                         )}
                         {/* Linear-parity transport, shared with the cinema overlay */}
@@ -1519,11 +1542,9 @@ export function App({
                     ) : (
                       <EditorTranscriptPanel
                         curSample={curSample}
-                        exportMsg={exportMsg}
                         inBroll={inBroll}
                         inZoom={inZoom}
                         onWordClick={onWordClick}
-                        saveError={saveError}
                         selRange={selRange}
                         words={project.words}
                       />
@@ -2050,7 +2071,7 @@ function RightSidebarTrigger({ className }: { className?: string }) {
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <SidebarGroup className="border-foreground/10 border-t px-3 py-3">
+    <SidebarGroup className="border-border border-t px-3 py-3">
       <SidebarGroupLabel className="mb-2.5 h-auto px-0 font-medium text-muted-foreground">
         {title}
       </SidebarGroupLabel>
