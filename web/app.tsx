@@ -35,23 +35,33 @@ import {
   useRef,
   useState,
 } from "react";
+import { AgentChatProvider } from "@/components/agent-chat-context";
+import { AgentChatPanel } from "@/components/agent-chat-panel";
 import { AgentModelSelect } from "@/components/agent-model-select";
 import { AgentSidebar } from "@/components/agent-sidebar";
 import { withAssetKind } from "@/components/asset-bin";
 import { CinemaPlayer } from "@/components/cinema-player";
 import { EditTimeline } from "@/components/edit-timeline";
 import { EditorSidebarShortcuts } from "@/components/editor-sidebar-shortcuts";
+import { EditorTranscriptPanel } from "@/components/editor-transcript-panel";
 import {
   ExportDialog,
   type ExportDialogOptions,
 } from "@/components/export-dialog";
+import { FindFillerButton } from "@/components/find-filler-button";
 import { HeroTitleOverlay } from "@/components/hero-title-overlay";
 import { KeyboardHint } from "@/components/keyboard-hint";
 import { OverlaySortable } from "@/components/overlay-sortable";
 import { PLAYER_SPEEDS, PlayerControls } from "@/components/player-controls";
 import { Button } from "@/components/ui/button";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
   SelectContent,
@@ -177,7 +187,6 @@ interface Project {
   sampleRate: number;
   slug: string;
   source: string;
-  width: number;
   stills?: Array<{
     assetId: string;
     endSample: number;
@@ -308,6 +317,8 @@ export function App({
     initialProject.look?.vignette ?? false
   );
   const [export1080, setExport1080] = useState(true);
+  const [centerPanel, setCenterPanel] = useState<"chat" | "transcript">("chat");
+  const [timelineOpen, setTimelineOpen] = useState(false);
   const [defaultAgent, setDefaultAgent] =
     useState<AgentModelId>(DEFAULT_AGENT_MODEL);
   const [cinema, setCinema] = useState(false);
@@ -1098,101 +1109,106 @@ export function App({
   );
 
   return (
-    <SidebarProvider
-      className="min-h-screen flex-col overflow-auto bg-background text-foreground md:h-screen md:min-h-0 md:flex-row md:overflow-hidden"
-      cookieName="openklip_sidebar_agent"
-      keyboardShortcut={false}
-      style={
-        {
-          "--sidebar-width": "18rem",
-          "--sidebar-width-icon": "3.25rem",
-        } as CSSProperties
-      }
-    >
-      {cinema && (
-        <CinemaPlayer
-          captionsOn={captionsOn}
-          exportDisabled={exportDisabled}
-          exportLabel={exportLabel}
-          onClose={() => setCinema(false)}
-          onExport={onExport}
-          onToggleCaptions={toggleCaptions}
-          projectName={project.slug}
-          src={`/media/proxy.mp4?v=${project.mediaVersion ?? 0}`}
-        />
-      )}
-      <AgentSidebar
-        activeSlug={project.slug}
-        assets={project.assets.map(withAssetKind)}
-        mediaVersion={project.mediaVersion}
-        onAssetsUpdated={(update) => {
-          setProject((p) => ({
-            ...p,
-            assets: update.assets,
-            ...(update.broll === undefined ? {} : { broll: update.broll }),
-            ...(update.stills === undefined ? {} : { stills: update.stills }),
-          }));
-          const nextBroll = update.assets.find(
-            (a) => (a.kind ?? "broll") === "broll"
-          );
-          if (nextBroll && !update.assets.some((a) => a.id === chosenAsset)) {
-            setChosenAsset(nextBroll.id);
-          }
-        }}
-        projectHover={projectHover}
-        projects={projects}
-        sampleRate={project.sampleRate}
-      />
-
-      <SidebarContextBridge>
-        {(agentSidebar) => (
-          <SidebarProvider
-            className="min-h-screen flex-1 flex-col overflow-auto bg-background text-foreground md:h-screen md:min-h-0 md:flex-row md:overflow-hidden"
-            cookieName="openklip_sidebar_inspector"
-            keyboardShortcut={false}
-            style={
-              {
-                "--sidebar-width": "17rem",
-                "--sidebar-width-icon": "3.25rem",
-              } as CSSProperties
+    <AgentChatProvider activeSlug={project.slug}>
+      <SidebarProvider
+        className="min-h-screen flex-col overflow-auto bg-background text-foreground md:h-screen md:min-h-0 md:flex-row md:overflow-hidden"
+        cookieName="openklip_sidebar_agent"
+        keyboardShortcut={false}
+        style={
+          {
+            "--sidebar-width": "18rem",
+            "--sidebar-width-icon": "3.25rem",
+          } as CSSProperties
+        }
+      >
+        {cinema && (
+          <CinemaPlayer
+            captionsOn={captionsOn}
+            exportDisabled={exportDisabled}
+            exportLabel={exportLabel}
+            onClose={() => setCinema(false)}
+            onExport={onExport}
+            onToggleCaptions={toggleCaptions}
+            projectName={project.slug}
+            src={`/media/proxy.mp4?v=${project.mediaVersion ?? 0}`}
+          />
+        )}
+        <AgentSidebar
+          activeSlug={project.slug}
+          assets={project.assets.map(withAssetKind)}
+          export1080={export1080}
+          mediaVersion={project.mediaVersion}
+          onAssetsUpdated={(update) => {
+            setProject((p) => ({
+              ...p,
+              assets: update.assets,
+              ...(update.broll === undefined ? {} : { broll: update.broll }),
+              ...(update.stills === undefined ? {} : { stills: update.stills }),
+            }));
+            const nextBroll = update.assets.find(
+              (a) => (a.kind ?? "broll") === "broll"
+            );
+            if (nextBroll && !update.assets.some((a) => a.id === chosenAsset)) {
+              setChosenAsset(nextBroll.id);
             }
-          >
-            <EditorSidebarShortcuts agentSidebar={agentSidebar} />
-            {/* CENTER : preview + transcript */}
-            <SidebarInset className="flex min-h-[28rem] min-w-0 flex-col md:min-h-0">
-              <div className="flex h-12 shrink-0 items-center gap-2 border-border border-b px-3">
-                <AgentSidebarToolbarTrigger
-                  onToggle={agentSidebar.toggleSidebar}
-                />
-                <div className="h-4 w-px bg-foreground/10" />
-                <div className="min-w-0">
-                  <div className="font-medium text-ui">Editor</div>
-                  <div className="truncate text-caption text-muted-foreground">
-                    {ranges.length} cuts · {fmt(keptDuration)} / {fmt(fullDur)}
+          }}
+          onExport1080Change={setExport1080}
+          projectHover={projectHover}
+          projects={projects}
+          sampleRate={project.sampleRate}
+        />
+
+        <SidebarContextBridge>
+          {(agentSidebar) => (
+            <SidebarProvider
+              className="min-h-screen flex-1 flex-col overflow-auto bg-background text-foreground md:h-screen md:min-h-0 md:flex-row md:overflow-hidden"
+              cookieName="openklip_sidebar_inspector"
+              keyboardShortcut={false}
+              style={
+                {
+                  "--sidebar-width": "17rem",
+                  "--sidebar-width-icon": "3.25rem",
+                } as CSSProperties
+              }
+            >
+              <EditorSidebarShortcuts agentSidebar={agentSidebar} />
+              {/* CENTER : preview + transcript */}
+              <SidebarInset className="flex min-h-[28rem] min-w-0 flex-col md:min-h-0">
+                <div className="flex h-12 shrink-0 items-center gap-2 border-border border-b px-3">
+                  <AgentSidebarToolbarTrigger
+                    onToggle={agentSidebar.toggleSidebar}
+                  />
+                  <div className="h-4 w-px bg-foreground/10" />
+                  <div className="min-w-0">
+                    <div className="font-medium text-ui">Editor</div>
+                    <div className="truncate text-caption text-muted-foreground">
+                      {ranges.length} cuts · {fmt(keptDuration)} /{" "}
+                      {fmt(fullDur)}
+                    </div>
                   </div>
-                </div>
-                <div className="ml-auto flex items-center gap-2">
-                  <ExportDialog
-                    defaultResolution={export1080 ? "1080" : "4k"}
-                    disabled={exportDisabled}
-                    durationSec={keptDuration}
-                    onExport={onExport}
-                    sourceFps={project.fps}
-                    sourceHeight={project.height}
-                    sourceWidth={project.width}
-                  >
-                    <Button
+                  <div className="ml-auto flex items-center gap-2">
+                    <ExportDialog
+                      defaultResolution={export1080 ? "1080" : "4k"}
                       disabled={exportDisabled}
-                      size="sm"
-                      variant="secondary"
+                      durationSec={keptDuration}
+                      onExport={onExport}
+                      sourceFps={project.fps}
+                      sourceHeight={project.height}
+                      sourceWidth={project.width}
                     >
-                      <Download />
-                      {exportLabel}
-                    </Button>
-                  </ExportDialog>
-                  <div className="flex items-center gap-0.5 rounded-lg border border-border bg-muted/50 p-0.5">
-                    {(["landscape", "portrait", "square"] as Orientation[]).map(
-                      (o) => (
+                      <Button
+                        disabled={exportDisabled}
+                        size="sm"
+                        variant="secondary"
+                      >
+                        <Download />
+                        {exportLabel}
+                      </Button>
+                    </ExportDialog>
+                    <div className="flex items-center gap-0.5 rounded-lg border border-border bg-muted/50 p-0.5">
+                      {(
+                        ["landscape", "portrait", "square"] as Orientation[]
+                      ).map((o) => (
                         <Button
                           aria-label={`Preview ${ORIENTATION_LABEL[o]}`}
                           aria-pressed={orientation === o}
@@ -1203,508 +1219,690 @@ export function App({
                         >
                           {ORIENTATION_LABEL[o]}
                         </Button>
-                      )
-                    )}
+                      ))}
+                    </div>
+                    <Button
+                      aria-label="Toggle color scheme"
+                      onClick={toggleColorScheme}
+                      size="icon-sm"
+                      variant="ghost"
+                    >
+                      {colorScheme === "dark" ? <Sun /> : <Moon />}
+                    </Button>
+                    <RightSidebarTrigger />
                   </div>
-                  <Button
-                    aria-label="Toggle color scheme"
-                    onClick={toggleColorScheme}
-                    size="icon-sm"
-                    variant="ghost"
-                  >
-                    {colorScheme === "dark" ? <Sun /> : <Moon />}
-                  </Button>
-                  <RightSidebarTrigger />
                 </div>
-              </div>
-              <div className="flex flex-col gap-3 p-4">
-                <div className="flex w-full justify-center">
-                  <div
-                    className="group/preview relative cursor-pointer overflow-hidden rounded-lg border border-border bg-black"
-                    onClick={onPreviewClick}
-                    style={
-                      orientation === "landscape"
-                        ? {
-                            width: "100%",
-                            aspectRatio: String(ORIENTATION_RATIO.landscape),
+                <div className="flex min-h-0 flex-1 flex-col">
+                  <div className="shrink-0 space-y-3 border-foreground/10 border-b p-4">
+                    <div className="mx-auto flex w-full max-w-2xl flex-wrap items-center gap-2">
+                      <FindFillerButton />
+                      <div className="flex items-center gap-0.5 rounded-lg border border-border bg-muted/50 p-0.5">
+                        <Button
+                          aria-pressed={centerPanel === "chat"}
+                          onClick={() => setCenterPanel("chat")}
+                          size="sm"
+                          variant={
+                            centerPanel === "chat" ? "secondary" : "ghost"
                           }
-                        : {
-                            height: "min(58vh, 70vw)",
-                            aspectRatio: String(ORIENTATION_RATIO[orientation]),
+                        >
+                          Chat
+                        </Button>
+                        <Button
+                          aria-pressed={centerPanel === "transcript"}
+                          onClick={() => setCenterPanel("transcript")}
+                          size="sm"
+                          variant={
+                            centerPanel === "transcript" ? "secondary" : "ghost"
                           }
-                    }
-                  >
-                    {/* biome-ignore lint/a11y/useMediaCaption: editor preview; transcript is the caption source */}
-                    <video
-                      className="block h-full w-full bg-black object-cover"
-                      playsInline
-                      ref={videoRef}
-                      src={`/media/proxy.mp4?v=${project.mediaVersion ?? 0}`}
-                      style={{
-                        transform: `scale(${zoomScale})`,
-                        transformOrigin: "center",
-                        transition: "transform 0.25s ease-out",
-                      }}
-                    />
-                    <video
-                      className={cn(
-                        "absolute inset-0 z-[1] h-full w-full bg-black object-cover",
-                        activeBroll ? "block" : "hidden"
-                      )}
-                      muted
-                      playsInline
-                      ref={brollRef}
-                    />
-                    {vignetteOn && (
+                        >
+                          Transcript
+                        </Button>
+                      </div>
+                      <Drawer
+                        onOpenChange={setTimelineOpen}
+                        open={timelineOpen}
+                      >
+                        <DrawerTrigger asChild>
+                          <Button size="sm" variant="outline">
+                            Timeline
+                          </Button>
+                        </DrawerTrigger>
+                        <DrawerContent className="max-h-[85vh]">
+                          <DrawerHeader className="pb-2">
+                            <DrawerTitle className="flex items-center justify-between font-medium text-sm">
+                              <span>Timeline</span>
+                              <span className="font-normal text-muted-foreground tabular-nums">
+                                {fmt(curSec)} / {fmt(fullDur)}
+                              </span>
+                            </DrawerTitle>
+                          </DrawerHeader>
+                          <EditTimeline
+                            broll={timelineBroll}
+                            curSec={curSec}
+                            durationSec={fullDur}
+                            libraryMusic={timelineMusic}
+                            libraryStills={timelineStills}
+                            onSeek={onSeek}
+                            onSelect={onTimelineSelect}
+                            ranges={ranges}
+                            selected={selected}
+                            selRange={selRange}
+                            titles={timelineTitles}
+                            wordSpans={timelineWords}
+                            zooms={timelineZooms}
+                          />
+                        </DrawerContent>
+                      </Drawer>
+                    </div>
+                    <div className="mx-auto w-full max-w-2xl">
                       <div
-                        className="pointer-events-none absolute inset-0 z-[2]"
-                        style={{
-                          background:
-                            "radial-gradient(ellipse at center, transparent 42%, rgba(0,0,0,0.62) 100%)",
+                        className="group/preview relative cursor-pointer overflow-hidden rounded-lg border border-border bg-black"
+                        onClick={onPreviewClick}
+                        style={
+                          orientation === "landscape"
+                            ? {
+                                width: "100%",
+                                aspectRatio: String(
+                                  ORIENTATION_RATIO.landscape
+                                ),
+                              }
+                            : {
+                                height: "min(42vh, 50vw)",
+                                aspectRatio: String(
+                                  ORIENTATION_RATIO[orientation]
+                                ),
+                              }
+                        }
+                      >
+                        {/* biome-ignore lint/a11y/useMediaCaption: editor preview; transcript is the caption source */}
+                        <video
+                          className="block h-full w-full bg-black object-cover"
+                          playsInline
+                          ref={videoRef}
+                          src={`/media/proxy.mp4?v=${project.mediaVersion ?? 0}`}
+                          style={{
+                            transform: `scale(${zoomScale})`,
+                            transformOrigin: "center",
+                            transition: "transform 0.25s ease-out",
+                          }}
+                        />
+                        <video
+                          className={cn(
+                            "absolute inset-0 z-[1] h-full w-full bg-black object-cover",
+                            activeBroll ? "block" : "hidden"
+                          )}
+                          muted
+                          playsInline
+                          ref={brollRef}
+                        />
+                        {vignetteOn && (
+                          <div
+                            className="pointer-events-none absolute inset-0 z-[2]"
+                            style={{
+                              background:
+                                "radial-gradient(ellipse at center, transparent 42%, rgba(0,0,0,0.62) 100%)",
+                            }}
+                          />
+                        )}
+                        <HeroTitleOverlay title={heroTitle} />
+                        {standardTitle && (
+                          <div
+                            className={cn(
+                              "pointer-events-none absolute inset-x-0 z-[3] flex justify-center",
+                              standardTitle.position === "center"
+                                ? "top-1/2 -translate-y-1/2"
+                                : "bottom-[16%]"
+                            )}
+                            key={standardTitle.id}
+                          >
+                            <span
+                              className={cn(
+                                "max-w-[80%] rounded-md bg-black/60 px-4 py-2 text-center font-medium text-white backdrop-blur",
+                                standardTitle.position === "center"
+                                  ? "text-[clamp(22px,4vw,52px)]"
+                                  : "text-[clamp(16px,2.6vw,32px)]"
+                              )}
+                            >
+                              {standardTitle.text}
+                            </span>
+                          </div>
+                        )}
+                        {activeGroup && !heroTitle && (
+                          <div
+                            className={cn(
+                              "pointer-events-none absolute inset-x-0 z-[3] flex justify-center",
+                              captionsRaised ? "bottom-[28%]" : "bottom-[9%]"
+                            )}
+                          >
+                            <div className="max-w-[82%] rounded-md bg-black/55 px-3.5 py-1.5 text-center font-medium text-[clamp(15px,2.3vw,30px)] text-white leading-tight backdrop-blur">
+                              {activeGroup.words.map((w, i) => {
+                                const next =
+                                  activeGroup.words[i + 1]?.startSec ??
+                                  activeGroup.endSec;
+                                const on =
+                                  curSec >= w.startSec - 0.02 && curSec < next;
+                                return (
+                                  <span
+                                    className={cn(
+                                      on ? "text-live" : "text-zinc-100"
+                                    )}
+                                    key={`${w.text}-${i}`}
+                                  >
+                                    {w.text}{" "}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                        <canvas
+                          className="pointer-events-none absolute inset-0 z-[4] h-full w-full"
+                          ref={transitionCanvasRef}
+                        />
+                        {(exporting || pendingSaves > 0) && (
+                          <div className="pointer-events-none absolute top-2 right-2 z-[5] flex items-center gap-1.5 rounded-md bg-black/70 px-2 py-1 font-medium text-caption text-white backdrop-blur">
+                            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
+                            {exporting
+                              ? (exportMsg ?? "Exporting…")
+                              : "Rebuilding…"}
+                          </div>
+                        )}
+                        {/* Linear-parity transport, shared with the cinema overlay */}
+                        <PlayerControls
+                          captionsOn={captionsOn}
+                          className="absolute inset-x-0 bottom-0 z-[6] px-3 pb-2 opacity-0 transition-opacity duration-200 ease-out focus-within:opacity-100 group-hover/preview:opacity-100"
+                          current={outPos}
+                          duration={keptDuration}
+                          fullscreenLabel="Open cinema player"
+                          muted={previewMuted}
+                          onCycleSpeed={cyclePreviewRate}
+                          onFullscreen={() => setCinema(true)}
+                          onPlayToggle={onPlay}
+                          onSeekFraction={(frac) =>
+                            onSeek(sourceAtOutput(ranges, frac * keptDuration))
+                          }
+                          onToggleCaptions={() => toggleCaptions(!captionsOn)}
+                          onToggleMute={togglePreviewMute}
+                          onTogglePip={togglePreviewPip}
+                          pipOn={previewPip}
+                          playing={playing}
+                          rate={previewRate}
+                        />
+                      </div>
+                    </div>
+
+                    {/* OpenKlip-specific controls (no Linear analogue) */}
+                    <div className="mx-auto flex w-full max-w-2xl flex-wrap items-center gap-2 md:flex-nowrap md:gap-3">
+                      <span className="shrink-0 text-muted-foreground text-xs tabular-nums">
+                        {fmt(outPos)} / {fmt(keptDuration)}
+                      </span>
+                      <div className="flex shrink-0 items-center gap-1">
+                        <Button
+                          aria-label="Set loop in-point"
+                          onClick={() => setLoopInPending(curSec)}
+                          size="sm"
+                          variant="outline"
+                        >
+                          In
+                        </Button>
+                        <Button
+                          aria-label="Set loop out-point"
+                          onClick={() => {
+                            const r = clampLoopRegion(
+                              loopInPending ?? 0,
+                              curSec,
+                              fullDur
+                            );
+                            if (r) {
+                              setLoop(r);
+                            }
+                          }}
+                          size="sm"
+                          variant="outline"
+                        >
+                          Out
+                        </Button>
+                        {loop && (
+                          <Button
+                            aria-label="Clear loop region"
+                            className="text-caption text-muted-foreground"
+                            onClick={() => {
+                              setLoop(null);
+                              setLoopInPending(null);
+                            }}
+                            size="sm"
+                            variant="ghost"
+                          >
+                            Loop {fmt(loop.inSec)}–{fmt(loop.outSec)} ✕
+                          </Button>
+                        )}
+                      </div>
+                      <Toggle
+                        aria-label="Vignette"
+                        className="ml-auto"
+                        onPressedChange={toggleVignette}
+                        pressed={vignetteOn}
+                        size="sm"
+                        variant="outline"
+                      >
+                        Vignette
+                      </Toggle>
+                    </div>
+                  </div>
+
+                  <div className="flex min-h-0 flex-1 flex-col">
+                    {centerPanel === "chat" ? (
+                      <AgentChatPanel
+                        onAssetsUpdated={(update) => {
+                          setProject((p) => ({
+                            ...p,
+                            assets: update.assets,
+                            ...(update.broll === undefined
+                              ? {}
+                              : { broll: update.broll }),
+                            ...(update.stills === undefined
+                              ? {}
+                              : { stills: update.stills }),
+                          }));
+                          const nextBroll = update.assets.find(
+                            (a) => (a.kind ?? "broll") === "broll"
+                          );
+                          if (
+                            nextBroll &&
+                            !update.assets.some((a) => a.id === chosenAsset)
+                          ) {
+                            setChosenAsset(nextBroll.id);
+                          }
                         }}
+                        slug={project.slug}
+                      />
+                    ) : (
+                      <EditorTranscriptPanel
+                        curSample={curSample}
+                        exportMsg={exportMsg}
+                        inBroll={inBroll}
+                        inZoom={inZoom}
+                        onWordClick={onWordClick}
+                        saveError={saveError}
+                        selRange={selRange}
+                        words={project.words}
                       />
                     )}
-                    <HeroTitleOverlay title={heroTitle} />
-                    {standardTitle && (
-                      <div
-                        className={cn(
-                          "pointer-events-none absolute inset-x-0 z-[3] flex justify-center",
-                          standardTitle.position === "center"
-                            ? "top-1/2 -translate-y-1/2"
-                            : "bottom-[16%]"
-                        )}
-                        key={standardTitle.id}
-                      >
-                        <span
-                          className={cn(
-                            "max-w-[80%] rounded-md bg-black/60 px-4 py-2 text-center font-medium text-white backdrop-blur",
-                            standardTitle.position === "center"
-                              ? "text-[clamp(22px,4vw,52px)]"
-                              : "text-[clamp(16px,2.6vw,32px)]"
-                          )}
-                        >
-                          {standardTitle.text}
-                        </span>
-                      </div>
-                    )}
-                    {activeGroup && !heroTitle && (
-                      <div
-                        className={cn(
-                          "pointer-events-none absolute inset-x-0 z-[3] flex justify-center",
-                          captionsRaised ? "bottom-[28%]" : "bottom-[9%]"
-                        )}
-                      >
-                        <div className="max-w-[82%] rounded-md bg-black/55 px-3.5 py-1.5 text-center font-medium text-[clamp(15px,2.3vw,30px)] text-white leading-tight backdrop-blur">
-                          {activeGroup.words.map((w, i) => {
-                            const next =
-                              activeGroup.words[i + 1]?.startSec ??
-                              activeGroup.endSec;
-                            const on =
-                              curSec >= w.startSec - 0.02 && curSec < next;
-                            return (
-                              <span
-                                className={cn(
-                                  on ? "text-live" : "text-zinc-100"
-                                )}
-                                key={`${w.text}-${i}`}
-                              >
-                                {w.text}{" "}
-                              </span>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                    <canvas
-                      className="pointer-events-none absolute inset-0 z-[4] h-full w-full"
-                      ref={transitionCanvasRef}
-                    />
-                    {(exporting || pendingSaves > 0) && (
-                      <div className="pointer-events-none absolute top-2 right-2 z-[5] flex items-center gap-1.5 rounded-md bg-black/70 px-2 py-1 font-medium text-caption text-white backdrop-blur">
-                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
-                        {exporting
-                          ? (exportMsg ?? "Exporting…")
-                          : "Rebuilding…"}
-                      </div>
-                    )}
-                    {/* Linear-parity transport, shared with the cinema overlay */}
-                    <PlayerControls
-                      captionsOn={captionsOn}
-                      className="absolute inset-x-0 bottom-0 z-[6] px-3 pb-2 opacity-0 transition-opacity duration-200 ease-out focus-within:opacity-100 group-hover/preview:opacity-100"
-                      current={outPos}
-                      duration={keptDuration}
-                      fullscreenLabel="Open cinema player"
-                      muted={previewMuted}
-                      onCycleSpeed={cyclePreviewRate}
-                      onFullscreen={() => setCinema(true)}
-                      onPlayToggle={onPlay}
-                      onSeekFraction={(frac) =>
-                        onSeek(sourceAtOutput(ranges, frac * keptDuration))
-                      }
-                      onToggleCaptions={() => toggleCaptions(!captionsOn)}
-                      onToggleMute={togglePreviewMute}
-                      onTogglePip={togglePreviewPip}
-                      pipOn={previewPip}
-                      playing={playing}
-                      rate={previewRate}
-                    />
                   </div>
                 </div>
+              </SidebarInset>
 
-                {/* OpenKlip-specific controls (no Linear analogue) */}
-                <div className="flex flex-wrap items-center gap-2 md:flex-nowrap md:gap-3">
-                  <span className="shrink-0 text-muted-foreground text-xs tabular-nums">
-                    {fmt(outPos)} / {fmt(keptDuration)}
-                  </span>
-                  <div className="flex shrink-0 items-center gap-1">
-                    <Button
-                      aria-label="Set loop in-point"
-                      onClick={() => setLoopInPending(curSec)}
-                      size="sm"
-                      variant="outline"
-                    >
-                      In
-                    </Button>
-                    <Button
-                      aria-label="Set loop out-point"
-                      onClick={() => {
-                        const r = clampLoopRegion(
-                          loopInPending ?? 0,
-                          curSec,
-                          fullDur
-                        );
-                        if (r) {
-                          setLoop(r);
-                        }
-                      }}
-                      size="sm"
-                      variant="outline"
-                    >
-                      Out
-                    </Button>
-                    {loop && (
-                      <Button
-                        aria-label="Clear loop region"
-                        className="text-caption text-muted-foreground"
-                        onClick={() => {
-                          setLoop(null);
-                          setLoopInPending(null);
-                        }}
-                        size="sm"
-                        variant="ghost"
-                      >
-                        Loop {fmt(loop.inSec)}–{fmt(loop.outSec)} ✕
-                      </Button>
-                    )}
-                  </div>
-                  <Toggle
-                    aria-label="Vignette"
-                    className="ml-auto"
-                    onPressedChange={toggleVignette}
-                    pressed={vignetteOn}
-                    size="sm"
-                    variant="outline"
-                  >
-                    Vignette
-                  </Toggle>
-                </div>
-              </div>
-
-              <div className="min-h-0 flex-1 border-foreground/10 border-t">
-                <ScrollArea className="h-full">
-                  <div className="px-6 pt-4 pb-12">
-                    <div className="mb-3 flex items-center gap-2">
-                      <span className="font-medium text-muted-foreground text-xs">
-                        Transcript
-                      </span>
-                      <span className="ml-auto text-caption text-muted-foreground/70">
-                        Click to cut · shift-click to select
-                      </span>
-                    </div>
-                    <p className="max-w-[60ch] text-base leading-[1.95]">
-                      {project.words.map((w, i) => {
-                        const active =
-                          curSample >= w.startSample &&
-                          curSample < w.endSample &&
-                          !w.deleted;
-                        const isSel =
-                          selRange != null &&
-                          i >= selRange[0] &&
-                          i <= selRange[1];
-                        return (
-                          <span
-                            className={cn(
-                              "cursor-pointer rounded px-0.5 py-px transition-colors fine-hover:hover:bg-muted active:bg-muted/80",
-                              w.deleted &&
-                                "text-muted-foreground/60 line-through decoration-1",
-                              active && "bg-live/15 text-live",
-                              inBroll(w) &&
-                                "underline decoration-2 decoration-broll/70 underline-offset-4",
-                              inZoom(w) && "bg-zoom/10",
-                              isSel &&
-                                "bg-live/10 ring-1 ring-live/40 ring-inset"
-                            )}
-                            key={w.id}
-                            onClick={(e) => onWordClick(i, e)}
-                          >
-                            {w.text}{" "}
-                          </span>
-                        );
-                      })}
-                    </p>
-                    {exportMsg && (
-                      <p className="mt-6 max-w-[60ch] break-words border-foreground/10 border-t pt-3 text-muted-foreground text-xs">
-                        {exportMsg}
-                      </p>
-                    )}
-                    {saveError && (
-                      <p className="mt-2 max-w-[60ch] break-words text-destructive text-xs">
-                        Save failed: {saveError}
-                      </p>
-                    )}
-                  </div>
-                </ScrollArea>
-              </div>
-              <EditTimeline
-                broll={timelineBroll}
-                curSec={curSec}
-                durationSec={fullDur}
-                libraryMusic={timelineMusic}
-                libraryStills={timelineStills}
-                onSeek={onSeek}
-                onSelect={onTimelineSelect}
-                ranges={ranges}
-                selected={selected}
-                selRange={selRange}
-                titles={timelineTitles}
-                wordSpans={timelineWords}
-                zooms={timelineZooms}
-              />
-            </SidebarInset>
-
-            {/* RIGHT : actions + inspector (Paper "properties" panel) */}
-            <Sidebar className="bg-background" collapsible="icon" side="right">
-              <SidebarHeader className="border-border border-b">
-                <SidebarMenu>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton tooltip="Settings">
-                      <Settings2 />
-                      <span>Settings</span>
-                    </SidebarMenuButton>
-                    <SidebarMenuBadge>
-                      {getThemeLabel(appTheme)} ·{" "}
-                      {export1080 ? "1080p" : "Auto"}
-                    </SidebarMenuBadge>
-                    <SidebarMenuSub>
-                      <SidebarMenuSubItem>
-                        <SidebarMenuSubButton asChild>
-                          <label className="cursor-pointer">
-                            <Switch
-                              checked={export1080}
-                              onCheckedChange={setExport1080}
-                            />
-                            <span>Limit to 1080p</span>
-                          </label>
-                        </SidebarMenuSubButton>
-                      </SidebarMenuSubItem>
-                      <SidebarMenuSubItem>
-                        <span className="px-2 py-1 font-medium text-muted-foreground text-section-label">
-                          Theme
-                        </span>
-                      </SidebarMenuSubItem>
-                      {THEME_CATALOG.map((themeOption) => (
-                        <SidebarMenuSubItem key={themeOption.id}>
-                          <SidebarMenuSubButton
-                            className="gap-2"
-                            isActive={appTheme === themeOption.id}
-                            onClick={() => setAppTheme(themeOption.id)}
-                          >
-                            {appTheme === themeOption.id ? (
-                              <Check className="size-3.5 shrink-0" />
-                            ) : (
-                              <Palette className="size-3.5 shrink-0 text-muted-foreground" />
-                            )}
-                            <span className="min-w-0 flex-1 truncate">
-                              {themeOption.name}
-                            </span>
-                            {themeOption.supportedModes.length === 1 &&
-                            themeOption.supportedModes[0] === "dark" ? (
-                              <span className="shrink-0 text-caption text-muted-foreground">
-                                dark
-                              </span>
-                            ) : null}
+              {/* RIGHT : actions + inspector (Paper "properties" panel) */}
+              <Sidebar
+                className="bg-background"
+                collapsible="icon"
+                side="right"
+              >
+                <SidebarHeader className="border-border border-b">
+                  <SidebarMenu>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton tooltip="Settings">
+                        <Settings2 />
+                        <span>Settings</span>
+                      </SidebarMenuButton>
+                      <SidebarMenuBadge>
+                        {getThemeLabel(appTheme)} ·{" "}
+                        {export1080 ? "1080p" : "Auto"}
+                      </SidebarMenuBadge>
+                      <SidebarMenuSub>
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton asChild>
+                            <label className="cursor-pointer">
+                              <Switch
+                                checked={export1080}
+                                onCheckedChange={setExport1080}
+                              />
+                              <span>Limit to 1080p</span>
+                            </label>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
-                      ))}
-                    </SidebarMenuSub>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton tooltip="Default agent">
-                      <AgentProviderIcon
-                        className="size-4 shrink-0"
-                        value={defaultAgent}
-                      />
-                      <span>Default agent</span>
-                    </SidebarMenuButton>
-                    <SidebarMenuBadge>
-                      {getAgentModelLabel(defaultAgent)}
-                    </SidebarMenuBadge>
-                    <SidebarMenuSub>
-                      <SidebarMenuSubItem className="px-2 pb-2">
-                        <AgentModelSelect
-                          onValueChange={setDefaultAgentModel}
+                        <SidebarMenuSubItem>
+                          <span className="px-2 py-1 font-medium text-muted-foreground text-section-label">
+                            Theme
+                          </span>
+                        </SidebarMenuSubItem>
+                        {THEME_CATALOG.map((themeOption) => (
+                          <SidebarMenuSubItem key={themeOption.id}>
+                            <SidebarMenuSubButton
+                              className="gap-2"
+                              isActive={appTheme === themeOption.id}
+                              onClick={() => setAppTheme(themeOption.id)}
+                            >
+                              {appTheme === themeOption.id ? (
+                                <Check className="size-3.5 shrink-0" />
+                              ) : (
+                                <Palette className="size-3.5 shrink-0 text-muted-foreground" />
+                              )}
+                              <span className="min-w-0 flex-1 truncate">
+                                {themeOption.name}
+                              </span>
+                              {themeOption.supportedModes.length === 1 &&
+                              themeOption.supportedModes[0] === "dark" ? (
+                                <span className="shrink-0 text-caption text-muted-foreground">
+                                  dark
+                                </span>
+                              ) : null}
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        ))}
+                      </SidebarMenuSub>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton tooltip="Default agent">
+                        <AgentProviderIcon
+                          className="size-4 shrink-0"
                           value={defaultAgent}
                         />
-                      </SidebarMenuSubItem>
-                    </SidebarMenuSub>
-                  </SidebarMenuItem>
-                </SidebarMenu>
-              </SidebarHeader>
+                        <span>Default agent</span>
+                      </SidebarMenuButton>
+                      <SidebarMenuBadge>
+                        {getAgentModelLabel(defaultAgent)}
+                      </SidebarMenuBadge>
+                      <SidebarMenuSub>
+                        <SidebarMenuSubItem className="px-2 pb-2">
+                          <AgentModelSelect
+                            onValueChange={setDefaultAgentModel}
+                            value={defaultAgent}
+                          />
+                        </SidebarMenuSubItem>
+                      </SidebarMenuSub>
+                    </SidebarMenuItem>
+                  </SidebarMenu>
+                </SidebarHeader>
 
-              <SidebarContent>
-                <SidebarGroup>
-                  <SidebarGroupLabel>Inspector</SidebarGroupLabel>
-                  <SidebarGroupContent>
-                    <SidebarMenu>
-                      <SidebarMenuItem>
-                        <SidebarMenuButton tooltip={inspectorLabel}>
-                          <InspectorIcon />
-                          <span>{inspectorLabel}</span>
-                        </SidebarMenuButton>
-                        <SidebarMenuBadge>{inspectorBadge}</SidebarMenuBadge>
-                        <SidebarMenuSub>
-                          {inspectorMeta.map((item) => (
-                            <InfoSubItem
-                              icon={item.icon}
-                              key={item.label}
-                              label={item.label}
-                              value={item.value}
+                <SidebarContent>
+                  <SidebarGroup>
+                    <SidebarGroupLabel>Inspector</SidebarGroupLabel>
+                    <SidebarGroupContent>
+                      <SidebarMenu>
+                        <SidebarMenuItem>
+                          <SidebarMenuButton tooltip={inspectorLabel}>
+                            <InspectorIcon />
+                            <span>{inspectorLabel}</span>
+                          </SidebarMenuButton>
+                          <SidebarMenuBadge>{inspectorBadge}</SidebarMenuBadge>
+                          <SidebarMenuSub>
+                            {inspectorMeta.map((item) => (
+                              <InfoSubItem
+                                icon={item.icon}
+                                key={item.label}
+                                label={item.label}
+                                value={item.value}
+                              />
+                            ))}
+                          </SidebarMenuSub>
+                        </SidebarMenuItem>
+                      </SidebarMenu>
+                    </SidebarGroupContent>
+                  </SidebarGroup>
+                  {selected && (selZoom || selTitle || selBroll) ? (
+                    <div className="group-data-[collapsible=icon]:hidden">
+                      <div className="px-3 py-3">
+                        <div className="flex items-center gap-2 font-medium text-ui">
+                          {selZoom ? (
+                            <ZoomIn className="size-3.5 text-muted-foreground" />
+                          ) : selTitle ? (
+                            <Type className="size-3.5 text-muted-foreground" />
+                          ) : (
+                            <Film className="size-3.5 text-muted-foreground" />
+                          )}
+                          {selZoom
+                            ? "Push-in"
+                            : selTitle
+                              ? "Title card"
+                              : "B-roll"}
+                          <span className="ml-auto text-caption text-muted-foreground tabular-nums">
+                            {selZoom &&
+                              `${fmt(selZoom.startSample / sr)}–${fmt(selZoom.endSample / sr)}`}
+                            {selTitle &&
+                              `${fmt(selTitle.startSample / sr)}–${fmt(selTitle.endSample / sr)}`}
+                            {selBroll &&
+                              `${fmt(selBroll.startSample / sr)}–${fmt(selBroll.endSample / sr)}`}
+                          </span>
+                        </div>
+                      </div>
+
+                      {selZoom && (
+                        <>
+                          <Section title="Parameters">
+                            <PropRow
+                              label="Scale"
+                              value={`${selZoom.scale.toFixed(2)}×`}
+                            >
+                              <Slider
+                                className={SLIDER}
+                                max={3}
+                                min={1}
+                                onValueChange={([v]) =>
+                                  updateZoom(selZoom.id, { scale: v })
+                                }
+                                step={0.05}
+                                value={[selZoom.scale]}
+                              />
+                            </PropRow>
+                            <PropRow
+                              label="Ramp"
+                              value={`${selZoom.rampSec.toFixed(1)}s`}
+                            >
+                              <Slider
+                                className={SLIDER}
+                                max={5}
+                                min={0}
+                                onValueChange={([v]) =>
+                                  updateZoom(selZoom.id, { rampSec: v })
+                                }
+                                step={0.1}
+                                value={[selZoom.rampSec]}
+                              />
+                            </PropRow>
+                          </Section>
+                          <Section title="Preset">
+                            <ToggleGroup
+                              className="w-full"
+                              onValueChange={(v) =>
+                                v && updateZoom(selZoom.id, ZOOM_PRESETS[v])
+                              }
+                              spacing={0}
+                              type="single"
+                              value={presetOf(selZoom)}
+                              variant="outline"
+                            >
+                              {Object.keys(ZOOM_PRESETS).map((k) => (
+                                <ToggleGroupItem
+                                  className="h-7 flex-1 text-xs"
+                                  key={k}
+                                  value={k}
+                                >
+                                  {k}
+                                </ToggleGroupItem>
+                              ))}
+                            </ToggleGroup>
+                          </Section>
+                        </>
+                      )}
+
+                      {selTitle && (
+                        <Section title="Title">
+                          {selTitle.position === "hero" ? (
+                            <textarea
+                              className="field-sizing-content min-h-16 w-full resize-y rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                              onChange={(e) =>
+                                updateTitle(selTitle.id, {
+                                  text: e.target.value,
+                                })
+                              }
+                              placeholder={
+                                "Headline\nSubtitle (optional second line)"
+                              }
+                              rows={3}
+                              value={selTitle.text}
                             />
-                          ))}
-                        </SidebarMenuSub>
-                      </SidebarMenuItem>
-                    </SidebarMenu>
-                  </SidebarGroupContent>
-                </SidebarGroup>
-                {selected && (selZoom || selTitle || selBroll) ? (
-                  <div className="group-data-[collapsible=icon]:hidden">
-                    <div className="px-3 py-3">
-                      <div className="flex items-center gap-2 font-medium text-ui">
-                        {selZoom ? (
-                          <ZoomIn className="size-3.5 text-muted-foreground" />
-                        ) : selTitle ? (
-                          <Type className="size-3.5 text-muted-foreground" />
-                        ) : (
-                          <Film className="size-3.5 text-muted-foreground" />
-                        )}
-                        {selZoom
-                          ? "Push-in"
-                          : selTitle
-                            ? "Title card"
-                            : "B-roll"}
-                        <span className="ml-auto text-caption text-muted-foreground tabular-nums">
-                          {selZoom &&
-                            `${fmt(selZoom.startSample / sr)}–${fmt(selZoom.endSample / sr)}`}
-                          {selTitle &&
-                            `${fmt(selTitle.startSample / sr)}–${fmt(selTitle.endSample / sr)}`}
-                          {selBroll &&
-                            `${fmt(selBroll.startSample / sr)}–${fmt(selBroll.endSample / sr)}`}
-                        </span>
+                          ) : (
+                            <Input
+                              onChange={(e) =>
+                                updateTitle(selTitle.id, {
+                                  text: e.target.value,
+                                })
+                              }
+                              placeholder="Title text"
+                              value={selTitle.text}
+                            />
+                          )}
+                          <div className="mt-2">
+                            <Select
+                              onValueChange={(v) =>
+                                updateTitle(selTitle.id, {
+                                  position: v as "lower" | "center" | "hero",
+                                })
+                              }
+                              value={selTitle.position}
+                            >
+                              <SelectTrigger className="w-full">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="lower">
+                                  Lower third
+                                </SelectItem>
+                                <SelectItem value="center">Centered</SelectItem>
+                                <SelectItem value="hero">Hero card</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </Section>
+                      )}
+
+                      {selBroll && brollAssets.length > 0 && (
+                        <Section title="Source">
+                          <Select
+                            onValueChange={(v) =>
+                              updateBroll(selBroll.id, { assetId: v })
+                            }
+                            value={selBroll.assetId}
+                          >
+                            <SelectTrigger className="w-full">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {brollAssets.map((a) => (
+                                <SelectItem key={a.id} value={a.id}>
+                                  {a.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {(project.broll ?? []).length > 1 && (
+                            <div className="mt-3">
+                              <span className="text-caption text-muted-foreground">
+                                Paint order : drag to restack
+                              </span>
+                              <div className="mt-1.5">
+                                <OverlaySortable
+                                  onReorder={reorderBrollOrder}
+                                  onSelect={(id) =>
+                                    setSelected({ kind: "broll", id })
+                                  }
+                                  rows={(project.broll ?? []).map((b) => ({
+                                    id: b.id,
+                                    label: assetName(b.assetId),
+                                  }))}
+                                  selectedId={selected?.id}
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </Section>
+                      )}
+
+                      <div className="p-3">
+                        <Button
+                          className="w-full"
+                          onClick={removeSelected}
+                          size="sm"
+                          variant="destructive"
+                        >
+                          <Trash2 /> Remove effect
+                        </Button>
                       </div>
                     </div>
-
-                    {selZoom && (
-                      <>
-                        <Section title="Parameters">
-                          <PropRow
-                            label="Scale"
-                            value={`${selZoom.scale.toFixed(2)}×`}
+                  ) : selRange ? (
+                    <div className="group-data-[collapsible=icon]:hidden">
+                      <div className="px-3 py-3 font-medium text-ui">
+                        Selection
+                        <span className="ml-2 text-caption text-muted-foreground">
+                          {selRange[1] - selRange[0] + 1} words
+                        </span>
+                      </div>
+                      <Section title="Add effect">
+                        <Button
+                          className="w-full justify-start"
+                          onClick={addZoom}
+                          size="sm"
+                          variant="secondary"
+                        >
+                          <ZoomIn /> Push in
+                        </Button>
+                        <div className="mt-2 flex gap-2">
+                          <Select
+                            onValueChange={setChosenAsset}
+                            value={chosenAsset}
                           >
-                            <Slider
-                              className={SLIDER}
-                              max={3}
-                              min={1}
-                              onValueChange={([v]) =>
-                                updateZoom(selZoom.id, { scale: v })
-                              }
-                              step={0.05}
-                              value={[selZoom.scale]}
-                            />
-                          </PropRow>
-                          <PropRow
-                            label="Ramp"
-                            value={`${selZoom.rampSec.toFixed(1)}s`}
+                            <SelectTrigger
+                              className="flex-1"
+                              disabled={brollAssets.length === 0}
+                            >
+                              <SelectValue placeholder="No b-roll" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {brollAssets.map((a) => (
+                                <SelectItem key={a.id} value={a.id}>
+                                  {a.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            aria-label="Add b-roll"
+                            disabled={brollAssets.length === 0}
+                            onClick={addBroll}
+                            size="sm"
+                            variant="secondary"
                           >
-                            <Slider
-                              className={SLIDER}
-                              max={5}
-                              min={0}
-                              onValueChange={([v]) =>
-                                updateZoom(selZoom.id, { rampSec: v })
-                              }
-                              step={0.1}
-                              value={[selZoom.rampSec]}
-                            />
-                          </PropRow>
-                        </Section>
-                        <Section title="Preset">
-                          <ToggleGroup
-                            className="w-full"
-                            onValueChange={(v) =>
-                              v && updateZoom(selZoom.id, ZOOM_PRESETS[v])
-                            }
-                            spacing={0}
-                            type="single"
-                            value={presetOf(selZoom)}
-                            variant="outline"
-                          >
-                            {Object.keys(ZOOM_PRESETS).map((k) => (
-                              <ToggleGroupItem
-                                className="h-7 flex-1 text-xs"
-                                key={k}
-                                value={k}
-                              >
-                                {k}
-                              </ToggleGroupItem>
-                            ))}
-                          </ToggleGroup>
-                        </Section>
-                      </>
-                    )}
-
-                    {selTitle && (
+                            <Film />
+                          </Button>
+                        </div>
+                      </Section>
                       <Section title="Title">
-                        {selTitle.position === "hero" ? (
+                        {titlePos === "hero" ? (
                           <textarea
                             className="field-sizing-content min-h-16 w-full resize-y rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                            onChange={(e) =>
-                              updateTitle(selTitle.id, { text: e.target.value })
-                            }
+                            onChange={(e) => setTitleText(e.target.value)}
                             placeholder={
                               "Headline\nSubtitle (optional second line)"
                             }
                             rows={3}
-                            value={selTitle.text}
+                            value={titleText}
                           />
                         ) : (
                           <Input
-                            onChange={(e) =>
-                              updateTitle(selTitle.id, { text: e.target.value })
-                            }
+                            onChange={(e) => setTitleText(e.target.value)}
                             placeholder="Title text"
-                            value={selTitle.text}
+                            value={titleText}
                           />
                         )}
-                        <div className="mt-2">
+                        <div className="mt-2 flex gap-2">
                           <Select
                             onValueChange={(v) =>
-                              updateTitle(selTitle.id, {
-                                position: v as "lower" | "center" | "hero",
-                              })
+                              setTitlePos(v as "lower" | "center" | "hero")
                             }
-                            value={selTitle.position}
+                            value={titlePos}
                           >
-                            <SelectTrigger className="w-full">
+                            <SelectTrigger className="flex-1">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -1713,208 +1911,71 @@ export function App({
                               <SelectItem value="hero">Hero card</SelectItem>
                             </SelectContent>
                           </Select>
+                          <Button
+                            aria-label="Add title"
+                            disabled={!titleText.trim()}
+                            onClick={addTitle}
+                            size="sm"
+                            variant="secondary"
+                          >
+                            <Type />
+                          </Button>
                         </div>
                       </Section>
-                    )}
-
-                    {selBroll && brollAssets.length > 0 && (
-                      <Section title="Source">
-                        <Select
-                          onValueChange={(v) =>
-                            updateBroll(selBroll.id, { assetId: v })
-                          }
-                          value={selBroll.assetId}
+                      <div className="p-3">
+                        <Button
+                          className="text-muted-foreground"
+                          onClick={clearSel}
+                          size="sm"
+                          variant="ghost"
                         >
-                          <SelectTrigger className="w-full">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {brollAssets.map((a) => (
-                              <SelectItem key={a.id} value={a.id}>
-                                {a.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        {(project.broll ?? []).length > 1 && (
-                          <div className="mt-3">
-                            <span className="text-caption text-muted-foreground">
-                              Paint order : drag to restack
-                            </span>
-                            <div className="mt-1.5">
-                              <OverlaySortable
-                                onReorder={reorderBrollOrder}
-                                onSelect={(id) =>
-                                  setSelected({ kind: "broll", id })
-                                }
-                                rows={(project.broll ?? []).map((b) => ({
-                                  id: b.id,
-                                  label: assetName(b.assetId),
-                                }))}
-                                selectedId={selected?.id}
-                              />
-                            </div>
-                          </div>
-                        )}
+                          Clear selection
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="group-data-[collapsible=icon]:hidden">
+                      <Section title="Captions">
+                        <PropRow
+                          label="Per line"
+                          value={String(project.captions?.maxWords ?? 6)}
+                        >
+                          <Slider
+                            className={SLIDER}
+                            max={12}
+                            min={1}
+                            onValueChange={([v]) => setMaxWords(v)}
+                            step={1}
+                            value={[project.captions?.maxWords ?? 6]}
+                          />
+                        </PropRow>
                       </Section>
-                    )}
-
-                    <div className="p-3">
-                      <Button
-                        className="w-full"
-                        onClick={removeSelected}
-                        size="sm"
-                        variant="destructive"
-                      >
-                        <Trash2 /> Remove effect
-                      </Button>
+                      <Section title="Timing">
+                        <PropRow label="Pad" value={`${project.padMs ?? 50}ms`}>
+                          <Slider
+                            className={SLIDER}
+                            max={200}
+                            min={0}
+                            onValueChange={([v]) => setPad(v)}
+                            step={5}
+                            value={[project.padMs ?? 50]}
+                          />
+                        </PropRow>
+                      </Section>
+                      <p className="px-3 py-3 text-muted-foreground text-xs leading-relaxed">
+                        Select a word range in the transcript to add a push-in,
+                        b-roll, or title. Click an effect to edit it here.
+                      </p>
                     </div>
-                  </div>
-                ) : selRange ? (
-                  <div className="group-data-[collapsible=icon]:hidden">
-                    <div className="px-3 py-3 font-medium text-ui">
-                      Selection
-                      <span className="ml-2 text-caption text-muted-foreground">
-                        {selRange[1] - selRange[0] + 1} words
-                      </span>
-                    </div>
-                    <Section title="Add effect">
-                      <Button
-                        className="w-full justify-start"
-                        onClick={addZoom}
-                        size="sm"
-                        variant="secondary"
-                      >
-                        <ZoomIn /> Push in
-                      </Button>
-                      <div className="mt-2 flex gap-2">
-                        <Select
-                          onValueChange={setChosenAsset}
-                          value={chosenAsset}
-                        >
-                          <SelectTrigger
-                            className="flex-1"
-                            disabled={brollAssets.length === 0}
-                          >
-                            <SelectValue placeholder="No b-roll" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {brollAssets.map((a) => (
-                              <SelectItem key={a.id} value={a.id}>
-                                {a.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Button
-                          aria-label="Add b-roll"
-                          disabled={brollAssets.length === 0}
-                          onClick={addBroll}
-                          size="sm"
-                          variant="secondary"
-                        >
-                          <Film />
-                        </Button>
-                      </div>
-                    </Section>
-                    <Section title="Title">
-                      {titlePos === "hero" ? (
-                        <textarea
-                          className="field-sizing-content min-h-16 w-full resize-y rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                          onChange={(e) => setTitleText(e.target.value)}
-                          placeholder={
-                            "Headline\nSubtitle (optional second line)"
-                          }
-                          rows={3}
-                          value={titleText}
-                        />
-                      ) : (
-                        <Input
-                          onChange={(e) => setTitleText(e.target.value)}
-                          placeholder="Title text"
-                          value={titleText}
-                        />
-                      )}
-                      <div className="mt-2 flex gap-2">
-                        <Select
-                          onValueChange={(v) =>
-                            setTitlePos(v as "lower" | "center" | "hero")
-                          }
-                          value={titlePos}
-                        >
-                          <SelectTrigger className="flex-1">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="lower">Lower third</SelectItem>
-                            <SelectItem value="center">Centered</SelectItem>
-                            <SelectItem value="hero">Hero card</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <Button
-                          aria-label="Add title"
-                          disabled={!titleText.trim()}
-                          onClick={addTitle}
-                          size="sm"
-                          variant="secondary"
-                        >
-                          <Type />
-                        </Button>
-                      </div>
-                    </Section>
-                    <div className="p-3">
-                      <Button
-                        className="text-muted-foreground"
-                        onClick={clearSel}
-                        size="sm"
-                        variant="ghost"
-                      >
-                        Clear selection
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="group-data-[collapsible=icon]:hidden">
-                    <Section title="Captions">
-                      <PropRow
-                        label="Per line"
-                        value={String(project.captions?.maxWords ?? 6)}
-                      >
-                        <Slider
-                          className={SLIDER}
-                          max={12}
-                          min={1}
-                          onValueChange={([v]) => setMaxWords(v)}
-                          step={1}
-                          value={[project.captions?.maxWords ?? 6]}
-                        />
-                      </PropRow>
-                    </Section>
-                    <Section title="Timing">
-                      <PropRow label="Pad" value={`${project.padMs ?? 50}ms`}>
-                        <Slider
-                          className={SLIDER}
-                          max={200}
-                          min={0}
-                          onValueChange={([v]) => setPad(v)}
-                          step={5}
-                          value={[project.padMs ?? 50]}
-                        />
-                      </PropRow>
-                    </Section>
-                    <p className="px-3 py-3 text-muted-foreground text-xs leading-relaxed">
-                      Select a word range in the transcript to add a push-in,
-                      b-roll, or title. Click an effect to edit it here.
-                    </p>
-                  </div>
-                )}
-              </SidebarContent>
-              <SidebarRail />
-            </Sidebar>
-          </SidebarProvider>
-        )}
-      </SidebarContextBridge>
-    </SidebarProvider>
+                  )}
+                </SidebarContent>
+                <SidebarRail />
+              </Sidebar>
+            </SidebarProvider>
+          )}
+        </SidebarContextBridge>
+      </SidebarProvider>
+    </AgentChatProvider>
   );
 }
 

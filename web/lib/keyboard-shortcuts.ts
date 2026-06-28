@@ -1,7 +1,7 @@
-export type ModShortcutParts = {
-  modifier: string;
+export interface ModShortcutParts {
   key: string;
-};
+  modifier: string;
+}
 
 /** Stable label for SSR and the first client paint (avoids hydration mismatch). */
 export function modShortcutNeutral(key: string): string {
