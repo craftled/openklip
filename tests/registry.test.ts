@@ -77,6 +77,9 @@ const EXPECTED = [
   "zoom-add",
   "zoom-set",
   "zoom-rm",
+  "graphic-add",
+  "graphic-set",
+  "graphic-rm",
   "captions",
   "captions-max",
   "pad",
@@ -213,6 +216,101 @@ test("actionManifest exposes JSON-schema input per action and filters by surface
   const mcp = actionManifest("mcp");
   assert.ok(mcp.length > 0, "no actions exposed to mcp");
   assert.ok(mcp.every((m) => m.surfaces.includes("mcp")));
+});
+
+test("graphic-add: places a bundled template and fills manifest defaults", () => {
+  const p = makeProject();
+  const item = runAction("graphic-add", p, {
+    template: "lower-third",
+    fromSec: 1,
+    toSec: 3,
+  }) as {
+    id: string;
+    template: string;
+    params: Record<string, unknown>;
+    track: string;
+  };
+  assert.equal(p.graphics?.length, 1);
+  assert.equal(item.template, "lower-third");
+  assert.match(item.id, /^g/);
+  assert.equal(item.track, "title");
+  // Manifest declares `title` default "Name"; addGraphic seeds it.
+  assert.equal(item.params.title, "Name");
+});
+
+test("graphic-add: caller params win over manifest defaults", () => {
+  const p = makeProject();
+  const item = runAction("graphic-add", p, {
+    template: "lower-third",
+    fromSec: 0,
+    toSec: 2,
+    params: { title: "Custom" },
+  }) as { params: Record<string, unknown> };
+  assert.equal(item.params.title, "Custom");
+});
+
+test("graphic-add: rejects an unknown template with the catalog listed", () => {
+  const p = makeProject();
+  let msg = "";
+  try {
+    runAction("graphic-add", p, { template: "nope", fromSec: 0, toSec: 2 });
+  } catch (e) {
+    msg = (e as Error).message;
+  }
+  assert.match(msg, /unknown graphic template/i);
+  assert.match(msg, /Available:/);
+  assert.equal(p.graphics?.length ?? 0, 0);
+});
+
+test("graphic-add: rejects an empty span (primitive owns the bound)", () => {
+  const p = makeProject();
+  assert.throws(() =>
+    runAction("graphic-add", p, {
+      template: "lower-third",
+      fromSec: 3,
+      toSec: 1,
+    })
+  );
+  assert.equal(p.graphics?.length ?? 0, 0);
+});
+
+test("graphic-set: merges params over the existing record", () => {
+  const p = makeProject();
+  const added = runAction("graphic-add", p, {
+    template: "lower-third",
+    fromSec: 0,
+    toSec: 2,
+    params: { title: "A", subtitle: "B" },
+  }) as { id: string };
+  const updated = runAction("graphic-set", p, {
+    id: added.id,
+    params: { subtitle: "C" },
+  }) as { params: Record<string, unknown> };
+  assert.equal(updated.params.title, "A", "untouched param kept");
+  assert.equal(updated.params.subtitle, "C", "patched param updated");
+});
+
+test("graphic-rm: removes by id and reports removed", () => {
+  const p = makeProject();
+  const added = runAction("graphic-add", p, {
+    template: "lower-third",
+    fromSec: 0,
+    toSec: 2,
+  }) as { id: string };
+  const res = runAction("graphic-rm", p, { id: added.id }) as {
+    removed: boolean;
+  };
+  assert.equal(res.removed, true);
+  assert.equal(p.graphics?.length, 0);
+});
+
+test("graphic-add manifest renders params record to JSON Schema for MCP", () => {
+  const entry = actionManifest("mcp").find((m) => m.name === "graphic-add");
+  assert.ok(entry, "graphic-add not exposed to mcp");
+  assert.equal(entry?.inputSchema.type, "object");
+  // The z.record(union) params field must survive z.toJSONSchema() so MCP tool
+  // registration does not throw at runtime.
+  assert.ok(entry?.inputSchema.properties.params, "params missing from schema");
 });
 
 test("actionTable renders a markdown row for each action", () => {

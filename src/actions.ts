@@ -4,15 +4,23 @@
 // are the operations an external coding agent drives from the terminal.
 import {
   type Broll,
+  type ColorAdjust,
+  ColorAdjustSchema,
   type Grade,
+  type Graphic,
   type Motion,
   type Project,
   SAMPLE_RATE,
   type Still,
-  survivingRanges,
   type Title,
   type Zoom,
 } from "./edl.ts";
+import { isNeutralColor } from "./grade-color.ts";
+import {
+  defaultGraphicParams,
+  listGraphics,
+  loadGraphicManifest,
+} from "./graphics.ts";
 import { findPhraseRuns } from "./phrase-match.ts";
 
 // Mark words (by id) deleted (or, with deleted=false, restored).
@@ -474,6 +482,144 @@ export function updateTitle(
   return item;
 }
 
+// Resolve and validate a graphic template id against the on-disk catalog,
+// throwing an actionable list (mirrors how addStill validates the asset id).
+function resolveGraphicTemplate(template: string): void {
+  const known = listGraphics();
+  if (!known.some((g) => g.id === template)) {
+    const list = known.map((g) => g.id).join(", ") || "(none)";
+    throw new Error(
+      `unknown graphic template "${template}". Available: ${list}`
+    );
+  }
+}
+
+// Add an HTML/CSS graphic overlay over a span of the source timeline. Validates
+// the template exists; fills any unset params from the template manifest's
+// declared defaults (caller params win). Converts seconds to samples on the
+// canonical 48 kHz grid; clamps end to project duration.
+export function addGraphic(
+  project: Project,
+  input: {
+    template: string;
+    fromSec: number;
+    toSec: number;
+    params?: Record<string, string | number | boolean>;
+    track?: Graphic["track"];
+  }
+): Graphic {
+  const { template, fromSec, toSec, params, track = "title" } = input;
+  if (![fromSec, toSec].every(Number.isFinite)) {
+    throw new Error("graphic timing values must be finite numbers");
+  }
+  if (fromSec < 0 || toSec < 0) {
+    throw new Error("graphic timing values must be non-negative");
+  }
+  resolveGraphicTemplate(template);
+  if (toSec <= fromSec) {
+    throw new Error(
+      `graphic span is empty: toSec (${toSec}) must be greater than fromSec (${fromSec})`
+    );
+  }
+  const projectDurationSec = project.durationSamples / SAMPLE_RATE;
+  if (fromSec >= projectDurationSec) {
+    throw new Error("graphic span starts after the project ends");
+  }
+  const endSec = Math.min(toSec, projectDurationSec);
+  if (endSec <= fromSec) {
+    throw new Error("graphic span is empty after clamping to project duration");
+  }
+  const merged = {
+    ...defaultGraphicParams(loadGraphicManifest(template)),
+    ...(params ?? {}),
+  };
+  const item: Graphic = {
+    id: `g${Date.now()}`,
+    template,
+    params: merged,
+    startSample: Math.round(fromSec * SAMPLE_RATE),
+    endSample: Math.round(endSec * SAMPLE_RATE),
+    track,
+  };
+  if (!project.graphics) {
+    project.graphics = [];
+  }
+  project.graphics.push(item);
+  return item;
+}
+
+// Remove a graphic overlay by id. Returns whether one was removed.
+export function removeGraphic(project: Project, id: string): boolean {
+  const graphics = project.graphics ?? [];
+  const before = graphics.length;
+  project.graphics = graphics.filter((g) => g.id !== id);
+  return project.graphics.length < before;
+}
+
+function findGraphic(project: Project, id: string): Graphic {
+  const item = (project.graphics ?? []).find((g) => g.id === id);
+  if (!item) {
+    throw new Error(`unknown graphic "${id}"`);
+  }
+  return item;
+}
+
+// Patch an existing graphic overlay. Omitted fields are unchanged; supplied
+// params are MERGED over the existing params (mirrors look-color's knob merge),
+// so callers can tweak one field without resending the whole record.
+export function updateGraphic(
+  project: Project,
+  id: string,
+  patch: {
+    template?: string;
+    fromSec?: number;
+    toSec?: number;
+    params?: Record<string, string | number | boolean>;
+    track?: Graphic["track"];
+  }
+): Graphic {
+  const item = findGraphic(project, id);
+  const template = patch.template ?? item.template;
+  const fromSec = patch.fromSec ?? item.startSample / SAMPLE_RATE;
+  const toSec = patch.toSec ?? item.endSample / SAMPLE_RATE;
+  const track = patch.track ?? item.track;
+  if (![fromSec, toSec].every(Number.isFinite)) {
+    throw new Error("graphic timing values must be finite numbers");
+  }
+  if (fromSec < 0 || toSec < 0) {
+    throw new Error("graphic timing values must be non-negative");
+  }
+  resolveGraphicTemplate(template);
+  if (toSec <= fromSec) {
+    throw new Error(
+      `graphic span is empty: toSec (${toSec}) must be greater than fromSec (${fromSec})`
+    );
+  }
+  const projectDurationSec = project.durationSamples / SAMPLE_RATE;
+  if (fromSec >= projectDurationSec) {
+    throw new Error("graphic span starts after the project ends");
+  }
+  const endSec = Math.min(toSec, projectDurationSec);
+  if (endSec <= fromSec) {
+    throw new Error("graphic span is empty after clamping to project duration");
+  }
+  // When the template changes, re-seed defaults so the new template's params are
+  // populated; keep prior params that still apply, then merge the caller's patch.
+  const base =
+    template === item.template
+      ? item.params
+      : {
+          ...defaultGraphicParams(loadGraphicManifest(template)),
+          ...item.params,
+        };
+  item.template = template;
+  item.params = { ...base, ...(patch.params ?? {}) };
+  item.track = track;
+  item.startSample = Math.round(fromSec * SAMPLE_RATE);
+  item.endSample = Math.round(endSec * SAMPLE_RATE);
+  return item;
+}
+
 // Toggle burned captions on/off for the export.
 export function setCaptions(project: Project, enabled: boolean): Project {
   project.captions = { ...project.captions, enabled };
@@ -499,7 +645,12 @@ export function setPadMs(project: Project, padMs: number): Project {
 // Toggle cinematic look flags (vignette).
 export function setLook(
   project: Project,
-  input: { vignette?: boolean; grade?: Grade; lut?: string | null }
+  input: {
+    vignette?: boolean;
+    grade?: Grade;
+    lut?: string | null;
+    color?: Partial<ColorAdjust>;
+  }
 ): Project {
   if (typeof input.vignette === "boolean") {
     project.look = { ...project.look, vignette: input.vignette };
@@ -515,7 +666,26 @@ export function setLook(
       project.look = { ...project.look, lut: input.lut };
     }
   }
+  if (input.color !== undefined) {
+    project.look = mergeColor(project.look, input.color);
+  }
   return project;
+}
+
+// Merge color knobs onto the current adjust (only the passed knobs change), then
+// drop the field entirely when the result is neutral so the EDL stays clean :
+// the same omit-when-default behaviour the LUT field uses.
+function mergeColor<T extends { color?: ColorAdjust }>(
+  look: T | undefined,
+  patch: Partial<ColorAdjust>
+): T {
+  const base = (look ?? {}) as T;
+  const merged = { ...ColorAdjustSchema.parse(base.color ?? {}), ...patch };
+  if (isNeutralColor(merged)) {
+    const { color: _omit, ...rest } = base;
+    return rest as T;
+  }
+  return { ...base, color: merged };
 }
 
 // Patch the global animation feel. Only the provided knobs change.
@@ -684,36 +854,8 @@ export function reorderZoom(
   return project.zooms;
 }
 
-export interface ProjectSummary {
-  assetCount: number;
-  brollCount: number;
-  cuts: number;
-  deleted: number;
-  kept: number;
-  keptDurationSec: number;
-  titleCount: number;
-  words: number;
-  zoomCount: number;
-}
-
-// A quick health read of the edit: word counts, number of surviving ranges, and
-// the kept duration in seconds (what the exported cut will run to).
-export function summarize(project: Project): ProjectSummary {
-  const deleted = project.words.filter((w) => w.deleted).length;
-  const ranges = survivingRanges(project);
-  const keptDurationSec = ranges.reduce(
-    (a, r) => a + (r.endSec - r.startSec),
-    0
-  );
-  return {
-    words: project.words.length,
-    deleted,
-    kept: project.words.length - deleted,
-    cuts: ranges.length,
-    brollCount: project.broll.length,
-    titleCount: project.titles?.length ?? 0,
-    zoomCount: project.zooms?.length ?? 0,
-    assetCount: project.assets.length,
-    keptDurationSec,
-  };
-}
+// `summarize` and its `ProjectSummary` type now live in the client-safe leaf
+// summary.ts (the GUI imports them on the client; keeping them here would drag
+// this module's server-only graphics catalog into the browser bundle). Re-export
+// so every server caller that imports them from actions.ts keeps working.
+export { type ProjectSummary, summarize } from "./summary.ts";

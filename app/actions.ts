@@ -1,7 +1,7 @@
 "use server";
 
 import { existsSync } from "node:fs";
-import type { Grade, Motion } from "@engine/edl";
+import type { ColorAdjust, Grade, Motion } from "@engine/edl";
 import { exportCut } from "@engine/exporter";
 import { projectPaths } from "@engine/paths";
 import {
@@ -55,7 +55,12 @@ export async function saveProjectEdits(
 
 export async function saveLook(
   slug: string,
-  body: { vignette?: boolean; grade?: Grade; lut?: string | null }
+  body: {
+    vignette?: boolean;
+    grade?: Grade;
+    lut?: string | null;
+    color?: Partial<ColorAdjust>;
+  }
 ): Promise<ActionResult> {
   try {
     await mutateProject(slug, (project) => applyLook(project, body));

@@ -1,7 +1,11 @@
 import {
   type Broll,
   BrollSchema,
+  type ColorAdjust,
+  ColorAdjustSchema,
   type Grade,
+  type Graphic,
+  GraphicSchema,
   type Motion,
   type Project,
   type Still,
@@ -11,6 +15,8 @@ import {
   type Zoom,
   ZoomSchema,
 } from "./edl.ts";
+import { isNeutralColor } from "./grade-color.ts";
+import { listGraphics } from "./graphics.ts";
 import { applyProjectTemplate } from "./templates.ts";
 
 export function applyProjectEdits(
@@ -48,7 +54,12 @@ export function applyProjectEdits(
 
 export function applyLook(
   project: Project,
-  body: { vignette?: boolean; grade?: Grade; lut?: string | null }
+  body: {
+    vignette?: boolean;
+    grade?: Grade;
+    lut?: string | null;
+    color?: Partial<ColorAdjust>;
+  }
 ): Project {
   if (typeof body.vignette === "boolean") {
     project.look = { ...project.look, vignette: body.vignette };
@@ -62,6 +73,18 @@ export function applyLook(
       project.look = rest;
     } else {
       project.look = { ...project.look, lut: body.lut };
+    }
+  }
+  if (body.color !== undefined) {
+    const merged = {
+      ...ColorAdjustSchema.parse(project.look.color ?? {}),
+      ...body.color,
+    };
+    if (isNeutralColor(merged)) {
+      const { color: _omit, ...rest } = project.look;
+      project.look = rest;
+    } else {
+      project.look = { ...project.look, color: merged };
     }
   }
   return project;
@@ -150,5 +173,29 @@ export function clampStillItems(project: Project, stills: unknown[]): Still[] {
 
 export function applyStills(project: Project, stills: unknown[]): Project {
   project.stills = clampStillItems(project, stills);
+  return project;
+}
+
+export function clampGraphicItems(
+  project: Project,
+  graphics: unknown[]
+): Graphic[] {
+  const templateIds = new Set(listGraphics().map((g) => g.id));
+  const dur = project.durationSamples;
+  const items: Graphic[] = [];
+  for (const raw of graphics) {
+    const graphic = GraphicSchema.parse(raw);
+    if (!templateIds.has(graphic.template)) {
+      continue;
+    }
+    const start = Math.max(0, Math.min(graphic.startSample, dur));
+    const end = Math.max(start + 1, Math.min(graphic.endSample, dur));
+    items.push({ ...graphic, startSample: start, endSample: end });
+  }
+  return items;
+}
+
+export function applyGraphics(project: Project, graphics: unknown[]): Project {
+  project.graphics = clampGraphicItems(project, graphics);
   return project;
 }

@@ -64,6 +64,7 @@ Time is integer audio samples at 48 kHz. The CLI takes seconds where a human num
 | Toggle vignette | `openklip look <slug> vignette on\|off` |
 | Set animation feel | `openklip motion <slug> --speed <n>` |
 | Set color grade | `openklip look <slug> grade <name>` |
+| Fine-tune the grade (color knobs) | `openklip look <slug> color --temp 0.15 --contrast 0.96 --sat 0.84` |
 | Apply a LUT (.cube) | `openklip look <slug> lut <name>` |
 | List available LUTs | `openklip luts` |
 | Cut boundary padding | `openklip pad <slug> <ms>` |
@@ -142,6 +143,7 @@ Prefer bounded reads over dumping the full transcript. Use `--json` for machine 
 | `openklip look <slug> vignette <on\|off>` | Toggle vignette. |
 | `openklip motion <slug> [--speed n] [--fade ms] [--hero-fade ms] [--slide frac]` | Global animation feel for overlay entrances (the deck's anim.tsx). `speed` scales every duration, so "make it snappier" is one number (`--speed 1.4`). Titles read it at export (ASS fade + slide). |
 | `openklip look <slug> grade <name>` | Set the color grade applied to the whole picture at export: `none`, `neutral`, `warm`, `cool`, `cool_desat`, `filmic`, `punchy`. Expands to a deterministic ffmpeg filter chain. `none` is the default no-op. |
+| `openklip look <slug> color [--temp n] [--tint n] [--bright n] [--contrast n] [--sat n] \| --reset` | Continuous color knobs **on top of** the base grade (the deck's "control room"): temperature/tint (colorbalance), then contrast/brightness/saturation (eq), in that order. Each knob defaults to the identity; only the ones you pass change, and an all-neutral result clears `look.color`. `--reset` returns to neutral. The GUI exposes the same knobs as live sliders previewed on a real frame; both write `look.color` through the one `look-color` action. |
 | `openklip look <slug> lut <name\|none>` | Apply a named `.cube` LUT from `luts/` (the technical color transform, e.g. log to Rec.709), applied before the grade. `none` clears it. Drop `name.cube` into `luts/`; reference by name so `project.json` stays portable. `openklip luts` lists them. |
 | `openklip pad <slug> <ms>` | Symmetric padding around kept ranges (0–500 ms). |
 | `openklip brand <slug> <name>` | Apply a brand preset (`brands/<name>.json`): sets caption/vignette/pad **defaults** only. `project.json` stays the edit; words and overlays are untouched. Also available at ingest: `openklip ingest <video> --brand <name>`. |

@@ -5,6 +5,7 @@ import { z } from "zod";
 import { spanForPhraseOverlay } from "./cli-query.ts";
 import { samplesToSec } from "./edl.ts";
 import { exportCut } from "./exporter.ts";
+import { listGraphics } from "./graphics.ts";
 import { listLuts } from "./lut.ts";
 import { listProjects, loadProject, mutateProject } from "./projectStore.ts";
 import {
@@ -245,6 +246,12 @@ const queryTools: AgentToolDef[] = [
     summary: "List available .cube LUTs (luts/) for look-lut.",
     schema: z.object({}),
     run: () => ({ luts: listLuts() }),
+  }),
+  defineQueryTool({
+    name: "graphic_list",
+    summary: "List available graphic templates (graphics/*/manifest.json).",
+    schema: z.object({}),
+    run: () => ({ graphics: listGraphics() }),
   }),
   defineQueryTool({
     name: "template_show",

@@ -25,6 +25,27 @@ export const GradeSchema = z
   .default("none");
 export type Grade = z.infer<typeof GradeSchema>;
 
+// Continuous color adjustment layered on TOP of the base grade: the deck's
+// "control room" sliders. Pure numbers that map deterministically to ffmpeg
+// colorbalance (temperature/tint) then eq (contrast/brightness/saturation), in
+// that order. Every default is the identity (no change), so an agent or human
+// only moves the knobs they care about. Absent or all-neutral emits no filter.
+// Unlike the deck, moving a knob here writes the EDL directly through the same
+// action a CLI or agent calls; there is no "copy a prompt" round trip.
+export const ColorAdjustSchema = z.object({
+  /** Warm (+) / cool (-) shift: red up, blue down via colorbalance. */
+  temperature: z.number().min(-1).max(1).default(0),
+  /** Green (+) / magenta (-) shift via the green channel. */
+  tint: z.number().min(-1).max(1).default(0),
+  /** Flat additive brightness in eq (-1..1, 0 = unchanged). */
+  brightness: z.number().min(-1).max(1).default(0),
+  /** Contrast multiplier around mid-gray (1 = unchanged). */
+  contrast: z.number().min(0).max(3).default(1),
+  /** Saturation multiplier (1 = unchanged, 0 = grayscale). */
+  saturation: z.number().min(0).max(3).default(1),
+});
+export type ColorAdjust = z.infer<typeof ColorAdjustSchema>;
+
 // A subagent-produced description of an asset: what it shows and where it
 // belongs, so the editing agent can place media by meaning, not by guessing
 // from a filename. Written by the per-asset analyze pass; the EDL stays valid
@@ -104,6 +125,23 @@ export const TitleSchema = z.object({
 });
 export type Title = z.infer<typeof TitleSchema>;
 
+// A native HTML/CSS graphic template composited over a span of the SOURCE
+// timeline. The HTML engine only emits an OVERLAY ASSET keyed to this sample
+// range; ffmpeg stays the master compositor (see src/graphic-render.ts and the
+// exporter hook). `template` is a graphics/<id> template id; `params` are the
+// scalar inputs that template's manifest declares (text, colors, etc).
+export const GraphicSchema = z.object({
+  id: z.string(),
+  template: z.string(),
+  params: z
+    .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
+    .default({}),
+  startSample: z.number().int().nonnegative(),
+  endSample: z.number().int().nonnegative(),
+  track: z.enum(["broll", "title", "zoom"]).default("title"),
+});
+export type Graphic = z.infer<typeof GraphicSchema>;
+
 // A subagent-produced "visual scene log" of the MAIN video: what is on screen
 // across spans of source time, so the editing agent knows where the footage is
 // already visually interesting (speaker, slide, screen-share) versus where it
@@ -171,11 +209,14 @@ export const ProjectSchema = z.object({
       grade: GradeSchema,
       /** Named .cube LUT in luts/ applied before the grade (absent = none). */
       lut: z.string().optional(),
+      /** Continuous color knobs on top of the grade (absent = neutral). */
+      color: ColorAdjustSchema.optional(),
     })
     .default({ vignette: false, grade: "none" }),
   zooms: z.array(ZoomSchema).default([]),
   titles: z.array(TitleSchema).default([]),
   stills: z.array(StillSchema).default([]),
+  graphics: z.array(GraphicSchema).default([]),
   words: z.array(WordSchema),
   /** Edit template id (templates/<id>/skill.md). */
   template: z.string().optional(),

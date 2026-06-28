@@ -8,6 +8,12 @@ const nextConfig: NextConfig = {
     "ffmpeg-static",
     "ffprobe-static",
     "@huggingface/transformers",
+    // The graphics renderer pulls @hyperframes/producer, which bundles esbuild
+    // (a native binary + non-JS assets like README.md). Keep both out of the
+    // Turbopack bundle so they load at runtime on the server instead of being
+    // traced/parsed.
+    "@hyperframes/producer",
+    "esbuild",
   ],
 };
 

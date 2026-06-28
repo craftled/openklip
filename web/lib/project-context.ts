@@ -1,6 +1,6 @@
-import type { ProjectSummary } from "@engine/actions";
-import { summarize } from "@engine/actions";
 import type { Project } from "@engine/edl";
+import type { ProjectSummary } from "@engine/summary";
+import { summarize } from "@engine/summary";
 
 export interface ProjectStatsInput {
   assets: unknown[];

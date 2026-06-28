@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  GraphicSchema,
   ProjectSchema,
   SAMPLE_RATE,
   samplesToSec,
@@ -39,6 +40,87 @@ test("TitleSchema accepts hero position", () => {
     position: "hero",
   });
   assert.equal(title.position, "hero");
+});
+
+test("GraphicSchema defaults params to {} and track to title", () => {
+  const g = GraphicSchema.parse({
+    id: "g1",
+    template: "lower-third",
+    startSample: 0,
+    endSample: 48_000,
+  });
+  assert.deepEqual(g.params, {});
+  assert.equal(g.track, "title");
+});
+
+test("GraphicSchema accepts scalar params and an explicit track", () => {
+  const g = GraphicSchema.parse({
+    id: "g2",
+    template: "kinetic-caption",
+    params: { text: "BIG IDEA", count: 3, bold: true },
+    startSample: 0,
+    endSample: 96_000,
+    track: "broll",
+  });
+  assert.equal(g.params.text, "BIG IDEA");
+  assert.equal(g.params.count, 3);
+  assert.equal(g.params.bold, true);
+  assert.equal(g.track, "broll");
+});
+
+test("GraphicSchema rejects an invalid track", () => {
+  assert.throws(() =>
+    GraphicSchema.parse({
+      id: "g3",
+      template: "x",
+      startSample: 0,
+      endSample: 1,
+      track: "captions",
+    })
+  );
+});
+
+test("ProjectSchema defaults graphics to [] (backward-compat parse)", () => {
+  const project = ProjectSchema.parse({
+    version: 1,
+    slug: "no-graphics",
+    source: "/tmp/source.mp4",
+    proxy: "proxy.mp4",
+    sampleRate: SAMPLE_RATE,
+    fps: 30,
+    width: 1920,
+    height: 1080,
+    durationSamples: SAMPLE_RATE,
+    words: [],
+  });
+  assert.deepEqual(project.graphics, []);
+});
+
+test("ProjectSchema parses a project that already has graphics", () => {
+  const project = ProjectSchema.parse({
+    version: 1,
+    slug: "with-graphics",
+    source: "/tmp/source.mp4",
+    proxy: "proxy.mp4",
+    sampleRate: SAMPLE_RATE,
+    fps: 30,
+    width: 1920,
+    height: 1080,
+    durationSamples: SAMPLE_RATE,
+    words: [],
+    graphics: [
+      {
+        id: "g1",
+        template: "lower-third",
+        params: { title: "Hello" },
+        startSample: 0,
+        endSample: 24_000,
+      },
+    ],
+  });
+  assert.equal(project.graphics.length, 1);
+  assert.equal(project.graphics[0].template, "lower-third");
+  assert.equal(project.graphics[0].track, "title");
 });
 
 test("samplesToSec rounds to the canonical grid", () => {

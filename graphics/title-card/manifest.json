@@ -1,0 +1,21 @@
+{
+  "id": "title-card",
+  "name": "Title Card",
+  "kind": "rich",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "params": {
+    "headline": {
+      "type": "string",
+      "default": "Chapter One",
+      "label": "Headline"
+    },
+    "subtitle": { "type": "string", "default": "", "label": "Subtitle" },
+    "accent": {
+      "type": "color",
+      "default": "oklch(0.809 0.1 284.59)",
+      "label": "Accent"
+    }
+  }
+}

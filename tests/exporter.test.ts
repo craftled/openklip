@@ -8,6 +8,7 @@ import {
   chooseAssetInput,
   chooseSourceInput,
   planBrollForRanges,
+  planGraphicWindow,
 } from "../src/exporter.ts";
 
 function withTempDir(fn: (dir: string) => void): void {
@@ -115,4 +116,49 @@ test("planBrollForRanges splits a b-roll cover across deleted gaps", () => {
       { inputIndex: 2, outEnd: 1.5, outStart: 1, srcInSec: 2.5 },
     ]
   );
+});
+
+test("planGraphicWindow maps a graphic span onto the output timeline", () => {
+  // A graphic covering source 0.5s..2.5s with a deleted gap (1s..3s removed):
+  // surviving ranges [0,1] then [3,5] -> output. The graphic's 0.5..1.0 maps to
+  // output 0.5..1.0; the 1.0..2.5 portion falls inside the deleted gap and is
+  // clamped, so the window collapses to the surviving [0.5,1.0] slice.
+  const win = planGraphicWindow({
+    startSample: Math.round(0.5 * SAMPLE_RATE),
+    endSample: Math.round(0.9 * SAMPLE_RATE),
+    sampleRate: SAMPLE_RATE,
+    ranges: [
+      { startSec: 0, endSec: 1 },
+      { startSec: 3, endSec: 5 },
+    ],
+  });
+
+  assert.deepEqual(win, { outStart: 0.5, outEnd: 0.9 });
+});
+
+test("planGraphicWindow returns null when the surviving span is below the 0.05s guard", () => {
+  const win = planGraphicWindow({
+    startSample: Math.round(1.0 * SAMPLE_RATE),
+    endSample: Math.round(1.02 * SAMPLE_RATE),
+    sampleRate: SAMPLE_RATE,
+    ranges: [{ startSec: 0, endSec: 5 }],
+  });
+
+  assert.equal(win, null);
+});
+
+test("planGraphicWindow shifts the window earlier when an earlier range is deleted", () => {
+  // Source span 3.5s..4.5s with the first second [0,1] deleted (kept [1,2],[3,5]).
+  // Output time of 3.5s = (2-1) + (3.5-3) = 1.5; 4.5s = 1 + 1.5 = 2.5.
+  const win = planGraphicWindow({
+    startSample: Math.round(3.5 * SAMPLE_RATE),
+    endSample: Math.round(4.5 * SAMPLE_RATE),
+    sampleRate: SAMPLE_RATE,
+    ranges: [
+      { startSec: 1, endSec: 2 },
+      { startSec: 3, endSec: 5 },
+    ],
+  });
+
+  assert.deepEqual(win, { outStart: 1.5, outEnd: 2.5 });
 });

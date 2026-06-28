@@ -21,6 +21,13 @@ import {
 } from "./edl.ts";
 import { FFMPEG, probe, run } from "./ffmpeg.ts";
 import { gradeFilter } from "./grade.ts";
+import { colorAdjustFilter } from "./grade-color.ts";
+import { renderGraphicOverlay } from "./graphic-render.ts";
+import {
+  defaultGraphicParams,
+  type GraphicManifest,
+  loadGraphicManifest,
+} from "./graphics.ts";
 import { buildStillZoompan } from "./ken-burns.ts";
 import { lut3dExpr, lutPath } from "./lut.ts";
 import { projectPaths } from "./paths.ts";
@@ -141,6 +148,36 @@ export function planBrollForRanges(input: {
   return plans;
 }
 
+export interface GraphicWindow {
+  outEnd: number;
+  outStart: number;
+}
+
+// Map a graphic overlay's SOURCE-time sample span onto the OUTPUT timeline using
+// the SAME sourceToOutputSec machinery as stills/titles. Returns null when the
+// surviving window collapses to <= 0.05s (mirrors the still/title guard). Pure
+// so the exporter filter-graph test can assert on it without spawning ffmpeg
+// (same pattern as planBrollForRanges).
+export function planGraphicWindow(input: {
+  startSample: number;
+  endSample: number;
+  sampleRate: number;
+  ranges: Range[];
+}): GraphicWindow | null {
+  const outStart = sourceToOutputSec(
+    input.startSample / input.sampleRate,
+    input.ranges
+  );
+  const outEnd = sourceToOutputSec(
+    input.endSample / input.sampleRate,
+    input.ranges
+  );
+  if (outEnd - outStart <= 0.05) {
+    return null;
+  }
+  return { outStart, outEnd };
+}
+
 export async function exportCut(
   slug: string,
   opts: ExportOptions = {}
@@ -153,6 +190,7 @@ export async function exportCut(
   stills: number;
   zooms: number;
   titles: number;
+  graphics: number;
   vignette: boolean;
   height: number;
 }> {
@@ -234,6 +272,109 @@ export async function exportCut(
     .filter((x): x is NonNullable<typeof x> => x !== null)
     // Still inputs follow the source (0) and all b-roll plan inputs.
     .map((sp, i) => ({ ...sp, inputIndex: 1 + plans.length + i }));
+
+  // graphics -> output windows. Each Graphic overlay is rendered through the
+  // renderer seam (src/graphic-render.ts) into an overlay asset keyed to its
+  // sample range; ffmpeg stays the master compositor.
+  //   - kind 'text' -> an ASS burn (combined into one graphics.ass below, exactly
+  //     like titles; the seam's per-overlay text path is the unit-testable
+  //     surface but the exporter builds the combined file directly for parity
+  //     with titles — keep this duplication, do NOT route text graphics back
+  //     through the per-overlay seam or the local/output timebase will mismatch).
+  //   - kind 'rich' -> an alpha WebM composited as one extra input after stills.
+  // One planning pass: map each Graphic to its output window + manifest + merged
+  // params. NO renderer-seam call here — text graphics are burned directly into
+  // the combined graphics.ass below (parity with titles), so only rich graphics
+  // pay for a headless render and no wasted per-overlay .ass file is written.
+  const graphicsPlanned = (project.graphics ?? [])
+    .map((g) => {
+      const win = planGraphicWindow({
+        startSample: g.startSample,
+        endSample: g.endSample,
+        sampleRate: sr,
+        ranges,
+      });
+      if (!win) {
+        return null;
+      }
+      const manifest: GraphicManifest = loadGraphicManifest(g.template);
+      const params = { ...defaultGraphicParams(manifest), ...g.params };
+      return {
+        graphic: g,
+        outStart: win.outStart,
+        outEnd: win.outEnd,
+        manifest,
+        params,
+      };
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null);
+
+  // Text graphics burn as a single combined ASS at OUTPUT time (mirrors titles).
+  // A representative accent (first text graphic that sets one) is threaded so the
+  // common single-accent case matches the preview's --accent; buildTitlesAss is
+  // single-accent per file, so mixed per-item accents would need grouped burns.
+  let graphicsAssPath: string | null = null;
+  const textGraphics = graphicsPlanned.filter(
+    (x) => x.manifest.kind === "text"
+  );
+  const textGraphicItems: TitleItem[] = textGraphics
+    .map((x): TitleItem => {
+      const pos = x.params.position;
+      const position: "lower" | "center" | "hero" =
+        pos === "center" || pos === "hero" ? pos : "lower";
+      return {
+        text: String(x.params.text ?? x.params.title ?? ""),
+        startSec: x.outStart,
+        endSec: x.outEnd,
+        position,
+      };
+    })
+    .filter((t) => t.text.trim().length > 0 && t.endSec - t.startSec > 0.05);
+  if (textGraphicItems.length > 0) {
+    const graphicAccent = textGraphics
+      .map((x) => x.params.accent)
+      .find((a): a is string => typeof a === "string" && a.length > 0);
+    graphicsAssPath = `${p.working}/graphics.ass`;
+    await Bun.write(
+      graphicsAssPath,
+      buildTitlesAss(textGraphicItems, {
+        width: outW,
+        height: outH,
+        motion: project.motion,
+        accent: graphicAccent,
+      })
+    );
+  }
+
+  // Rich graphics each pay for a headless alpha-WebM render through the seam,
+  // keyed by the overlay's UNIQUE id (g.id) so two overlays sharing a template
+  // never collide on one file. Input-index invariant: physical -i order is
+  // source(0), b-roll plans, stills, THEN rich graphics. The
+  // `1 + plans.length + stillPlans.length + j` math MUST match the flatMap append
+  // order in the inputs array — the single most likely off-by-one bug, so the
+  // index math and the append order live together.
+  const richRendered = await Promise.all(
+    graphicsPlanned
+      .filter((x) => x.manifest.kind === "rich")
+      .map(async (x) => {
+        const asset = await renderGraphicOverlay({
+          manifest: x.manifest,
+          id: x.graphic.id,
+          template: x.graphic.template,
+          params: x.params,
+          durationSamples: x.graphic.endSample - x.graphic.startSample,
+          fps: outFps,
+          width: outW,
+          height: outH,
+          outDir: p.working,
+        });
+        return { ...x, asset };
+      })
+  );
+  const richGraphics = richRendered.map((x, j) => ({
+    ...x,
+    inputIndex: 1 + plans.length + stillPlans.length + j,
+  }));
 
   // zooms -> output windows
   const zoomWins = (project.zooms ?? [])
@@ -370,10 +511,33 @@ export async function exportCut(
     last = "grd";
   }
 
+  // Continuous color knobs (the deck's control-room sliders) on top of the base
+  // grade, in the same slot so the look composites grade then fine adjustment.
+  const colorChain = colorAdjustFilter(project.look?.color);
+  if (colorChain) {
+    parts.push(`[${last}]${colorChain}[clr]`);
+    last = "clr";
+  }
+
   const vignette = Boolean(project.look?.vignette);
   if (vignette) {
     parts.push(`[${last}]vignette[vig]`);
     last = "vig";
+  }
+
+  // Rich graphics sit on top of the grade/vignette, just below the subtitle
+  // burns (captions/titles/text-graphics) — same editorial layer as titles. The
+  // alpha WebM carries its own duration + transparency, so just PTS-offset to its
+  // output start, scale to the frame, and overlay within its enable window
+  // (mirrors the still overlay loop above; eof_action=pass like b-roll/stills).
+  for (const rg of richGraphics) {
+    parts.push(
+      `[${rg.inputIndex}:v]setpts=PTS-STARTPTS+${sec(rg.outStart)}/TB,scale=${outW}:${outH}[gv${rg.inputIndex}]`
+    );
+    parts.push(
+      `[${last}][gv${rg.inputIndex}]overlay=eof_action=pass:enable='between(t,${sec(rg.outStart)},${sec(rg.outEnd)})'[gov${rg.inputIndex}]`
+    );
+    last = `gov${rg.inputIndex}`;
   }
 
   let vlabel = last;
@@ -384,6 +548,12 @@ export async function exportCut(
   if (titlesAssPath) {
     parts.push(`[${vlabel}]subtitles='${escapeAssPath(titlesAssPath)}'[vtit]`);
     vlabel = "vtit";
+  }
+  if (graphicsAssPath) {
+    parts.push(
+      `[${vlabel}]subtitles='${escapeAssPath(graphicsAssPath)}'[vgfx]`
+    );
+    vlabel = "vgfx";
   }
   parts.push(`[${vlabel}]null[vout]`);
   parts.push(`[0:a]aselect='${selectExpr}',asetpts=N/SR/TB[aout]`);
@@ -401,6 +571,10 @@ export async function exportCut(
       "-i",
       sp.srcPath,
     ]),
+    // Rich-graphic alpha WebMs. MUST be appended AFTER stills to keep the
+    // 1 + plans.length + stillPlans.length + j index math above correct. VP9
+    // alpha (yuva420p) is auto-detected by ffmpeg; no input codec flag needed.
+    ...richGraphics.flatMap((rg) => ["-i", rg.asset.assetPath]),
   ];
   await run(
     FFMPEG,
@@ -441,6 +615,7 @@ export async function exportCut(
     stills: stillPlans.length,
     zooms: zoomWins.length,
     titles: titleItems.length,
+    graphics: graphicsPlanned.length,
     vignette,
     height: outH,
   };

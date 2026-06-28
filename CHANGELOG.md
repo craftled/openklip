@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.8.8.0 - 2026-06-28
+
+Grade control room: continuous color knobs on top of the base grade, with a live single-frame preview, across CLI, GUI, and MCP.
+
+### Added
+- **Color adjust (`look.color`)**: five continuous knobs layered on the named grade: temperature, tint, brightness, contrast, saturation. Maps to a deterministic ffmpeg chain: colorbalance (temp/tint), then eq (contrast/brightness/saturation), in the deck's order. Absent or all-neutral emits no filter and is dropped from the EDL.
+- **`openklip look <slug> color`**: set any subset of knobs (`--temp`, `--tint`, `--bright`, `--contrast`, `--sat`) or `--reset`. Only the passed knobs change. Mirrored as the `look-color` registry action, so the GUI and an MCP agent drive the same mutation.
+- **Grade control room (GUI)**: a dialog with the five knobs as live sliders, a base-grade picker, and hold-to-compare. Each slider previews on a real frame and writes `project.json` on release: no "copy a prompt" round trip, unlike the source deck. The agent can set the look from chat; the human nudges here.
+- **Preview-frame endpoint** (`GET /api/projects/<slug>/preview-frame`): renders one graded frame (LUT then grade then color, the exact export order) so tuning is instant. Query overrides let the GUI preview unsaved values; with no overrides it shows the committed look.
+
 ## 0.8.7.1 - 2026-06-28
 
 Hotfix the 0.8.7.0 release: green up typecheck/CI, sync the version, and refine the player transport bar.

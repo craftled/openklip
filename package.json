@@ -1,6 +1,6 @@
 {
   "name": "openklip",
-  "version": "0.8.7.1",
+  "version": "0.8.8.0",
   "license": "MIT",
   "private": true,
   "type": "module",
@@ -58,6 +58,9 @@
     "use-stick-to-bottom": "^1.1.6",
     "vaul": "^1.1.2",
     "zod": "4.4.3"
+  },
+  "optionalDependencies": {
+    "@hyperframes/producer": "^0.7.17"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.16",

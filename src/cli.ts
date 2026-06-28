@@ -18,6 +18,7 @@ import {
 import { runDoctor } from "./doctor.ts";
 import {
   type Broll,
+  type Graphic,
   type Project,
   ProjectSchema,
   type Still,
@@ -28,6 +29,7 @@ import {
 import { exportCut } from "./exporter.ts";
 import { FFMPEG, FFPROBE } from "./ffmpeg.ts";
 import { GRADE_NAMES, isGrade } from "./grade.ts";
+import { colorAdjustSummary } from "./grade-color.ts";
 import { ingest } from "./ingest.ts";
 import { loadIngesters } from "./ingesters.ts";
 import { listLuts, lutPath } from "./lut.ts";
@@ -117,6 +119,11 @@ Overlays
                                        --scale <1-3>  --focus-x <0-1>  --focus-y <0-1>
   openklip still-set <slug> <stillId> patch still (--asset --from --to --scale --focus-x --focus-y)
   openklip still-rm <slug> <stillId> remove a still overlay
+  openklip graphic-add <slug> <template> <fromSec> <toSec>
+                                     overlay an HTML/CSS graphic template
+                                       --param key=value (repeatable)  --track broll|title|zoom
+  openklip graphic-set <slug> <graphicId> patch graphic (--template --from --to --param --track)
+  openklip graphic-rm <slug> <graphicId> remove a graphic overlay
   openklip title-add-phrase <slug> "spoken phrase" "title text"
                                      place title at first phrase match
                                        --position lower|center|hero
@@ -132,6 +139,7 @@ Look & captions
   openklip captions <slug> <on|off>    toggle burned captions for export
   openklip captions-max <slug> <n>       words per caption line (1-12)
   openklip look <slug> vignette <on|off> toggle vignette
+  openklip look <slug> color [--temp n] [--tint n] [--bright n] [--contrast n] [--sat n] | --reset
   openklip pad <slug> <ms>               cut boundary padding (0-500 ms)
   openklip brand <slug> <name>           apply a brand preset (look defaults)
   openklip template list                 list edit templates (templates/*/skill.md)
@@ -216,6 +224,39 @@ function flagNumber(args: string[], flag: string): number | undefined {
     throw new Error(`${flag} must be a number`);
   }
   return n;
+}
+
+// Collect repeated `--param key=value` flags into a params record for graphic
+// overlays. Values stay strings (the Graphic params schema accepts string too).
+function collectParams(args: string[]): Record<string, string> {
+  const params: Record<string, string> = {};
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] !== "--param") {
+      continue;
+    }
+    const pair = args[i + 1];
+    if (!pair) {
+      throw new Error("--param expects key=value");
+    }
+    const eq = pair.indexOf("=");
+    if (eq <= 0) {
+      throw new Error(`--param must be key=value (got "${pair}")`);
+    }
+    params[pair.slice(0, eq)] = pair.slice(eq + 1);
+  }
+  return params;
+}
+
+// Parse the optional --track flag for graphics (z-layer: broll|title|zoom).
+function trackFlag(args: string[]): "broll" | "title" | "zoom" | undefined {
+  const t = flagValue(args, "--track");
+  if (t === undefined) {
+    return;
+  }
+  if (t !== "broll" && t !== "title" && t !== "zoom") {
+    throw new Error("--track must be broll, title, or zoom");
+  }
+  return t;
 }
 
 // Expand cut tokens (word ids "w12" and inclusive ranges "w12-w20") into the
@@ -714,6 +755,75 @@ try {
       console.log(`removed still ${rest[1]}`);
       break;
     }
+    case "graphic-add": {
+      if (!(rest[0] && rest[1] && rest[2] && rest[3])) {
+        throw new Error(
+          "usage: openklip graphic-add <slug> <template> <fromSec> <toSec> [--param key=value ...] [--track broll|title|zoom]"
+        );
+      }
+      const slug = rest[0];
+      const args = rest.slice(1);
+      const fromSec = Number(rest[2]);
+      const toSec = Number(rest[3]);
+      if (!(Number.isFinite(fromSec) && Number.isFinite(toSec))) {
+        throw new Error("fromSec and toSec must be numbers (seconds)");
+      }
+      const project = await loadProject(slug);
+      const item = runAction("graphic-add", project, {
+        template: rest[1],
+        fromSec,
+        toSec,
+        params: collectParams(args),
+        track: trackFlag(args),
+      }) as Graphic;
+      await saveProject(slug, project);
+      console.log(
+        `added graphic ${item.id} (template "${item.template}", ${fromSec}s-${toSec}s, ${item.track})`
+      );
+      break;
+    }
+    case "graphic-set": {
+      if (!(rest[0] && rest[1])) {
+        throw new Error(
+          "usage: openklip graphic-set <slug> <graphicId> [--template id] [--from N] [--to N] [--param key=value ...] [--track broll|title|zoom]"
+        );
+      }
+      const slug = rest[0];
+      const args = rest.slice(2);
+      const params = collectParams(args);
+      const project = await loadProject(slug);
+      const item = runAction("graphic-set", project, {
+        id: rest[1],
+        template: flagValue(args, "--template"),
+        fromSec: flagNumber(args, "--from"),
+        toSec: flagNumber(args, "--to"),
+        params: Object.keys(params).length > 0 ? params : undefined,
+        track: trackFlag(args),
+      }) as Graphic;
+      await saveProject(slug, project);
+      console.log(
+        `updated graphic ${item.id} (template "${item.template}", ${secSpan(item.startSample, item.endSample)}, ${item.track})`
+      );
+      break;
+    }
+    case "graphic-rm": {
+      if (!(rest[0] && rest[1])) {
+        throw new Error("usage: openklip graphic-rm <slug> <graphicId>");
+      }
+      const project = await loadProject(rest[0]);
+      const { removed } = runAction("graphic-rm", project, {
+        id: rest[1],
+      }) as {
+        removed: boolean;
+      };
+      if (!removed) {
+        console.log(`no graphic overlay with id "${rest[1]}"`);
+        break;
+      }
+      await saveProject(rest[0], project);
+      console.log(`removed graphic ${rest[1]}`);
+      break;
+    }
     case "title-add": {
       if (!rest[0]) {
         throw new Error(
@@ -956,9 +1066,60 @@ try {
         console.log(`lut: ${project.look.lut ?? "none"}`);
         break;
       }
+      if (rest[1] === "color") {
+        const colorNum = (...flags: string[]) => {
+          for (const flag of flags) {
+            const v = flagValue(rest, flag);
+            if (v === undefined) {
+              continue;
+            }
+            const n = Number(v);
+            if (!Number.isFinite(n)) {
+              throw new Error(`${flag} must be a number`);
+            }
+            return n;
+          }
+          return;
+        };
+        const input: Record<string, number | boolean> = {};
+        if (rest.includes("--reset")) {
+          input.reset = true;
+        } else {
+          const temperature = colorNum("--temp", "--temperature");
+          const tint = colorNum("--tint");
+          const brightness = colorNum("--bright", "--brightness");
+          const contrast = colorNum("--contrast");
+          const saturation = colorNum("--sat", "--saturation");
+          if (temperature !== undefined) {
+            input.temperature = temperature;
+          }
+          if (tint !== undefined) {
+            input.tint = tint;
+          }
+          if (brightness !== undefined) {
+            input.brightness = brightness;
+          }
+          if (contrast !== undefined) {
+            input.contrast = contrast;
+          }
+          if (saturation !== undefined) {
+            input.saturation = saturation;
+          }
+          if (Object.keys(input).length === 0) {
+            throw new Error(
+              "usage: openklip look <slug> color [--temp n] [--tint n] [--bright n] [--contrast n] [--sat n] | --reset"
+            );
+          }
+        }
+        const project = await loadProject(rest[0]);
+        runAction("look-color", project, input);
+        await saveProject(rest[0], project);
+        console.log(`color: ${colorAdjustSummary(project.look.color)}`);
+        break;
+      }
       if (rest[1] !== "vignette") {
         throw new Error(
-          `usage: openklip look <slug> vignette <on|off>\n       ${gradeUsage}\n       openklip look <slug> lut <name|none>`
+          `usage: openklip look <slug> vignette <on|off>\n       ${gradeUsage}\n       openklip look <slug> lut <name|none>\n       openklip look <slug> color [--temp n] [--tint n] [--bright n] [--contrast n] [--sat n] | --reset`
         );
       }
       const vignette = parseOnOff(rest[2], "openklip look <slug> vignette");
@@ -1050,7 +1211,7 @@ try {
         `  captions:     ${project.captions.enabled ? "on" : "off"}  (max ${project.captions.maxWords ?? 6} words/line)`
       );
       console.log(
-        `  look:         vignette ${project.look?.vignette ? "on" : "off"}, grade ${project.look?.grade ?? "none"}${project.look?.lut ? `, lut ${project.look.lut}` : ""}`
+        `  look:         vignette ${project.look?.vignette ? "on" : "off"}, grade ${project.look?.grade ?? "none"}${project.look?.lut ? `, lut ${project.look.lut}` : ""}${project.look?.color ? `, color ${colorAdjustSummary(project.look.color)}` : ""}`
       );
       console.log(
         `  motion:       speed ${project.motion.speed}, fade ${project.motion.fadeMs}ms`

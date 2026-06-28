@@ -9,6 +9,7 @@
 import { z } from "zod";
 import {
   addBroll,
+  addGraphic,
   addStill,
   addTitle,
   addZoom,
@@ -16,6 +17,7 @@ import {
   cutByText,
   cutWords,
   removeBroll,
+  removeGraphic,
   removeStill,
   removeTitle,
   removeZoom,
@@ -29,11 +31,13 @@ import {
   setMotion,
   setPadMs,
   updateBroll,
+  updateGraphic,
   updateStill,
   updateTitle,
   updateZoom,
 } from "./actions.ts";
 import { GradeSchema, type Project } from "./edl.ts";
+import { NEUTRAL_COLOR } from "./grade-color.ts";
 
 // Where an action is exposed. The CLI dispatch, the editor's server actions, and
 // the agent-facing manifest each filter the registry by surface.
@@ -238,6 +242,44 @@ export const actions: ActionDef[] = [
     run: (p, i) => ({ removed: removeZoom(p, i.id) }),
   }),
   defineAction({
+    name: "graphic-add",
+    summary: "Overlay an HTML/CSS graphic template over a source-time span.",
+    surfaces: ["cli", "gui", "mcp"],
+    schema: z.object({
+      template: z.string(),
+      fromSec: sec,
+      toSec: sec,
+      params: z
+        .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
+        .optional(),
+      track: track.optional(),
+    }),
+    run: (p, i) => addGraphic(p, i),
+  }),
+  defineAction({
+    name: "graphic-set",
+    summary: "Patch a graphic overlay (template, params, span, track).",
+    surfaces: ["cli", "gui", "mcp"],
+    schema: z.object({
+      id: z.string(),
+      template: z.string().optional(),
+      fromSec: sec.optional(),
+      toSec: sec.optional(),
+      params: z
+        .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
+        .optional(),
+      track: track.optional(),
+    }),
+    run: (p, i) => updateGraphic(p, i.id, i),
+  }),
+  defineAction({
+    name: "graphic-rm",
+    summary: "Remove a graphic overlay by id.",
+    surfaces: ["cli", "gui", "mcp"],
+    schema: z.object({ id: z.string() }),
+    run: (p, i) => ({ removed: removeGraphic(p, i.id) }),
+  }),
+  defineAction({
     name: "captions",
     summary: "Toggle burned captions for export.",
     surfaces: ["cli", "gui", "mcp"],
@@ -295,6 +337,29 @@ export const actions: ActionDef[] = [
     run: (p, i) => {
       setLook(p, { lut: i.lut });
       return { lut: p.look.lut ?? null };
+    },
+  }),
+  defineAction({
+    name: "look-color",
+    summary:
+      "Adjust continuous color knobs on top of the base grade (temperature, tint, brightness, contrast, saturation). Omitted knobs keep their value; reset:true returns to neutral.",
+    surfaces: ["cli", "gui", "mcp"],
+    schema: z.object({
+      temperature: z.number().min(-1).max(1).optional(),
+      tint: z.number().min(-1).max(1).optional(),
+      brightness: z.number().min(-1).max(1).optional(),
+      contrast: z.number().min(0).max(3).optional(),
+      saturation: z.number().min(0).max(3).optional(),
+      reset: z.boolean().optional(),
+    }),
+    run: (p, i) => {
+      if (i.reset) {
+        setLook(p, { color: NEUTRAL_COLOR });
+      } else {
+        const { reset: _reset, ...knobs } = i;
+        setLook(p, { color: knobs });
+      }
+      return { color: p.look.color ?? null };
     },
   }),
   defineAction({

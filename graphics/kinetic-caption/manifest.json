@@ -1,0 +1,16 @@
+{
+  "id": "kinetic-caption",
+  "name": "Kinetic Caption",
+  "kind": "text",
+  "width": 1080,
+  "height": 1080,
+  "fps": 30,
+  "params": {
+    "text": { "type": "string", "default": "BIG IDEA", "label": "Text" },
+    "accent": {
+      "type": "color",
+      "default": "oklch(0.809 0.1 284.59)",
+      "label": "Accent"
+    }
+  }
+}

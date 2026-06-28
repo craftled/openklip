@@ -1,0 +1,63 @@
+<div data-graphic-root data-width="1920" data-height="1080" data-fps="30">
+  <style>
+  .tc {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 0 8%;
+    font-family: Georgia, "Times New Roman", serif;
+    color: #fff;
+    text-align: center;
+  }
+  .tc h1 {
+    margin: 0;
+    font-size: 144px;
+    font-weight: 700;
+    line-height: 1.04;
+    text-shadow: 0 2px 24px rgba(0, 0, 0, 0.45);
+  }
+  .tc .rule {
+    width: 180px;
+    height: 3px;
+    margin: 28px 0;
+    background: var(--accent, oklch(0.809 0.1 284.59));
+    border-radius: 2px;
+  }
+  .tc p {
+    max-width: 80%;
+    margin: 0;
+    font-size: 42px;
+    font-weight: 400;
+    opacity: 0.9;
+  }
+  </style>
+  <div class="tc">
+    <h1
+      data-anim="fade,slideUp"
+      data-in-frame="0"
+      data-in-dur="9"
+      data-ease="easeOut"
+      data-slide="60"
+      data-bind="headline"
+    >
+      Chapter One
+    </h1>
+    <div
+      class="rule"
+      data-anim="wipe"
+      data-in-frame="6"
+      data-in-dur="10"
+      data-ease="easeInOut"
+    ></div>
+    <p
+      data-anim="fade"
+      data-in-frame="10"
+      data-in-dur="9"
+      data-ease="easeOut"
+      data-bind="subtitle"
+    ></p>
+  </div>
+</div>

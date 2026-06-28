@@ -1,6 +1,6 @@
 "use client";
 
-import type { Grade } from "@engine/edl";
+import type { ColorAdjust, Grade } from "@engine/edl";
 import { GRADE_OPTIONS } from "@engine/grade";
 import {
   createShader,
@@ -42,6 +42,8 @@ import {
   type ExportDialogOptions,
 } from "@/components/export-dialog";
 import { FindFillerButton } from "@/components/find-filler-button";
+import { GradeControlRoom } from "@/components/grade-control-room";
+import { type GraphicItem, GraphicOverlay } from "@/components/graphic-overlay";
 import { HeroTitleOverlay } from "@/components/hero-title-overlay";
 import { KeyboardHint } from "@/components/keyboard-hint";
 import { OverlaySortable } from "@/components/overlay-sortable";
@@ -194,8 +196,9 @@ interface Project {
   dirPath: string;
   durationSamples: number;
   fps: number;
+  graphics?: GraphicItem[];
   height: number;
-  look?: { vignette: boolean; grade?: Grade };
+  look?: { vignette: boolean; grade?: Grade; color?: ColorAdjust };
   mediaVersion?: number;
   motion?: { speed?: number };
   padMs: number;
@@ -330,6 +333,9 @@ export function App({
   );
   const [grade, setGradeState] = useState<Grade>(
     initialProject.look?.grade ?? "none"
+  );
+  const [color, setColorState] = useState<ColorAdjust | null>(
+    initialProject.look?.color ?? null
   );
   const [motionSpeed, setMotionSpeed] = useState<number>(
     initialProject.motion?.speed ?? 1
@@ -536,6 +542,11 @@ export function App({
   const standardTitle =
     activeTitle && activeTitle.position !== "hero" ? activeTitle : null;
   const captionsRaised = standardTitle?.position === "lower";
+  // Graphics can stack (multiple tracks), so collect all active ones rather than
+  // a single find. Each is keyed on the same source sample grid as titles/broll.
+  const activeGraphics = (project?.graphics ?? []).filter(
+    (g) => curSample >= g.startSample && curSample < g.endSample
+  );
   const assetName = (id: string) =>
     project?.assets.find((a) => a.id === id)?.name ?? id;
   const brollAssets = useMemo(
@@ -858,6 +869,17 @@ export function App({
   const changeGrade = (next: Grade) => {
     setGradeState(next);
     enqueueSave(() => saveLook(project.slug, { grade: next }));
+  };
+  const changeColor = (next: ColorAdjust) => {
+    // Mirror the engine's omit-when-neutral: a fully default adjust clears.
+    const neutral =
+      next.temperature === 0 &&
+      next.tint === 0 &&
+      next.brightness === 0 &&
+      next.contrast === 1 &&
+      next.saturation === 1;
+    setColorState(neutral ? null : next);
+    enqueueSave(() => saveLook(project.slug, { color: next }));
   };
   const changeMotionSpeed = (next: number) => {
     setMotionSpeed(next);
@@ -1538,6 +1560,14 @@ export function App({
                           />
                         )}
                         <HeroTitleOverlay title={heroTitle} />
+                        {activeGraphics.map((g) => (
+                          <GraphicOverlay
+                            curSample={curSample}
+                            graphic={g}
+                            key={g.id}
+                            sampleRate={sr}
+                          />
+                        ))}
                         {standardTitle && (
                           <div
                             className={cn(
@@ -1703,6 +1733,14 @@ export function App({
                           ))}
                         </SelectContent>
                       </Select>
+                      <GradeControlRoom
+                        atSec={curSec}
+                        color={color}
+                        grade={grade}
+                        onColor={changeColor}
+                        onGrade={changeGrade}
+                        slug={project.slug}
+                      />
                       <Toggle
                         aria-label="Vignette"
                         onPressedChange={toggleVignette}

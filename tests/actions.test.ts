@@ -368,6 +368,27 @@ test("setLook toggles vignette", () => {
   assert.equal(p.look.vignette, false);
 });
 
+test("setLook merges color knobs and only changes the passed ones", () => {
+  const p = makeProject();
+  setLook(p, { color: { temperature: 0.15 } });
+  assert.equal(p.look.color?.temperature, 0.15);
+  // Untouched knobs keep their identity defaults.
+  assert.equal(p.look.color?.contrast, 1);
+  assert.equal(p.look.color?.saturation, 1);
+  // A second patch merges, not replaces.
+  setLook(p, { color: { saturation: 0.84 } });
+  assert.equal(p.look.color?.temperature, 0.15);
+  assert.equal(p.look.color?.saturation, 0.84);
+});
+
+test("setLook drops the color field when knobs return to neutral", () => {
+  const p = makeProject();
+  setLook(p, { color: { temperature: 0.15, saturation: 0.84 } });
+  assert.ok(p.look.color);
+  setLook(p, { color: { temperature: 0, saturation: 1 } });
+  assert.equal(p.look.color, undefined);
+});
+
 test("addZoom stores scale and rampSec", () => {
   const p = makeProject();
   const item = addZoom(p, {

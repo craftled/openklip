@@ -1,0 +1,17 @@
+{
+  "id": "lower-third",
+  "name": "Lower Third",
+  "kind": "text",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "params": {
+    "title": { "type": "string", "default": "Name", "label": "Title" },
+    "subtitle": { "type": "string", "default": "", "label": "Subtitle" },
+    "accent": {
+      "type": "color",
+      "default": "oklch(0.809 0.1 284.59)",
+      "label": "Accent"
+    }
+  }
+}
