@@ -4,8 +4,13 @@
 // the user's Claude subscription (via `claude -p`) to suggest + apply cuts on
 // the same project.json the editor reads. No API keys. Kept in its own file so
 // it doesn't touch the hand-written action surface.
-import { detectAgents, runFillerAgent } from "@engine/agent-driver";
-import { mutateProject } from "@engine/projectStore";
+import {
+  buildChatPrompt,
+  detectAgents,
+  runAgentText,
+  runFillerAgent,
+} from "@engine/agent-driver";
+import { loadProject, mutateProject } from "@engine/projectStore";
 
 // Re-export the type from source (type-only, never emits runtime code) so client
 // components import it from here without pulling the server-only driver into their
@@ -53,6 +58,32 @@ export async function suggestFillerCuts(
       return cut;
     });
     return { ok: true, cut: cutWords.length, words: cutWords };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+export type ChatReply =
+  | { ok: true; text: string }
+  | { ok: false; error: string };
+
+// Free-text chat: hand the selected agent the project transcript + the user's
+// message and return its reply. Read-only (no project mutation) so it can run
+// without the project lock while edits proceed. `agent` is the GUI selector
+// value (claude-opus-4-8, gpt-5-5, composer-2-5, grok-build).
+export async function chatWithAgent(
+  slug: string,
+  agent: string,
+  message: string
+): Promise<ChatReply> {
+  try {
+    const project = await loadProject(slug);
+    const prompt = buildChatPrompt(
+      { words: project.words, template: project.template },
+      message
+    );
+    const { text } = await runAgentText(prompt, { agent });
+    return { ok: true, text: text.trim() || "(no response)" };
   } catch (e) {
     return { ok: false, error: (e as Error).message };
   }

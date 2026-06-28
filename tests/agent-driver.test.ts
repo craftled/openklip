@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  buildChatPrompt,
   buildFillerPrompt,
   extractModelText,
   isConnected,
@@ -10,6 +11,32 @@ import {
   signInCommand,
   stripBunNodeOptions,
 } from "../src/agent-driver.ts";
+
+// ---- chat prompt (grounding) ----
+
+test("buildChatPrompt grounds the question in kept transcript words", () => {
+  const prompt = buildChatPrompt(
+    {
+      words: [
+        { text: "hello" },
+        { text: "um", deleted: true },
+        { text: "world" },
+      ],
+      template: "talking-head",
+    },
+    "What is this about?"
+  );
+  assert.match(prompt, /hello world/);
+  assert.doesNotMatch(prompt, /\bum\b/); // deleted words are excluded
+  assert.match(prompt, /talking-head/);
+  assert.match(prompt, /User: What is this about\?/);
+});
+
+test("buildChatPrompt truncates an oversized transcript", () => {
+  const words = Array.from({ length: 5000 }, () => ({ text: "word" }));
+  const prompt = buildChatPrompt({ words }, "hi", { maxChars: 100 });
+  assert.match(prompt, /transcript truncated/);
+});
 
 // ---- connection detection (per auth strategy) ----
 

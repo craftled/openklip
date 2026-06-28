@@ -42,6 +42,7 @@ import { resolveThreadAfterRemove } from "@/lib/chat-list";
 import { findFillerPromiseMessages } from "@/lib/toast-notifications";
 import {
   type AgentStatus,
+  chatWithAgent,
   getAgentStatuses,
   suggestFillerCuts,
 } from "../../app/agent-actions.ts";
@@ -289,12 +290,22 @@ export function AgentChatProvider({
       setRunningThreadId(threadId);
       try {
         await appendMessageApi(activeSlug, threadId, "user", trimmed);
-        await appendMessageApi(
-          activeSlug,
-          threadId,
-          "assistant",
-          assistantHint(activeSlug, trimmed, projectTemplate)
-        );
+        // Drive the selected agent when it's installed + connected; otherwise
+        // fall back to the deterministic "run this CLI loop" hint.
+        let reply: string;
+        if (agentUsable) {
+          const res = await chatWithAgent(activeSlug, agent, trimmed);
+          reply = res.ok
+            ? res.text
+            : `${providerLabel} could not respond: ${res.error}\n\n${assistantHint(
+                activeSlug,
+                trimmed,
+                projectTemplate
+              )}`;
+        } else {
+          reply = assistantHint(activeSlug, trimmed, projectTemplate);
+        }
+        await appendMessageApi(activeSlug, threadId, "assistant", reply);
         await refreshThreads();
       } catch (e) {
         toastChatSendFailed((e as Error).message);
@@ -302,7 +313,15 @@ export function AgentChatProvider({
         setRunningThreadId(null);
       }
     },
-    [activeSlug, activeThreadId, projectTemplate, refreshThreads]
+    [
+      activeSlug,
+      activeThreadId,
+      agent,
+      agentUsable,
+      providerLabel,
+      projectTemplate,
+      refreshThreads,
+    ]
   );
 
   const onFindFiller = useCallback(async () => {

@@ -224,6 +224,38 @@ export function buildFillerPrompt(words: PromptWord[]): string {
   return `You are editing a spoken-video transcript. Each token is "id:text". Return ONLY a JSON object {"cut":[ids]} listing the word ids that are filler words or false starts : "um", "uh", "er", "you know", "like", "sort of", "kind of", "I mean". Do NOT cut meaningful content words. Respond with JSON only, no prose.\n\n${tokens}`;
 }
 
+// Chat prompt: ground the agent in the project transcript so a free-text
+// question gets a real, project-aware answer (not a canned hint). Pure + bounded
+// so latency and context stay sane on every agent CLI. The transcript is the
+// kept words only (deleted = cut), joined as plain text.
+export function buildChatPrompt(
+  ctx: { template?: string; words: Array<{ deleted?: boolean; text: string }> },
+  question: string,
+  opts: { maxChars?: number } = {}
+): string {
+  const maxChars = opts.maxChars ?? 12_000;
+  const full = ctx.words
+    .filter((w) => !w.deleted)
+    .map((w) => w.text)
+    .join(" ")
+    .trim();
+  const transcript =
+    full.length > maxChars
+      ? `${full.slice(0, maxChars)}… [transcript truncated]`
+      : full || "[no transcript yet]";
+  const templateLine = ctx.template
+    ? `\nThis project uses the "${ctx.template}" edit template.`
+    : "";
+  return `You are OpenKlip's editing assistant for a spoken-video project. Answer the user's question concisely and concretely, grounded in the transcript below. When they ask for an edit, say what to change and which \`openklip\` CLI commands achieve it (e.g. \`openklip cut\`, \`openklip zoom-add-phrase\`, \`openklip broll-add-phrase\`). Never invent transcript content. Reply with the answer only: no preamble, no restating the question, no narration of your reasoning.${templateLine}
+
+Transcript:
+"""
+${transcript}
+"""
+
+User: ${question}`;
+}
+
 // Recover the model's final text from an agent's output channel.
 export function extractModelText(
   mode: OutputMode,
@@ -306,18 +338,20 @@ function sanitizedEnv(): Record<string, string | undefined> {
   return stripBunNodeOptions(process.env as Record<string, string | undefined>);
 }
 
-export interface FillerRun {
+export interface AgentTextRun {
   agent: string;
-  ids: string[];
   raw: string;
+  text: string;
 }
 
-// Spawn the selected agent headless against the transcript and return suggested
-// word ids. Uses the user's subscription for that agent (no API key).
-export async function runFillerAgent(
-  words: PromptWord[],
+// Spawn the selected agent headless with an arbitrary prompt and return the
+// model's final text. Uses the user's subscription for that agent (no API key).
+// This is the generic runner: filler-cutting and free-text chat both go through
+// it; only the prompt and how the reply is parsed differ.
+export async function runAgentText(
+  prompt: string,
   opts: { agent: string; timeoutMs?: number }
-): Promise<FillerRun> {
+): Promise<AgentTextRun> {
   const spec = resolveAgent(opts.agent);
   const cli = Bun.which(spec.cli);
   if (!cli) {
@@ -330,11 +364,10 @@ export async function runFillerAgent(
     spec.outputMode === "file"
       ? join(tmpdir(), `openklip-agent-${process.pid}-${Date.now()}.txt`)
       : undefined;
-  const args = spec.buildArgs(buildFillerPrompt(words), {
-    model,
-    lastMessageFile,
-  });
+  const args = spec.buildArgs(prompt, { model, lastMessageFile });
   const proc = Bun.spawn([cli, ...args], {
+    // Close stdin so a headless CLI never blocks waiting for piped input.
+    stdin: "ignore",
     stdout: "pipe",
     stderr: "pipe",
     env: sanitizedEnv(),
@@ -357,8 +390,8 @@ export async function runFillerAgent(
         // file missing : extraction falls back to stdout
       }
     }
-    const ids = parseAgentOutput(spec.outputMode, stdout, fileContent);
-    return { ids, raw: stdout, agent: spec.label };
+    const text = extractModelText(spec.outputMode, stdout, fileContent);
+    return { text, raw: stdout, agent: spec.label };
   } finally {
     clearTimeout(timer);
     if (lastMessageFile) {
@@ -369,4 +402,23 @@ export async function runFillerAgent(
       }
     }
   }
+}
+
+export interface FillerRun {
+  agent: string;
+  ids: string[];
+  raw: string;
+}
+
+// Filler-detection pass: run the transcript through the agent and parse the
+// {"cut":[ids]} reply into word ids.
+export async function runFillerAgent(
+  words: PromptWord[],
+  opts: { agent: string; timeoutMs?: number }
+): Promise<FillerRun> {
+  const { text, raw, agent } = await runAgentText(
+    buildFillerPrompt(words),
+    opts
+  );
+  return { ids: parseCutIds(text), raw, agent };
 }
