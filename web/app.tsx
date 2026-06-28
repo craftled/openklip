@@ -79,6 +79,7 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { useModShortcut } from "@/hooks/use-mod-shortcut";
 import { AgentProviderIcon } from "@/lib/agent-icons";
 import {
   type AgentModelId,
@@ -88,13 +89,13 @@ import {
   setDefaultAgentModel,
   subscribeDefaultAgent,
 } from "@/lib/agent-preferences";
-import { modShortcut } from "@/lib/keyboard-shortcuts";
 import {
   clampLoopRegion,
   ORIENTATION_LABEL,
   ORIENTATION_RATIO,
   type Orientation,
 } from "@/lib/preview-layout";
+import { buildProjectHoverContext } from "@/lib/project-context";
 import type { ProjectListing } from "@/lib/project-list";
 import { getThemeLabel, THEME_CATALOG } from "@/lib/theme-catalog";
 import {
@@ -162,13 +163,24 @@ interface Project {
   assets: Asset[];
   broll: BrollItem[];
   captions?: { enabled: boolean; maxWords?: number };
+  dirPath: string;
   durationSamples: number;
   look?: { vignette: boolean };
   mediaVersion?: number;
   padMs: number;
   sampleRate: number;
   slug: string;
+  source: string;
   titles: TitleItem[];
+  stills?: Array<{
+    assetId: string;
+    endSample: number;
+    focusX: number;
+    focusY: number;
+    id: string;
+    scale: number;
+    startSample: number;
+  }>;
   words: Word[];
   zooms: ZoomItem[];
 }
@@ -432,6 +444,10 @@ export function App({
 
   const ranges = useMemo(
     () => (project ? survivingRanges(project) : []),
+    [project]
+  );
+  const projectHover = useMemo(
+    () => buildProjectHoverContext(project, project.dirPath),
     [project]
   );
   const keptDuration = ranges.reduce((a, r) => a + (r.endSec - r.startSec), 0);
@@ -1098,13 +1114,21 @@ export function App({
         activeSlug={project.slug}
         assets={project.assets.map(withAssetKind)}
         mediaVersion={project.mediaVersion}
-        onAssetsUpdated={(assets) => {
-          setProject((p) => ({ ...p, assets }));
-          const nextBroll = assets.find((a) => (a.kind ?? "broll") === "broll");
-          if (nextBroll && !assets.some((a) => a.id === chosenAsset)) {
+        onAssetsUpdated={(update) => {
+          setProject((p) => ({
+            ...p,
+            assets: update.assets,
+            ...(update.broll !== undefined ? { broll: update.broll } : {}),
+            ...(update.stills !== undefined ? { stills: update.stills } : {}),
+          }));
+          const nextBroll = update.assets.find(
+            (a) => (a.kind ?? "broll") === "broll"
+          );
+          if (nextBroll && !update.assets.some((a) => a.id === chosenAsset)) {
             setChosenAsset(nextBroll.id);
           }
         }}
+        projectHover={projectHover}
         projects={projects}
         sampleRate={project.sampleRate}
       />
@@ -1126,16 +1150,9 @@ export function App({
             {/* CENTER : preview + transcript */}
             <SidebarInset className="flex min-h-[28rem] min-w-0 flex-col md:min-h-0">
               <div className="flex h-12 shrink-0 items-center gap-2 border-border border-b px-3">
-                <Button
-                  aria-label={`Toggle agent sidebar (${modShortcut("b")})`}
-                  className="h-8 shrink-0 gap-1 px-2"
-                  onClick={agentSidebar.toggleSidebar}
-                  title={`Toggle agent sidebar (${modShortcut("b")})`}
-                  variant="ghost"
-                >
-                  <PanelLeft className="size-4" />
-                  <KeyboardHint shortcutKey="b" />
-                </Button>
+                <AgentSidebarToolbarTrigger
+                  onToggle={agentSidebar.toggleSidebar}
+                />
                 <div className="h-4 w-px bg-foreground/10" />
                 <div className="min-w-0">
                   <div className="font-medium text-ui">Editor</div>
@@ -1913,9 +1930,28 @@ function SidebarContextBridge({
   return children(useSidebar());
 }
 
+function AgentSidebarToolbarTrigger({ onToggle }: { onToggle: () => void }) {
+  const shortcut = useModShortcut("b");
+  const label = `Toggle agent sidebar (${shortcut})`;
+
+  return (
+    <Button
+      aria-label={label}
+      className="h-8 shrink-0 gap-1 px-2"
+      onClick={onToggle}
+      title={label}
+      variant="ghost"
+    >
+      <PanelLeft className="size-4" />
+      <KeyboardHint shortcutKey="b" />
+    </Button>
+  );
+}
+
 function RightSidebarTrigger({ className }: { className?: string }) {
   const { toggleSidebar } = useSidebar();
-  const label = `Toggle inspector (${modShortcut("i")})`;
+  const shortcut = useModShortcut("i");
+  const label = `Toggle inspector (${shortcut})`;
 
   return (
     <Button

@@ -3,6 +3,7 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { deleteProject } from "./delete-project.ts";
 import { type Project, ProjectSchema } from "./edl.ts";
 import { projectPaths, projectsRoot } from "./paths.ts";
 import { withProjectLock } from "./project-lock.ts";
@@ -80,3 +81,5 @@ export function mutateProject<T>(
     return result;
   });
 }
+
+export { deleteProject };

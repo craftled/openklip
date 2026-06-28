@@ -11,13 +11,13 @@ interface RouteParams {
   params: Promise<{ slug: string }>;
 }
 
-// Folder sync mutates project.json (registers any new files dropped into
-// assets/), so it lives behind POST: a GET that mutates is an anti-pattern
-// (crawlers/bots/service workers will issue GETs to any URL they discover;
-// see Next.js prefetching guide §"Triggering unwanted side-effects during
-// prefetching"). syncAssetsFromFolder serializes per-slug so overlapping
-// polls (interval + focus, or multiple tabs) collapse into one sync and
-// never interleave the project.json read-modify-write.
+// Folder sync mutates project.json (prunes stale registrations, registers
+// files dropped into assets/), so it lives behind POST: a GET that mutates is
+// an anti-pattern (crawlers/bots/service workers will issue GETs to any URL
+// they discover; see Next.js prefetching guide §"Triggering unwanted
+// side-effects during prefetching"). syncAssetsFromFolder serializes per-slug
+// so overlapping polls (interval + focus, or multiple tabs) collapse into
+// one sync and never interleave the project.json read-modify-write.
 export async function POST(_req: NextRequest, { params }: RouteParams) {
   const { slug } = await params;
   try {

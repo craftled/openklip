@@ -185,6 +185,18 @@ export function removeBroll(project: Project, id: string): boolean {
   return project.broll.length < before;
 }
 
+// Remove a registered asset and any overlays that reference it.
+export function removeAsset(project: Project, assetId: string): boolean {
+  const before = project.assets.length;
+  project.assets = project.assets.filter((a) => a.id !== assetId);
+  if (project.assets.length === before) {
+    return false;
+  }
+  project.broll = project.broll.filter((b) => b.assetId !== assetId);
+  project.stills = (project.stills ?? []).filter((s) => s.assetId !== assetId);
+  return true;
+}
+
 function findBroll(project: Project, id: string): Broll {
   const item = project.broll.find((b) => b.id === id);
   if (!item) {

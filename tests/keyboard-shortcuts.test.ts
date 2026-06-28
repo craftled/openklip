@@ -1,6 +1,23 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { isModKeyOnly, modShortcut } from "../web/lib/keyboard-shortcuts.ts";
+import { isModKeyOnly, modShortcut, modShortcutNeutral } from "../web/lib/keyboard-shortcuts.ts";
+
+test("modShortcutNeutral uses a stable Mod+ prefix", () => {
+  assert.equal(modShortcutNeutral("b"), "Mod+B");
+});
+
+test("modShortcut uses Mod+ when navigator is unavailable", () => {
+  const original = globalThis.navigator;
+  Object.defineProperty(globalThis, "navigator", {
+    configurable: true,
+    value: undefined,
+  });
+  assert.equal(modShortcut("b"), "Mod+B");
+  Object.defineProperty(globalThis, "navigator", {
+    configurable: true,
+    value: original,
+  });
+});
 
 test("modShortcut uses Ctrl+ prefix off Apple platforms", () => {
   const original = navigator.userAgent;

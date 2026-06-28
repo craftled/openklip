@@ -1,6 +1,6 @@
 "use client";
 
-import { Film, ImageIcon, Music, Upload } from "lucide-react";
+import { Film, ImageIcon, Music, Trash2, Upload, X } from "lucide-react";
 import {
   type DragEvent,
   useCallback,
@@ -10,7 +10,11 @@ import {
 } from "react";
 import { AssetPreviewRow } from "@/components/asset-preview-hover";
 import { Badge } from "@/components/ui/badge";
+import type { AssetBinUpdate } from "@/lib/asset-bin-update";
+import { deleteAssetApi } from "@/lib/asset-bin-update";
 import { cn } from "@/lib/utils";
+
+export type { AssetBinUpdate } from "@/lib/asset-bin-update";
 
 export type AssetKind = "broll" | "music" | "still";
 
@@ -31,7 +35,7 @@ export function withAssetKind<T extends { kind?: AssetKind }>(
 interface AssetBinProps {
   assets: BinAsset[];
   mediaVersion?: number;
-  onAssetsUpdated: (assets: BinAsset[]) => void;
+  onAssetsUpdated: (update: AssetBinUpdate) => void;
   sampleRate: number;
   slug: string;
 }
@@ -82,6 +86,85 @@ async function readUploadResponse(res: Response): Promise<{
   }
 }
 
+function AssetBinRow({
+  asset,
+  confirmDelete,
+  deleting,
+  mediaVersion,
+  onCancelDelete,
+  onConfirmDelete,
+  onRequestDelete,
+  sampleRate,
+  slug,
+}: {
+  asset: BinAsset;
+  confirmDelete: boolean;
+  deleting: boolean;
+  mediaVersion?: number;
+  onCancelDelete: () => void;
+  onConfirmDelete: () => void;
+  onRequestDelete: () => void;
+  sampleRate: number;
+  slug: string;
+}) {
+  return (
+    <AssetPreviewRow
+      asset={asset}
+      className="group/asset relative flex items-center gap-1 rounded px-1.5 py-1 text-sm hover:bg-foreground/5"
+      mediaVersion={mediaVersion}
+      slug={slug}
+    >
+      <span className="min-w-0 flex-1 truncate">{asset.name}</span>
+      {confirmDelete ? (
+        <span className="flex shrink-0 items-center gap-1">
+          <span className="text-[11px] text-muted-foreground">Delete?</span>
+          <button
+            aria-label={`Confirm delete ${asset.name}`}
+            className="inline-flex size-5 cursor-pointer items-center justify-center rounded-sm text-destructive hover:bg-destructive/10 disabled:opacity-50"
+            disabled={deleting}
+            onClick={(e) => {
+              e.stopPropagation();
+              onConfirmDelete();
+            }}
+            type="button"
+          >
+            <Trash2 className="size-3" />
+          </button>
+          <button
+            aria-label={`Cancel delete ${asset.name}`}
+            className="inline-flex size-5 cursor-pointer items-center justify-center rounded-sm text-muted-foreground hover:bg-muted disabled:opacity-50"
+            disabled={deleting}
+            onClick={(e) => {
+              e.stopPropagation();
+              onCancelDelete();
+            }}
+            type="button"
+          >
+            <X className="size-3" />
+          </button>
+        </span>
+      ) : (
+        <>
+          <button
+            aria-label={`Delete ${asset.name}`}
+            className="inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-sm text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive focus-visible:opacity-100 group-hover/asset:opacity-100"
+            onClick={(e) => {
+              e.stopPropagation();
+              onRequestDelete();
+            }}
+            type="button"
+          >
+            <Trash2 className="size-3" />
+          </button>
+          <span className="shrink-0 text-caption text-muted-foreground tabular-nums">
+            {fmtDur(asset.durationSamples, sampleRate)}
+          </span>
+        </>
+      )}
+    </AssetPreviewRow>
+  );
+}
+
 export function AssetBin({
   assets,
   mediaVersion,
@@ -93,6 +176,8 @@ export function AssetBin({
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const syncingRef = useRef(false);
   const syncFromFolder = useCallback(async () => {
@@ -107,7 +192,7 @@ export function AssetBin({
       );
       const data = await readUploadResponse(res);
       if (res.ok && data.assets) {
-        onAssetsUpdated(data.assets.map(withAssetKind));
+        onAssetsUpdated({ assets: data.assets.map(withAssetKind) });
       }
     } catch {
       // folder sync is best-effort
@@ -152,7 +237,7 @@ export function AssetBin({
             latest = data.assets.map(withAssetKind);
           }
         }
-        onAssetsUpdated(latest);
+        onAssetsUpdated({ assets: latest });
         await syncFromFolder();
       } catch (e) {
         setError((e as Error).message);
@@ -161,6 +246,26 @@ export function AssetBin({
       }
     },
     [assets, onAssetsUpdated, slug, syncFromFolder]
+  );
+
+  const onDeleteAsset = useCallback(
+    async (assetId: string) => {
+      setDeletingId(assetId);
+      setError(null);
+      try {
+        const result = await deleteAssetApi(slug, assetId);
+        if ("error" in result) {
+          throw new Error(result.error);
+        }
+        onAssetsUpdated(result);
+        setConfirmDeleteId(null);
+      } catch (e) {
+        setError((e as Error).message);
+      } finally {
+        setDeletingId(null);
+      }
+    },
+    [onAssetsUpdated, slug]
   );
 
   const onDrop = async (e: DragEvent) => {
@@ -224,7 +329,7 @@ export function AssetBin({
 
       {error && (
         <p className="px-1 pb-2 text-destructive text-xs">
-          Upload failed: {error}
+          {error.startsWith("Upload failed") ? error : `Asset error: ${error}`}
         </p>
       )}
 
@@ -255,18 +360,18 @@ export function AssetBin({
               ) : (
                 <ul className="flex flex-col gap-1">
                   {items.map((a) => (
-                    <AssetPreviewRow
+                    <AssetBinRow
                       asset={a}
-                      className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-sm hover:bg-foreground/5"
+                      confirmDelete={confirmDeleteId === a.id}
+                      deleting={deletingId === a.id}
                       key={a.id}
                       mediaVersion={mediaVersion}
+                      onCancelDelete={() => setConfirmDeleteId(null)}
+                      onConfirmDelete={() => void onDeleteAsset(a.id)}
+                      onRequestDelete={() => setConfirmDeleteId(a.id)}
+                      sampleRate={sampleRate}
                       slug={slug}
-                    >
-                      <span className="min-w-0 flex-1 truncate">{a.name}</span>
-                      <span className="shrink-0 text-caption text-muted-foreground tabular-nums">
-                        {fmtDur(a.durationSamples, sampleRate)}
-                      </span>
-                    </AssetPreviewRow>
+                    />
                   ))}
                 </ul>
               )}

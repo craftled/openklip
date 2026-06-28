@@ -2,6 +2,8 @@
 
 import { Check, ChevronsUpDown, Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { ProjectDeleteAction } from "@/components/project-delete-action";
+import { ProjectInlineFolderAction } from "@/components/project-folder-action";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -43,19 +45,27 @@ function relativeTime(ms: number): string {
 
 export function ProjectSwitcher({
   activeSlug,
-  onIngestVideo,
+  onCreateProject,
+  onDeleteProject,
   onSelectProject,
   projects,
 }: {
   activeSlug: string;
-  onIngestVideo: (file: File) => Promise<void>;
+  onCreateProject: (file: File) => Promise<void>;
+  onDeleteProject: (slug: string) => Promise<void>;
   onSelectProject: (slug: string) => void;
   projects: ProjectListing[];
 }) {
   const { isMobile } = useSidebar();
   const inputRef = useRef<HTMLInputElement>(null);
-  const [ingesting, setIngesting] = useState(false);
-  const [ingestError, setIngestError] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [confirmDeleteSlug, setConfirmDeleteSlug] = useState<string | null>(
+    null
+  );
+  const [deletingSlug, setDeletingSlug] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const active = findActiveProject(projects, activeSlug);
 
@@ -76,14 +86,28 @@ export function ProjectSwitcher({
   }, [onSelectProject, projects]);
 
   const onPickVideo = async (file: File) => {
-    setIngesting(true);
-    setIngestError(null);
+    setCreating(true);
+    setCreateError(null);
     try {
-      await onIngestVideo(file);
+      await onCreateProject(file);
     } catch (e) {
-      setIngestError((e as Error).message);
+      setCreateError((e as Error).message);
     } finally {
-      setIngesting(false);
+      setCreating(false);
+    }
+  };
+
+  const onConfirmDelete = async (slug: string) => {
+    setDeletingSlug(slug);
+    setDeleteError(null);
+    try {
+      await onDeleteProject(slug);
+      setConfirmDeleteSlug(null);
+      setMenuOpen(false);
+    } catch (e) {
+      setDeleteError((e as Error).message);
+    } finally {
+      setDeletingSlug(null);
     }
   };
 
@@ -91,7 +115,16 @@ export function ProjectSwitcher({
     <>
       <SidebarMenu>
         <SidebarMenuItem>
-          <DropdownMenu>
+          <DropdownMenu
+            onOpenChange={(open) => {
+              setMenuOpen(open);
+              if (!open) {
+                setConfirmDeleteSlug(null);
+                setDeleteError(null);
+              }
+            }}
+            open={menuOpen}
+          >
             <DropdownMenuTrigger asChild>
               <SidebarMenuButton
                 className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
@@ -101,10 +134,13 @@ export function ProjectSwitcher({
                   {projectInitial(active.slug)}
                 </div>
                 <div className="grid min-w-0 flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium">{active.slug}</span>
+                  <span className="flex min-w-0 items-center gap-0.5">
+                    <span className="truncate font-medium">{active.slug}</span>
+                    <ProjectInlineFolderAction slug={active.slug} />
+                  </span>
                   <span className="truncate text-muted-foreground text-xs">
-                    {ingesting
-                      ? "Ingesting video…"
+                    {creating
+                      ? "Creating project…"
                       : relativeTime(active.mtimeMs)}
                   </span>
                 </div>
@@ -128,24 +164,72 @@ export function ProjectSwitcher({
                 )}
                 {projects.map((project, index) => {
                   const selected = project.slug === activeSlug;
+                  const confirming = confirmDeleteSlug === project.slug;
+                  const deleting = deletingSlug === project.slug;
                   return (
                     <DropdownMenuItem
-                      className="gap-2 p-2"
+                      className="group/project relative gap-2 p-2"
                       key={project.slug}
-                      onClick={() => onSelectProject(project.slug)}
+                      onSelect={(e) => {
+                        if (confirming || deleting) {
+                          e.preventDefault();
+                        }
+                      }}
+                      onClick={(e) => {
+                        if (
+                          confirming ||
+                          deleting ||
+                          (e.target as HTMLElement).closest("button")
+                        ) {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          return;
+                        }
+                        onSelectProject(project.slug);
+                      }}
                     >
                       <div className="flex size-6 items-center justify-center rounded-md bg-foreground/5 font-medium text-xs">
                         {projectInitial(project.slug)}
                       </div>
-                      <span className="min-w-0 flex-1 truncate">
-                        {project.slug}
+                      <span className="flex min-w-0 flex-1 items-center gap-0.5">
+                        <span className="truncate">{project.slug}</span>
+                        <ProjectInlineFolderAction
+                          revealGroup="project"
+                          slug={project.slug}
+                        />
                       </span>
-                      {selected ? (
-                        <Check className="ml-auto size-3.5 shrink-0" />
+                      {confirming ? (
+                        <ProjectDeleteAction
+                          confirming
+                          deleting={deleting}
+                          onCancel={() => setConfirmDeleteSlug(null)}
+                          onConfirm={() => void onConfirmDelete(project.slug)}
+                          onRequestDelete={() =>
+                            setConfirmDeleteSlug(project.slug)
+                          }
+                          slug={project.slug}
+                        />
                       ) : (
-                        <DropdownMenuShortcut>
-                          ⌘{index + 1}
-                        </DropdownMenuShortcut>
+                        <>
+                          {selected ? (
+                            <Check className="ml-auto size-3.5 shrink-0 group-hover/project:invisible" />
+                          ) : (
+                            <DropdownMenuShortcut className="ml-auto group-hover/project:invisible">
+                              ⌘{index + 1}
+                            </DropdownMenuShortcut>
+                          )}
+                          <ProjectDeleteAction
+                            className="absolute right-2 opacity-0 group-hover/project:opacity-100"
+                            confirming={false}
+                            deleting={false}
+                            onCancel={() => setConfirmDeleteSlug(null)}
+                            onConfirm={() => void onConfirmDelete(project.slug)}
+                            onRequestDelete={() =>
+                              setConfirmDeleteSlug(project.slug)
+                            }
+                            slug={project.slug}
+                          />
+                        </>
                       )}
                     </DropdownMenuItem>
                   );
@@ -155,14 +239,14 @@ export function ProjectSwitcher({
               <DropdownMenuGroup>
                 <DropdownMenuItem
                   className="gap-2 p-2"
-                  disabled={ingesting}
+                  disabled={creating}
                   onClick={() => inputRef.current?.click()}
                 >
                   <div className="flex size-6 items-center justify-center rounded-md bg-foreground/5">
                     <Plus className="size-4" />
                   </div>
                   <span className="font-medium text-muted-foreground">
-                    {ingesting ? "Ingesting…" : "Ingest video"}
+                    {creating ? "Creating…" : "Create new project"}
                   </span>
                 </DropdownMenuItem>
               </DropdownMenuGroup>
@@ -170,8 +254,11 @@ export function ProjectSwitcher({
           </DropdownMenu>
         </SidebarMenuItem>
       </SidebarMenu>
-      {ingestError && (
-        <p className="px-3 text-destructive text-xs">{ingestError}</p>
+      {createError && (
+        <p className="px-3 text-destructive text-xs">{createError}</p>
+      )}
+      {deleteError && (
+        <p className="px-3 text-destructive text-xs">{deleteError}</p>
       )}
       <input
         accept="video/*"

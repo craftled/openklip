@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   exportProject,
+  revealProjectFolder,
   saveBroll,
   saveLook,
   saveProjectEdits,
@@ -169,6 +170,21 @@ test("exportProject returns ok:false when all words are cut", async () => {
     assert.equal(result.ok, false);
     if (!result.ok) {
       assert.match(result.error, /nothing to export/);
+    }
+  });
+});
+
+test("revealProjectFolder rejects invalid slug", async () => {
+  const result = await revealProjectFolder("../etc");
+  assert.equal(result.ok, false);
+});
+
+test("revealProjectFolder rejects missing project", async () => {
+  await withTempProjectsRoot(async () => {
+    const result = await revealProjectFolder("missing-project");
+    assert.equal(result.ok, false);
+    if (!result.ok) {
+      assert.match(result.error, /project not found/);
     }
   });
 });

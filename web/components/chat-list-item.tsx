@@ -8,6 +8,8 @@ import {
   Trash2,
 } from "lucide-react";
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
+import { ChatPreviewRow } from "@/components/chat-preview-hover";
+import { ChatProgressIndicator } from "@/components/chat-progress-indicator";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,28 +24,33 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import type { AgentThread } from "@/lib/agent-threads";
+import type { ProjectHoverContext } from "@/lib/project-context";
 import { cn } from "@/lib/utils";
 
 interface ChatListItemProps {
   archived?: boolean;
+  inProgress?: boolean;
   isActive: boolean;
   onArchive: () => void;
   onDelete: () => void;
   onRename: (title: string) => void;
   onSelect: () => void;
   onUnarchive?: () => void;
+  project: ProjectHoverContext;
   thread: AgentThread;
   timeLabel: string;
 }
 
 export function ChatListItem({
   archived = false,
+  inProgress = false,
   isActive,
   onArchive,
   onDelete,
   onRename,
   onSelect,
   onUnarchive,
+  project,
   thread,
   timeLabel,
 }: ChatListItemProps) {
@@ -101,14 +108,22 @@ export function ChatListItem({
           value={draftTitle}
         />
       ) : (
-        <>
+        <ChatPreviewRow
+          className="group/chat-item relative"
+          disabled={isRenaming}
+          project={project}
+          thread={thread}
+        >
           <SidebarMenuButton
+            aria-busy={inProgress}
             className={cn("h-8 gap-2 text-ui", archived && "opacity-70")}
             isActive={isActive}
             onClick={onSelect}
-            tooltip={thread.title}
           >
-            <span className="min-w-0 flex-1 truncate">{thread.title}</span>
+            <span className="flex min-w-0 flex-1 items-center gap-1.5">
+              {inProgress ? <ChatProgressIndicator /> : null}
+              <span className="truncate">{thread.title}</span>
+            </span>
             <span className="text-caption text-muted-foreground tabular-nums">
               {timeLabel}
             </span>
@@ -205,7 +220,7 @@ export function ChatListItem({
               )}
             </DropdownMenuContent>
           </DropdownMenu>
-        </>
+        </ChatPreviewRow>
       )}
     </SidebarMenuItem>
   );
