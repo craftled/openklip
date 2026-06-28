@@ -173,6 +173,11 @@ export function AssetBin({
   const knownAssetIdsRef = useRef<Set<string>>(new Set());
   const initialSyncDoneRef = useRef(false);
   const syncingRef = useRef(false);
+  const onAssetsUpdatedRef = useRef(onAssetsUpdated);
+  useEffect(() => {
+    onAssetsUpdatedRef.current = onAssetsUpdated;
+  }, [onAssetsUpdated]);
+
   const syncFromFolder = useCallback(async () => {
     if (syncingRef.current) {
       return;
@@ -188,7 +193,7 @@ export function AssetBin({
         for (const asset of update.assets) {
           knownAssetIdsRef.current.add(asset.id);
         }
-        onAssetsUpdated(update);
+        onAssetsUpdatedRef.current(update);
         if (initialSyncDoneRef.current && newIds.length > 0) {
           toastAssetsSynced(newIds.length);
         }
@@ -199,7 +204,7 @@ export function AssetBin({
     } finally {
       syncingRef.current = false;
     }
-  }, [onAssetsUpdated, slug]);
+  }, [slug]);
 
   useEffect(() => {
     knownAssetIdsRef.current = new Set(assets.map((asset) => asset.id));
