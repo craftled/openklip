@@ -120,6 +120,27 @@ const queryTools: AgentToolDef[] = [
     },
   }),
   defineQueryTool({
+    name: "asset_cards",
+    summary:
+      "Subagent descriptions of assets (summary, tags, bestFor) for placement.",
+    schema: z.object({ slug }),
+    run: async ({ slug: projectSlug }) => {
+      const project = await loadProject(projectSlug);
+      return {
+        cards: project.assets
+          .filter((a) => a.card)
+          .map((a) => ({
+            id: a.id,
+            kind: a.kind ?? "broll",
+            summary: a.card?.summary,
+            tags: a.card?.tags ?? [],
+            bestFor: a.card?.bestFor ?? [],
+            suggestedFocus: a.card?.suggestedFocus,
+          })),
+      };
+    },
+  }),
+  defineQueryTool({
     name: "project_status",
     summary: "Agent-friendly edit summary (words, ranges, overlays, look).",
     schema: z.object({ slug }),

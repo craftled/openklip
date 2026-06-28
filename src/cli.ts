@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { summarize } from "./actions.ts";
 import { agentToolManifest, agentToolTable } from "./agent-tools.ts";
+import { analyzeAssets } from "./asset-cards.ts";
 import { registerAsset } from "./assets.ts";
 import { applyBrand, loadBrand } from "./brands.ts";
 import {
@@ -38,7 +39,12 @@ import {
   resolvePackagePass,
 } from "./package-pass.ts";
 import { projectPaths } from "./paths.ts";
-import { latestProject, listProjects } from "./projectStore.ts";
+import {
+  latestProject,
+  listProjects,
+  mutateProject,
+  loadProject as storeLoadProject,
+} from "./projectStore.ts";
 import { expandWordTokens } from "./query.ts";
 import {
   actionManifest,
@@ -253,6 +259,35 @@ try {
         );
       }
       console.log(`\n${project.assets.length} asset(s)`);
+      break;
+    }
+    case "analyze": {
+      if (!rest[0]) {
+        throw new Error("usage: openklip analyze <slug> [--agent <model>]");
+      }
+      const slug = rest[0];
+      const agent = flagValue(rest, "--agent") ?? "claude-opus-4-8";
+      console.log(`[analyze] describing assets with ${agent}...`);
+      const res = await analyzeAssets(
+        slug,
+        { agent },
+        { loadProject: storeLoadProject, mutateProject }
+      );
+      if (res.total === 0) {
+        console.log("[analyze] no un-described assets (b-roll/stills).");
+        break;
+      }
+      for (const a of res.analyzed) {
+        console.log(`  ${a.id.padEnd(16)}  ${a.summary}`);
+      }
+      if (res.skipped.length > 0) {
+        console.log(
+          `[analyze] skipped (not described): ${res.skipped.join(", ")}`
+        );
+      }
+      console.log(
+        `[analyze] ${res.analyzed.length}/${res.total} asset(s) described.`
+      );
       break;
     }
     case "ingest": {

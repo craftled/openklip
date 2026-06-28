@@ -302,6 +302,33 @@ export function findFillerPromiseMessages(providerLabel: string): {
   };
 }
 
+export function analyzeAssetsPromiseMessages(providerLabel: string): {
+  error: (error: unknown) => { description?: string; message: string };
+  loading: string;
+  success: (result: { analyzed: number; skipped: number; total: number }) => {
+    description?: string;
+    message: string;
+  };
+} {
+  return {
+    loading: `${providerLabel} is describing assets…`,
+    success: (result) => {
+      if (result.total === 0) {
+        return { message: "Assets already described" };
+      }
+      const skipped = result.skipped > 0 ? ` (${result.skipped} skipped)` : "";
+      return {
+        message: `Described ${result.analyzed} of ${result.total} asset(s)`,
+        description: `${providerLabel} catalogued b-roll and stills${skipped}.`,
+      };
+    },
+    error: (error) => ({
+      message: "Asset analysis failed",
+      description: (error as Error).message,
+    }),
+  };
+}
+
 export function exportPromiseMessages(): {
   error: (error: unknown) => { description?: string; message: string };
   loading: string;

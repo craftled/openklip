@@ -16,6 +16,28 @@ export type Word = z.infer<typeof WordSchema>;
 export const AssetKindSchema = z.enum(["broll", "music", "still"]);
 export type AssetKind = z.infer<typeof AssetKindSchema>;
 
+// A subagent-produced description of an asset: what it shows and where it
+// belongs, so the editing agent can place media by meaning, not by guessing
+// from a filename. Written by the per-asset analyze pass; the EDL stays valid
+// without it (optional), and re-analysis just overwrites the card.
+export const AssetCardSchema = z.object({
+  /** One concise sentence describing what the asset visually shows. */
+  summary: z.string(),
+  /** Short lowercase keywords for matching to spoken content. */
+  tags: z.array(z.string()).default([]),
+  /** Editorial uses, e.g. "intro", "b-roll cover", "transition". */
+  bestFor: z.array(z.string()).default([]),
+  /** Visual center of interest in [0,1] image coords (stills → Ken Burns). */
+  suggestedFocus: z
+    .object({ x: z.number().min(0).max(1), y: z.number().min(0).max(1) })
+    .optional(),
+  /** ISO timestamp of the analysis run. */
+  analyzedAt: z.string(),
+  /** Agent label that produced the card (e.g. "Claude"). */
+  agent: z.string().optional(),
+});
+export type AssetCard = z.infer<typeof AssetCardSchema>;
+
 export const AssetSchema = z.object({
   id: z.string(),
   kind: AssetKindSchema.default("broll"),
@@ -23,6 +45,8 @@ export const AssetSchema = z.object({
   src: z.string(),
   proxy: z.string(),
   durationSamples: z.number().int().nonnegative(),
+  /** Subagent description (absent until the analyze pass runs). */
+  card: AssetCardSchema.optional(),
 });
 export type Asset = z.infer<typeof AssetSchema>;
 

@@ -1,6 +1,5 @@
 "use client";
 
-import { Film, ImageIcon, Music, Trash2, Upload, X } from "lucide-react";
 import {
   type DragEvent,
   useCallback,
@@ -17,9 +16,15 @@ import {
   toastAssetUploadFailed,
   toastAssetUploadSuccess,
 } from "@/lib/app-toast";
+import {
+  type AssetCardLite,
+  assetCardCaption,
+  assetCardTooltip,
+} from "@/lib/asset-card-display";
 import type { AssetBinUpdate } from "@/lib/asset-bin-update";
 import { deleteAssetApi } from "@/lib/asset-bin-update";
 import { syncProjectAssets, uploadProjectAssets } from "@/lib/asset-upload";
+import { Film, ImageIcon, Music, Trash2, Upload, X } from "@/lib/icon";
 import { countNewAssetIds } from "@/lib/toast-notifications";
 import { cn } from "@/lib/utils";
 
@@ -28,6 +33,7 @@ export type { AssetBinUpdate } from "@/lib/asset-bin-update";
 export type AssetKind = "broll" | "music" | "still";
 
 export interface BinAsset {
+  card?: AssetCardLite;
   durationSamples: number;
   id: string;
   kind: AssetKind;
@@ -106,7 +112,17 @@ function AssetBinRow({
       mediaVersion={mediaVersion}
       slug={slug}
     >
-      <span className="min-w-0 flex-1 truncate">{asset.name}</span>
+      <span
+        className="flex min-w-0 flex-1 flex-col"
+        title={asset.card ? assetCardTooltip(asset.card) : undefined}
+      >
+        <span className="truncate">{asset.name}</span>
+        {asset.card ? (
+          <span className="truncate text-caption text-tertiary">
+            {assetCardCaption(asset.card)}
+          </span>
+        ) : null}
+      </span>
       {confirmDelete ? (
         <span className="flex shrink-0 items-center gap-1">
           <span className="text-[11px] text-tertiary">Delete?</span>

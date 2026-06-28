@@ -39,9 +39,13 @@ import {
   toastPromise,
 } from "@/lib/app-toast";
 import { resolveThreadAfterRemove } from "@/lib/chat-list";
-import { findFillerPromiseMessages } from "@/lib/toast-notifications";
+import {
+  analyzeAssetsPromiseMessages,
+  findFillerPromiseMessages,
+} from "@/lib/toast-notifications";
 import {
   type AgentStatus,
+  analyzeProjectAssets,
   chatWithAgent,
   getAgentStatuses,
   suggestFillerCuts,
@@ -55,9 +59,11 @@ interface AgentChatContextValue {
   activeThreadId: string | null;
   agent: AgentModelId;
   agentUsable: boolean;
+  analyzingAssets: boolean;
   archivedThreads: AgentThread[];
   chatsLoading: boolean;
   defaultAgent: AgentModelId;
+  onAnalyzeAssets: () => Promise<void>;
   onArchiveThread: (threadId: string) => Promise<void>;
   onDeleteThread: (threadId: string) => Promise<void>;
   onFindFiller: () => Promise<void>;
@@ -100,6 +106,7 @@ export function AgentChatProvider({
   const [defaultAgent, setDefaultAgent] =
     useState<AgentModelId>(DEFAULT_AGENT_MODEL);
   const [runningThreadId, setRunningThreadId] = useState<string | null>(null);
+  const [analyzingAssets, setAnalyzingAssets] = useState(false);
   const [statuses, setStatuses] = useState<Record<string, AgentStatus>>({});
 
   useEffect(() => {
@@ -293,20 +300,29 @@ export function AgentChatProvider({
         // Drive the selected agent when it's installed + connected; otherwise
         // fall back to the deterministic "run this CLI loop" hint.
         let reply: string;
+        let edited = false;
         if (agentUsable) {
           const res = await chatWithAgent(activeSlug, agent, trimmed);
-          reply = res.ok
-            ? res.text
-            : `${providerLabel} could not respond: ${res.error}\n\n${assistantHint(
-                activeSlug,
-                trimmed,
-                projectTemplate
-              )}`;
+          if (res.ok) {
+            reply = res.text;
+            edited = res.edited;
+          } else {
+            reply = `${providerLabel} could not respond: ${res.error}\n\n${assistantHint(
+              activeSlug,
+              trimmed,
+              projectTemplate
+            )}`;
+          }
         } else {
           reply = assistantHint(activeSlug, trimmed, projectTemplate);
         }
         await appendMessageApi(activeSlug, threadId, "assistant", reply);
         await refreshThreads();
+        // The agent may have edited project.json; pull the new edit into the
+        // player/timeline.
+        if (edited) {
+          router.refresh();
+        }
       } catch (e) {
         toastChatSendFailed((e as Error).message);
       } finally {
@@ -319,6 +335,7 @@ export function AgentChatProvider({
       agent,
       agentUsable,
       providerLabel,
+      router,
       projectTemplate,
       refreshThreads,
     ]
@@ -387,6 +404,31 @@ export function AgentChatProvider({
     runningThreadId,
   ]);
 
+  const onAnalyzeAssets = useCallback(async () => {
+    if (analyzingAssets || !agentUsable) {
+      return;
+    }
+    setAnalyzingAssets(true);
+    try {
+      const run = (async () => {
+        const result = await analyzeProjectAssets(activeSlug, agent);
+        if (!result.ok) {
+          throw new Error(result.error);
+        }
+        return result;
+      })();
+      void toastPromise(run, analyzeAssetsPromiseMessages(providerLabel));
+      await run;
+      // Cards now live on project.json; pull them into the editor so chat and
+      // overlays can use the descriptions.
+      router.refresh();
+    } catch {
+      // surfaced by the toast above
+    } finally {
+      setAnalyzingAssets(false);
+    }
+  }, [activeSlug, agent, agentUsable, analyzingAssets, providerLabel, router]);
+
   const value = useMemo(
     () => ({
       activeSlug,
@@ -395,9 +437,11 @@ export function AgentChatProvider({
       activeStatus,
       agent,
       agentUsable,
+      analyzingAssets,
       archivedThreads,
       chatsLoading,
       defaultAgent,
+      onAnalyzeAssets,
       onArchiveThread,
       onDeleteThread,
       onFindFiller,
@@ -419,9 +463,11 @@ export function AgentChatProvider({
       activeStatus,
       agent,
       agentUsable,
+      analyzingAssets,
       archivedThreads,
       chatsLoading,
       defaultAgent,
+      onAnalyzeAssets,
       onArchiveThread,
       onDeleteThread,
       onFindFiller,
