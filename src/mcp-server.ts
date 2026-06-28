@@ -5,6 +5,7 @@
  */
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import type { ZodRawShapeCompat } from "@modelcontextprotocol/sdk/server/zod-compat.js";
 import { agentTools, callAgentTool } from "./agent-tools.ts";
 
 export async function startMcpServer(): Promise<void> {
@@ -18,9 +19,9 @@ export async function startMcpServer(): Promise<void> {
       tool.name,
       {
         description: tool.summary,
-        inputSchema: tool.zodShape,
+        inputSchema: tool.zodShape as unknown as ZodRawShapeCompat,
       },
-      async (input) => {
+      async (input: Record<string, unknown>) => {
         try {
           const result = await callAgentTool(tool.name, input);
           return {

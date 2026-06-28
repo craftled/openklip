@@ -74,19 +74,19 @@ function mutationTool(action: ActionDef): AgentToolDef {
   };
 }
 
-function defineQueryTool(def: {
+function defineQueryTool<S extends z.ZodRawShape>(def: {
   name: string;
   summary: string;
-  schema: z.ZodObject<z.ZodRawShape>;
+  schema: z.ZodObject<S>;
   surfaces?: Surface[];
-  run: (input: z.infer<def["schema"]>) => Promise<unknown> | unknown;
+  run: (input: z.infer<z.ZodObject<S>>) => Promise<unknown> | unknown;
 }): AgentToolDef {
   return {
     name: def.name,
     summary: def.summary,
     surfaces: def.surfaces ?? ["mcp", "cli"],
     schema: def.schema,
-    zodShape: def.schema.shape as Record<string, z.ZodType>,
+    zodShape: def.schema.shape as unknown as Record<string, z.ZodType>,
     run: async (raw) => def.run(def.schema.parse(raw)),
   };
 }

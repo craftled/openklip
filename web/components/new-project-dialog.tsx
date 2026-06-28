@@ -204,7 +204,7 @@ export function NewProjectDialog({
         <div className="flex flex-wrap gap-2">
           {workspace?.pickerSupported ? (
             <StepPill
-              active={showFolderStep}
+              active={Boolean(showFolderStep)}
               done={folderDone}
               label="Choose folder"
               step={1}
