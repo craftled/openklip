@@ -2,17 +2,19 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-/** Run path helpers against ./projects under a temp cwd (no .openklip config). */
+/**
+ * Run path helpers against a temp `projects/` root. Pins
+ * OPENKLIP_PROJECTS_ROOT explicitly so the layered-layout assertions
+ * (project/working/output) stay deterministic and independent of the default
+ * fallback location.
+ */
 export function withDefaultProjectsRoot<T>(fn: () => T): T {
   const prevRoot = process.env.OPENKLIP_PROJECTS_ROOT;
-  const prevCwd = process.cwd();
   const temp = mkdtempSync(join(tmpdir(), "openklip-paths-"));
-  process.chdir(temp);
-  delete process.env.OPENKLIP_PROJECTS_ROOT;
+  process.env.OPENKLIP_PROJECTS_ROOT = join(temp, "projects");
   try {
     return fn();
   } finally {
-    process.chdir(prevCwd);
     if (prevRoot === undefined) {
       delete process.env.OPENKLIP_PROJECTS_ROOT;
     } else {
