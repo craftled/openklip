@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, test } from "node:test";
 import {
+  DEFAULT_APP_THEME,
+  getThemeLabel,
+  THEME_CATALOG,
+} from "../web/lib/theme-catalog.ts";
+import {
   getAppTheme,
   getColorScheme,
   resetThemePreferencesForTests,
@@ -9,11 +14,6 @@ import {
   subscribeAppTheme,
   subscribeColorScheme,
 } from "../web/lib/theme-preferences.ts";
-import {
-  DEFAULT_APP_THEME,
-  getThemeLabel,
-  THEME_CATALOG,
-} from "../web/lib/theme-catalog.ts";
 import {
   installLocalStorageMock,
   uninstallLocalStorageMock,
