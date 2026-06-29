@@ -43,16 +43,17 @@ Time is integer audio samples at 48 kHz. The CLI takes seconds where a human num
 | --- | --- |
 | List projects | `openklip list` |
 | Ingest a video | `openklip ingest <video> [--force]` |
-| Open editor | `openklip serve [slug]` |
+| Open editor | `openklip serve [slug]` (alias `dev`) |
 | Read transcript (full) | `openklip transcript <slug>` |
 | Grep transcript | `openklip transcript grep`, `span`, `phrase` |
 | Review edit (JSON) | `openklip status <slug> --json`, `ranges`, `overlays` |
 | Cut / restore words | `openklip cut`, `openklip restore` |
 | Register b-roll file | `openklip broll <slug> <file>` |
+| Register a still or music asset | `openklip asset-add <slug> <file> --kind still\|music` |
 | List b-roll assets | `openklip assets <slug>` |
 | Describe media (subagents) | `openklip analyze <slug>` |
 | Place / patch / remove b-roll | `openklip broll-add`, `broll-set`, `broll-rm`, `broll-add-phrase` |
-| Place / remove still (Ken Burns) | `openklip still-add`, `still-rm` |
+| Place / patch / remove still (Ken Burns) | `openklip still-add`, `still-set`, `still-rm` |
 | Place / patch / remove graphic (HTML/CSS template) | `openklip graphic-add`, `graphic-set`, `graphic-rm` |
 | Place / patch / remove title | `openklip title-add`, `title-set`, `title-rm`, `title-add-phrase` |
 | Add / patch / remove zoom | `openklip zoom-add`, `zoom-set`, `zoom-rm`, `zoom-add-phrase` |
@@ -124,6 +125,7 @@ Add `--note "<why>"` to any `cut` or overlay-add to record the rationale on the 
 | Command | What it does |
 | --- | --- |
 | `openklip broll <slug> <file>` | Register a b-roll clip (builds preview proxy, returns asset id). |
+| `openklip asset-add <slug> <file> [--kind broll\|music\|still]` | Register any asset kind (builds a proxy for video/audio, returns the asset id). `openklip broll` is the `--kind broll` shortcut; register a **still** here before `still-add`. |
 | `openklip broll-add <slug> <assetId> <fromSec> <toSec>` | Cover a source-time span with a registered asset. |
 | `openklip broll-add-phrase <slug> <assetId> "spoken phrase"` | Cover the span of the first spoken phrase match. |
 | `openklip broll-set <slug> <brollId>` | Patch b-roll: `--asset`, `--from`, `--to`, `--src-in` (seconds). |
@@ -137,6 +139,7 @@ Add `--note "<why>"` to any `cut` or overlay-add to record the rationale on the 
 | `openklip zoom-set <slug> <zoomId>` | Patch zoom: `--scale`, `--ramp`, `--from`, `--to`. |
 | `openklip zoom-rm <slug> <zoomId>` | Remove a push-in zoom. |
 | `openklip still-add <slug> <assetId> <fromSec> <toSec>` | Overlay a registered **still** image with a Ken Burns push-in. `--scale 1.2` (1–3), `--focus-x 0.5` / `--focus-y 0.5` (0–1 image coords). |
+| `openklip still-set <slug> <stillId>` | Patch a still: `--asset`, `--from`, `--to`, `--scale`, `--focus-x`, `--focus-y`. |
 | `openklip still-rm <slug> <stillId>` | Remove a still overlay. |
 | `openklip graphic-add <slug> <template> <fromSec> <toSec>` | Overlay an HTML/CSS graphic template. `--param key=value` (repeatable), `--track broll\|title\|zoom` (z-layer). Text templates (`kind: "text"`) render via ASS and stay browser-free; rich templates (`kind: "rich"`) render pixel-faithfully through headless Chrome to a transparent ProRes 4444 MOV (install once: `bunx puppeteer browsers install chrome-headless-shell`). |
 | `openklip graphic-set <slug> <graphicId>` | Patch a graphic: `--template`, `--from`, `--to`, `--param`, `--track`. |
@@ -156,7 +159,7 @@ Pick the best lines across several recordings of the same script, then splice th
 | `openklip takes <slug>` | List ingested takes with id, duration, and word count. |
 | `openklip assemble <slug> <takeId:wStart-wEnd> [more...]` | Splice the chosen word runs end-to-end into a **new** single-source project. `--pad <ms>` is the symmetric seam pad (0–500, default 50); `--force` overwrites an existing edit. Segments are inclusive word-id ranges into each take's own transcript (read them with `take_transcript`). |
 
-Workflow: `take-add` each recording, read `take_transcript <slug> <takeId>` to find the best read of each line, then `assemble` the runs in script order. The planner lays them end-to-end with no gap at the seam and re-ids the merged transcript `w0..` (integer-exact source-sample → output-sample re-timing, so preview and export can't drift). Provenance (where every output span came from in take samples) is written to `project.json`'s `assembly` block. Via the `assemble` agent tool you can attach a per-segment `note` recording **why** that take won the line — it rides into the provenance for the next pass. The exporter is unchanged: it reads the one assembled `source`. Concat uses an ffmpeg **filter** (not the demuxer) so mismatched takes are normalized to the first take's geometry/fps; the takes stay parked in `takes/` alongside the new source.
+Workflow: `take-add` each recording, read `take_transcript <slug> <takeId>` to find the best read of each line, then `assemble` the runs in script order. The planner lays them end-to-end with no gap at the seam and re-ids the merged transcript `w0..` (integer-exact source-sample → output-sample re-timing, so preview and export can't drift). Provenance (where every output span came from in take samples) is written to `project.json`'s `assembly` block. Via the `assemble` agent tool you can attach a per-segment `note` recording **why** that take won the line, and it rides into the provenance for the next pass. The exporter is unchanged: it reads the one assembled `source`. Concat uses an ffmpeg **filter** (not the demuxer) so mismatched takes are normalized to the first take's geometry/fps; the takes stay parked in `takes/` alongside the new source.
 
 ### Look & captions
 

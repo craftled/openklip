@@ -4,6 +4,25 @@ Use these bodies when publishing releases. Each section matches a tag in `CHANGE
 
 ---
 
+## v0.8.10.0
+
+**The edit carries its own reasoning: written rationale, phrase-anchored cues, multi-take assembly.**
+
+### Highlights
+- **Written rationale** (`--note`): `openklip cut <slug> w5 --note "filler restart"` and an optional `note` on every overlay record why a pick was made. Surfaces in `openklip overlays`, the transcript and query views, and the MCP tools; metadata only, never reaches ffmpeg (`--note ""` clears it)
+- **Phrase-anchored cues** (`src/reanchor.ts`): `title-add-phrase` / `zoom-add-phrase` / `broll-add-phrase` remember the spoken phrase on the overlay, so after a re-cut anchored overlays re-resolve their span onto the current kept words automatically (CLI and GUI). A deleted phrase flags `stale` and keeps the last good span; `openklip reanchor` re-resolves on demand
+- **Multi-take assembly** (`src/assembly-plan.ts` + `src/assembly.ts`): `openklip take-add` ingests alternate takes into `takes/<id>/`, `openklip takes` lists them, and `openklip assemble <takeId:wStart-wEnd> ...` splices the chosen word runs into one single-source `project.json` (integer-exact re-timing) the cut/overlay/export engine edits unchanged
+- Backward-compatible EDL: `src/edl.ts` gains only optional or defaulted fields, `version` stays `1`, every legacy `project.json` parses unchanged; `src/exporter.ts` is untouched
+- Researched against OpenCut, VibeFrame, Monet, and craft-agents; built red-green TDD (411 to 585 tests)
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations) for the full list (current).
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#08100---2026-06-29)
+
+---
+
 ## v0.8.9
 
 **Native graphics export pixel-for-pixel: first-party headless-Chrome render, fullscreen overlays.**

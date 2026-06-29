@@ -4,7 +4,7 @@
 
 OpenKlip is a lean, local-first **agent-native video toolchain**: external agents drive the edit loop via CLI; humans review in the browser. Both read/write the same `project.json` on disk.
 
-**Current release:** v0.8.9.0 (2026-06-28). Working local editor: cut → captions → b-roll → vignette → push-in zoom → titles → grade/LUT → rich graphics → export; cinema player with live graphics/titles/captions overlays; resizable right chat sidebar with Claude MCP edits; asset cards (`openklip analyze` + **Describe assets**); skills slash menu; MCP agent tools (48 tools); edit templates; native HTML/CSS graphics templates (pixel-faithful headless-Chrome export to ProRes 4444 alpha); Linear-style UI (Inter Variable + OKLCH, Phosphor fill icons); export dialog; macOS workspace folder picker; multi-agent filler cuts; sidebar asset bin with folder sync; 525 tests; MIT.
+**Current release:** v0.8.10.0 (2026-06-29). Working local editor: cut → captions → b-roll → vignette → push-in zoom → titles → grade/LUT → rich graphics → export; cinema player with live graphics/titles/captions overlays; resizable right chat sidebar with Claude MCP edits; asset cards (`openklip analyze` + **Describe assets**); skills slash menu; MCP agent tools (52 tools); edit templates; native HTML/CSS graphics templates (pixel-faithful headless-Chrome export to ProRes 4444 alpha); Linear-style UI (Inter Variable + OKLCH, Phosphor fill icons); export dialog; macOS workspace folder picker; multi-agent filler cuts; sidebar asset bin with folder sync; written rationale notes on cuts/overlays; phrase-anchored cues that re-snap after a re-cut; multi-take assembly; 585 tests; MIT.
 
 Preview cuts get a Glimm WebGL sweep in the browser; exported MP4s still hard-cut until the ffmpeg transition graph lands.
 
@@ -36,7 +36,7 @@ Preview cuts get a Glimm WebGL sweep in the browser; exported MP4s still hard-cu
 - [x] **Project write serialization** (`src/project-lock.ts`, `mutateProject()`; in-process per-slug locks for `project.json` and `chats.json`)
 - [x] **Chats + asset hardening** (atomic `chats.json` writes, POST folder sync, re-ingest guard with `--force`, external still copy-in)
 - [x] **Design system: Inter Variable + OKLCH** ([DESIGN.md](./DESIGN.md): Linear-style surfaces, semantic tokens, blue-only-when-it-matters CTA hierarchy; swappable theme presets)
-- [x] **TDD test suite** (`bun test`: 525 tests across actions, captions, EDL, exporter, project lock, chats, assets, workspace, agent-tools, templates, graphics, headless render, and more)
+- [x] **TDD test suite** (`bun test`: 585 tests across actions, captions, EDL, exporter, project lock, chats, assets, workspace, agent-tools, templates, graphics, headless render, reanchor, multi-take assembly, and more)
 - [x] **GitHub Actions CI** (`check`, `typecheck`, `test`, `build`)
 - [x] **Open-sourced** (public GitHub repo, MIT license, source media gitignored + purged from history)
 - [x] **Center chat panel** (agent threads + prompt input in center column; chat list in left sidebar; PR #12)
@@ -52,6 +52,9 @@ Preview cuts get a Glimm WebGL sweep in the browser; exported MP4s still hard-cu
 - [x] **Resizable chat sidebar** (full-height right column, drag handle 340–760px, localStorage persistence; v0.8.5)
 - [x] **Asset cards / analyze assets** (`src/asset-cards.ts`, `openklip analyze`, GUI **Describe assets** button; v0.8.5)
 - [x] **Phosphor fill icons** (`@phosphor-icons/react` via `web/lib/icon.tsx`; v0.8.5)
+- [x] **Written rationale (`note`)** (v0.8.10.0): optional `note` on cuts and overlays records the *why* of a pick; surfaces in CLI / query / transcript / MCP; metadata only, never reaches ffmpeg (`--note ""` clears it; pinned by an exporter no-op test)
+- [x] **Phrase-anchored cues** (`src/reanchor.ts`; v0.8.10.0): `*-add-phrase` overlays remember the spoken phrase and re-resolve onto the kept words after a re-cut (CLI + GUI via `applyProjectEdits`); flag `stale` and keep the last good span when the phrase is deleted; follow a surviving instance on duplicates; `openklip reanchor`
+- [x] **Multi-take assembly** (`src/assembly-plan.ts` pure planner + `src/assembly.ts`; v0.8.10.0): `take-add` / `takes` / `assemble` ingest alternate takes into `takes/<id>/` and splice the best line per take into one single-source `project.json` (integer-exact re-timing, provenance block) the cut/overlay/export engine edits unchanged
 
 ## Architecture & Key Decisions
 
@@ -137,6 +140,8 @@ Single list of current gaps (code is truth). README and release notes point here
 - Phrase-based cutting (`openklip cut --text`, `transcript grep`) is CLI/MCP-only; transcript UI uses per-word click, not phrase search.
 - Whisper word timestamps are ~100 ms loose; cuts can clip a phoneme until VAD-snapping lands.
 - Cuts are word-boundary based; no VAD snap-to-silence or equal-power audio crossfade at boundaries yet.
+- Phrase-anchored overlays re-snap to their anchor on every cut: a manual `*-set` span on a phrase-placed overlay can be re-moved by the next word deletion (place a plain `*-add` overlay to pin a span). A deleted anchor phrase leaves the overlay `stale` with its last good span until the words are restored.
+- Multi-take assembly is CLI/MCP-only (`take-add` / `takes` / `assemble`): no GUI take browser. Each take is ingested with the full ffmpeg + Whisper path and parked in `takes/<id>/`; `assemble` writes a new single-source project and needs `--force` to overwrite an existing edit.
 
 ### Workspace & platform
 
