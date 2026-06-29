@@ -89,7 +89,7 @@ export function AgentSidebar({
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
-  const [sidebarView, setSidebarView] = useState<SidebarSegmentView>("threads");
+  const [sidebarView, setSidebarView] = useState<SidebarSegmentView>("chats");
 
   const {
     activeThreadId,
@@ -198,9 +198,9 @@ export function AgentSidebar({
             </div>
           </SidebarHeader>
 
-          <SidebarContent>
-            <SidebarGroup className="px-1.5 pt-1 pb-1.5">
-              <SidebarMenu>
+          <SidebarContent className="gap-0">
+            <SidebarGroup className="py-0">
+              <SidebarMenu className="gap-0.5">
                 <SidebarMenuItem>
                   <SidebarMenuButton
                     className={sidebarHeaderRowClass()}
@@ -251,99 +251,91 @@ export function AgentSidebar({
               onSelectView={setSidebarView}
             />
 
-            {sidebarView === "threads" ? (
-              <>
-                <CollapsibleSidebarSection defaultOpen title="Chats">
-                  <SidebarMenu>
-                    {chatEmptyLabel && (
-                      <p className="px-2 py-1 text-[12px] text-tertiary/58">
-                        {chatEmptyLabel}
-                      </p>
-                    )}
-                    {filteredChats.map((t) => (
-                      <ChatListItem
-                        inProgress={runningThreadId === t.id}
-                        isActive={t.id === activeThreadId}
-                        key={t.id}
-                        onArchive={() => void onArchiveThread(t.id)}
-                        onDelete={() => void onDeleteThread(t.id)}
-                        onRename={(title) => void onRenameThread(t.id, title)}
-                        onSelect={() => void selectThread(t.id)}
-                        project={projectHover}
-                        thread={t}
-                        timeLabel={
-                          <RelativeTimeLabel
-                            format={relativeTimeShort}
-                            ms={t.updatedAt}
-                          />
-                        }
-                      />
-                    ))}
-                  </SidebarMenu>
-                  {filteredArchivedChats.length > 0 && (
-                    <>
-                      <p className="mt-2 mb-1 px-2 text-[12px] text-tertiary/58">
-                        Archived
-                      </p>
-                      <SidebarMenu>
-                        {filteredArchivedChats.map((t) => (
-                          <ChatListItem
-                            archived
-                            isActive={t.id === activeThreadId}
-                            key={t.id}
-                            onArchive={() => void onArchiveThread(t.id)}
-                            onDelete={() => void onDeleteThread(t.id)}
-                            onRename={(title) =>
-                              void onRenameThread(t.id, title)
-                            }
-                            onSelect={() => void selectThread(t.id)}
-                            onUnarchive={() => void onUnarchiveThread(t.id)}
-                            project={projectHover}
-                            thread={t}
-                            timeLabel={
-                              <RelativeTimeLabel
-                                format={relativeTimeShort}
-                                ms={t.updatedAt}
-                              />
-                            }
-                          />
-                        ))}
-                      </SidebarMenu>
-                    </>
+            {sidebarView === "chats" ? (
+              <CollapsibleSidebarSection defaultOpen title="Chats">
+                <SidebarMenu>
+                  {chatEmptyLabel && (
+                    <p className="px-2 py-1 text-[12px] text-tertiary/58">
+                      {chatEmptyLabel}
+                    </p>
                   )}
-                </CollapsibleSidebarSection>
-
-                <CollapsibleSidebarSection
-                  action={
-                    <ProjectInlineFolderAction
-                      className="opacity-100"
-                      revealGroup="assets"
-                      slug={activeSlug}
-                      target="assets"
+                  {filteredChats.map((t) => (
+                    <ChatListItem
+                      inProgress={runningThreadId === t.id}
+                      isActive={t.id === activeThreadId}
+                      key={t.id}
+                      onArchive={() => void onArchiveThread(t.id)}
+                      onDelete={() => void onDeleteThread(t.id)}
+                      onRename={(title) => void onRenameThread(t.id, title)}
+                      onSelect={() => void selectThread(t.id)}
+                      project={projectHover}
+                      thread={t}
+                      timeLabel={
+                        <RelativeTimeLabel
+                          format={relativeTimeShort}
+                          ms={t.updatedAt}
+                        />
+                      }
                     />
-                  }
-                  defaultOpen
-                  showFolderIcon
-                  title="Assets"
-                >
-                  <div className="px-0.5">
-                    <AssetBin
-                      assets={assets}
-                      mediaVersion={mediaVersion}
-                      onAssetsUpdated={onAssetsUpdated}
-                      sampleRate={sampleRate}
-                      slug={activeSlug}
-                    />
-                    <div className="px-1 pt-1.5">
-                      <AnalyzeAssetsButton />
-                    </div>
-                  </div>
-                </CollapsibleSidebarSection>
-              </>
+                  ))}
+                </SidebarMenu>
+                {filteredArchivedChats.length > 0 && (
+                  <>
+                    <p className="mt-2 mb-1 px-2 text-[12px] text-tertiary/58">
+                      Archived
+                    </p>
+                    <SidebarMenu>
+                      {filteredArchivedChats.map((t) => (
+                        <ChatListItem
+                          archived
+                          isActive={t.id === activeThreadId}
+                          key={t.id}
+                          onArchive={() => void onArchiveThread(t.id)}
+                          onDelete={() => void onDeleteThread(t.id)}
+                          onRename={(title) => void onRenameThread(t.id, title)}
+                          onSelect={() => void selectThread(t.id)}
+                          onUnarchive={() => void onUnarchiveThread(t.id)}
+                          project={projectHover}
+                          thread={t}
+                          timeLabel={
+                            <RelativeTimeLabel
+                              format={relativeTimeShort}
+                              ms={t.updatedAt}
+                            />
+                          }
+                        />
+                      ))}
+                    </SidebarMenu>
+                  </>
+                )}
+              </CollapsibleSidebarSection>
             ) : (
-              <p className="px-2 py-3 text-[12px] text-tertiary/58">
-                Workspace terminals and files will live here.
-              </p>
+              <CollapsibleSidebarSection
+                action={
+                  <ProjectInlineFolderAction
+                    className="opacity-100"
+                    revealGroup="assets"
+                    slug={activeSlug}
+                    target="assets"
+                  />
+                }
+                defaultOpen
+                showFolderIcon
+                title="Assets"
+              >
+                <div className="px-0.5">
+                  <AssetBin
+                    assets={assets}
+                    mediaVersion={mediaVersion}
+                    onAssetsUpdated={onAssetsUpdated}
+                    sampleRate={sampleRate}
+                    slug={activeSlug}
+                  />
+                  <div className="px-1 pt-1.5">
+                    <AnalyzeAssetsButton />
+                  </div>
+                </div>
+              </CollapsibleSidebarSection>
             )}
           </SidebarContent>
 

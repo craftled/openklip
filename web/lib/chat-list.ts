@@ -1,5 +1,10 @@
 import type { AgentThread } from "@engine/chats.ts";
 
+/** Agent replied at least once and the row is not currently streaming. */
+export function isChatThreadCompleted(thread: AgentThread): boolean {
+  return thread.messages.some((message) => message.role === "assistant");
+}
+
 export function filterThreadsByQuery(
   threads: AgentThread[],
   query: string

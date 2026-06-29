@@ -4,6 +4,7 @@ import type { AgentThread } from "@engine/chats.ts";
 import {
   chatListEmptyLabel,
   filterThreadsByQuery,
+  isChatThreadCompleted,
   resolveThreadAfterRemove,
 } from "../web/lib/chat-list.ts";
 
@@ -13,6 +14,29 @@ const thread = (id: string, title: string): AgentThread => ({
   title,
   messages: [],
   updatedAt: 0,
+});
+
+test("isChatThreadCompleted is true when an assistant message exists", () => {
+  const empty = thread("a", "New");
+  const done = {
+    ...thread("b", "Done"),
+    messages: [
+      {
+        id: "m1",
+        role: "user" as const,
+        content: "Cut filler",
+        createdAt: 1,
+      },
+      {
+        id: "m2",
+        role: "assistant" as const,
+        content: "Cut 3 words.",
+        createdAt: 2,
+      },
+    ],
+  };
+  assert.equal(isChatThreadCompleted(empty), false);
+  assert.equal(isChatThreadCompleted(done), true);
 });
 
 test("filterThreadsByQuery returns all threads when query is empty", () => {

@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { ChatCompletedIndicator } from "@/components/chat-completed-indicator";
 import { ChatPreviewRow } from "@/components/chat-preview-hover";
 import { ChatProgressIndicator } from "@/components/chat-progress-indicator";
 import {
@@ -23,6 +24,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import type { AgentThread } from "@/lib/agent-threads";
+import { isChatThreadCompleted } from "@/lib/chat-list";
 import {
   Archive,
   MessageSquare,
@@ -134,6 +136,8 @@ export function ChatListItem({
           >
             {inProgress ? (
               <ChatProgressIndicator />
+            ) : isChatThreadCompleted(thread) ? (
+              <ChatCompletedIndicator />
             ) : (
               <MessageSquare className="size-4 shrink-0 opacity-70" />
             )}

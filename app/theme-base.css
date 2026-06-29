@@ -117,6 +117,18 @@
 
   --secondary: oklch(from var(--foreground) l c h / 0.05);
   --secondary-foreground: var(--text-primary);
+  /* synara parity: active row fill + secondary button hover (shared token). */
+  --sidebar-accent-active: color-mix(
+    in oklch,
+    var(--foreground) 6%,
+    var(--background)
+  );
+
+  /* synara parity: segmented picker + secondary chrome (named like Codex/Synara) */
+  --color-text-foreground: var(--foreground);
+  --color-text-foreground-secondary: var(--text-secondary);
+  --color-background-elevated-secondary: var(--secondary);
+  --color-background-button-secondary-hover: var(--sidebar-accent-active);
   --muted: var(--surface-2);
   --muted-foreground: var(--text-tertiary);
   --card: var(--surface-0);
@@ -198,6 +210,15 @@
   --z-overlay: 300;
 }
 
+/* synara parity: active Threads/Workspace segment matches composer input fill */
+:root {
+  --composer-surface: color-mix(in oklab, var(--background) 90%, transparent);
+}
+
+.dark {
+  --composer-surface: var(--surface-1);
+}
+
 /* Dark-only preset selected while color scheme is light */
 html[data-theme-mismatch]::before {
   position: fixed;
@@ -277,12 +298,6 @@ html[data-theme-mismatch]::before {
   --color-sidebar-primary-foreground: var(--background);
   --color-sidebar-accent: var(--muted);
   --color-sidebar-accent-foreground: var(--foreground);
-  /* synara parity: active row fill is slightly stronger than hover. */
-  --sidebar-accent-active: color-mix(
-    in oklch,
-    var(--foreground) 6%,
-    var(--background)
-  );
   --color-sidebar-border: oklch(from var(--foreground) l c h / 0.05);
   --color-sidebar-ring: var(--ring);
 
@@ -522,32 +537,93 @@ html[data-theme-mismatch]::before {
   background: var(--sidebar-accent-active);
 }
 
-/* synara parity: Threads / Workspace segmented picker in the agent sidebar */
-.sidebar-segmented-picker {
-  background: var(--surface-2) !important;
-  box-shadow: none !important;
-  filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  backdrop-filter: none !important;
+/* Sliding Chats / Assets tabs (transitions.dev pattern, sidebar tokens) */
+:root,
+.dark {
+  --tabs-dur: 250ms;
+  --tabs-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --tabs-bar-bg: var(--color-background-elevated-secondary);
+  --tabs-pill-bg: var(--composer-surface);
+  --tabs-text-muted: var(--color-text-foreground-secondary);
+  --tabs-text-active: var(--color-text-foreground);
 }
 
-.sidebar-segmented-picker [data-sidebar-segmented-active="true"] {
-  background: var(--background) !important;
-  background-color: var(--background) !important;
-  background-image: none !important;
-  box-shadow: none !important;
-  opacity: 1 !important;
-  filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  backdrop-filter: none !important;
+.dark {
+  /* Stronger track vs pill steps than generic secondary chrome (was ~5% / ~6%). */
+  --tabs-bar-bg: color-mix(in oklch, var(--foreground) 9%, var(--background));
+  --tabs-pill-bg: color-mix(in oklch, var(--foreground) 17%, var(--background));
+  --tabs-text-muted: color-mix(
+    in oklch,
+    var(--foreground) 62%,
+    var(--background)
+  );
+  --tabs-text-active: var(--color-text-foreground);
 }
 
-.dark .sidebar-segmented-picker [data-sidebar-segmented-active="true"] {
-  background: var(--foreground-10) !important;
-  background-color: var(--foreground-10) !important;
+.sidebar-sliding-tabs {
+  position: relative;
+  display: flex;
+  gap: 3px;
+  align-items: center;
+  width: 100%;
+  padding: 2px 3px;
+  overflow: hidden;
+  background: var(--tabs-bar-bg);
+  border-radius: var(--radius);
 }
 
-.sidebar-segmented-picker [data-sidebar-segmented-active="true"]::before,
-.sidebar-segmented-picker [data-sidebar-segmented-active="true"]::after {
-  display: none !important;
+.sidebar-sliding-tab {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  height: 28px;
+  padding: 2px 12px;
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--tabs-text-muted);
+  appearance: none;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: calc(var(--radius) - 2px);
+  transition: color var(--tabs-dur) var(--tabs-ease);
+}
+
+.sidebar-sliding-tab:not([aria-selected="true"]):hover {
+  color: var(--tabs-text-active);
+}
+
+.sidebar-sliding-tab[aria-selected="true"] {
+  color: var(--tabs-text-active);
+  background: var(--tabs-pill-bg);
+  border-radius: calc(var(--radius) - 2px);
+}
+
+.sidebar-sliding-tabs-pill {
+  position: absolute;
+  top: 2px;
+  left: 0;
+  z-index: 0;
+  width: 0;
+  height: 28px;
+  pointer-events: none;
+  background: var(--tabs-pill-bg);
+  border-radius: calc(var(--radius) - 2px);
+  transform: translateX(0);
+  transition:
+    transform var(--tabs-dur) var(--tabs-ease),
+    width var(--tabs-dur) var(--tabs-ease);
+  will-change: transform, width;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-sliding-tabs-pill,
+  .sidebar-sliding-tab {
+    transition: none !important;
+  }
 }

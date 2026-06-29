@@ -58,6 +58,15 @@ export const SIDEBAR_HEADER_ICON_CLASS = "size-4 shrink-0 text-inherit";
 /** Primary nav leading glyphs (Synara: 15px in a 16px slot). */
 export const SIDEBAR_LEADING_GLYPH_CLASS = "size-[15px] shrink-0 text-inherit";
 
+/** Shared horizontal inset for sidebar chrome (rows, picker, sections). */
+export const SIDEBAR_CONTENT_INSET_CLASS = "px-1.5";
+
+/** Chats / Assets sliding tabs wrapper spacing. */
+export const SIDEBAR_SEGMENTED_PICKER_WRAP_CLASS = cn(
+  SIDEBAR_CONTENT_INSET_CLASS,
+  "w-full pt-0.5 pb-1"
+);
+
 export function sidebarThreadRowClass(isActive: boolean): string {
   if (isActive) {
     return cn(SIDEBAR_THREAD_ROW_BASE_CLASS, SIDEBAR_ROW_ACTIVE_CLASS);
