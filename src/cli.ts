@@ -7,6 +7,7 @@ import { assembleFromSelection, ingestTake, listTakes } from "./assembly.ts";
 import { analyzeAssets } from "./asset-cards.ts";
 import { registerAsset } from "./assets.ts";
 import { applyBrand, loadBrand } from "./brands.ts";
+import { buildCallInput, runCallTool } from "./call-cli.ts";
 import {
   runOverlays,
   runRanges,
@@ -174,6 +175,10 @@ Diagnostics
   openklip tools                     unified agent tool manifest (query + mutate + export)
                                        --json            machine-readable manifest
                                        --surface mcp     filter by cli|gui|mcp
+  openklip call <tool>               invoke one agent tool (JSON in/out for scripts)
+                                       --slug <slug>     merge slug into tool input
+                                       --json '{}'       tool input object (default {})
+                                       --stdin           read tool input JSON from stdin
   openklip mcp                       start the MCP stdio server (Cursor, Claude Desktop, …)
 
 Post-export (optional, external)
@@ -1715,6 +1720,27 @@ try {
         break;
       }
       console.log(agentToolTable(surface));
+      break;
+    }
+    case "call": {
+      const tool = rest[0];
+      if (!tool || tool.startsWith("-")) {
+        throw new Error(
+          "usage: openklip call <tool> [--slug <slug>] [--json '{}'] [--stdin]"
+        );
+      }
+      const slugArg = flagValue(rest, "--slug");
+      const jsonArg = flagValue(rest, "--json");
+      const stdinJson = rest.includes("--stdin")
+        ? await Bun.stdin.text()
+        : undefined;
+      const input = buildCallInput({
+        json: jsonArg,
+        slug: slugArg,
+        stdinJson,
+      });
+      const result = await runCallTool(tool, input);
+      console.log(JSON.stringify(result, null, 2));
       break;
     }
     case "mcp": {

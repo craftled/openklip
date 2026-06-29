@@ -79,6 +79,7 @@ Time is integer audio samples at 48 kHz. The CLI takes seconds where a human num
 | List ingester plugins | `openklip ingesters` |
 | List the action registry (mutations only) | `openklip actions` |
 | List all agent tools (query + mutate + export) | `openklip tools` |
+| Invoke one agent tool (JSON in/out) | `openklip call <tool> [--slug <slug>] [--json '{}']` |
 | MCP server (stdio) | `openklip mcp` or `bun run mcp` |
 | Export MP4 | `openklip export <slug>` |
 | Verify rendered cut | `openklip verify <slug>` |
@@ -192,6 +193,7 @@ Workflow: `take-add` each recording, read `take_transcript <slug> <takeId>` to f
 | `openklip ingesters` | List ingester plugins (`ingesters/<id>/ingester.json`): declarative seams for non-file media import (URL, batch, etc.). |
 | `openklip actions` | **Mutations only:** every `project.json` edit action (cut, broll, title, zoom, still, captions, look, pad, reorder). `--json` emits JSON Schema (`inputSchema` shape). |
 | `openklip tools` | **Full agent surface:** query tools (`transcript_grep`, `project_status`, …), registry mutations, phrase-add helpers, and `export`. Same manifest the MCP server exposes. `--json`; `--surface mcp` filters. |
+| `openklip call <tool>` | Invoke one tool from the manifest with JSON in/out (for bash/Pi/Codex scripts without MCP). `--slug` merges into input; `--json '{}'` or `--stdin` for the rest. |
 | `openklip mcp` | Start the MCP stdio server (`src/mcp-server.ts`). Cursor: `.cursor/mcp.json` in repo root. Set `OPENKLIP_PROJECTS_ROOT` in the server env if projects live outside the repo. |
 | `openklip package <slug> <pass>` | Optional post-export pass on `output/out.mp4` via the HyperFrames CLI: `remove-background` (→ transparent `.webm`, the matte primitive for embed-behind-subject) or `transcribe` (→ `.srt`). Uses the local `node_modules/.bin/hyperframes` if installed (`bun add -d hyperframes`); runs Chrome + our bundled ffmpeg. Fails with install instructions if absent. |
 
