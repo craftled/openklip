@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.8.10.0 - 2026-06-29
+
+The edit carries more of itself as plain text: a written rationale on every decision, overlays that re-anchor to the spoken word after a re-cut, and multi-take assembly that stitches the best take per line into one editable source. Researched against four open editors (OpenCut, VibeFrame, Monet, craft-agents) and built red-green TDD (411 → 585 tests).
+
+### Added
+- **Written rationale (`note`)**: `openklip cut <slug> w5 --note "filler restart"` and an optional `note` on every overlay record the *why* of a pick. It surfaces in `openklip overlays`, the query/transcript views, and the MCP tools — but is metadata only and never reaches ffmpeg (pinned by an exporter no-op test). `--note ""` clears it.
+- **Phrase-anchored cues**: `title-add-phrase` / `zoom-add-phrase` / `broll-add-phrase` now **remember** the spoken phrase on the overlay instead of forgetting it. After a re-cut, anchored overlays re-resolve their span to the current kept words automatically (on `cut` / `cut --text` / `restore`, CLI and GUI alike); if the phrase is deleted they flag `stale` and preserve the last good span; if it appears more than once the anchor follows a surviving instance. New `openklip reanchor <slug> [overlayId]` re-resolves on demand. New pure module `src/reanchor.ts`.
+- **Multi-take assembly**: `openklip take-add <slug> <video>` ingests alternate takes into `takes/<id>/`; `openklip takes <slug>` lists them; the agent reads each take's transcript and picks the best line, then `openklip assemble <slug> <takeId:wStart-wEnd> ...` ffmpeg-concats the chosen segments into one `source.mp4` + a spliced, re-timed transcript — a normal single-source `project.json` the cut/overlay/export engine edits unchanged. Pure planner `src/assembly-plan.ts` (integer-exact splice) + `src/assembly.ts` (ffmpeg/Whisper shell); `assemble`/`list_takes`/`take_transcript` are agent query tools.
+
+### Changed
+- The EDL schema (`src/edl.ts`) gains `note?` on words and overlays, `PhraseAnchor` + `anchor?` on overlays, and `Take` / `AssemblySelection` / `AssemblyProvenance` + `Project.assembly?`. All optional/defaulted — `version` stays `1`, every legacy `project.json` parses unchanged. `src/exporter.ts` is untouched.
+
 ## 0.8.9.0 - 2026-06-28
 
 Native graphics templates now export pixel-for-pixel and render in fullscreen. The rich render path is first-party (headless Chrome, no third-party engine), so an HTML/CSS template looks identical in the editor preview and the exported video.
