@@ -7,6 +7,7 @@ import {
   ConversationContent,
   ConversationScrollButton,
 } from "@/components/ai-elements/conversation";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 import { AgentProviderIcon } from "@/lib/agent-icons";
 import { getAgentModelLabel } from "@/lib/agent-preferences";
 import type { AssetBinUpdate } from "@/lib/asset-bin-update";
@@ -34,7 +35,7 @@ export function AgentChatPanel({ onAssetsUpdated, slug }: AgentChatPanelProps) {
       <div className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col">
         <div className="flex shrink-0 items-center justify-between gap-3 border-border border-b px-6 py-3">
           <span className="text-section-label text-tertiary">Chat</span>
-          <div className="flex min-w-0 items-center gap-3">
+          <div className="flex min-w-0 items-center gap-2">
             <span
               className="flex shrink-0 items-center gap-1.5 text-caption text-tertiary"
               title={getAgentModelLabel(agent)}
@@ -47,6 +48,7 @@ export function AgentChatPanel({ onAssetsUpdated, slug }: AgentChatPanelProps) {
                 {activeThread.title}
               </span>
             )}
+            <SidebarTrigger aria-label="Toggle inspector" side="right" />
           </div>
         </div>
 

@@ -32,6 +32,7 @@ import {
   Trash2,
 } from "@/lib/icon";
 import type { ProjectHoverContext } from "@/lib/project-context";
+import { sidebarThreadRowClass } from "@/lib/sidebar-row-styles";
 import { cn } from "@/lib/utils";
 
 interface ChatListItemProps {
@@ -107,7 +108,7 @@ export function ChatListItem({
     <SidebarMenuItem>
       {isRenaming ? (
         <Input
-          className="h-8 border-border bg-background px-2 text-sm shadow-none focus-visible:ring-1"
+          className="h-7 border-border bg-background px-2 text-xs shadow-none focus-visible:ring-1"
           onBlur={commitRename}
           onChange={(e) => setDraftTitle(e.target.value)}
           onKeyDown={onRenameKeyDown}
@@ -123,17 +124,21 @@ export function ChatListItem({
         >
           <SidebarMenuButton
             aria-busy={inProgress}
-            className={cn(archived && "opacity-70")}
+            className={cn(
+              sidebarThreadRowClass(isActive),
+              archived && "opacity-70"
+            )}
             isActive={isActive}
             onClick={onSelect}
+            size="sm"
           >
             {inProgress ? (
               <ChatProgressIndicator />
             ) : (
-              <MessageSquare className="size-4 shrink-0" />
+              <MessageSquare className="size-4 shrink-0 opacity-70" />
             )}
             <span className="min-w-0 flex-1 truncate">{thread.title}</span>
-            <span className="text-caption text-tertiary tabular-nums">
+            <span className="shrink-0 text-[12px] text-tertiary/58 tabular-nums">
               {timeLabel}
             </span>
           </SidebarMenuButton>

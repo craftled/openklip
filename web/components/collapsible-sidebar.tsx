@@ -10,14 +10,18 @@ import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
-  SidebarMenu,
   SidebarMenuAction,
   SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSub,
 } from "@/components/ui/sidebar";
-import { ChevronRight } from "@/lib/icon";
+import { ChevronRight, FolderClosed, FolderOpen } from "@/lib/icon";
+import {
+  SIDEBAR_NESTED_LIST_GAP_CLASS,
+  SIDEBAR_NESTED_LIST_OFFSET_CLASS,
+  SIDEBAR_SECTION_LABEL_CLASS,
+} from "@/lib/sidebar-row-styles";
 import { cn } from "@/lib/utils";
 
 /** sidebar-08 nav-main pattern: menu row + chevron action + collapsible sub panel. */
@@ -39,7 +43,7 @@ export function CollapsibleSidebarMenuItem({
   return (
     <Collapsible asChild defaultOpen={defaultOpen}>
       <SidebarMenuItem>
-        <SidebarMenuButton tooltip={tooltip}>
+        <SidebarMenuButton size="sm" tooltip={tooltip}>
           {icon}
           <span>{label}</span>
         </SidebarMenuButton>
@@ -58,47 +62,64 @@ export function CollapsibleSidebarMenuItem({
   );
 }
 
-/** sidebar-08 section row: icon + title + optional action + chevron, with shadcn hover/active styles. */
+/** synara-style section: muted label row + chevron, no icon, no hover fill on header. */
 export function CollapsibleSidebarSection({
   action,
   children,
   className,
   defaultOpen = true,
-  icon: Icon,
+  showFolderIcon = false,
   title,
 }: {
   action?: ReactNode;
   children: ReactNode;
   className?: string;
   defaultOpen?: boolean;
-  icon?: ComponentType<{ className?: string }>;
+  showFolderIcon?: boolean;
   title: ReactNode;
 }) {
   return (
-    <SidebarGroup className={cn("py-2", className)}>
-      <SidebarMenu>
-        <Collapsible asChild defaultOpen={defaultOpen}>
-          <SidebarMenuItem className="relative">
+    <SidebarGroup className={cn("py-1.5", className)}>
+      <Collapsible asChild defaultOpen={defaultOpen}>
+        <div>
+          <div className="group/section-header relative my-1">
             <CollapsibleTrigger asChild>
-              <SidebarMenuButton className="[&[data-state=open]>svg.chevron]:rotate-90">
-                {Icon ? <Icon /> : null}
-                <span className="flex-1 truncate text-left">{title}</span>
-                <ChevronRight className="chevron size-4 shrink-0 transition-transform duration-200" />
-              </SidebarMenuButton>
+              <button
+                className={cn(
+                  "group flex h-7 w-full min-w-0 cursor-pointer items-center gap-1 rounded-md px-2 py-0.5 text-left outline-hidden transition-colors focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-inset [&[data-state=open]>svg.chevron]:rotate-90",
+                  SIDEBAR_SECTION_LABEL_CLASS
+                )}
+                type="button"
+              >
+                {showFolderIcon ? (
+                  <span className="relative inline-flex size-3.5 shrink-0 items-center justify-center">
+                    <FolderClosed className="size-3.5 shrink-0 opacity-60 group-data-[state=open]:hidden" />
+                    <FolderOpen className="hidden size-3.5 shrink-0 opacity-60 group-data-[state=open]:block" />
+                  </span>
+                ) : null}
+                <span className="min-w-0 flex-1 truncate">{title}</span>
+                <ChevronRight className="chevron size-3.5 shrink-0 opacity-60 transition-transform duration-200" />
+              </button>
             </CollapsibleTrigger>
             {action ? (
               <div className="absolute top-1/2 right-7 z-10 -translate-y-1/2">
                 {action}
               </div>
             ) : null}
-            <CollapsibleContent>
-              <SidebarGroupContent className="space-y-2 px-1 pt-2 pb-1">
-                {children}
-              </SidebarGroupContent>
-            </CollapsibleContent>
-          </SidebarMenuItem>
-        </Collapsible>
-      </SidebarMenu>
+          </div>
+          <CollapsibleContent>
+            <SidebarGroupContent
+              className={cn(
+                SIDEBAR_NESTED_LIST_OFFSET_CLASS,
+                SIDEBAR_NESTED_LIST_GAP_CLASS,
+                "flex flex-col px-0"
+              )}
+            >
+              {children}
+            </SidebarGroupContent>
+          </CollapsibleContent>
+        </div>
+      </Collapsible>
     </SidebarGroup>
   );
 }
@@ -113,10 +134,10 @@ export function CollapsibleSidebarMetaItem({
   value: string;
 }) {
   return (
-    <div className="flex h-7 items-center gap-2 px-2 text-sidebar-foreground text-xs">
-      <Icon className="size-4 shrink-0 text-sidebar-accent-foreground" />
+    <div className="flex h-7 items-center gap-2 px-2 text-[12px] text-sidebar-foreground">
+      <Icon className="size-4 shrink-0 text-inherit opacity-70" />
       <span className="min-w-0 flex-1 truncate">{label}</span>
-      <span className="shrink-0 text-tertiary tabular-nums">{value}</span>
+      <span className="shrink-0 text-tertiary/70 tabular-nums">{value}</span>
     </div>
   );
 }
@@ -130,8 +151,13 @@ export function SidebarSettingsLabel({
   icon?: ComponentType<{ className?: string }>;
 }) {
   return (
-    <SidebarGroupLabel className="mb-1 h-7 px-2">
-      {Icon ? <Icon className="size-4 shrink-0" /> : null}
+    <SidebarGroupLabel
+      className={cn(
+        "mb-1 h-7 px-2 font-normal text-tertiary/58",
+        SIDEBAR_SECTION_LABEL_CLASS
+      )}
+    >
+      {Icon ? <Icon className="size-4 shrink-0 opacity-70" /> : null}
       <span>{children}</span>
     </SidebarGroupLabel>
   );

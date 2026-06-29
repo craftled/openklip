@@ -13,10 +13,11 @@
   --surface-2: color-mix(in oklch, var(--foreground) 4.5%, var(--background));
   --surface-3: color-mix(in oklch, var(--foreground) 7%, var(--background));
   --background-elevated: var(--surface-1);
-  /* Sidebars: slightly recessed vs main shell (darker in light and dark).
-     Named --sidebar-surface (not --sidebar) so Tailwind does not treat "black"
-     in the color-mix() as the sidebar theme color. */
-  --sidebar-surface: color-mix(in oklch, black 2.5%, var(--background));
+  /* App content shell: faintly recessed vs the pure-base rails so the sidebar
+     reads as the bright surface (true synara polarity: content sits below the
+     rails in BOTH modes). Plain var (not --color-*) so Tailwind does not parse
+     the literal "black" as a theme color. */
+  --app-shell-surface: color-mix(in oklch, black 2%, var(--background));
 
   /* Text hierarchy (matched contrast in light and dark) */
   --text-primary: var(--foreground);
@@ -158,8 +159,9 @@
   --brand-900: oklch(0.253 0.095 258.298);
   --brand-950: oklch(0.176 0.066 258.298);
 
+  /* synara parity: native system UI font (SF Pro on macOS), no web font. */
   --font-sans:
-    var(--font-inter), "SF Pro Display", system-ui, -apple-system, sans-serif;
+    -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   --font-monospace:
     var(--font-mono-src), ui-monospace, "SF Mono", Menlo, monospace;
   --font-default: var(--font-sans);
@@ -175,8 +177,10 @@
   --font-weight-bold: 680;
   --leading-ui: 1.6;
   --leading-tight: 1.25;
-  --tracking-ui: -0.011em;
-  --tracking-small: -0.013em;
+  /* synara parity: neutral tracking so the system font uses its own optical
+     metrics instead of a squeezed, "designed" negative tracking. */
+  --tracking-ui: normal;
+  --tracking-small: normal;
   --tracking-label: 0.04em;
   --radius: 0.5rem;
   --spacing: 0.25rem;
@@ -263,13 +267,23 @@ html[data-theme-mismatch]::before {
   --color-surface-3: var(--surface-3);
   --color-overlay: var(--overlay);
 
-  --color-sidebar: var(--sidebar-surface);
+  /* True synara polarity: the rails are the pure base (the brightest surface),
+     while the app content shell (--color-app-shell, applied to SidebarInset) is
+     faintly recessed below them. Border stays a ~5% hairline. */
+  --color-app-shell: var(--app-shell-surface);
+  --color-sidebar: var(--background);
   --color-sidebar-foreground: var(--text-primary);
   --color-sidebar-primary: var(--foreground);
   --color-sidebar-primary-foreground: var(--background);
   --color-sidebar-accent: var(--muted);
   --color-sidebar-accent-foreground: var(--foreground);
-  --color-sidebar-border: var(--border);
+  /* synara parity: active row fill is slightly stronger than hover. */
+  --sidebar-accent-active: color-mix(
+    in oklch,
+    var(--foreground) 6%,
+    var(--background)
+  );
+  --color-sidebar-border: oklch(from var(--foreground) l c h / 0.05);
   --color-sidebar-ring: var(--ring);
 
   --color-card: var(--card);
@@ -455,11 +469,12 @@ html[data-theme-mismatch]::before {
     background: var(--muted-foreground);
   }
 
+  /* synara parity: section labels are normal-case, normal-weight, neutral
+     tracking (muted color comes from the call site's text-tertiary). */
   .text-section-label {
     font-size: var(--text-caption);
-    font-weight: var(--font-weight-medium);
-    text-transform: uppercase;
-    letter-spacing: var(--tracking-label);
+    font-weight: var(--font-weight-normal);
+    letter-spacing: normal;
   }
 
   .text-ui {
@@ -495,4 +510,44 @@ html[data-theme-mismatch]::before {
   [data-sidebar-instant] [data-slot="sidebar-group-label"] {
     transition: none !important;
   }
+}
+
+/* =============================================================================
+   synara parity: sidebar selection signals via fill + brighter text, not weight.
+   Unlayered so it overrides the `data-[active=true]:font-medium` utility.
+============================================================================= */
+[data-slot="sidebar-container"]
+  [data-slot="sidebar-menu-button"][data-active="true"] {
+  font-weight: var(--font-weight-normal);
+  background: var(--sidebar-accent-active);
+}
+
+/* synara parity: Threads / Workspace segmented picker in the agent sidebar */
+.sidebar-segmented-picker {
+  background: var(--surface-2) !important;
+  box-shadow: none !important;
+  filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+.sidebar-segmented-picker [data-sidebar-segmented-active="true"] {
+  background: var(--background) !important;
+  background-color: var(--background) !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  opacity: 1 !important;
+  filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+.dark .sidebar-segmented-picker [data-sidebar-segmented-active="true"] {
+  background: var(--foreground-10) !important;
+  background-color: var(--foreground-10) !important;
+}
+
+.sidebar-segmented-picker [data-sidebar-segmented-active="true"]::before,
+.sidebar-segmented-picker [data-sidebar-segmented-active="true"]::after {
+  display: none !important;
 }

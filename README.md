@@ -94,7 +94,7 @@ Verified against the current codebase (585 tests, v0.8.10.0):
 - **MCP server**: `openklip mcp` (stdio) exposes 52 tools with CLI/GUI parity; `.cursor/mcp.json` wired for Cursor
 - **Edit templates**: `templates/<id>/skill.md` playbooks; `openklip template set`; brand presets at ingest (`openklip brand`)
 - **Agent selector**: drive filler cuts via Claude Code, Codex, Cursor, or Grok subscription CLIs
-- **Design system**: Linear-style Inter Variable + OKLCH surfaces ([DESIGN.md](./DESIGN.md), including [Icons](./DESIGN.md#icons)); Phosphor fill via `web/lib/icon.tsx`; swappable theme presets with light/dark scheme
+- **Design system**: OKLCH theme tokens (`themes/*.json`, `app/theme-base.css`); icons via `web/lib/icon.tsx`; swappable theme presets with light/dark scheme
 - **Agent demo**: `bun run agent-demo` (phrase list → cut → status → optional export)
 
 Phrase-based cutting is CLI/MCP-only today (`openklip cut --text`). The transcript UI is word click, not phrase search. First project on a machine: use `openklip ingest` from the CLI, or pick a folder in the GUI (macOS) that already contains ingested projects. Known gaps: **[TODO.md](./TODO.md)**.

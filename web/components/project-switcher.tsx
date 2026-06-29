@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/sidebar";
 import { useProjectCreate } from "@/hooks/use-project-create";
 import { toastProjectDeleted, toastProjectDeleteFailed } from "@/lib/app-toast";
-import { Check, ChevronsUpDown, Plus } from "@/lib/icon";
+import { Check, ChevronsUpDown, FolderOpen, Plus } from "@/lib/icon";
 import type { IngestProgressView } from "@/lib/project-create";
 import type { ProjectListing } from "@/lib/project-list";
 import {
@@ -34,6 +34,12 @@ import {
   projectInitial,
 } from "@/lib/project-list";
 import { relativeTimeAgo } from "@/lib/relative-time";
+import {
+  SIDEBAR_HEADER_ICON_CLASS,
+  SIDEBAR_ROW_LABEL_TEXT_CLASS,
+  sidebarHeaderRowClass,
+} from "@/lib/sidebar-row-styles";
+import { cn } from "@/lib/utils";
 
 export function ProjectSwitcher({
   activeSlug,
@@ -119,7 +125,7 @@ export function ProjectSwitcher({
         open={newProjectOpen}
       />
       <SidebarMenu>
-        <SidebarMenuItem className="group/project-trigger">
+        <SidebarMenuItem className="group/project-trigger relative">
           <DropdownMenu
             onOpenChange={(open) => {
               setMenuOpen(open);
@@ -131,28 +137,34 @@ export function ProjectSwitcher({
           >
             <DropdownMenuTrigger asChild>
               <SidebarMenuButton
-                className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-                size="lg"
+                className={cn(
+                  sidebarHeaderRowClass(),
+                  "data-[state=open]:bg-[var(--sidebar-accent-active)] data-[state=open]:text-sidebar-accent-foreground"
+                )}
+                size="sm"
               >
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-foreground-5 font-medium text-foreground text-sm">
-                  {projectInitial(active.slug)}
-                </div>
-                <div className="grid min-w-0 flex-1 text-left text-sm leading-tight">
-                  <span className="truncate pr-4 font-medium">
-                    {active.slug}
+                <FolderOpen className={SIDEBAR_HEADER_ICON_CLASS} />
+                <span
+                  className={cn(
+                    "min-w-0 flex-1 truncate pr-6",
+                    SIDEBAR_ROW_LABEL_TEXT_CLASS
+                  )}
+                >
+                  {active.slug}
+                </span>
+                {creating ? (
+                  <span className="shrink-0 text-[12px] text-tertiary/58">
+                    Creating…
                   </span>
-                  <span className="truncate text-tertiary text-xs">
-                    {creating ? (
-                      "Creating project…"
-                    ) : (
-                      <RelativeTimeLabel
-                        format={relativeTimeAgo}
-                        ms={active.mtimeMs}
-                      />
-                    )}
+                ) : (
+                  <span className="shrink-0 text-[12px] text-tertiary/40 tabular-nums">
+                    <RelativeTimeLabel
+                      format={relativeTimeAgo}
+                      ms={active.mtimeMs}
+                    />
                   </span>
-                </div>
-                <ChevronsUpDown className="ml-auto size-4 shrink-0" />
+                )}
+                <ChevronsUpDown className="absolute right-2 size-4 shrink-0 opacity-60" />
               </SidebarMenuButton>
             </DropdownMenuTrigger>
             <DropdownMenuContent
