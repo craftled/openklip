@@ -69,7 +69,7 @@ Agent sidebar chats use `working/chats.json`, not `localStorage` (theme and defa
 
 ## What works today
 
-Verified against the current codebase (411 tests, v0.8.5.0):
+Verified against the current codebase (525 tests, v0.8.9.0):
 
 - **Ingest**: video → local transcript + preview proxy + `project.json` (`openklip ingest`; refuses re-ingest unless `--force`)
 - **Transcript editing**: click words to toggle `deleted`; `openklip cut` / `cut --text` / `restore` on CLI
@@ -84,9 +84,11 @@ Verified against the current codebase (411 tests, v0.8.5.0):
 - **Assets**: register b-roll, music, stills; sidebar asset bin with upload + `assets/` folder sync; upload from chat `+`
 - **Overlays**: b-roll cover, Ken Burns stills, push-in zooms, title cards (lower / center / hero), vignette; phrase helpers (`*-add-phrase`) on CLI
 - **Export**: ffmpeg composes kept ranges + overlays + captions; GUI export dialog picks max height (720p / 1080p / 4K)
+- **Rich graphics templates**: HTML/CSS graphic templates (`kind: "rich"`) render through headless Chrome (`chrome-headless-shell` via `puppeteer-core`), driven by the same `web/lib/graphic-runtime.ts` as the live preview, so export matches preview frame-for-frame. Frames capture with a transparent background to a ProRes 4444 alpha MOV (`src/headless-render.ts`), then composite as a timed ffmpeg overlay. Chrome is an optional, one-time download (`bunx puppeteer browsers install chrome-headless-shell`); the default text path needs no browser
+- **Fullscreen overlays**: the cinema player renders the graphics/titles/captions overlay stack (`web/components/preview-overlays.tsx`), shared with the inline preview and synced to playback
 - **Workspace**: macOS folder picker on empty landing; inline project create; projects root persisted in `.openklip/projects-root`
 - **CLI**: full edit surface; `openklip actions --json` mutations manifest; `openklip tools --json` full agent tool list
-- **MCP server**: `openklip mcp` (stdio) exposes 35 tools with CLI/GUI parity; `.cursor/mcp.json` wired for Cursor
+- **MCP server**: `openklip mcp` (stdio) exposes 48 tools with CLI/GUI parity; `.cursor/mcp.json` wired for Cursor
 - **Edit templates**: `templates/<id>/skill.md` playbooks; `openklip template set`; brand presets at ingest (`openklip brand`)
 - **Agent selector**: drive filler cuts via Claude Code, Codex, Cursor, or Grok subscription CLIs
 - **Design system**: Linear-style Inter Variable + OKLCH surfaces ([DESIGN.md](./DESIGN.md), including [Icons](./DESIGN.md#icons)); Phosphor fill via `web/lib/icon.tsx`; swappable theme presets with light/dark scheme
@@ -145,6 +147,7 @@ Command reference: **[AGENTS.md](./AGENTS.md)**. Mutation manifest: `openklip ac
 - **Preview**: `<video>` on `working/proxy.mp4`; seeks across kept ranges.
 - **Export**: ffmpeg `filter_complex`: range concat, b-roll/still cover, zoompan, vignette, libass captions/titles.
 - **Export source**: prefers original media; can fall back to project proxies when source files are missing (see exporter).
+- **Rich graphics**: `kind: "rich"` templates render to a transparent ProRes 4444 MOV via headless Chrome (`src/headless-render.ts`, lazy-loaded), then ffmpeg overlays it like a still. ffmpeg stays the master compositor; the text/ASS path stays browser-free.
 
 ---
 

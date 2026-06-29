@@ -30,11 +30,23 @@ interface CinemaPlayerProps {
   /** Top-right primary action, replacing "Watch on YouTube". */
   onExport?: () => void;
   onToggleCaptions?: (next: boolean) => void;
+  /**
+   * Live overlay stack (titles/graphics/captions) rendered aligned to the
+   * letterboxed video box, driven by THIS player's current time in seconds.
+   */
+  overlay?: (curSec: number) => ReactNode;
   poster?: string;
   /** Shown top-left, replacing Linear's "Episode 01". */
   projectName: string;
   /** Source URL for the video (e.g. the proxy). */
   src: string;
+}
+
+interface VideoBox {
+  height: number;
+  left: number;
+  top: number;
+  width: number;
 }
 
 /**
@@ -54,6 +66,7 @@ export function CinemaPlayer({
   captionSlot,
   captionsOn = true,
   onToggleCaptions,
+  overlay,
   poster,
 }: CinemaPlayerProps) {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -71,6 +84,41 @@ export function CinemaPlayer({
   const [pip, setPip] = useState(false);
   const [caps, setCaps] = useState(captionsOn);
   const [chromeVisible, setChromeVisible] = useState(true);
+  const [box, setBox] = useState<VideoBox | null>(null);
+
+  // Keep the live overlay aligned to the letterboxed (object-contain) video box,
+  // not the full black surround, so a lower-third lands on the video edge.
+  const measureBox = useCallback(() => {
+    const v = videoRef.current;
+    const r = rootRef.current;
+    if (!(v && r)) {
+      return;
+    }
+    const vr = v.getBoundingClientRect();
+    const rr = r.getBoundingClientRect();
+    setBox({
+      left: vr.left - rr.left,
+      top: vr.top - rr.top,
+      width: vr.width,
+      height: vr.height,
+    });
+  }, []);
+
+  useEffect(() => {
+    measureBox();
+    const v = videoRef.current;
+    const ro = new ResizeObserver(measureBox);
+    if (v) {
+      ro.observe(v);
+    }
+    window.addEventListener("resize", measureBox);
+    document.addEventListener("fullscreenchange", measureBox);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", measureBox);
+      document.removeEventListener("fullscreenchange", measureBox);
+    };
+  }, [measureBox]);
 
   // --- controls auto-hide -------------------------------------------------
   const showChrome = useCallback(() => {
@@ -267,7 +315,10 @@ export function CinemaPlayer({
         onClick={togglePlay}
         onDoubleClick={toggleFullscreen}
         onDurationChange={(e) => setDur(e.currentTarget.duration)}
-        onLoadedMetadata={(e) => setDur(e.currentTarget.duration)}
+        onLoadedMetadata={(e) => {
+          setDur(e.currentTarget.duration);
+          measureBox();
+        }}
         onPause={() => {
           setPlaying(false);
           showChrome();
@@ -289,6 +340,22 @@ export function CinemaPlayer({
         ref={videoRef}
         src={src}
       />
+
+      {/* Live overlay stack (titles / graphics / captions), aligned to the
+          letterboxed video box and synced to this player's playback time. */}
+      {overlay && box && (
+        <div
+          className="pointer-events-none absolute z-10"
+          style={{
+            height: box.height,
+            left: box.left,
+            top: box.top,
+            width: box.width,
+          }}
+        >
+          {overlay(cur)}
+        </div>
+      )}
 
       {/* Live caption overlay (caller-provided, e.g. transcript words) */}
       {caps && captionSlot && (

@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import {
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+} from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { SAMPLE_RATE } from "../src/edl.ts";
@@ -20,8 +26,8 @@ test("graphicAssetBasename is deterministic and kind-keyed", () => {
     "graphic-lower-third.ass"
   );
   assert.equal(
-    graphicAssetBasename("title-card", "webm"),
-    "graphic-title-card.webm"
+    graphicAssetBasename("title-card", "mov"),
+    "graphic-title-card.mov"
   );
 });
 
@@ -109,22 +115,29 @@ test("text-kind graphic authors a local timebase starting at t=0", async () => {
   }
 });
 
-// Rich path: gated. @hyperframes/producer + chrome-headless-shell are OPTIONAL.
-// When absent, renderGraphicOverlay must throw a clear, actionable error rather
-// than hang or fake success. When present, this test is skipped (the real render
-// needs headless Chrome and is covered by manual/integration verification).
-test("rich-kind graphic throws an actionable error when hyperframes is absent", async () => {
-  let hyperframesPresent = false;
-  try {
-    await import("@hyperframes/producer" as string);
-    hyperframesPresent = true;
-  } catch {
-    hyperframesPresent = false;
+// Rich path: gated on chrome-headless-shell (the only optional runtime dep). When
+// absent, renderGraphicOverlay must throw a clear, actionable error rather than
+// hang or fake success. When present, this test is skipped — the real render
+// spawns headless Chrome and is covered by manual/integration verification.
+function chromeHeadlessInstalled(): boolean {
+  const base = join(homedir(), ".cache", "puppeteer", "chrome-headless-shell");
+  if (!existsSync(base)) {
+    return false;
   }
+  for (const build of readdirSync(base)) {
+    for (const inner of readdirSync(join(base, build))) {
+      if (existsSync(join(base, build, inner, "chrome-headless-shell"))) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
 
-  if (hyperframesPresent) {
-    // Package is installed; skip cleanly so CI with Chrome stays green without
-    // spawning a headless render here.
+test("rich-kind graphic throws an actionable error when Chrome is absent", async () => {
+  if (chromeHeadlessInstalled()) {
+    // Chrome is installed; skip cleanly so CI with Chrome stays green without
+    // spawning a real headless render here.
     return;
   }
 
@@ -144,7 +157,35 @@ test("rich-kind graphic throws an actionable error when hyperframes is absent", 
           height: 1080,
           outDir: dir,
         }),
-      /@hyperframes\/producer/
+      /chrome-headless-shell/
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// Distinct from the Chrome-missing path: a rich graphic whose composition.html
+// is absent must fail with a clear error BEFORE any headless render runs (so the
+// check is Chrome-free and deterministic in CI). Reuse a real rich manifest but
+// point the template id at a directory that does not exist.
+test("rich-kind graphic errors clearly when composition.html is missing", async () => {
+  const dir = tmp();
+  try {
+    const manifest = loadGraphicManifest("title-card");
+    await assert.rejects(
+      () =>
+        renderGraphicOverlay({
+          manifest,
+          id: "g6",
+          template: "no-such-template",
+          params: { headline: "Chapter One" },
+          durationSamples: SAMPLE_RATE,
+          fps: 30,
+          width: 1920,
+          height: 1080,
+          outDir: dir,
+        }),
+      /composition\.html not found/
     );
   } finally {
     rmSync(dir, { recursive: true, force: true });

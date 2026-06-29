@@ -4,7 +4,7 @@
 
 OpenKlip is a lean, local-first **agent-native video toolchain**: external agents drive the edit loop via CLI; humans review in the browser. Both read/write the same `project.json` on disk.
 
-**Current release:** v0.8.5.0 (2026-06-28). Working local editor: cut → captions → b-roll → vignette → push-in zoom → titles → export; cinema player; resizable right chat sidebar with Claude MCP edits; asset cards (`openklip analyze` + **Describe assets**); skills slash menu; MCP agent tools (35 tools); edit templates; Linear-style UI (Inter Variable + OKLCH, Phosphor fill icons); export dialog; macOS workspace folder picker; multi-agent filler cuts; sidebar asset bin with folder sync; 411 tests; MIT.
+**Current release:** v0.8.9.0 (2026-06-28). Working local editor: cut → captions → b-roll → vignette → push-in zoom → titles → grade/LUT → rich graphics → export; cinema player with live graphics/titles/captions overlays; resizable right chat sidebar with Claude MCP edits; asset cards (`openklip analyze` + **Describe assets**); skills slash menu; MCP agent tools (48 tools); edit templates; native HTML/CSS graphics templates (pixel-faithful headless-Chrome export to ProRes 4444 alpha); Linear-style UI (Inter Variable + OKLCH, Phosphor fill icons); export dialog; macOS workspace folder picker; multi-agent filler cuts; sidebar asset bin with folder sync; 525 tests; MIT.
 
 Preview cuts get a Glimm WebGL sweep in the browser; exported MP4s still hard-cut until the ffmpeg transition graph lands.
 
@@ -36,7 +36,7 @@ Preview cuts get a Glimm WebGL sweep in the browser; exported MP4s still hard-cu
 - [x] **Project write serialization** (`src/project-lock.ts`, `mutateProject()`; in-process per-slug locks for `project.json` and `chats.json`)
 - [x] **Chats + asset hardening** (atomic `chats.json` writes, POST folder sync, re-ingest guard with `--force`, external still copy-in)
 - [x] **Design system: Inter Variable + OKLCH** ([DESIGN.md](./DESIGN.md): Linear-style surfaces, semantic tokens, blue-only-when-it-matters CTA hierarchy; swappable theme presets)
-- [x] **TDD test suite** (`bun test`: 387 tests across actions, captions, EDL, exporter, project lock, chats, assets, workspace, agent-tools, templates, and more)
+- [x] **TDD test suite** (`bun test`: 525 tests across actions, captions, EDL, exporter, project lock, chats, assets, workspace, agent-tools, templates, graphics, headless render, and more)
 - [x] **GitHub Actions CI** (`check`, `typecheck`, `test`, `build`)
 - [x] **Open-sourced** (public GitHub repo, MIT license, source media gitignored + purged from history)
 - [x] **Center chat panel** (agent threads + prompt input in center column; chat list in left sidebar; PR #12)
@@ -108,6 +108,8 @@ Preview cuts get a Glimm WebGL sweep in the browser; exported MP4s still hard-cu
 - [x] Ken Burns **still** overlays (`still-add`/`still-rm`, `zoompan` push-in in exporter, focus point).
 - [x] Ingester plugin manifest (`ingesters/<id>/ingester.json` + loader + `openklip ingesters`).
 - [x] Post-export HyperFrames seam (`openklip package <slug> remove-background|transcribe`): opt-in `hyperframes` CLI, verified end-to-end.
+- [x] First-party rich-graphics export (`src/headless-render.ts`): `kind: "rich"` templates render through headless Chrome (`chrome-headless-shell` via `puppeteer-core`) driving the same `web/lib/graphic-runtime.ts` as the preview, captured to a transparent ProRes 4444 alpha MOV and composited by ffmpeg. Replaced `@hyperframes/producer` (and its `next.config.ts` esbuild workaround); Chrome is an optional one-time download.
+- [x] Fullscreen overlay parity (`web/components/preview-overlays.tsx`): the graphics/titles/captions overlay stack is shared by the inline preview and the cinema player, aligned to the letterboxed video box and synced to playback.
 - [x] Agent skill router (intent → CLI command sequences) feeding the sidebar.
 - [x] GUI: orientation toggle (16:9/9:16/1:1 preview), rebuilding/saving overlay, `@dnd-kit` drag-reorder of b-roll paint order, replace-from-bin, in/out loop region.
 - [x] Brand presets (`brands/*.json` + `applyBrand`): caption/vignette/pad defaults at `ingest --brand` or `openklip brand`.

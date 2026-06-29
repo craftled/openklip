@@ -858,4 +858,5 @@ export function reorderZoom(
 // summary.ts (the GUI imports them on the client; keeping them here would drag
 // this module's server-only graphics catalog into the browser bundle). Re-export
 // so every server caller that imports them from actions.ts keeps working.
+// biome-ignore lint/performance/noBarrelFile: intentional back-compat re-export of the summarize/ProjectSummary leaf so existing server callers don't all have to repoint to ./summary.ts
 export { type ProjectSummary, summarize } from "./summary.ts";

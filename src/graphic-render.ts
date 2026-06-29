@@ -1,14 +1,15 @@
 // Renderer seam for Graphic overlays. ONE interface, TWO backends:
 //   - kind 'text' -> FAST PATH: reuse the existing ASS machinery (src/titles.ts).
 //     No Chrome, no new deps, works fully offline. The default.
-//   - kind 'rich' -> alpha WebM via a LAZY dynamic import of @hyperframes/producer
-//     (headless Chrome). If the package or its Chrome is unavailable, throws a
-//     clear, actionable error.
+//   - kind 'rich' -> alpha ProRes MOV via a LAZY import of src/headless-render.ts,
+//     which renders the composition.html in headless Chrome driven by the SAME
+//     web/lib/graphic-runtime.ts the preview uses (so export == preview). Needs
+//     chrome-headless-shell; throws a clear, actionable error if it is missing.
 //
 // ffmpeg stays the master compositor: this module only EMITS an overlay asset
 // keyed to a sample range; the exporter (src/exporter.ts) composites it onto the
-// output timeline. NO hyperframes import at top level, so typecheck/build/tests
-// pass with the optional rich backend absent.
+// output timeline. The headless renderer is imported LAZILY so typecheck/build/
+// tests pass (and the text path runs) without Chrome present.
 
 import { join } from "node:path";
 import { SAMPLE_RATE } from "./edl.ts";
@@ -40,18 +41,20 @@ export interface RenderGraphicInput {
 export interface GraphicAsset {
   // Absolute path to the emitted overlay asset.
   assetPath: string;
-  // Tells the exporter how to composite it.
-  kind: "ass" | "webm";
+  // How the exporter composites it: 'ass' burns via subtitles, 'alpha' overlays
+  // the transparent MOV like a still.
+  kind: "ass" | "alpha";
 }
 
 // Deterministic per-overlay filename so re-export overwrites rather than leaking
 // files, and two overlays sharing a template never collide. The exporter passes
-// the overlay's unique id (g.id), NOT the template id.
+// the overlay's unique id (g.id), NOT the template id. `ext` is the on-disk file
+// extension (ass for text, mov for the alpha ProRes overlay).
 export function graphicAssetBasename(
   graphicId: string,
-  kind: "ass" | "webm"
+  ext: "ass" | "mov"
 ): string {
-  return `graphic-${graphicId}.${kind}`;
+  return `graphic-${graphicId}.${ext}`;
 }
 
 // Resolve a graphic's text param. Templates conventionally expose either a flat
@@ -106,61 +109,49 @@ function renderTextGraphic(input: RenderGraphicInput): GraphicAsset {
   return { assetPath, kind: "ass" };
 }
 
-// Render the rich path: alpha WebM via the OPTIONAL @hyperframes/producer. The
-// import is lazy + try/catch'd so this module never requires the package at
-// typecheck/build/test time. The `as string` specifier defeats TS module
-// resolution so tsc does not demand the package's .d.ts when it is absent.
-//
-// ANIMATION CONTRACT (known gap on this optional, Chrome-gated path): OpenKlip's
-// data-* frame contract is driven by web/lib/graphic-runtime.ts in the browser
-// preview. The producer only sees the bare composition.html + inputProps, so a
-// rich template animates at EXPORT only if its composition.html embeds its own
-// frame-driven <script> (Hyperframes-style window.__timelines / seek). Until a
-// rich template is verified end-to-end against a real headless Chrome render,
-// treat rich graphics as authoring-preview-accurate but export-static unless the
-// template self-drives. The default text path has no such gap.
+// Render the rich path: an alpha ProRes MOV produced by headless Chrome driving
+// the SAME web/lib/graphic-runtime.ts as the live preview (so export == preview,
+// frame-for-frame). src/headless-render.ts is imported LAZILY so puppeteer-core
+// never enters the app bundle and the text path runs with no Chrome installed.
 async function renderRichGraphic(
   input: RenderGraphicInput
 ): Promise<GraphicAsset> {
-  const installHint = `rich graphic "${input.template}" requires the optional @hyperframes/producer package (+ chrome-headless-shell). Install it with: bun add @hyperframes/producer && npx @hyperframes/producer install-chrome — or convert the template to kind:"text".`;
-
-  let producer: { createRenderJob: (opts: unknown) => Promise<unknown> };
-  try {
-    producer = (await import("@hyperframes/producer" as string)) as {
-      createRenderJob: (opts: unknown) => Promise<unknown>;
-    };
-  } catch {
-    throw new Error(installHint);
-  }
-
-  const durationInFrames = Math.max(
+  const assetPath = join(input.outDir, graphicAssetBasename(input.id, "mov"));
+  const durFrames = Math.max(
     1,
     Math.round((input.durationSamples / SAMPLE_RATE) * input.fps)
   );
-  const assetPath = join(input.outDir, graphicAssetBasename(input.id, "webm"));
+
+  let compositionHtml: string;
+  try {
+    compositionHtml = await Bun.file(
+      graphicCompositionPath(input.template)
+    ).text();
+  } catch {
+    throw new Error(
+      `rich graphic "${input.template}": composition.html not found in graphics/${input.template}/.`
+    );
+  }
 
   try {
-    const job = (await producer.createRenderJob({
-      format: "webm", // transparent alpha overlay (vp9 yuva420p)
-      composition: graphicCompositionPath(input.template),
+    const { renderHeadlessAlpha } = await import("./headless-render.ts");
+    await renderHeadlessAlpha({
+      compositionHtml,
+      params: input.params,
       width: input.width,
       height: input.height,
       fps: input.fps,
-      durationInFrames,
-      inputProps: input.params,
-      output: assetPath,
-    })) as { done?: () => Promise<unknown> };
-    if (typeof job?.done === "function") {
-      await job.done();
-    }
+      durFrames,
+      outPath: assetPath,
+    });
   } catch (err) {
-    // Chrome present but missing/broken at render time: re-wrap with the same
-    // actionable message so the user knows to run the Chrome install step.
     const detail = err instanceof Error ? err.message : String(err);
-    throw new Error(`${installHint} (render failed: ${detail})`);
+    throw new Error(
+      `rich graphic "${input.template}" failed to render (${detail}). Rich graphics need chrome-headless-shell — install once with: bunx puppeteer browsers install chrome-headless-shell — or set the template's manifest kind to "text".`
+    );
   }
 
-  return { assetPath, kind: "webm" };
+  return { assetPath, kind: "alpha" };
 }
 
 export async function renderGraphicOverlay(
