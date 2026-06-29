@@ -1,5 +1,5 @@
 import { summarize } from "./actions.ts";
-import type { Grade, Project } from "./edl.ts";
+import type { Grade, PhraseAnchor, Project } from "./edl.ts";
 import { samplesToSec, survivingRanges } from "./edl.ts";
 import { findPhraseRuns, type PhraseRun } from "./phrase-match.ts";
 
@@ -8,6 +8,7 @@ export interface TranscriptWordView {
   endSec: number;
   id: string;
   index: number;
+  note?: string;
   startSec: number;
   text: string;
 }
@@ -34,31 +35,39 @@ export interface WordSpanResult {
 
 export interface OverlayViews {
   broll: Array<{
+    anchor: PhraseAnchor | null;
     assetId: string;
     fromSec: number;
     id: string;
+    note?: string;
     srcInSec: number;
     toSec: number;
   }>;
   stills: Array<{
+    anchor: PhraseAnchor | null;
     assetId: string;
     focusX: number;
     focusY: number;
     fromSec: number;
     id: string;
+    note?: string;
     scale: number;
     toSec: number;
   }>;
   titles: Array<{
+    anchor: PhraseAnchor | null;
     fromSec: number;
     id: string;
+    note?: string;
     position: string;
     text: string;
     toSec: number;
   }>;
   zooms: Array<{
+    anchor: PhraseAnchor | null;
     fromSec: number;
     id: string;
+    note?: string;
     rampSec: number;
     scale: number;
     toSec: number;
@@ -86,6 +95,7 @@ function wordView(project: Project, index: number): TranscriptWordView {
     startSec: samplesToSec(w.startSample),
     endSec: samplesToSec(w.endSample),
     deleted: w.deleted,
+    ...(w.note === undefined ? {} : { note: w.note }),
   };
 }
 
@@ -182,6 +192,8 @@ export function listOverlays(project: Project): OverlayViews {
       fromSec: sec(b.startSample),
       toSec: sec(b.endSample),
       srcInSec: sec(b.srcInSample ?? 0),
+      anchor: b.anchor ?? null,
+      ...(b.note === undefined ? {} : { note: b.note }),
     })),
     titles: (project.titles ?? []).map((t) => ({
       id: t.id,
@@ -189,6 +201,8 @@ export function listOverlays(project: Project): OverlayViews {
       position: t.position,
       fromSec: sec(t.startSample),
       toSec: sec(t.endSample),
+      anchor: t.anchor ?? null,
+      ...(t.note === undefined ? {} : { note: t.note }),
     })),
     zooms: (project.zooms ?? []).map((z) => ({
       id: z.id,
@@ -196,6 +210,8 @@ export function listOverlays(project: Project): OverlayViews {
       rampSec: z.rampSec,
       fromSec: sec(z.startSample),
       toSec: sec(z.endSample),
+      anchor: z.anchor ?? null,
+      ...(z.note === undefined ? {} : { note: z.note }),
     })),
     stills: (project.stills ?? []).map((s) => ({
       id: s.id,
@@ -205,6 +221,8 @@ export function listOverlays(project: Project): OverlayViews {
       focusY: s.focusY,
       fromSec: sec(s.startSample),
       toSec: sec(s.endSample),
+      anchor: s.anchor ?? null,
+      ...(s.note === undefined ? {} : { note: s.note }),
     })),
   };
 }

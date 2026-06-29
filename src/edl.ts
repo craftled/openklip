@@ -10,8 +10,23 @@ export const WordSchema = z.object({
   startSample: z.number().int().nonnegative(),
   endSample: z.number().int().nonnegative(),
   deleted: z.boolean().default(false),
+  /** F1: why this word was cut/kept; metadata only, never reaches ffmpeg. */
+  note: z.string().optional(),
 });
 export type Word = z.infer<typeof WordSchema>;
+
+// A transcript anchor remembered on an overlay so its sample span can be
+// re-resolved from the CURRENT kept words after a re-cut (resolve-and-REMEMBER,
+// vs the old resolve-and-forget). Metadata only — the exporter still reads
+// startSample/endSample. `phrase` = spoken text placed at; `wordIds` = the kept
+// run it last resolved to (provenance/hint); `stale` = true when re-resolution
+// can no longer find the phrase (last good span is preserved).
+export const PhraseAnchorSchema = z.object({
+  phrase: z.string().min(1),
+  wordIds: z.array(z.string()).default([]),
+  stale: z.boolean().default(false),
+});
+export type PhraseAnchor = z.infer<typeof PhraseAnchorSchema>;
 
 export const AssetKindSchema = z.enum(["broll", "music", "still"]);
 export type AssetKind = z.infer<typeof AssetKindSchema>;
@@ -88,6 +103,8 @@ export const BrollSchema = z.object({
   startSample: z.number().int().nonnegative(),
   endSample: z.number().int().nonnegative(),
   srcInSample: z.number().int().nonnegative().default(0),
+  note: z.string().optional(),
+  anchor: PhraseAnchorSchema.optional(),
 });
 export type Broll = z.infer<typeof BrollSchema>;
 
@@ -98,6 +115,8 @@ export const ZoomSchema = z.object({
   endSample: z.number().int().nonnegative(),
   scale: z.number().min(1).max(3).default(1.15),
   rampSec: z.number().min(0).max(5).default(0.6),
+  note: z.string().optional(),
+  anchor: PhraseAnchorSchema.optional(),
 });
 export type Zoom = z.infer<typeof ZoomSchema>;
 
@@ -112,6 +131,8 @@ export const StillSchema = z.object({
   scale: z.number().min(1).max(3).default(1.2),
   focusX: z.number().min(0).max(1).default(0.5),
   focusY: z.number().min(0).max(1).default(0.5),
+  note: z.string().optional(),
+  anchor: PhraseAnchorSchema.optional(),
 });
 export type Still = z.infer<typeof StillSchema>;
 
@@ -122,6 +143,8 @@ export const TitleSchema = z.object({
   startSample: z.number().int().nonnegative(),
   endSample: z.number().int().nonnegative(),
   position: z.enum(["lower", "center", "hero"]).default("lower"),
+  note: z.string().optional(),
+  anchor: PhraseAnchorSchema.optional(),
 });
 export type Title = z.infer<typeof TitleSchema>;
 
@@ -139,8 +162,65 @@ export const GraphicSchema = z.object({
   startSample: z.number().int().nonnegative(),
   endSample: z.number().int().nonnegative(),
   track: z.enum(["broll", "title", "zoom"]).default("title"),
+  note: z.string().optional(),
+  anchor: PhraseAnchorSchema.optional(),
 });
 export type Graphic = z.infer<typeof GraphicSchema>;
+
+// ── FEATURE 3: multi-take assembly ──────────────────────────────────────────
+// A take is one of several recordings of the same script, parked in takes/<id>/
+// with its own transcript. Takes never ship in project.json (they live on disk);
+// only the optional `assembly` provenance block below references them.
+export const TakeWordSchema = WordSchema; // identical {id,text,startSample,endSample,deleted}
+export const TakeSchema = z.object({
+  id: z.string(),
+  label: z.string().default(""),
+  source: z.string(), // abs path to the take's original video
+  proxy: z.string(), // relative-to-take-dir 720p proxy ("proxy.mp4")
+  sampleRate: z.literal(SAMPLE_RATE),
+  fps: z.number().positive(),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+  durationSamples: z.number().int().nonnegative(),
+  words: z.array(TakeWordSchema),
+  ingestedAt: z.string(), // ISO
+});
+export type Take = z.infer<typeof TakeSchema>;
+
+// One contiguous run of words chosen from a single take, inclusive on both ends.
+export const AssemblySegmentSchema = z.object({
+  takeId: z.string(),
+  startWordId: z.string(), // inclusive, ids into THAT take's words[]
+  endWordId: z.string(), // inclusive
+  note: z.string().optional(), // F1 synergy: why this take/line (provenance)
+});
+// The agent-supplied recipe: a list of segments laid end-to-end, with a seam pad.
+export const AssemblySelectionSchema = z.object({
+  segments: z.array(AssemblySegmentSchema).min(1),
+  padMs: z.number().nonnegative().max(500).default(50),
+});
+export type AssemblySegment = z.infer<typeof AssemblySegmentSchema>;
+export type AssemblySelection = z.infer<typeof AssemblySelectionSchema>;
+
+// Provenance written into the assembled project.json: where every output span
+// came from in source-take samples. The engine itself reads one source/proxy;
+// this block only records the assembly so the agent can reason about it.
+export const AssemblyProvenanceSchema = z.object({
+  assembledAt: z.string(),
+  segments: z.array(
+    z.object({
+      takeId: z.string(),
+      startWordId: z.string(),
+      endWordId: z.string(),
+      srcStartSample: z.number().int().nonnegative(),
+      srcEndSample: z.number().int().nonnegative(),
+      outStartSample: z.number().int().nonnegative(),
+      outEndSample: z.number().int().nonnegative(),
+      note: z.string().optional(),
+    })
+  ),
+});
+export type AssemblyProvenance = z.infer<typeof AssemblyProvenanceSchema>;
 
 // A subagent-produced "visual scene log" of the MAIN video: what is on screen
 // across spans of source time, so the editing agent knows where the footage is
@@ -222,6 +302,8 @@ export const ProjectSchema = z.object({
   template: z.string().optional(),
   /** Subagent visual scene log of the main video (absent until analyzed). */
   sceneLog: SceneLogSchema.optional(),
+  /** F3: provenance of a multi-take assembly (absent for single-source projects). */
+  assembly: AssemblyProvenanceSchema.optional(),
   /** Global animation feel for overlay entrances. */
   motion: MotionSchema,
 });

@@ -13,6 +13,109 @@ interface RawChunk {
   text: string;
 }
 
+// ── Shared ingest core (reused by single-source ingest AND multi-take ingest) ─
+// The same probe → all-intra 720p proxy → 16k mono PCM → Whisper pipeline backs
+// both src/ingest.ts (one project source) and src/assembly.ts (one take). Kept
+// here so the ffmpeg argv and the chunk→word mapping live in exactly one place
+// and the two paths cannot drift.
+
+/** Build the all-intra 720p proxy + 48k stereo AAC at `outProxy`. */
+export function buildProxy(source: string, outProxy: string): Promise<void> {
+  return run(
+    FFMPEG,
+    [
+      "-y",
+      "-i",
+      source,
+      "-vf",
+      "scale=-2:720",
+      "-c:v",
+      "libx264",
+      "-preset",
+      "veryfast",
+      "-crf",
+      "26",
+      "-g",
+      "1",
+      "-keyint_min",
+      "1",
+      "-sc_threshold",
+      "0",
+      "-pix_fmt",
+      "yuv420p",
+      "-c:a",
+      "aac",
+      "-ar",
+      String(SAMPLE_RATE),
+      "-ac",
+      "2",
+      "-movflags",
+      "+faststart",
+      outProxy,
+    ],
+    "ffmpeg(proxy)"
+  );
+}
+
+/** Extract 16k mono f32 PCM to `outAudio` for Whisper. */
+export function extractAudio(source: string, outAudio: string): Promise<void> {
+  return run(
+    FFMPEG,
+    [
+      "-y",
+      "-i",
+      source,
+      "-vn",
+      "-ac",
+      "1",
+      "-ar",
+      "16000",
+      "-f",
+      "f32le",
+      outAudio,
+    ],
+    "ffmpeg(audio)"
+  );
+}
+
+/** Map Whisper chunks into the canonical Word list (one shared mapping). */
+export function wordsFromRawChunks(raw: RawChunk[]): Word[] {
+  const words: Word[] = [];
+  let prevEnd = 0;
+  raw.forEach((c, i) => {
+    const startSec = c.start ?? prevEnd;
+    const endSec = c.end ?? startSec + 0.2;
+    prevEnd = endSec;
+    words.push({
+      id: `w${i}`,
+      text: c.text,
+      startSample: Math.max(0, Math.round(startSec * SAMPLE_RATE)),
+      endSample: Math.max(0, Math.round(endSec * SAMPLE_RATE)),
+      deleted: false,
+    });
+  });
+  return words;
+}
+
+// Run the Whisper transcriber on a 16k PCM file and return the canonical words.
+// `rawJson` is the scratch path the node side writes its chunk JSON to.
+export async function transcribeToWords(
+  audioRaw: string,
+  rawJson: string
+): Promise<Word[]> {
+  const proc = Bun.spawn(
+    ["node", resolve(import.meta.dir, "transcribe.mjs"), audioRaw, rawJson],
+    { stdout: "inherit", stderr: "inherit" }
+  );
+  if ((await proc.exited) !== 0) {
+    throw new Error("transcription step failed");
+  }
+  const raw = (
+    JSON.parse(await Bun.file(rawJson).text()) as { chunks: RawChunk[] }
+  ).chunks;
+  return wordsFromRawChunks(raw);
+}
+
 export type IngestPhase =
   | "probe"
   | "proxy"
@@ -88,60 +191,11 @@ export async function ingest(
   console.log(
     "[ingest] building all-intra 720p proxy (fast seeks) + 48k audio..."
   );
-  await run(
-    FFMPEG,
-    [
-      "-y",
-      "-i",
-      source,
-      "-vf",
-      "scale=-2:720",
-      "-c:v",
-      "libx264",
-      "-preset",
-      "veryfast",
-      "-crf",
-      "26",
-      "-g",
-      "1",
-      "-keyint_min",
-      "1",
-      "-sc_threshold",
-      "0",
-      "-pix_fmt",
-      "yuv420p",
-      "-c:a",
-      "aac",
-      "-ar",
-      String(SAMPLE_RATE),
-      "-ac",
-      "2",
-      "-movflags",
-      "+faststart",
-      p.proxy,
-    ],
-    "ffmpeg(proxy)"
-  );
+  await buildProxy(source, p.proxy);
 
   emit("audio");
   console.log("[ingest] extracting 16k mono PCM for transcription...");
-  await run(
-    FFMPEG,
-    [
-      "-y",
-      "-i",
-      source,
-      "-vn",
-      "-ac",
-      "1",
-      "-ar",
-      "16000",
-      "-f",
-      "f32le",
-      p.audioRaw,
-    ],
-    "ffmpeg(audio)"
-  );
+  await extractAudio(source, p.audioRaw);
 
   emit("frames");
   console.log(
@@ -168,35 +222,10 @@ export async function ingest(
   console.log(
     "[ingest] transcribing (first run downloads the Whisper model)..."
   );
-  const rawJson = `${p.working}/transcript.raw.json`;
-  const proc = Bun.spawn(
-    ["node", resolve(import.meta.dir, "transcribe.mjs"), p.audioRaw, rawJson],
-    {
-      stdout: "inherit",
-      stderr: "inherit",
-    }
+  const words = await transcribeToWords(
+    p.audioRaw,
+    `${p.working}/transcript.raw.json`
   );
-  if ((await proc.exited) !== 0) {
-    throw new Error("transcription step failed");
-  }
-
-  const raw = (
-    JSON.parse(await Bun.file(rawJson).text()) as { chunks: RawChunk[] }
-  ).chunks;
-  const words: Word[] = [];
-  let prevEnd = 0;
-  raw.forEach((c, i) => {
-    const startSec = c.start ?? prevEnd;
-    const endSec = c.end ?? startSec + 0.2;
-    prevEnd = endSec;
-    words.push({
-      id: `w${i}`,
-      text: c.text,
-      startSample: Math.max(0, Math.round(startSec * SAMPLE_RATE)),
-      endSample: Math.max(0, Math.round(endSec * SAMPLE_RATE)),
-      deleted: false,
-    });
-  });
 
   emit("finalize");
   const project: Project = ProjectSchema.parse({

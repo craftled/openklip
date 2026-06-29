@@ -57,6 +57,9 @@ Time is integer audio samples at 48 kHz. The CLI takes seconds where a human num
 | Place / patch / remove title | `openklip title-add`, `title-set`, `title-rm`, `title-add-phrase` |
 | Add / patch / remove zoom | `openklip zoom-add`, `zoom-set`, `zoom-rm`, `zoom-add-phrase` |
 | Reorder overlay (paint order) | `openklip reorder <slug> <broll\|title\|zoom> <id> <toIndex>` |
+| Ingest an alternate take | `openklip take-add <slug> <video> [--id <takeId>] [--label <text>]` |
+| List ingested takes | `openklip takes <slug>` |
+| Splice takes into a new source | `openklip assemble <slug> <takeId:wStart-wEnd> [more...]` |
 | Apply brand preset (look defaults) | `openklip brand <slug> <name>` |
 | Set edit template (agent skill) | `openklip template set <slug> <id>` |
 | List / show edit templates | `openklip template list`, `openklip template show <id>` |
@@ -114,6 +117,8 @@ Prefer bounded reads over dumping the full transcript. Use `--json` for machine 
 | `openklip cut <slug> <tokens...> --restore` | Restore the listed words instead of cutting them. |
 | `openklip restore <slug>` | Restore every word (clear all cuts). |
 
+Add `--note "<why>"` to any `cut` or overlay-add to record the rationale on the edit (metadata only, never reaches ffmpeg; `--note ""` clears it). Surfaces in `transcript`, `overlays`, and the agent tools so the next pass knows why.
+
 ### Overlays
 
 | Command | What it does |
@@ -137,6 +142,21 @@ Prefer bounded reads over dumping the full transcript. Use `--json` for machine 
 | `openklip graphic-set <slug> <graphicId>` | Patch a graphic: `--template`, `--from`, `--to`, `--param`, `--track`. |
 | `openklip graphic-rm <slug> <graphicId>` | Remove a graphic overlay. |
 | `openklip reorder <slug> <broll\|title\|zoom> <id> <toIndex>` | Restack an overlay within its track. Array order is paint order: a later index paints on top (matters when b-roll covers overlap). |
+| `openklip reanchor <slug> [overlayId]` | Re-resolve phrase-anchored overlays onto the current kept words. Reports each overlay as `moved`, `unchanged`, or `stale`. Runs automatically after every word-deletion path (`cut`, `cut --text`, `restore`, GUI word toggles); call it manually only to re-snap after editing the transcript out of band. |
+
+The `*-add-phrase` helpers remember the spoken phrase as an **anchor** on the overlay, so a later cut re-snaps the overlay's window onto the words it belongs to instead of stranding it. If you manually move a phrase-placed overlay with `*-set` (`--from`/`--to`), that span may be re-moved by the next word-deletion (the anchor still wins); place anchorless overlays with the plain `*-add` if you want the span pinned. When the anchored phrase is deleted the overlay is flagged `stale` and keeps its last good span (the exporter still renders it); restoring the words clears `stale`.
+
+### Multi-take assembly
+
+Pick the best lines across several recordings of the same script, then splice them into one clean source the rest of the engine treats normally (single `source`/`proxy`, all overlays/look/captions apply on top).
+
+| Command | What it does |
+| --- | --- |
+| `openklip take-add <slug> <video>` | Ingest one alternate take into `takes/<id>/` (probe + 720p proxy + Whisper transcript). Takes never enter `project.json`; they are raw material. `--id <takeId>` to name it, `--label <text>` for a human note. |
+| `openklip takes <slug>` | List ingested takes with id, duration, and word count. |
+| `openklip assemble <slug> <takeId:wStart-wEnd> [more...]` | Splice the chosen word runs end-to-end into a **new** single-source project. `--pad <ms>` is the symmetric seam pad (0–500, default 50); `--force` overwrites an existing edit. Segments are inclusive word-id ranges into each take's own transcript (read them with `take_transcript`). |
+
+Workflow: `take-add` each recording, read `take_transcript <slug> <takeId>` to find the best read of each line, then `assemble` the runs in script order. The planner lays them end-to-end with no gap at the seam and re-ids the merged transcript `w0..` (integer-exact source-sample → output-sample re-timing, so preview and export can't drift). Provenance (where every output span came from in take samples) is written to `project.json`'s `assembly` block. Via the `assemble` agent tool you can attach a per-segment `note` recording **why** that take won the line — it rides into the provenance for the next pass. The exporter is unchanged: it reads the one assembled `source`. Concat uses an ffmpeg **filter** (not the demuxer) so mismatched takes are normalized to the first take's geometry/fps; the takes stay parked in `takes/` alongside the new source.
 
 ### Look & captions
 

@@ -85,6 +85,7 @@ const EXPECTED = [
   "pad",
   "look-vignette",
   "reorder",
+  "reanchor",
 ];
 
 test("registry covers every documented mutation by name", () => {
@@ -92,6 +93,13 @@ test("registry covers every documented mutation by name", () => {
   for (const name of EXPECTED) {
     assert.ok(names.has(name), `missing action: ${name}`);
   }
+});
+
+test("assemble is NOT a registry action (it is a query/ffmpeg tool)", () => {
+  // Multi-take assembly touches takes/ + ffmpeg like export/verify, so it lives
+  // in agent-tools queryTools, never as a project.json mutation in the registry.
+  const names = new Set(actions.map((a) => a.name));
+  assert.equal(names.has("assemble"), false);
 });
 
 test("every action declares summary, schema, and at least one surface", () => {
@@ -319,4 +327,92 @@ test("actionTable renders a markdown row for each action", () => {
   for (const a of actions) {
     assert.ok(md.includes(a.name), `table missing ${a.name}`);
   }
+});
+
+// ── FEATURE 1: written rationale (note) through the registry ─────────────────
+
+test("broll-add: carries an optional note onto the overlay", () => {
+  const p = makeProject();
+  runAction("broll-add", p, {
+    assetId: "broll-1",
+    fromSec: 1,
+    toSec: 3,
+    note: "n",
+  });
+  assert.equal(p.broll[0].note, "n");
+});
+
+test("cut: carries an optional note onto the cut word", () => {
+  const p = makeProject();
+  runAction("cut", p, { ids: ["w0"], note: "um" });
+  assert.equal(p.words[0].note, "um");
+  assert.equal(p.words[0].deleted, true);
+});
+
+test("cut-text: carries an optional note onto the matched words", () => {
+  const p = makeProject();
+  runAction("cut-text", p, { phrase: "word2", note: "filler" });
+  const w = p.words.find((x) => x.id === "w2");
+  assert.equal(w?.deleted, true);
+  assert.equal(w?.note, "filler");
+});
+
+test("broll-add manifest exposes note as an optional property for MCP", () => {
+  const entry = actionManifest("mcp").find((m) => m.name === "broll-add");
+  assert.ok(entry, "broll-add not exposed to mcp");
+  assert.ok(
+    entry?.inputSchema.properties.note,
+    "note missing from broll-add schema"
+  );
+});
+
+test("cut manifest exposes note as an optional property for MCP", () => {
+  const entry = actionManifest("mcp").find((m) => m.name === "cut");
+  assert.ok(entry, "cut not exposed to mcp");
+  assert.ok(entry?.inputSchema.properties.note, "note missing from cut schema");
+});
+
+// ── FEATURE 2: phrase-anchored cues (reanchor) through the registry ──────────
+
+// Place an anchored title at the spoken phrase, then verify the action re-snaps.
+function withAnchoredTitle(p: Project): void {
+  p.titles = [
+    {
+      id: "t1",
+      text: "Card",
+      // Deliberately wrong stored span: word0 (0-1s), phrase is word2.
+      startSample: 0,
+      endSample: SAMPLE_RATE,
+      position: "lower",
+      anchor: { phrase: "word2", wordIds: [], stale: false },
+    },
+  ];
+}
+
+test("reanchor: re-resolves every anchored overlay from its phrase", () => {
+  const p = makeProject();
+  withAnchoredTitle(p);
+  const results = runAction("reanchor", p, {}) as Array<{
+    id: string;
+    status: string;
+  }>;
+  assert.equal(results.length, 1);
+  assert.equal(results[0].id, "t1");
+  // "word2" is the third word (2-3s); the title snaps onto it.
+  assert.equal(p.titles?.[0].startSample, 2 * SAMPLE_RATE);
+});
+
+test("reanchor: cut-text of an anchored phrase marks the overlay stale", () => {
+  const p = makeProject();
+  withAnchoredTitle(p);
+  // Snap first so the stored span is correct, then delete the phrase.
+  runAction("reanchor", p, {});
+  runAction("cut-text", p, { phrase: "word2" });
+  assert.equal(p.titles?.[0].anchor?.stale, true);
+});
+
+test("reanchor manifest is exposed to mcp with an optional id", () => {
+  const entry = actionManifest("mcp").find((m) => m.name === "reanchor");
+  assert.ok(entry, "reanchor not exposed to mcp");
+  assert.equal(entry?.inputSchema.type, "object");
 });

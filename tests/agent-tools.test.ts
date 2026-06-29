@@ -135,3 +135,60 @@ test("callAgentTool rejects unknown tools", async () => {
     /unknown agent tool/i
   );
 });
+
+// ── FEATURE 1: written rationale (note) surfaced to agents ──────────────────
+
+test("callAgentTool transcript_list carries a note on a cut word", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    await callAgentTool("cut", { slug, ids: ["w0"], note: "filler" });
+    const list = (await callAgentTool("transcript_list", { slug })) as {
+      words: Array<{ id: string; note?: string }>;
+    };
+    const w0 = list.words.find((w) => w.id === "w0");
+    assert.equal(w0?.note, "filler");
+  });
+});
+
+test("callAgentTool broll-add-phrase forwards a note onto the overlay", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    await callAgentTool("broll-add-phrase", {
+      slug,
+      assetId: "broll-a",
+      spokenPhrase: "Hello world",
+      note: "cover the stumble",
+    });
+    const overlays = (await callAgentTool("project_overlays", { slug })) as {
+      broll: Array<{ note?: string }>;
+    };
+    assert.equal(overlays.broll[0].note, "cover the stumble");
+  });
+});
+
+// ── FEATURE 3: multi-take assembly tools (query surface, not registry) ──────
+
+test("multi-take tools are exposed as agent query tools", () => {
+  const names = agentToolNames("mcp");
+  assert.ok(names.includes("list_takes"));
+  assert.ok(names.includes("take_transcript"));
+  assert.ok(names.includes("assemble"));
+});
+
+test("assemble inputSchema exposes the selection segments and optional padMs", () => {
+  const manifest = agentToolManifest("mcp");
+  const assemble = manifest.find((m) => m.name === "assemble");
+  assert.ok(assemble, "assemble tool missing from manifest");
+  const schema = assemble?.inputSchema as {
+    properties?: Record<
+      string,
+      { items?: { properties?: Record<string, unknown> } }
+    >;
+  };
+  assert.ok(schema.properties?.slug, "assemble takes a slug");
+  assert.ok(schema.properties?.padMs, "assemble takes an optional padMs");
+  const segItem = schema.properties?.segments?.items?.properties;
+  assert.ok(segItem?.takeId, "segments[].takeId");
+  assert.ok(segItem?.startWordId, "segments[].startWordId");
+  assert.ok(segItem?.endWordId, "segments[].endWordId");
+});

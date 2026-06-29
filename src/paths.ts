@@ -76,7 +76,21 @@ export function projectPaths(slug: string) {
     assetProxies: join(working, "assets"),
     chats: join(working, "chats.json"),
     out: join(output, "out.mp4"),
+    /** Multi-take ingest parking lot: takes/<id>/ (F3). */
+    takes: join(dir, "takes"),
   };
+}
+
+// One ingested take's folder under the project's takes/. The take id is itself a
+// slug, so the same path gate that protects [slug] in network routes protects it
+// here before any join — a hostile take id cannot traverse out of takes/.
+export function takeDir(slug: string, takeId: string): string {
+  return join(projectDir(slug), "takes", assertValidSlug(takeId));
+}
+
+/** The take.json record (transcript + probe metadata) inside a take folder. */
+export function takeFile(slug: string, takeId: string): string {
+  return join(takeDir(slug, takeId), "take.json");
 }
 
 /** Relative path (from project dir) for a user asset original. */

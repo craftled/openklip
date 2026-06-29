@@ -7,6 +7,12 @@ import {
   projectStatus,
   wordSpan,
 } from "./query.ts";
+import { placeFromPhrase } from "./reanchor.ts";
+
+// Re-exported so existing importers of the min-span constant keep one source of
+// truth; ownership now lives in reanchor.ts alongside the resolver.
+// biome-ignore lint/performance/noBarrelFile: intentional back-compat re-export of the MIN_PHRASE_OVERLAY_SEC const whose ownership moved to reanchor.ts, so existing importers don't all have to repoint.
+export { MIN_PHRASE_OVERLAY_SEC } from "./reanchor.ts";
 
 function jsonOut(value: unknown): string {
   return `${JSON.stringify(value, null, 2)}\n`;
@@ -103,30 +109,32 @@ export function runOverlays(
   if (options.json) {
     return jsonOut(overlays);
   }
+  // Append the human rationale (F1 note) as a trailing ` — <why>` on the line.
+  const noteSuffix = (note?: string) => (note ? ` — ${note}` : "");
   const lines: string[] = [];
   lines.push(`b-roll (${overlays.broll.length}):`);
   for (const b of overlays.broll) {
     lines.push(
-      `  ${b.id}  asset ${b.assetId}  ${b.fromSec.toFixed(3)}s-${b.toSec.toFixed(3)}s`
+      `  ${b.id}  asset ${b.assetId}  ${b.fromSec.toFixed(3)}s-${b.toSec.toFixed(3)}s${noteSuffix(b.note)}`
     );
   }
   lines.push(`titles (${overlays.titles.length}):`);
   for (const t of overlays.titles) {
     const preview = t.text.replace(/\n/g, "\\n").slice(0, 40);
     lines.push(
-      `  ${t.id}  ${t.position}  ${t.fromSec.toFixed(3)}s-${t.toSec.toFixed(3)}s  "${preview}"`
+      `  ${t.id}  ${t.position}  ${t.fromSec.toFixed(3)}s-${t.toSec.toFixed(3)}s  "${preview}"${noteSuffix(t.note)}`
     );
   }
   lines.push(`zooms (${overlays.zooms.length}):`);
   for (const z of overlays.zooms) {
     lines.push(
-      `  ${z.id}  ${z.scale}x  ramp ${z.rampSec}s  ${z.fromSec.toFixed(3)}s-${z.toSec.toFixed(3)}s`
+      `  ${z.id}  ${z.scale}x  ramp ${z.rampSec}s  ${z.fromSec.toFixed(3)}s-${z.toSec.toFixed(3)}s${noteSuffix(z.note)}`
     );
   }
   lines.push(`stills (${overlays.stills.length}):`);
   for (const s of overlays.stills) {
     lines.push(
-      `  ${s.id}  asset ${s.assetId}  ${s.fromSec.toFixed(3)}s-${s.toSec.toFixed(3)}s`
+      `  ${s.id}  asset ${s.assetId}  ${s.fromSec.toFixed(3)}s-${s.toSec.toFixed(3)}s${noteSuffix(s.note)}`
     );
   }
   return `${lines.join("\n")}\n`;
@@ -136,24 +144,13 @@ export function runStatusJson(project: Project): string {
   return jsonOut(projectStatus(project));
 }
 
-// Minimum overlay duration when placing from a short spoken phrase (seconds).
-const MIN_PHRASE_OVERLAY_SEC = 2;
-
+// Resolve a spoken phrase to an overlay placement span. Delegates to the pure
+// reanchor resolver so manual phrase-placement and post-cut re-anchoring share
+// exactly one span-math implementation (min-span clamp, project-duration clamp).
 export function spanForPhraseOverlay(
   project: Project,
   phrase: string
 ): { fromSec: number; matched: boolean; toSec: number } {
-  const span = phraseSpan(project, phrase);
-  if (!span.matched) {
-    return { matched: false, fromSec: 0, toSec: 0 };
-  }
-  const dur = span.toSec - span.fromSec;
-  const toSec =
-    dur >= MIN_PHRASE_OVERLAY_SEC
-      ? span.toSec
-      : Math.min(
-          project.durationSamples / project.sampleRate,
-          span.fromSec + MIN_PHRASE_OVERLAY_SEC
-        );
-  return { matched: true, fromSec: span.fromSec, toSec };
+  const span = placeFromPhrase(project, phrase);
+  return { matched: span.matched, fromSec: span.fromSec, toSec: span.toSec };
 }

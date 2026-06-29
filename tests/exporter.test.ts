@@ -3,7 +3,13 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { type Broll, SAMPLE_RATE } from "../src/edl.ts";
+import {
+  type Broll,
+  type Project,
+  SAMPLE_RATE,
+  sec,
+  survivingRanges,
+} from "../src/edl.ts";
 import {
   chooseAssetInput,
   chooseSourceInput,
@@ -161,4 +167,105 @@ test("planGraphicWindow shifts the window earlier when an earlier range is delet
   });
 
   assert.deepEqual(win, { outStart: 1.5, outEnd: 2.5 });
+});
+
+// ── FEATURE 1: notes are metadata only and NEVER reach ffmpeg ────────────────
+// The exporter is UNTOUCHED by the note feature. To pin "metadata only", build
+// the exact computations that feed ffmpeg (the select expression over surviving
+// ranges, the b-roll input plans, and the graphic output windows) for a project
+// WITH a note on every overlay + word and for the same project WITHOUT any note,
+// and assert the derived ffmpeg inputs are byte-identical.
+function noteGuardFixture(withNotes: boolean): Project {
+  const s = (n: number) => n * SAMPLE_RATE;
+  const note = (text: string) => (withNotes ? { note: text } : {});
+  return {
+    version: 1,
+    slug: "note-guard",
+    source: "/tmp/source.mp4",
+    proxy: "proxy.mp4",
+    sampleRate: SAMPLE_RATE,
+    fps: 30,
+    width: 1920,
+    height: 1080,
+    durationSamples: s(6),
+    padMs: 0,
+    captions: { enabled: true, maxWords: 6 },
+    assets: [
+      {
+        id: "broll-1",
+        kind: "broll",
+        name: "broll.mp4",
+        src: "/tmp/broll.mp4",
+        proxy: "assets/broll-1.mp4",
+        durationSamples: s(10),
+      },
+    ],
+    broll: [
+      {
+        id: "br1",
+        assetId: "broll-1",
+        startSample: s(0),
+        endSample: s(3),
+        srcInSample: 0,
+        ...note("cover the intro"),
+      },
+    ],
+    look: { vignette: false, grade: "none" },
+    zooms: [],
+    titles: [],
+    stills: [],
+    graphics: [
+      {
+        id: "g1",
+        template: "lower-third",
+        params: {},
+        startSample: s(1),
+        endSample: s(4),
+        track: "title",
+        ...note("name the speaker"),
+      },
+    ],
+    words: Array.from({ length: 6 }, (_, i) => ({
+      id: `w${i}`,
+      text: `word${i}`,
+      startSample: s(i),
+      endSample: s(i + 1),
+      deleted: i === 2,
+      ...note(`why word${i}`),
+    })),
+    motion: { fadeMs: 180, heroFadeMs: 320, slideFrac: 0.04, speed: 1 },
+  };
+}
+
+function ffmpegInputs(project: Project) {
+  const ranges = survivingRanges(project);
+  const selectExpr = ranges
+    .map((r) => `between(t,${sec(r.startSec)},${sec(r.endSec)})`)
+    .join("+");
+  const brollPlans = project.broll.flatMap((b) =>
+    planBrollForRanges({
+      broll: b,
+      firstInputIndex: 1,
+      ranges,
+      sampleRate: project.sampleRate,
+      srcPath: "/tmp/broll.mp4",
+    })
+  );
+  const graphicWindows = (project.graphics ?? []).map((g) =>
+    planGraphicWindow({
+      startSample: g.startSample,
+      endSample: g.endSample,
+      sampleRate: project.sampleRate,
+      ranges,
+    })
+  );
+  return { selectExpr, ranges, brollPlans, graphicWindows };
+}
+
+test("notes never change the ffmpeg argv/filter inputs (metadata only)", () => {
+  const withNotes = ffmpegInputs(noteGuardFixture(true));
+  const withoutNotes = ffmpegInputs(noteGuardFixture(false));
+  assert.deepEqual(withNotes, withoutNotes);
+  // And the select expression string itself is identical.
+  assert.equal(withNotes.selectExpr, withoutNotes.selectExpr);
 });

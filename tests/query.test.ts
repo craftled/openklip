@@ -178,6 +178,37 @@ test("listOverlays returns structured b-roll titles zooms stills", () => {
   assert.equal(o.stills.length, 0);
 });
 
+test("listOverlays surfaces a note when present and omits the key otherwise", () => {
+  const p = makeProject();
+  addTitle(p, { fromSec: 0, toSec: 2, text: "Noted", note: "why this" });
+  addTitle(p, { fromSec: 2, toSec: 4, text: "Plain" });
+  const o = listOverlays(p);
+  assert.equal(o.titles[0].note, "why this");
+  assert.ok(!("note" in o.titles[1]), "note key should be omitted when absent");
+});
+
+test("listOverlays surfaces an anchor when present and null otherwise", () => {
+  const p = makeProject();
+  addTitle(p, {
+    fromSec: 0,
+    toSec: 2,
+    text: "Anchored",
+    anchor: { phrase: "big reveal", wordIds: ["w0", "w1"], stale: false },
+  });
+  addTitle(p, { fromSec: 2, toSec: 4, text: "Plain" });
+  const o = listOverlays(p);
+  assert.equal(o.titles[0].anchor?.phrase, "big reveal");
+  assert.equal(o.titles[1].anchor, null);
+});
+
+test("wordSpan view carries a note on a cut word", () => {
+  const p = makeProject();
+  p.words[1].deleted = true;
+  p.words[1].note = "stumble";
+  const slice = wordSpan(p, "w1");
+  assert.equal(slice.words[0].note, "stumble");
+});
+
 test("projectStatus returns agent-friendly JSON shape", () => {
   const p = makeProject({ template: "talking-head" });
   p.words[0].deleted = true;
