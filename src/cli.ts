@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { summarize } from "./actions.ts";
 import { agentToolManifest, agentToolTable } from "./agent-tools.ts";
+import { assembleFromSelection, ingestTake, listTakes } from "./assembly.ts";
 import { analyzeAssets } from "./asset-cards.ts";
 import { registerAsset } from "./assets.ts";
 import { applyBrand, loadBrand } from "./brands.ts";
@@ -13,7 +14,6 @@ import {
   runTranscriptGrep,
   runTranscriptPhrase,
   runTranscriptSpan,
-  spanForPhraseOverlay,
 } from "./cli-query.ts";
 import { runDoctor } from "./doctor.ts";
 import {
@@ -50,6 +50,7 @@ import {
   loadProject as storeLoadProject,
 } from "./projectStore.ts";
 import { expandWordTokens } from "./query.ts";
+import { placeFromPhrase } from "./reanchor.ts";
 import {
   actionManifest,
   actionTable,
@@ -132,6 +133,7 @@ Overlays
                                        --scale <1-3>  --ramp <sec>
   openklip broll-add-phrase <slug> <assetId> "spoken phrase"
                                      b-roll cover at first phrase match
+  openklip reanchor <slug> [overlayId] re-resolve phrase-anchored overlays after a re-cut
   openklip reorder <slug> <broll|title|zoom> <id> <toIndex>
                                      restack an overlay (paint order)
 
@@ -145,6 +147,16 @@ Look & captions
   openklip template list                 list edit templates (templates/*/skill.md)
   openklip template show <id>            print a template skill file
   openklip template set <slug> <id>      attach a template to a project
+
+Multi-take assembly
+  openklip take-add <slug> <video>   ingest an alternate take into takes/<id>/
+                                       --id <takeId>   --label <text>
+  openklip takes <slug>              list ingested takes (id, duration, words)
+  openklip assemble <slug> <takeId:wStart-wEnd> [more...]
+                                     splice chosen take runs into a new source
+                                       --pad <ms>   seam pad (0-500, default 50)
+                                       --force      overwrite an existing edit
+                                     add a per-segment "why" note via the agent tool
 
 Review & export
   openklip status <slug>             summarize the current edit
@@ -561,6 +573,8 @@ try {
       const restore = args.includes("--restore");
       const cutAll = args.includes("--all");
       const textIdx = args.indexOf("--text");
+      // F1: optional human rationale recorded on the cut words.
+      const note = flagValue(args, "--note");
       const project = await loadProject(slug);
 
       if (textIdx !== -1) {
@@ -577,6 +591,7 @@ try {
           const result = runAction("cut-text", project, {
             phrase,
             all: true,
+            note,
           }) as { matches: number; ids: string[] };
           if (result.matches === 0) {
             console.log(`no contiguous runs matched: "${phrase}"`);
@@ -591,6 +606,7 @@ try {
         const result = runAction("cut-text", project, {
           phrase,
           all: false,
+          note,
         }) as { matched: boolean; ids: string[] };
         if (!result.matched) {
           console.log(`no contiguous run of words matched: "${phrase}"`);
@@ -601,14 +617,22 @@ try {
         break;
       }
 
-      const tokens = args.filter((a) => a !== "--restore" && a !== "--all");
+      // Keep word tokens only: drop the boolean flags and the --note value pair.
+      const noteIdx = args.indexOf("--note");
+      const tokens = args.filter(
+        (a, i) =>
+          a !== "--restore" &&
+          a !== "--all" &&
+          a !== "--note" &&
+          !(noteIdx !== -1 && i === noteIdx + 1)
+      );
       if (tokens.length === 0) {
         throw new Error(
-          "usage: openklip cut <slug> <w12> <w15-w20> [--restore]"
+          "usage: openklip cut <slug> <w12> <w15-w20> [--restore] [--note <why>]"
         );
       }
       const ids = resolveCutIds(project, tokens);
-      runAction("cut", project, { ids, deleted: !restore });
+      runAction("cut", project, { ids, deleted: !restore, note });
       await saveProject(slug, project);
       console.log(
         `${restore ? "restored" : "cut"} ${ids.length} words: ${ids.join(", ")}`
@@ -1286,7 +1310,7 @@ try {
       const spokenPhrase = positional[0];
       const text = positional.slice(1).join(" ").replace(/\\n/g, "\n");
       const project = await loadProject(slug);
-      const span = spanForPhraseOverlay(project, spokenPhrase);
+      const span = placeFromPhrase(project, spokenPhrase);
       if (!span.matched) {
         throw new Error(`no match for spoken phrase: "${spokenPhrase}"`);
       }
@@ -1295,6 +1319,7 @@ try {
         toSec: span.toSec,
         text,
         position,
+        anchor: { phrase: spokenPhrase, wordIds: span.ids, stale: false },
       }) as Title;
       await saveProject(slug, project);
       console.log(
@@ -1343,7 +1368,7 @@ try {
         );
       }
       const project = await loadProject(slug);
-      const span = spanForPhraseOverlay(project, spokenPhrase);
+      const span = placeFromPhrase(project, spokenPhrase);
       if (!span.matched) {
         throw new Error(`no match for spoken phrase: "${spokenPhrase}"`);
       }
@@ -1352,6 +1377,7 @@ try {
         toSec: span.toSec,
         scale,
         rampSec,
+        anchor: { phrase: spokenPhrase, wordIds: span.ids, stale: false },
       }) as Zoom;
       await saveProject(slug, project);
       console.log(
@@ -1374,7 +1400,7 @@ try {
         );
       }
       const project = await loadProject(slug);
-      const span = spanForPhraseOverlay(project, spokenPhrase);
+      const span = placeFromPhrase(project, spokenPhrase);
       if (!span.matched) {
         throw new Error(`no match for spoken phrase: "${spokenPhrase}"`);
       }
@@ -1382,6 +1408,7 @@ try {
         assetId,
         fromSec: span.fromSec,
         toSec: span.toSec,
+        anchor: { phrase: spokenPhrase, wordIds: span.ids, stale: false },
       }) as Broll;
       await saveProject(slug, project);
       console.log(
@@ -1418,6 +1445,93 @@ try {
         console.log(`  missing kept words: ${report.missingKept.join(", ")}`);
       }
       process.exitCode = report.ok ? 0 : 1;
+      break;
+    }
+    case "take-add": {
+      if (!(rest[0] && rest[1])) {
+        throw new Error(
+          "usage: openklip take-add <slug> <video> [--id <takeId>] [--label <text>]"
+        );
+      }
+      const slug = rest[0];
+      const id = flagValue(rest, "--id");
+      const label = flagValue(rest, "--label");
+      const video = rest.slice(1).filter((a, i, arr) => {
+        const prev = arr[i - 1];
+        return (
+          a !== "--id" &&
+          a !== "--label" &&
+          prev !== "--id" &&
+          prev !== "--label"
+        );
+      })[0];
+      if (!video) {
+        throw new Error(
+          "usage: openklip take-add <slug> <video> [--id <takeId>]"
+        );
+      }
+      const take = await ingestTake(slug, video, { id, label });
+      console.log(
+        `take "${take.id}" ingested: ${take.words.length} words, ${samplesToSec(take.durationSamples).toFixed(1)}s`
+      );
+      break;
+    }
+    case "takes": {
+      if (!rest[0]) {
+        throw new Error("usage: openklip takes <slug>");
+      }
+      const takes = await listTakes(rest[0]);
+      if (takes.length === 0) {
+        console.log("no takes. Run: openklip take-add <slug> <video>");
+        break;
+      }
+      for (const t of takes) {
+        const dur = samplesToSec(t.durationSamples).toFixed(1);
+        console.log(
+          `${t.id.padEnd(20)}  ${`${dur}s`.padStart(7)}  ${t.words.length} words${t.label ? `  ${t.label}` : ""}`
+        );
+      }
+      console.log(`\n${takes.length} take(s)`);
+      break;
+    }
+    case "assemble": {
+      if (!(rest[0] && rest[1])) {
+        throw new Error(
+          "usage: openklip assemble <slug> <takeId:wStart-wEnd> [more...] [--pad <ms>] [--force]"
+        );
+      }
+      const slug = rest[0];
+      const padMs = flagNumber(rest, "--pad");
+      const force = rest.includes("--force");
+      // Each segment is "<takeId>:<startWordId>-<endWordId>".
+      const segments = rest
+        .slice(1)
+        .filter((a, i, arr) => {
+          const prev = arr[i - 1];
+          return a !== "--pad" && a !== "--force" && prev !== "--pad";
+        })
+        .map((spec) => {
+          const colon = spec.indexOf(":");
+          const dash = spec.indexOf("-", colon + 1);
+          if (colon <= 0 || dash <= colon) {
+            throw new Error(
+              `bad segment "${spec}" (want <takeId>:<wStart>-<wEnd>)`
+            );
+          }
+          return {
+            takeId: spec.slice(0, colon),
+            startWordId: spec.slice(colon + 1, dash),
+            endWordId: spec.slice(dash + 1),
+          };
+        });
+      const r = await assembleFromSelection(
+        slug,
+        { segments, ...(padMs === undefined ? {} : { padMs }) },
+        { force }
+      );
+      console.log(
+        `assembled ${r.segments} segment(s), ${r.words} words, ${r.durationSec.toFixed(1)}s -> ${slug}`
+      );
       break;
     }
     case "brand": {
@@ -1486,6 +1600,28 @@ try {
       runAction("reorder", project, { track: kind, id, toIndex });
       await saveProject(slug, project);
       console.log(`reordered ${kind} ${id} -> index ${toIndex}`);
+      break;
+    }
+    case "reanchor": {
+      if (!rest[0]) {
+        throw new Error("usage: openklip reanchor <slug> [overlayId]");
+      }
+      const slug = rest[0];
+      const overlayId = rest[1];
+      const project = await loadProject(slug);
+      const results = runAction(
+        "reanchor",
+        project,
+        overlayId ? { id: overlayId } : {}
+      ) as Array<{ id: string; kind: string; status: string }>;
+      await saveProject(slug, project);
+      if (results.length === 0) {
+        console.log("no phrase-anchored overlays to re-resolve");
+        break;
+      }
+      for (const r of results) {
+        console.log(`${r.kind} ${r.id}: ${r.status}`);
+      }
       break;
     }
     case "package": {

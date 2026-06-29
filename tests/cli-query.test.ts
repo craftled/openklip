@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { join } from "node:path";
 import { test } from "node:test";
+import { addTitle } from "../src/actions.ts";
+import { runOverlays } from "../src/cli-query.ts";
 import {
   makeProject,
   withTempProjectsRoot,
@@ -229,4 +231,20 @@ test("CLI title-add-phrase errors when phrase not found", async () => {
     assert.notEqual(r.code, 0);
     assert.match(r.out, /no match/i);
   });
+});
+
+// ── FEATURE 1: written rationale (note) in overlay listings ─────────────────
+
+test("runOverlays human output includes a note suffix", () => {
+  const p = makeProject();
+  addTitle(p, { fromSec: 0, toSec: 2, text: "Hook", note: "why this line" });
+  const out = runOverlays(p, { json: false });
+  assert.match(out, /why this line/);
+});
+
+test("runOverlays json output includes the note key", () => {
+  const p = makeProject();
+  addTitle(p, { fromSec: 0, toSec: 2, text: "Hook", note: "why this line" });
+  const out = runOverlays(p, { json: true });
+  assert.match(out, /"note"/);
 });

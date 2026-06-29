@@ -17,6 +17,7 @@ import {
 } from "./edl.ts";
 import { isNeutralColor } from "./grade-color.ts";
 import { listGraphics } from "./graphics.ts";
+import { reanchorProject } from "./reanchor.ts";
 import { applyProjectTemplate } from "./templates.ts";
 
 export function applyProjectEdits(
@@ -35,6 +36,9 @@ export function applyProjectEdits(
         w.deleted = Boolean(del.get(w.id));
       }
     }
+    // F2: a word-level edit can strand or revive an anchored overlay; re-resolve
+    // every phrase anchor onto the current kept words (word-deletion path only).
+    reanchorProject(project);
   }
   if (typeof body.captions?.enabled === "boolean") {
     project.captions = { ...project.captions, enabled: body.captions.enabled };

@@ -24,6 +24,23 @@ test("applyProjectEdits toggles deleted words and caption settings", () => {
   assert.equal(project.padMs, 120);
 });
 
+test("applyProjectEdits re-anchors overlays when its words cut deletes the phrase", () => {
+  const project = makeProject();
+  // Anchor a title onto the second word ("world"); stored span already correct.
+  project.titles = [
+    {
+      id: "t1",
+      text: "Card",
+      startSample: project.words[1].startSample,
+      endSample: project.words[1].endSample,
+      position: "lower",
+      anchor: { phrase: "world", wordIds: ["w1"], stale: false },
+    },
+  ];
+  applyProjectEdits(project, { words: [{ id: "w1", deleted: true }] });
+  assert.equal(project.titles[0].anchor?.stale, true);
+});
+
 test("applyProjectEdits clamps caption maxWords and padMs", () => {
   const project = makeProject();
   applyProjectEdits(project, { captions: { maxWords: 99 }, padMs: 9999 });

@@ -9,6 +9,7 @@ import {
   type Grade,
   type Graphic,
   type Motion,
+  type PhraseAnchor,
   type Project,
   SAMPLE_RATE,
   type Still,
@@ -23,16 +24,35 @@ import {
 } from "./graphics.ts";
 import { findPhraseRuns } from "./phrase-match.ts";
 
-// Mark words (by id) deleted (or, with deleted=false, restored).
+// Apply an optional `note` patch to an overlay item: a non-empty string sets the
+// rationale, an empty string CLEARS it (delete-on-empty, mirroring look-lut), and
+// an omitted patch leaves any existing note untouched. Metadata only, no ffmpeg.
+function patchNote(item: { note?: string }, note: string | undefined): void {
+  if (note === undefined) {
+    return;
+  }
+  if (note === "") {
+    Reflect.deleteProperty(item, "note");
+  } else {
+    item.note = note;
+  }
+}
+
+// Mark words (by id) deleted (or, with deleted=false, restored). An optional
+// `note` records the human rationale for the cut on each affected word; passing
+// an empty string CLEARS the note (delete-on-empty, mirroring look-lut), and an
+// omitted note leaves any existing note untouched. Metadata only, never ffmpeg.
 export function cutWords(
   project: Project,
   ids: string[],
-  deleted = true
+  deleted = true,
+  note?: string
 ): Project {
   const set = new Set(ids);
   for (const w of project.words) {
     if (set.has(w.id)) {
       w.deleted = deleted;
+      patchNote(w, note);
     }
   }
   return project;
@@ -43,14 +63,15 @@ export function cutWords(
 // match was found and which word ids were cut.
 export function cutByText(
   project: Project,
-  phrase: string
+  phrase: string,
+  note?: string
 ): { matched: boolean; ids: string[] } {
   const runs = findPhraseRuns(project, phrase, { all: false });
   if (runs.length === 0) {
     return { matched: false, ids: [] };
   }
   const ids = runs[0].ids;
-  cutWords(project, ids, true);
+  cutWords(project, ids, true, note);
   return { matched: true, ids };
 }
 
@@ -58,12 +79,13 @@ export function cutByText(
 // many runs were cut and the combined word ids.
 export function cutAllByText(
   project: Project,
-  phrase: string
+  phrase: string,
+  note?: string
 ): { matches: number; ids: string[] } {
   const ids: string[] = [];
   let matches = 0;
   while (true) {
-    const result = cutByText(project, phrase);
+    const result = cutByText(project, phrase, note);
     if (!result.matched) {
       break;
     }
@@ -85,9 +107,16 @@ export function restoreAll(project: Project): Project {
 // asset exists; converts seconds to samples on the canonical 48 kHz grid.
 export function addBroll(
   project: Project,
-  input: { assetId: string; fromSec: number; toSec: number; srcInSec?: number }
+  input: {
+    assetId: string;
+    fromSec: number;
+    toSec: number;
+    srcInSec?: number;
+    note?: string;
+    anchor?: PhraseAnchor;
+  }
 ): Broll {
-  const { assetId, fromSec, toSec, srcInSec = 0 } = input;
+  const { assetId, fromSec, toSec, srcInSec = 0, note, anchor } = input;
   if (![fromSec, toSec, srcInSec].every(Number.isFinite)) {
     throw new Error("b-roll timing values must be finite numbers");
   }
@@ -131,6 +160,8 @@ export function addBroll(
     startSample: Math.round(fromSec * SAMPLE_RATE),
     endSample: Math.round(endSec * SAMPLE_RATE),
     srcInSample: Math.round(srcInSec * SAMPLE_RATE),
+    ...(note === undefined ? {} : { note }),
+    ...(anchor === undefined ? {} : { anchor }),
   };
   project.broll.push(item);
   return item;
@@ -172,6 +203,7 @@ export function updateBroll(
     fromSec?: number;
     toSec?: number;
     srcInSec?: number;
+    note?: string;
   }
 ): Broll {
   const item = findBroll(project, id);
@@ -220,6 +252,7 @@ export function updateBroll(
   item.startSample = Math.round(fromSec * SAMPLE_RATE);
   item.endSample = Math.round(endSec * SAMPLE_RATE);
   item.srcInSample = Math.round(srcInSec * SAMPLE_RATE);
+  patchNote(item, patch.note);
   return item;
 }
 
@@ -234,6 +267,8 @@ export function addStill(
     scale?: number;
     focusX?: number;
     focusY?: number;
+    note?: string;
+    anchor?: PhraseAnchor;
   }
 ): Still {
   const {
@@ -243,6 +278,8 @@ export function addStill(
     scale = 1.2,
     focusX = 0.5,
     focusY = 0.5,
+    note,
+    anchor,
   } = input;
   if (![fromSec, toSec, scale, focusX, focusY].every(Number.isFinite)) {
     throw new Error("still timing/look values must be finite numbers");
@@ -284,6 +321,8 @@ export function addStill(
     scale,
     focusX,
     focusY,
+    ...(note === undefined ? {} : { note }),
+    ...(anchor === undefined ? {} : { anchor }),
   };
   if (!project.stills) {
     project.stills = [];
@@ -319,6 +358,7 @@ export function updateStill(
     scale?: number;
     focusX?: number;
     focusY?: number;
+    note?: string;
   }
 ): Still {
   const item = findStill(project, id);
@@ -369,6 +409,7 @@ export function updateStill(
   item.focusY = focusY;
   item.startSample = Math.round(fromSec * SAMPLE_RATE);
   item.endSample = Math.round(endSec * SAMPLE_RATE);
+  patchNote(item, patch.note);
   return item;
 }
 
@@ -381,9 +422,11 @@ export function addTitle(
     toSec: number;
     text: string;
     position?: Title["position"];
+    note?: string;
+    anchor?: PhraseAnchor;
   }
 ): Title {
-  const { fromSec, toSec, text, position = "lower" } = input;
+  const { fromSec, toSec, text, position = "lower", note, anchor } = input;
   const trimmed = text.trim();
   if (!trimmed) {
     throw new Error("title text must be non-empty");
@@ -413,6 +456,8 @@ export function addTitle(
     startSample: Math.round(fromSec * SAMPLE_RATE),
     endSample: Math.round(endSec * SAMPLE_RATE),
     position,
+    ...(note === undefined ? {} : { note }),
+    ...(anchor === undefined ? {} : { anchor }),
   };
   if (!project.titles) {
     project.titles = [];
@@ -446,6 +491,7 @@ export function updateTitle(
     position?: Title["position"];
     fromSec?: number;
     toSec?: number;
+    note?: string;
   }
 ): Title {
   const item = findTitle(project, id);
@@ -479,6 +525,7 @@ export function updateTitle(
   item.position = position;
   item.startSample = Math.round(fromSec * SAMPLE_RATE);
   item.endSample = Math.round(endSec * SAMPLE_RATE);
+  patchNote(item, patch.note);
   return item;
 }
 
@@ -506,9 +553,19 @@ export function addGraphic(
     toSec: number;
     params?: Record<string, string | number | boolean>;
     track?: Graphic["track"];
+    note?: string;
+    anchor?: PhraseAnchor;
   }
 ): Graphic {
-  const { template, fromSec, toSec, params, track = "title" } = input;
+  const {
+    template,
+    fromSec,
+    toSec,
+    params,
+    track = "title",
+    note,
+    anchor,
+  } = input;
   if (![fromSec, toSec].every(Number.isFinite)) {
     throw new Error("graphic timing values must be finite numbers");
   }
@@ -540,6 +597,8 @@ export function addGraphic(
     startSample: Math.round(fromSec * SAMPLE_RATE),
     endSample: Math.round(endSec * SAMPLE_RATE),
     track,
+    ...(note === undefined ? {} : { note }),
+    ...(anchor === undefined ? {} : { anchor }),
   };
   if (!project.graphics) {
     project.graphics = [];
@@ -576,6 +635,7 @@ export function updateGraphic(
     toSec?: number;
     params?: Record<string, string | number | boolean>;
     track?: Graphic["track"];
+    note?: string;
   }
 ): Graphic {
   const item = findGraphic(project, id);
@@ -617,6 +677,7 @@ export function updateGraphic(
   item.track = track;
   item.startSample = Math.round(fromSec * SAMPLE_RATE);
   item.endSample = Math.round(endSec * SAMPLE_RATE);
+  patchNote(item, patch.note);
   return item;
 }
 
@@ -702,9 +763,11 @@ export function addZoom(
     toSec: number;
     scale?: number;
     rampSec?: number;
+    note?: string;
+    anchor?: PhraseAnchor;
   }
 ): Zoom {
-  const { fromSec, toSec, scale = 1.15, rampSec = 0.6 } = input;
+  const { fromSec, toSec, scale = 1.15, rampSec = 0.6, note, anchor } = input;
   if (![fromSec, toSec, scale, rampSec].every(Number.isFinite)) {
     throw new Error("zoom timing values must be finite numbers");
   }
@@ -736,6 +799,8 @@ export function addZoom(
     endSample: Math.round(endSec * SAMPLE_RATE),
     scale,
     rampSec,
+    ...(note === undefined ? {} : { note }),
+    ...(anchor === undefined ? {} : { anchor }),
   };
   if (!project.zooms) {
     project.zooms = [];
@@ -769,6 +834,7 @@ export function updateZoom(
     rampSec?: number;
     fromSec?: number;
     toSec?: number;
+    note?: string;
   }
 ): Zoom {
   const item = findZoom(project, id);
@@ -805,6 +871,7 @@ export function updateZoom(
   item.rampSec = rampSec;
   item.startSample = Math.round(fromSec * SAMPLE_RATE);
   item.endSample = Math.round(endSec * SAMPLE_RATE);
+  patchNote(item, patch.note);
   return item;
 }
 

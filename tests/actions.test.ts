@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   addBroll,
+  addGraphic,
+  addStill,
   addTitle,
   addZoom,
   cutAllByText,
@@ -409,6 +411,120 @@ test("removeZoom removes a zoom by id", () => {
   assert.equal(removeZoom(p, item.id), true);
   assert.equal(p.zooms?.length, 0);
   assert.equal(removeZoom(p, "missing"), false);
+});
+
+// ── FEATURE 1: written rationale (note) ─────────────────────────────────────
+
+// Register a still asset on the shared fixture so addStill has something to bind.
+function withStillAsset(p: Project): Project {
+  p.assets.push({
+    id: "still-1",
+    kind: "still",
+    name: "still.png",
+    src: "/tmp/still.png",
+    proxy: "assets/still-1.png",
+    durationSamples: 0,
+  });
+  return p;
+}
+
+test("addBroll stores an optional note and omits it when absent", () => {
+  const p = makeProject();
+  const noted = addBroll(p, {
+    assetId: "broll-1",
+    fromSec: 0,
+    toSec: 2,
+    note: "establish setting",
+  });
+  assert.equal(noted.note, "establish setting");
+  const plain = addBroll(p, { assetId: "broll-1", fromSec: 2, toSec: 4 });
+  assert.equal(plain.note, undefined);
+});
+
+test("addStill stores an optional note and omits it when absent", () => {
+  const p = withStillAsset(makeProject());
+  const noted = addStill(p, {
+    assetId: "still-1",
+    fromSec: 0,
+    toSec: 2,
+    note: "context shot",
+  });
+  assert.equal(noted.note, "context shot");
+  const plain = addStill(p, { assetId: "still-1", fromSec: 2, toSec: 4 });
+  assert.equal(plain.note, undefined);
+});
+
+test("addTitle stores an optional note and omits it when absent", () => {
+  const p = makeProject();
+  const noted = addTitle(p, {
+    fromSec: 0,
+    toSec: 2,
+    text: "Hook",
+    note: "why this title",
+  });
+  assert.equal(noted.note, "why this title");
+  const plain = addTitle(p, { fromSec: 2, toSec: 4, text: "Plain" });
+  assert.equal(plain.note, undefined);
+});
+
+test("addZoom stores an optional note and omits it when absent", () => {
+  const p = makeProject();
+  const noted = addZoom(p, { fromSec: 0, toSec: 2, note: "punch in" });
+  assert.equal(noted.note, "punch in");
+  const plain = addZoom(p, { fromSec: 2, toSec: 4 });
+  assert.equal(plain.note, undefined);
+});
+
+test("addGraphic stores an optional note and omits it when absent", () => {
+  const p = makeProject();
+  const noted = addGraphic(p, {
+    template: "lower-third",
+    fromSec: 0,
+    toSec: 2,
+    note: "lower third why",
+  });
+  assert.equal(noted.note, "lower third why");
+  const plain = addGraphic(p, {
+    template: "lower-third",
+    fromSec: 2,
+    toSec: 4,
+  });
+  assert.equal(plain.note, undefined);
+});
+
+test("updateTitle sets a note then clears it on empty string", () => {
+  const p = makeProject();
+  const item = addTitle(p, { fromSec: 0, toSec: 2, text: "Hook" });
+  updateTitle(p, item.id, { note: "why" });
+  assert.equal(item.note, "why");
+  updateTitle(p, item.id, { note: "" });
+  assert.equal(item.note, undefined);
+});
+
+test("cutWords records a per-word note and clears it on empty string", () => {
+  const p = makeProject();
+  cutWords(p, ["w1"], true, "stumble");
+  const w = p.words.find((x) => x.id === "w1");
+  assert.equal(w?.deleted, true);
+  assert.equal(w?.note, "stumble");
+  cutWords(p, ["w1"], true, "");
+  assert.equal(w?.note, undefined);
+});
+
+// ── FEATURE 2: phrase-anchored cues (anchor) ────────────────────────────────
+
+test("addTitle stores an optional phrase anchor", () => {
+  const p = makeProject();
+  const anchored = addTitle(p, {
+    fromSec: 0,
+    toSec: 2,
+    text: "Hook",
+    anchor: { phrase: "big reveal", wordIds: ["w0", "w1"], stale: false },
+  });
+  assert.equal(anchored.anchor?.phrase, "big reveal");
+  assert.deepEqual(anchored.anchor?.wordIds, ["w0", "w1"]);
+  const plain = addTitle(p, { fromSec: 2, toSec: 4, text: "Plain" });
+  assert.equal(plain.anchor, undefined);
 });
 
 test("summarize counts words, cuts, ranges, broll, and kept duration", () => {

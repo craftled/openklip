@@ -2,7 +2,7 @@
 // commands in one manifest. CLI (`openklip tools`), MCP (stdio server), and docs
 // all read from here so surfaces stay in sync with the GUI's project.json edits.
 import { z } from "zod";
-import { spanForPhraseOverlay } from "./cli-query.ts";
+import { assembleFromSelection, listTakes, loadTake } from "./assembly.ts";
 import { samplesToSec } from "./edl.ts";
 import { exportCut } from "./exporter.ts";
 import { listGraphics } from "./graphics.ts";
@@ -16,6 +16,7 @@ import {
   projectStatus,
   wordSpan,
 } from "./query.ts";
+import { placeFromPhrase } from "./reanchor.ts";
 import {
   type ActionDef,
   actions,
@@ -229,6 +230,7 @@ const queryTools: AgentToolDef[] = [
           startSec: samplesToSec(w.startSample),
           endSec: samplesToSec(w.endSample),
           deleted: w.deleted,
+          ...(w.note === undefined ? {} : { note: w.note }),
         })),
         total: project.words.length,
         cut: project.words.filter((w) => w.deleted).length,
@@ -277,10 +279,11 @@ const queryTools: AgentToolDef[] = [
       spokenPhrase: z.string().min(1),
       text: z.string().min(1),
       position: z.enum(["lower", "center", "hero"]).default("lower"),
+      note: z.string().optional(),
     }),
-    run: async ({ slug: projectSlug, spokenPhrase, text, position }) =>
+    run: async ({ slug: projectSlug, spokenPhrase, text, position, note }) =>
       mutateProject(projectSlug, (project) => {
-        const span = spanForPhraseOverlay(project, spokenPhrase);
+        const span = placeFromPhrase(project, spokenPhrase);
         if (!span.matched) {
           throw new Error(`no match for spoken phrase: "${spokenPhrase}"`);
         }
@@ -289,6 +292,8 @@ const queryTools: AgentToolDef[] = [
           toSec: span.toSec,
           text: text.replace(/\\n/g, "\n"),
           position,
+          note,
+          anchor: { phrase: spokenPhrase, wordIds: span.ids, stale: false },
         });
       }),
   }),
@@ -300,10 +305,11 @@ const queryTools: AgentToolDef[] = [
       spokenPhrase: z.string().min(1),
       scale: z.number().optional(),
       rampSec: z.number().optional(),
+      note: z.string().optional(),
     }),
-    run: async ({ slug: projectSlug, spokenPhrase, scale, rampSec }) =>
+    run: async ({ slug: projectSlug, spokenPhrase, scale, rampSec, note }) =>
       mutateProject(projectSlug, (project) => {
-        const span = spanForPhraseOverlay(project, spokenPhrase);
+        const span = placeFromPhrase(project, spokenPhrase);
         if (!span.matched) {
           throw new Error(`no match for spoken phrase: "${spokenPhrase}"`);
         }
@@ -312,6 +318,8 @@ const queryTools: AgentToolDef[] = [
           toSec: span.toSec,
           scale,
           rampSec,
+          note,
+          anchor: { phrase: spokenPhrase, wordIds: span.ids, stale: false },
         });
       }),
   }),
@@ -322,10 +330,11 @@ const queryTools: AgentToolDef[] = [
       slug,
       assetId: z.string().min(1),
       spokenPhrase: z.string().min(1),
+      note: z.string().optional(),
     }),
-    run: async ({ slug: projectSlug, assetId, spokenPhrase }) =>
+    run: async ({ slug: projectSlug, assetId, spokenPhrase, note }) =>
       mutateProject(projectSlug, (project) => {
-        const span = spanForPhraseOverlay(project, spokenPhrase);
+        const span = placeFromPhrase(project, spokenPhrase);
         if (!span.matched) {
           throw new Error(`no match for spoken phrase: "${spokenPhrase}"`);
         }
@@ -333,6 +342,8 @@ const queryTools: AgentToolDef[] = [
           assetId,
           fromSec: span.fromSec,
           toSec: span.toSec,
+          note,
+          anchor: { phrase: spokenPhrase, wordIds: span.ids, stale: false },
         });
       }),
   }),
@@ -355,6 +366,71 @@ const queryTools: AgentToolDef[] = [
       const report = await verifyCut(projectSlug);
       return { ...report, verdict: verifyVerdict(report) };
     },
+  }),
+  // ── FEATURE 3: multi-take assembly (takes/ + ffmpeg, like export/verify) ──
+  defineQueryTool({
+    name: "list_takes",
+    summary:
+      "List ingested takes for a project (id, label, duration, word count).",
+    schema: z.object({ slug }),
+    run: async ({ slug: projectSlug }) => {
+      const takes = await listTakes(projectSlug);
+      return {
+        takes: takes.map((t) => ({
+          id: t.id,
+          label: t.label,
+          durationSec: samplesToSec(t.durationSamples),
+          words: t.words.length,
+        })),
+      };
+    },
+  }),
+  defineQueryTool({
+    name: "take_transcript",
+    summary:
+      "Full transcript of one ingested take (word ids for an assemble selection).",
+    schema: z.object({ slug, takeId: z.string().min(1) }),
+    run: async ({ slug: projectSlug, takeId }) => {
+      const take = await loadTake(projectSlug, takeId);
+      return {
+        takeId: take.id,
+        label: take.label,
+        words: take.words.map((w, index) => ({
+          index,
+          id: w.id,
+          text: w.text,
+          startSec: samplesToSec(w.startSample),
+          endSec: samplesToSec(w.endSample),
+        })),
+        total: take.words.length,
+      };
+    },
+  }),
+  defineQueryTool({
+    name: "assemble",
+    summary:
+      "Splice chosen runs from ingested takes into a single new source (originals untouched).",
+    schema: z.object({
+      slug,
+      segments: z
+        .array(
+          z.object({
+            takeId: z.string().min(1),
+            startWordId: z.string().min(1),
+            endWordId: z.string().min(1),
+            note: z.string().optional(),
+          })
+        )
+        .min(1),
+      padMs: z.number().nonnegative().max(500).optional(),
+      force: z.boolean().optional(),
+    }),
+    run: async ({ slug: projectSlug, segments, padMs, force }) =>
+      assembleFromSelection(
+        projectSlug,
+        { segments, ...(padMs === undefined ? {} : { padMs }) },
+        { force }
+      ),
   }),
 ];
 

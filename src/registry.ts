@@ -36,8 +36,9 @@ import {
   updateTitle,
   updateZoom,
 } from "./actions.ts";
-import { GradeSchema, type Project } from "./edl.ts";
+import { GradeSchema, PhraseAnchorSchema, type Project } from "./edl.ts";
 import { NEUTRAL_COLOR } from "./grade-color.ts";
+import { reanchorOne, reanchorProject } from "./reanchor.ts";
 
 // Where an action is exposed. The CLI dispatch, the editor's server actions, and
 // the agent-facing manifest each filter the registry by surface.
@@ -83,10 +84,13 @@ export const actions: ActionDef[] = [
     schema: z.object({
       ids: z.array(z.string()).min(1),
       deleted: z.boolean().default(true),
+      note: z.string().optional(),
     }),
     run: (p, i) => {
-      cutWords(p, i.ids, i.deleted);
-      return { cut: i.deleted, ids: i.ids };
+      cutWords(p, i.ids, i.deleted, i.note);
+      // F2: a deletion can strand an anchored overlay; re-resolve its span.
+      const reanchored = reanchorProject(p);
+      return { cut: i.deleted, ids: i.ids, reanchored };
     },
   }),
   defineAction({
@@ -96,8 +100,16 @@ export const actions: ActionDef[] = [
     schema: z.object({
       phrase: z.string().min(1),
       all: z.boolean().default(false),
+      note: z.string().optional(),
     }),
-    run: (p, i) => (i.all ? cutAllByText(p, i.phrase) : cutByText(p, i.phrase)),
+    run: (p, i) => {
+      const result = i.all
+        ? cutAllByText(p, i.phrase, i.note)
+        : cutByText(p, i.phrase, i.note);
+      // F2: cutting a phrase can strand an anchored overlay; re-resolve spans.
+      const reanchored = reanchorProject(p);
+      return { ...result, reanchored };
+    },
   }),
   defineAction({
     name: "restore-all",
@@ -106,7 +118,9 @@ export const actions: ActionDef[] = [
     schema: z.object({}),
     run: (p) => {
       restoreAll(p);
-      return { ok: true };
+      // F2: restoring words can bring a phrase back; re-resolve stale anchors.
+      const reanchored = reanchorProject(p);
+      return { ok: true, reanchored };
     },
   }),
   defineAction({
@@ -118,6 +132,8 @@ export const actions: ActionDef[] = [
       fromSec: sec,
       toSec: sec,
       srcInSec: sec.optional(),
+      note: z.string().optional(),
+      anchor: PhraseAnchorSchema.optional(),
     }),
     run: (p, i) => addBroll(p, i),
   }),
@@ -131,6 +147,7 @@ export const actions: ActionDef[] = [
       fromSec: sec.optional(),
       toSec: sec.optional(),
       srcInSec: sec.optional(),
+      note: z.string().optional(),
     }),
     run: (p, i) => updateBroll(p, i.id, i),
   }),
@@ -152,6 +169,8 @@ export const actions: ActionDef[] = [
       scale: z.number().optional(),
       focusX: z.number().optional(),
       focusY: z.number().optional(),
+      note: z.string().optional(),
+      anchor: PhraseAnchorSchema.optional(),
     }),
     run: (p, i) => addStill(p, i),
   }),
@@ -174,6 +193,7 @@ export const actions: ActionDef[] = [
       scale: z.number().optional(),
       focusX: z.number().optional(),
       focusY: z.number().optional(),
+      note: z.string().optional(),
     }),
     run: (p, i) => updateStill(p, i.id, i),
   }),
@@ -186,6 +206,8 @@ export const actions: ActionDef[] = [
       toSec: sec,
       text: z.string(),
       position: position.optional(),
+      note: z.string().optional(),
+      anchor: PhraseAnchorSchema.optional(),
     }),
     run: (p, i) => addTitle(p, i),
   }),
@@ -199,6 +221,7 @@ export const actions: ActionDef[] = [
       position: position.optional(),
       fromSec: sec.optional(),
       toSec: sec.optional(),
+      note: z.string().optional(),
     }),
     run: (p, i) => updateTitle(p, i.id, i),
   }),
@@ -218,6 +241,8 @@ export const actions: ActionDef[] = [
       toSec: sec,
       scale: z.number().optional(),
       rampSec: z.number().optional(),
+      note: z.string().optional(),
+      anchor: PhraseAnchorSchema.optional(),
     }),
     run: (p, i) => addZoom(p, i),
   }),
@@ -231,6 +256,7 @@ export const actions: ActionDef[] = [
       rampSec: z.number().optional(),
       fromSec: sec.optional(),
       toSec: sec.optional(),
+      note: z.string().optional(),
     }),
     run: (p, i) => updateZoom(p, i.id, i),
   }),
@@ -253,6 +279,8 @@ export const actions: ActionDef[] = [
         .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
         .optional(),
       track: track.optional(),
+      note: z.string().optional(),
+      anchor: PhraseAnchorSchema.optional(),
     }),
     run: (p, i) => addGraphic(p, i),
   }),
@@ -269,6 +297,7 @@ export const actions: ActionDef[] = [
         .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
         .optional(),
       track: track.optional(),
+      note: z.string().optional(),
     }),
     run: (p, i) => updateGraphic(p, i.id, i),
   }),
@@ -395,6 +424,14 @@ export const actions: ActionDef[] = [
             : reorderZoom(p, i.id, i.toIndex);
       return { track: i.track, order: list.map((x) => x.id) };
     },
+  }),
+  defineAction({
+    name: "reanchor",
+    summary:
+      "Re-resolve phrase-anchored overlays onto the current kept words (all, or one by id).",
+    surfaces: ["cli", "gui", "mcp"],
+    schema: z.object({ id: z.string().optional() }),
+    run: (p, i) => (i.id ? [reanchorOne(p, i.id)] : reanchorProject(p)),
   }),
 ];
 

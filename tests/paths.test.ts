@@ -7,6 +7,8 @@ import {
   projectPaths,
   slugFromVideo,
   slugify,
+  takeDir,
+  takeFile,
 } from "../src/paths.ts";
 import { withDefaultProjectsRoot } from "./helpers/pathsIsolation.ts";
 
@@ -88,4 +90,22 @@ test("projectDir still resolves a clean slug", () => {
   withDefaultProjectsRoot(() => {
     assert.ok(projectDir("my-video_2").endsWith("projects/my-video_2"));
   });
+});
+
+test("takeDir and takeFile live under the project's takes/ folder", () => {
+  withDefaultProjectsRoot(() => {
+    const p = projectPaths("demo");
+    assert.ok(p.takes.endsWith("projects/demo/takes"));
+    assert.ok(takeDir("demo", "t1").endsWith("projects/demo/takes/t1"));
+    assert.ok(
+      takeFile("demo", "t1").endsWith("projects/demo/takes/t1/take.json")
+    );
+  });
+});
+
+test("takeDir and takeFile validate the take id (no traversal)", () => {
+  for (const bad of ["..", "../escape", "a/b", "/abs"]) {
+    assert.throws(() => takeDir("demo", bad), /invalid project slug/i, bad);
+    assert.throws(() => takeFile("demo", bad), /invalid project slug/i, bad);
+  }
 });
