@@ -1217,7 +1217,7 @@ try {
       }
       const project = await loadProject(rest[0]);
       if (rest.includes("--json")) {
-        process.stdout.write(runStatusJson(project));
+        process.stdout.write(runStatusJson(project, rest[0]));
         break;
       }
       const s = summarize(project);

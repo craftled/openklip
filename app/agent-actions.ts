@@ -16,6 +16,7 @@ import {
 } from "@engine/agent-driver";
 import { analyzeAssets, assetCardLines } from "@engine/asset-cards";
 import { projectsRoot } from "@engine/paths";
+import { loadProjectContext } from "@engine/project-context";
 import { loadProject, mutateProject } from "@engine/projectStore";
 import { analyzeSceneLog, sceneLogLines } from "@engine/scene-log";
 import { type VerifyReport, verifyCut, verifyVerdict } from "@engine/verify";
@@ -165,6 +166,7 @@ export async function chatWithAgent(
     const project = await loadProject(slug);
     const assetCards = assetCardLines(project.assets);
     const sceneLog = sceneLogLines(project.sceneLog);
+    const projectContext = loadProjectContext(slug);
     if (supportsToolEditing(agent)) {
       const prompt = buildEditPrompt(
         {
@@ -172,6 +174,7 @@ export async function chatWithAgent(
           template: project.template,
           assetCards,
           sceneLog,
+          projectContext,
         },
         slug,
         message
@@ -190,6 +193,7 @@ export async function chatWithAgent(
         template: project.template,
         assetCards,
         sceneLog,
+        projectContext,
       },
       message
     );

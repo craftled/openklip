@@ -1,35 +1,75 @@
-import { describe, expect, test } from "bun:test";
+import assert from "node:assert/strict";
+import { writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { test } from "node:test";
 import {
-  basenamePath,
-  buildProjectHoverContext,
-  formatDurationSec,
-} from "../web/lib/project-context.ts";
-import { makeProject } from "./helpers/projectFixture.ts";
+  contextBlock,
+  loadProjectContext,
+  projectContextPath,
+  projectStatusWithContext,
+} from "../src/project-context.ts";
+import { makeProject, withTempProjectsRoot } from "./helpers/projectFixture.ts";
 
-describe("formatDurationSec", () => {
-  test("formats minutes and zero-padded seconds", () => {
-    expect(formatDurationSec(272)).toBe("4:32");
-    expect(formatDurationSec(65)).toBe("1:05");
+test("loadProjectContext returns undefined when file is absent", async () => {
+  await withTempProjectsRoot(({ slug }) => {
+    assert.equal(loadProjectContext(slug), undefined);
+    assert.ok(projectContextPath(slug).endsWith("AGENTS.local.md"));
   });
 });
 
-describe("basenamePath", () => {
-  test("returns the last path segment", () => {
-    expect(basenamePath("input/source.mp4")).toBe("source.mp4");
-    expect(basenamePath("/Users/me/video.mov")).toBe("video.mov");
-  });
-});
-
-describe("buildProjectHoverContext", () => {
-  test("includes slug, source, dir path, and summary", () => {
-    const project = makeProject({ slug: "demo", source: "input/source.mp4" });
-    const ctx = buildProjectHoverContext(
-      project,
-      "~/Sites/openklip/projects/demo"
+test("loadProjectContext reads AGENTS.local.md from project root", async () => {
+  await withTempProjectsRoot(({ root, slug }) => {
+    const dir = join(root, "projects", slug);
+    writeFileSync(
+      join(dir, "AGENTS.local.md"),
+      "Always keep the first 3 seconds.\nNo vignette.",
+      "utf8"
     );
-    expect(ctx.slug).toBe("demo");
-    expect(ctx.source).toBe("input/source.mp4");
-    expect(ctx.dirPath).toBe("~/Sites/openklip/projects/demo");
-    expect(ctx.summary.words).toBeGreaterThan(0);
+    assert.equal(
+      loadProjectContext(slug),
+      "Always keep the first 3 seconds.\nNo vignette."
+    );
+  });
+});
+
+test("loadProjectContext truncates oversized files", async () => {
+  await withTempProjectsRoot(({ root, slug }) => {
+    const dir = join(root, "projects", slug);
+    writeFileSync(join(dir, "AGENTS.local.md"), "x".repeat(9000), "utf8");
+    const text = loadProjectContext(slug);
+    assert.ok(text);
+    assert.ok(text.length < 9000);
+    assert.match(text, /\[context truncated\]$/);
+  });
+});
+
+test("contextBlock renders markdown fence or empty string", () => {
+  assert.equal(contextBlock(undefined), "");
+  assert.equal(contextBlock("  "), "");
+  assert.match(contextBlock("No zooms."), /AGENTS\.local\.md/);
+  assert.match(contextBlock("No zooms."), /No zooms\./);
+});
+
+test("projectStatusWithContext includes context when present", async () => {
+  await withTempProjectsRoot(({ root, slug }) => {
+    const dir = join(root, "projects", slug);
+    writeFileSync(
+      join(dir, "AGENTS.local.md"),
+      "Captions off for this one.",
+      "utf8"
+    );
+    const project = makeProject({ slug });
+    const status = projectStatusWithContext(project, slug);
+    assert.equal(status.slug, slug);
+    assert.equal(status.context, "Captions off for this one.");
+  });
+});
+
+test("projectStatusWithContext omits context field when absent", async () => {
+  await withTempProjectsRoot(({ slug }) => {
+    const project = makeProject({ slug });
+    const status = projectStatusWithContext(project, slug);
+    assert.equal(status.slug, slug);
+    assert.equal("context" in status, false);
   });
 });

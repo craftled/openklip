@@ -94,6 +94,24 @@ test("buildChatPrompt omits the scene block when no scene log", () => {
   assert.doesNotMatch(prompt, /Visual scene log/);
 });
 
+test("buildChatPrompt injects AGENTS.local.md project context", () => {
+  const prompt = buildChatPrompt(
+    { words: [{ text: "hi" }], projectContext: "Never add vignette." },
+    "what is this?"
+  );
+  assert.match(prompt, /AGENTS\.local\.md/);
+  assert.match(prompt, /Never add vignette\./);
+});
+
+test("buildEditPrompt injects AGENTS.local.md project context", () => {
+  const prompt = buildEditPrompt(
+    { words: [{ text: "hi" }], projectContext: "Keep the cold open." },
+    "demo",
+    "cut filler"
+  );
+  assert.match(prompt, /Keep the cold open\./);
+});
+
 test("supportsToolEditing is true for Claude, false otherwise", () => {
   assert.equal(supportsToolEditing("claude-opus-4-8"), true);
   assert.equal(supportsToolEditing("gpt-5-5"), false);

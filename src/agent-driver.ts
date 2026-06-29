@@ -16,6 +16,7 @@
 import { existsSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
+import { contextBlock } from "./project-context.ts";
 
 export interface PromptWord {
   id: string;
@@ -231,6 +232,7 @@ export function buildFillerPrompt(words: PromptWord[]): string {
 export function buildChatPrompt(
   ctx: {
     assetCards?: string;
+    projectContext?: string;
     sceneLog?: string;
     template?: string;
     words: Array<{ deleted?: boolean; text: string }>;
@@ -257,7 +259,7 @@ Transcript:
 """
 ${transcript}
 """
-${assetBlock(ctx.assetCards)}${sceneBlock(ctx.sceneLog)}
+${assetBlock(ctx.assetCards)}${sceneBlock(ctx.sceneLog)}${contextBlock(ctx.projectContext)}
 User: ${question}`;
 }
 
@@ -291,6 +293,7 @@ ${log}
 export function buildEditPrompt(
   ctx: {
     assetCards?: string;
+    projectContext?: string;
     sceneLog?: string;
     template?: string;
     words: Array<{ deleted?: boolean; text: string }>;
@@ -320,7 +323,7 @@ Transcript:
 """
 ${transcript}
 """
-${assetBlock(ctx.assetCards)}${sceneBlock(ctx.sceneLog)}
+${assetBlock(ctx.assetCards)}${sceneBlock(ctx.sceneLog)}${contextBlock(ctx.projectContext)}
 User: ${question}`;
 }
 

@@ -75,6 +75,8 @@ export function projectPaths(slug: string) {
     /** Generated asset proxies (ffmpeg output). */
     assetProxies: join(working, "assets"),
     chats: join(working, "chats.json"),
+    /** Optional per-project agent instructions (markdown). */
+    agentsLocal: join(dir, "AGENTS.local.md"),
     out: join(output, "out.mp4"),
     /** Multi-take ingest parking lot: takes/<id>/ (F3). */
     takes: join(dir, "takes"),

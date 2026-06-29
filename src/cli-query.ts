@@ -1,10 +1,10 @@
 import type { Project } from "./edl.ts";
+import { projectStatusWithContext } from "./project-context.ts";
 import {
   grepTranscript,
   listOverlays,
   listRanges,
   phraseSpan,
-  projectStatus,
   wordSpan,
 } from "./query.ts";
 import { placeFromPhrase } from "./reanchor.ts";
@@ -140,8 +140,8 @@ export function runOverlays(
   return `${lines.join("\n")}\n`;
 }
 
-export function runStatusJson(project: Project): string {
-  return jsonOut(projectStatus(project));
+export function runStatusJson(project: Project, slug: string): string {
+  return jsonOut(projectStatusWithContext(project, slug));
 }
 
 // Resolve a spoken phrase to an overlay placement span. Delegates to the pure

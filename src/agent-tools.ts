@@ -7,13 +7,13 @@ import { samplesToSec } from "./edl.ts";
 import { exportCut } from "./exporter.ts";
 import { listGraphics } from "./graphics.ts";
 import { listLuts } from "./lut.ts";
+import { projectStatusWithContext } from "./project-context.ts";
 import { listProjects, loadProject, mutateProject } from "./projectStore.ts";
 import {
   grepTranscript,
   listOverlays,
   listRanges,
   phraseSpan,
-  projectStatus,
   wordSpan,
 } from "./query.ts";
 import { placeFromPhrase } from "./reanchor.ts";
@@ -160,7 +160,7 @@ const queryTools: AgentToolDef[] = [
     schema: z.object({ slug }),
     run: async ({ slug: projectSlug }) => {
       const project = await loadProject(projectSlug);
-      return projectStatus(project);
+      return projectStatusWithContext(project, projectSlug);
     },
   }),
   defineQueryTool({

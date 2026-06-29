@@ -19,6 +19,7 @@ Each project lives as plain files under `projects/<slug>/` in a layered layout. 
 ```
 projects/<slug>/
   project.json            the EDL - the edit itself (the only file you edit)
+  AGENTS.local.md         optional per-project agent instructions (not in EDL)
   assets/                 user originals (flat): drop b-roll, music, stills here
   working/                derived media + scratch: proxy.mp4, transcript.json,
                           audio16k.f32, frames/, asset proxies, chats.json…
@@ -261,11 +262,13 @@ When working on a project, gather state before editing:
 ```
 openklip list                          # which projects exist
 openklip status <slug>                 # current edit health + overlay ids
+openklip status <slug> --json          # includes AGENTS.local.md when present
 openklip transcript grep <slug> "phrase"  # bounded read (prefer over full dump)
-openklip status <slug> --json             # edit health + overlay ids
 openklip overlays <slug> --json           # structured overlay list
 openklip assets <slug>                 # b-roll asset ids (if adding b-roll)
 ```
+
+Optional per-project instructions live in `projects/<slug>/AGENTS.local.md` (markdown, not part of `project.json`). The GUI agent chat, `project_status`, and `openklip status --json` surface this file when it exists. Use it for creator-specific rules (e.g. "keep the cold open", "no vignette", "always 6-word captions").
 
 The agent and the GUI share the same `projects/` directory.
 
