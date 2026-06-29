@@ -163,3 +163,31 @@ test("rich-kind graphic throws an actionable error when Chrome is absent", async
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// Distinct from the Chrome-missing path: a rich graphic whose composition.html
+// is absent must fail with a clear error BEFORE any headless render runs (so the
+// check is Chrome-free and deterministic in CI). Reuse a real rich manifest but
+// point the template id at a directory that does not exist.
+test("rich-kind graphic errors clearly when composition.html is missing", async () => {
+  const dir = tmp();
+  try {
+    const manifest = loadGraphicManifest("title-card");
+    await assert.rejects(
+      () =>
+        renderGraphicOverlay({
+          manifest,
+          id: "g6",
+          template: "no-such-template",
+          params: { headline: "Chapter One" },
+          durationSamples: SAMPLE_RATE,
+          fps: 30,
+          width: 1920,
+          height: 1080,
+          outDir: dir,
+        }),
+      /composition\.html not found/
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

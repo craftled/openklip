@@ -1320,11 +1320,11 @@ export function App({
             onClose={() => setCinema(false)}
             onExport={onExport}
             onToggleCaptions={toggleCaptions}
-            overlay={(curSec) => (
+            overlay={(playerSec) => (
               <PreviewOverlays
                 captionGroups={captionGroups}
                 captionsOn={captionsOn}
-                curSample={Math.round(curSec * sr)}
+                curSample={Math.round(playerSec * sr)}
                 graphics={project.graphics ?? []}
                 sampleRate={sr}
                 titles={project.titles ?? []}

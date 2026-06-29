@@ -5,8 +5,9 @@
 // PREVIEW (frame-pure, Remotion-style). chrome-headless-shell (via puppeteer-
 // core) renders the composition with a transparent background and captures one
 // PNG per frame (page.screenshot omitBackground); ffmpeg muxes the frames into
-// an alpha WebM (libvpx-vp9 / yuva420p) that the exporter overlays exactly like
-// a still or b-roll. ffmpeg therefore stays the master compositor.
+// a transparent ProRes 4444 MOV (prores_ks / yuva444p10le) that the exporter
+// overlays exactly like a still or b-roll. ffmpeg therefore stays the master
+// compositor.
 //
 // node-only + heavy: imported LAZILY by src/graphic-render.ts and listed in
 // next.config serverExternalPackages so it never enters a client/server bundle.
@@ -15,6 +16,9 @@ import { existsSync, readdirSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
+// Type-only import: erased at compile time, so puppeteer-core stays out of the
+// bundle (the runtime use is the lazy dynamic import inside renderHeadlessAlpha).
+import type { Browser } from "puppeteer-core";
 import { FFMPEG, run } from "./ffmpeg.ts";
 
 export interface HeadlessRenderInput {
@@ -39,7 +43,14 @@ function findChrome(): string {
   }
   for (const build of readdirSync(base)) {
     const buildDir = join(base, build);
-    for (const inner of readdirSync(buildDir)) {
+    let inners: string[];
+    try {
+      inners = readdirSync(buildDir);
+    } catch {
+      // Stray file (not a build dir) under the cache root — skip it.
+      continue;
+    }
+    for (const inner of inners) {
       const bin = join(buildDir, inner, "chrome-headless-shell");
       if (existsSync(bin)) {
         return bin;
@@ -74,28 +85,45 @@ async function buildRuntimeBundle(): Promise<string> {
 
 const pad5 = (n: number): string => String(n).padStart(5, "0");
 
-// Render `compositionHtml` to a transparent WebM at `outPath`. One headless
-// Chrome page is seeked frame-by-frame via the shared runtime; each frame is a
-// PNG with alpha, then ffmpeg encodes the sequence to vp9 yuva420p.
+// Render `compositionHtml` to a transparent ProRes 4444 MOV at `outPath`. One
+// headless Chrome page is seeked frame-by-frame via the shared runtime; each
+// frame is a PNG with alpha, then ffmpeg encodes the sequence to prores_ks
+// yuva444p10le.
+// A rich graphic writes one full-res PNG per frame to a temp dir before ffmpeg
+// runs, so an unbounded span (e.g. a graphic covering the whole video) can flood
+// the disk. Cap it: realistic graphics are seconds, so 120s is generous.
+const MAX_RICH_SECONDS = 120;
+
 export async function renderHeadlessAlpha(
   input: HeadlessRenderInput
 ): Promise<void> {
+  if (input.durFrames > input.fps * MAX_RICH_SECONDS) {
+    const secs = Math.round(input.durFrames / Math.max(1, input.fps));
+    throw new Error(
+      `rich graphic is too long to render: ${secs}s (${input.durFrames} frames) exceeds the ${MAX_RICH_SECONDS}s cap. Shorten the graphic's span, or use a kind:"text" template (no per-frame capture).`
+    );
+  }
   const chrome = findChrome();
   const bundle = await buildRuntimeBundle();
   const puppeteer = (await import("puppeteer-core")).default;
 
-  const browser = await puppeteer.launch({
-    executablePath: chrome,
-    headless: true,
-    args: [
-      "--no-sandbox",
-      "--disable-gpu",
-      "--hide-scrollbars",
-      "--force-color-profile=srgb",
-    ],
-  });
-  const framesDir = await mkdtemp(join(tmpdir(), "openklip-rich-"));
+  // browser + framesDir are assigned INSIDE the try so the finally always cleans
+  // up even if launch or mkdtemp throws (otherwise a failed export leaks a Chrome
+  // process and a temp dir).
+  let browser: Browser | undefined;
+  let framesDir: string | undefined;
   try {
+    browser = await puppeteer.launch({
+      executablePath: chrome,
+      headless: true,
+      args: [
+        "--no-sandbox",
+        "--disable-gpu",
+        "--hide-scrollbars",
+        "--force-color-profile=srgb",
+      ],
+    });
+    framesDir = await mkdtemp(join(tmpdir(), "openklip-rich-"));
     const page = await browser.newPage();
     await page.setViewport({
       width: input.width,
@@ -110,9 +138,25 @@ export async function renderHeadlessAlpha(
     await page.evaluate(() => document.fonts.ready);
     await page.addScriptTag({ content: bundle });
 
+    // Params are static for the whole render — bind text/accent ONCE, not per
+    // frame (the per-frame loop only re-seeks the animation).
+    await page.evaluate((params: unknown) => {
+      const api = (
+        window as unknown as {
+          __okGraphic: {
+            applyGraphicParams: (r: Element, p: unknown) => void;
+          };
+        }
+      ).__okGraphic;
+      const root = document.querySelector("[data-graphic-root]");
+      if (root) {
+        api.applyGraphicParams(root, params);
+      }
+    }, input.params);
+
     for (let f = 0; f < input.durFrames; f++) {
       await page.evaluate(
-        (frame: number, durFrames: number, height: number, params: unknown) => {
+        (frame: number, durFrames: number, height: number) => {
           const api = (
             window as unknown as {
               __okGraphic: {
@@ -122,7 +166,6 @@ export async function renderHeadlessAlpha(
                   df: number,
                   h: number
                 ) => void;
-                applyGraphicParams: (r: Element, p: unknown) => void;
               };
             }
           ).__okGraphic;
@@ -130,13 +173,11 @@ export async function renderHeadlessAlpha(
           if (!root) {
             return;
           }
-          api.applyGraphicParams(root, params);
           api.applyGraphicFrame(root, frame, durFrames, height);
         },
         f,
         input.durFrames,
-        input.height,
-        input.params
+        input.height
       );
       const buf = (await page.screenshot({
         omitBackground: true,
@@ -166,9 +207,13 @@ export async function renderHeadlessAlpha(
       input.outPath,
     ]);
   } finally {
-    await browser.close().catch(() => {
-      // already closed
-    });
-    await rm(framesDir, { recursive: true, force: true });
+    if (browser) {
+      await browser.close().catch(() => {
+        // already closed
+      });
+    }
+    if (framesDir) {
+      await rm(framesDir, { recursive: true, force: true });
+    }
   }
 }
