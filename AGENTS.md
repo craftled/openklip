@@ -33,7 +33,7 @@ templates/<id>/skill.md   agent playbook (cuts, overlays, export loop)
 
 Optional `template` field on `project.json` points at a template id (e.g. `talking-head`).
 
-**`project.json` IS the edit.** It holds every transcribed word with a `deleted` flag, b-roll overlays, still (Ken Burns) overlays, push-in zooms, title cards, captions settings, and look flags. Everything under `working/` and `output/` is regenerated from it. The GUI editor and these CLI commands both read and write this same file; they are **equivalent (parity)**. Edit it through the CLI; the browser editor will show the same result, and vice-versa.
+**`project.json` IS the edit.** It holds every transcribed word with a `deleted` flag, b-roll overlays, still (Ken Burns) overlays, push-in zooms, title cards, graphics (HTML/CSS template overlays), captions settings, and look flags. Everything under `working/` and `output/` is regenerated from it. The GUI editor and these CLI commands both read and write this same file; they are **equivalent (parity)**. Edit it through the CLI; the browser editor will show the same result, and vice-versa.
 
 Time is integer audio samples at 48 kHz. The CLI takes seconds where a human number is natural (overlay spans) and converts for you.
 
@@ -53,6 +53,7 @@ Time is integer audio samples at 48 kHz. The CLI takes seconds where a human num
 | Describe media (subagents) | `openklip analyze <slug>` |
 | Place / patch / remove b-roll | `openklip broll-add`, `broll-set`, `broll-rm`, `broll-add-phrase` |
 | Place / remove still (Ken Burns) | `openklip still-add`, `still-rm` |
+| Place / patch / remove graphic (HTML/CSS template) | `openklip graphic-add`, `graphic-set`, `graphic-rm` |
 | Place / patch / remove title | `openklip title-add`, `title-set`, `title-rm`, `title-add-phrase` |
 | Add / patch / remove zoom | `openklip zoom-add`, `zoom-set`, `zoom-rm`, `zoom-add-phrase` |
 | Reorder overlay (paint order) | `openklip reorder <slug> <broll\|title\|zoom> <id> <toIndex>` |
@@ -132,6 +133,9 @@ Prefer bounded reads over dumping the full transcript. Use `--json` for machine 
 | `openklip zoom-rm <slug> <zoomId>` | Remove a push-in zoom. |
 | `openklip still-add <slug> <assetId> <fromSec> <toSec>` | Overlay a registered **still** image with a Ken Burns push-in. `--scale 1.2` (1–3), `--focus-x 0.5` / `--focus-y 0.5` (0–1 image coords). |
 | `openklip still-rm <slug> <stillId>` | Remove a still overlay. |
+| `openklip graphic-add <slug> <template> <fromSec> <toSec>` | Overlay an HTML/CSS graphic template. `--param key=value` (repeatable), `--track broll\|title\|zoom` (z-layer). Text templates (`kind: "text"`) render via ASS and stay browser-free; rich templates (`kind: "rich"`) render pixel-faithfully through headless Chrome to a transparent ProRes 4444 MOV (install once: `bunx puppeteer browsers install chrome-headless-shell`). |
+| `openklip graphic-set <slug> <graphicId>` | Patch a graphic: `--template`, `--from`, `--to`, `--param`, `--track`. |
+| `openklip graphic-rm <slug> <graphicId>` | Remove a graphic overlay. |
 | `openklip reorder <slug> <broll\|title\|zoom> <id> <toIndex>` | Restack an overlay within its track. Array order is paint order: a later index paints on top (matters when b-roll covers overlap). |
 
 ### Look & captions

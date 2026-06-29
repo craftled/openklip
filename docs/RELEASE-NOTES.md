@@ -4,6 +4,24 @@ Use these bodies when publishing releases. Each section matches a tag in `CHANGE
 
 ---
 
+## v0.8.9
+
+**Native graphics export pixel-for-pixel: first-party headless-Chrome render, fullscreen overlays.**
+
+### Highlights
+- Rich graphics templates (`kind: "rich"`) render through headless Chrome (`chrome-headless-shell` via `puppeteer-core`), driven by the same `web/lib/graphic-runtime.ts` as the live preview, so export matches preview frame-for-frame; frames capture to a transparent ProRes 4444 alpha MOV (`src/headless-render.ts`) and composite as a timed ffmpeg overlay
+- The fullscreen cinema player now renders the graphics/titles/captions overlay stack (`web/components/preview-overlays.tsx`), shared with the inline preview and synced to playback
+- Chrome is an optional one-time download (`bunx puppeteer browsers install chrome-headless-shell`); the default text path still needs no browser and runs fully offline
+- Dropped `@hyperframes/producer` (and its `next.config.ts` esbuild workaround) in favor of the lightweight `puppeteer-core`
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations) for the full list (current).
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#0890---2026-06-28)
+
+---
+
 ## v0.8.5
 
 **Chat does edits, not advice: Claude MCP mutations, resizable sidebar, asset cards, Phosphor icons.**
