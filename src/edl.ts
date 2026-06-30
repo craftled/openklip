@@ -31,17 +31,15 @@ export type PhraseAnchor = z.infer<typeof PhraseAnchorSchema>;
 export const AssetKindSchema = z.enum(["broll", "music", "still"]);
 export type AssetKind = z.infer<typeof AssetKindSchema>;
 
-// Named color grade applied to the whole picture at export. The footage renders
-// flat off the camera; a grade is the finishing look (the deck's "log in,
-// picture out"). "none" is a no-op; the others expand to a deterministic ffmpeg
-// filter chain in grade.ts. "cool_desat" is the deck's neutral_cool_desat look.
-export const GradeSchema = z
-  .enum(["none", "neutral", "warm", "cool", "cool_desat", "filmic", "punchy"])
+// Built-in filter applied to the whole picture at export. These are
+// deterministic ffmpeg filter chains, not external LUT files.
+export const FilterSchema = z
+  .enum(["none", "natural", "warm", "cool", "muted", "cinematic", "dramatic"])
   .default("none");
-export type Grade = z.infer<typeof GradeSchema>;
+export type Filter = z.infer<typeof FilterSchema>;
 
-// Continuous color adjustment layered on TOP of the base grade: the deck's
-// "control room" sliders. Pure numbers that map deterministically to ffmpeg
+// Continuous color adjustment layered on top of the base filter. Pure
+// numbers that map deterministically to ffmpeg
 // colorbalance (temperature/tint) then eq (contrast/brightness/saturation), in
 // that order. Every default is the identity (no change), so an agent or human
 // only moves the knobs they care about. Absent or all-neutral emits no filter.
@@ -264,6 +262,38 @@ export const MotionSchema = z
   .default({ fadeMs: 180, heroFadeMs: 320, slideFrac: 0.04, speed: 1 });
 export type Motion = z.infer<typeof MotionSchema>;
 
+// Cut-quality settings stored in project.json. The full VAD analysis stays in
+// working/ as derived cache; this block records the edit behavior that preview,
+// export, GUI, CLI, and agents must agree on.
+export const CutSnapSchema = z
+  .object({
+    enabled: z.boolean().default(false),
+    mode: z.enum(["off", "vad"]).default("off"),
+    maxShiftMs: z.number().min(0).max(500).default(120),
+    crossfadeMs: z.number().min(0).max(100).default(24),
+  })
+  .default({
+    enabled: false,
+    mode: "off",
+    maxShiftMs: 120,
+    crossfadeMs: 24,
+  });
+export type CutSnap = z.infer<typeof CutSnapSchema>;
+
+export const CutsSchema = z
+  .object({
+    snap: CutSnapSchema,
+  })
+  .default({
+    snap: {
+      enabled: false,
+      mode: "off",
+      maxShiftMs: 120,
+      crossfadeMs: 24,
+    },
+  });
+export type Cuts = z.infer<typeof CutsSchema>;
+
 export const ProjectSchema = z.object({
   version: z.literal(1),
   slug: z.string(),
@@ -286,18 +316,21 @@ export const ProjectSchema = z.object({
   look: z
     .object({
       vignette: z.boolean().default(false),
-      grade: GradeSchema,
-      /** Named .cube LUT in luts/ applied before the grade (absent = none). */
+      /** Built-in filter applied to the whole picture. */
+      filter: FilterSchema,
+      /** Named .cube LUT in luts/ applied before the filter (absent = none). */
       lut: z.string().optional(),
-      /** Continuous color knobs on top of the grade (absent = neutral). */
+      /** Continuous color knobs on top of the filter (absent = neutral). */
       color: ColorAdjustSchema.optional(),
     })
-    .default({ vignette: false, grade: "none" }),
+    .default({ vignette: false, filter: "none" }),
   zooms: z.array(ZoomSchema).default([]),
   titles: z.array(TitleSchema).default([]),
   stills: z.array(StillSchema).default([]),
   graphics: z.array(GraphicSchema).default([]),
   words: z.array(WordSchema),
+  /** Cut-quality settings. Analysis caches live under working/, not here. */
+  cuts: CutsSchema,
   /** Edit template id (templates/<id>/skill.md). */
   template: z.string().optional(),
   /** Subagent visual scene log of the main video (absent until analyzed). */

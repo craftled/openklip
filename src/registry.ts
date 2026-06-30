@@ -27,6 +27,7 @@ import {
   restoreAll,
   setCaptionMaxWords,
   setCaptions,
+  setCutSnap,
   setLook,
   setMotion,
   setPadMs,
@@ -36,8 +37,8 @@ import {
   updateTitle,
   updateZoom,
 } from "./actions.ts";
-import { GradeSchema, PhraseAnchorSchema, type Project } from "./edl.ts";
-import { NEUTRAL_COLOR } from "./grade-color.ts";
+import { NEUTRAL_COLOR } from "./color-adjust.ts";
+import { FilterSchema, PhraseAnchorSchema, type Project } from "./edl.ts";
 import { reanchorOne, reanchorProject } from "./reanchor.ts";
 
 // Where an action is exposed. The CLI dispatch, the editor's server actions, and
@@ -339,6 +340,22 @@ export const actions: ActionDef[] = [
     },
   }),
   defineAction({
+    name: "cuts-snap",
+    summary:
+      "Store cut-boundary snap settings for VAD cleanup and short crossfades.",
+    surfaces: ["cli", "gui", "mcp"],
+    schema: z.object({
+      enabled: z.boolean().optional(),
+      mode: z.enum(["off", "vad"]).optional(),
+      maxShiftMs: z.number().optional(),
+      crossfadeMs: z.number().optional(),
+    }),
+    run: (p, i) => {
+      setCutSnap(p, i);
+      return { snap: p.cuts.snap };
+    },
+  }),
+  defineAction({
     name: "look-vignette",
     summary: "Toggle the vignette look flag.",
     surfaces: ["cli", "gui", "mcp"],
@@ -349,13 +366,13 @@ export const actions: ActionDef[] = [
     },
   }),
   defineAction({
-    name: "look-grade",
-    summary: "Set the color grade applied to the whole picture at export.",
+    name: "look-filter",
+    summary: "Set the built-in filter applied to the whole picture.",
     surfaces: ["cli", "gui", "mcp"],
-    schema: z.object({ grade: GradeSchema }),
+    schema: z.object({ filter: FilterSchema }),
     run: (p, i) => {
-      setLook(p, { grade: i.grade });
-      return { grade: p.look.grade };
+      setLook(p, { filter: i.filter });
+      return { filter: p.look.filter };
     },
   }),
   defineAction({
@@ -371,7 +388,7 @@ export const actions: ActionDef[] = [
   defineAction({
     name: "look-color",
     summary:
-      "Adjust continuous color knobs on top of the base grade (temperature, tint, brightness, contrast, saturation). Omitted knobs keep their value; reset:true returns to neutral.",
+      "Adjust continuous color knobs on top of the filter (temperature, tint, brightness, contrast, saturation). Omitted knobs keep their value; reset:true returns to neutral.",
     surfaces: ["cli", "gui", "mcp"],
     schema: z.object({
       temperature: z.number().min(-1).max(1).optional(),

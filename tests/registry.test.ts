@@ -83,6 +83,7 @@ const EXPECTED = [
   "captions",
   "captions-max",
   "pad",
+  "cuts-snap",
   "look-vignette",
   "reorder",
   "reanchor",
@@ -187,6 +188,30 @@ test("cut-text: cuts the first matching run", () => {
   };
   assert.equal(r.matched, true);
   assert.deepEqual(r.ids, ["w2"]);
+});
+
+test("cuts-snap: stores VAD snap settings in project JSON", () => {
+  const p = makeProject();
+  const r = runAction("cuts-snap", p, {
+    enabled: true,
+    mode: "vad",
+    maxShiftMs: 140.4,
+    crossfadeMs: 31.6,
+  }) as {
+    snap: {
+      enabled: boolean;
+      mode: string;
+      maxShiftMs: number;
+      crossfadeMs: number;
+    };
+  };
+  assert.deepEqual(r.snap, {
+    enabled: true,
+    mode: "vad",
+    maxShiftMs: 140,
+    crossfadeMs: 32,
+  });
+  assert.deepEqual(p.cuts.snap, r.snap);
 });
 
 test("reorder: restacks within a track", () => {

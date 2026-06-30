@@ -1,26 +1,26 @@
-// Single-frame grade preview: the live heart of the deck's "control room". The
+// Single-frame filter preview: the live heart of the deck's "control room". The
 // GUI points an <img> at the preview-frame route, and dragging a slider
 // re-renders ONE frame (cheap ffmpeg) instead of a full export. The filter chain
-// is the exact LUT -> grade -> color order the exporter uses, so what the slider
+// is the exact LUT -> filter -> color order the exporter uses, so what the slider
 // shows is what the render produces. Pure chain builder is unit tested; the
 // spawn is exercised end to end.
 import { existsSync } from "node:fs";
-import type { ColorAdjust, Grade, Project } from "./edl.ts";
+import { colorAdjustFilter } from "./color-adjust.ts";
+import type { ColorAdjust, Filter, Project } from "./edl.ts";
 import { FFMPEG, run } from "./ffmpeg.ts";
-import { gradeFilter } from "./grade.ts";
-import { colorAdjustFilter } from "./grade-color.ts";
+import { filterChain } from "./filter.ts";
 import { lut3dExpr, lutPath } from "./lut.ts";
 import { projectPaths } from "./paths.ts";
 
 export interface PreviewLook {
   color?: ColorAdjust | null;
-  grade?: Grade;
+  filter?: Filter;
   lut?: string | null;
 }
 
-// The still-frame filter chain: technical LUT first, then the base grade, then
+// The still-frame filter chain: technical LUT first, then the base filter, then
 // the continuous color adjust : same order as the export filtergraph so the
-// preview matches the rendered output. Returns "" for a bare (ungraded) frame.
+// preview matches the rendered output. Returns "" for a bare frame.
 export function previewFilterChain(look: PreviewLook): string {
   const parts: string[] = [];
   if (look.lut) {
@@ -35,9 +35,9 @@ export function previewFilterChain(look: PreviewLook): string {
       // skip unknown LUT
     }
   }
-  const grade = gradeFilter(look.grade ?? "none");
-  if (grade) {
-    parts.push(grade);
+  const filter = filterChain(look.filter ?? "none");
+  if (filter) {
+    parts.push(filter);
   }
   const color = colorAdjustFilter(look.color);
   if (color) {
@@ -46,7 +46,7 @@ export function previewFilterChain(look: PreviewLook): string {
   return parts.join(",");
 }
 
-// Render one graded frame from the project proxy at `atSec` to `outPath` (jpeg).
+// Render one filtered frame from the project proxy at `atSec` to `outPath` (jpeg).
 // Clamps the seek inside the clip. Returns the output path.
 export async function renderPreviewFrame(opts: {
   project: Project;

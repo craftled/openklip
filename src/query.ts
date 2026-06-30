@@ -1,6 +1,13 @@
 import { summarize } from "./actions.ts";
-import type { Grade, PhraseAnchor, Project } from "./edl.ts";
-import { samplesToSec, survivingRanges } from "./edl.ts";
+import {
+  type CutSnap,
+  CutsSchema,
+  type Filter,
+  type PhraseAnchor,
+  type Project,
+  samplesToSec,
+  survivingRanges,
+} from "./edl.ts";
 import { findPhraseRuns, type PhraseRun } from "./phrase-match.ts";
 
 export interface TranscriptWordView {
@@ -76,8 +83,9 @@ export interface OverlayViews {
 
 export interface ProjectStatusJson {
   captions: { enabled: boolean; maxWords: number };
+  cuts: { snap: CutSnap };
   keptDurationSec: number;
-  look: { vignette: boolean; grade: Grade; lut?: string };
+  look: { vignette: boolean; filter: Filter; lut?: string };
   overlays: OverlayViews;
   padMs: number;
   ranges: Array<{ endSec: number; startSec: number }>;
@@ -229,6 +237,7 @@ export function listOverlays(project: Project): OverlayViews {
 
 export function projectStatus(project: Project): ProjectStatusJson {
   const s = summarize(project);
+  const cuts = CutsSchema.parse(project.cuts ?? {});
   return {
     slug: project.slug,
     template: project.template,
@@ -244,9 +253,12 @@ export function projectStatus(project: Project): ProjectStatusJson {
       enabled: project.captions.enabled,
       maxWords: project.captions.maxWords ?? 6,
     },
+    cuts: {
+      snap: cuts.snap,
+    },
     look: {
       vignette: project.look?.vignette ?? false,
-      grade: project.look?.grade ?? "none",
+      filter: project.look?.filter ?? "none",
       ...(project.look?.lut ? { lut: project.look.lut } : {}),
     },
     overlays: listOverlays(project),

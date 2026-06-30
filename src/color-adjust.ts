@@ -1,10 +1,10 @@
-// Continuous color adjustment: the deck's "control room" grade sliders, applied
-// on top of the named base grade. Each knob maps to a deterministic ffmpeg
+// Continuous color adjustment: the deck's filter sliders, applied on top of the
+// named base filter. Each knob maps to a deterministic ffmpeg
 // filter so no string drifts without a failing test. Pipeline order mirrors the
 // deck exactly: temperature/tint gains (colorbalance) -> contrast (pivot at
 // mid-gray) -> brightness -> saturation (eq). Pure and unit tested.
 //
-// (Named grade-color, not color: src/color.ts already owns the OKLCH brand
+// (Named color-adjust, not color: src/color.ts already owns the OKLCH brand
 // palette math, a separate concern.)
 import { type ColorAdjust, ColorAdjustSchema } from "./edl.ts";
 
@@ -41,7 +41,7 @@ export function isNeutralColor(color?: ColorAdjust | null): boolean {
 }
 
 // The ffmpeg filter chain for a color adjust, or "" when neutral so the export
-// filtergraph stays bare. Comma-joined so it can slot straight after the grade.
+// filtergraph stays bare. Comma-joined so it can slot straight after the filter.
 export function colorAdjustFilter(color?: ColorAdjust | null): string {
   if (isNeutralColor(color)) {
     return "";

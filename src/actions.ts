@@ -2,11 +2,15 @@
 // function here mutates the passed Project and returns it (or a small result),
 // so the CLI and the GUI operate on the SAME project.json shape (parity). These
 // are the operations an external coding agent drives from the terminal.
+
+import { isNeutralColor } from "./color-adjust.ts";
 import {
   type Broll,
   type ColorAdjust,
   ColorAdjustSchema,
-  type Grade,
+  type CutSnap,
+  CutSnapSchema,
+  type Filter,
   type Graphic,
   type Motion,
   type PhraseAnchor,
@@ -16,7 +20,6 @@ import {
   type Title,
   type Zoom,
 } from "./edl.ts";
-import { isNeutralColor } from "./grade-color.ts";
 import {
   defaultGraphicParams,
   listGraphics,
@@ -703,12 +706,42 @@ export function setPadMs(project: Project, padMs: number): Project {
   return project;
 }
 
-// Toggle cinematic look flags (vignette).
+function clampMs(value: number, max: number): number {
+  return Math.max(0, Math.min(max, Math.round(value)));
+}
+
+// Store cut-boundary snap behavior in the EDL. Raw VAD measurements are derived
+// media and belong in working/; this setting is the edit contract every surface
+// reads before preview/export apply cleaner boundaries.
+export function setCutSnap(project: Project, input: Partial<CutSnap>): Project {
+  const current = CutSnapSchema.parse(project.cuts?.snap ?? {});
+  const mode =
+    input.mode ??
+    (input.enabled === true && current.mode === "off" ? "vad" : current.mode);
+  const enabled =
+    mode === "off"
+      ? false
+      : input.enabled === undefined
+        ? mode === "vad"
+        : input.enabled;
+  project.cuts = {
+    ...project.cuts,
+    snap: {
+      enabled,
+      mode: enabled ? mode : "off",
+      maxShiftMs: clampMs(input.maxShiftMs ?? current.maxShiftMs, 500),
+      crossfadeMs: clampMs(input.crossfadeMs ?? current.crossfadeMs, 100),
+    },
+  };
+  return project;
+}
+
+// Apply picture look flags and filters.
 export function setLook(
   project: Project,
   input: {
     vignette?: boolean;
-    grade?: Grade;
+    filter?: Filter;
     lut?: string | null;
     color?: Partial<ColorAdjust>;
   }
@@ -716,8 +749,8 @@ export function setLook(
   if (typeof input.vignette === "boolean") {
     project.look = { ...project.look, vignette: input.vignette };
   }
-  if (input.grade !== undefined) {
-    project.look = { ...project.look, grade: input.grade };
+  if (input.filter !== undefined) {
+    project.look = { ...project.look, filter: input.filter };
   }
   if (input.lut !== undefined) {
     if (input.lut === null || input.lut === "") {

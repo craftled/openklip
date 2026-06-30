@@ -1,9 +1,12 @@
+import { setCutSnap } from "./actions.ts";
+import { isNeutralColor } from "./color-adjust.ts";
 import {
   type Broll,
   BrollSchema,
   type ColorAdjust,
   ColorAdjustSchema,
-  type Grade,
+  type Cuts,
+  type Filter,
   type Graphic,
   GraphicSchema,
   type Motion,
@@ -15,7 +18,6 @@ import {
   type Zoom,
   ZoomSchema,
 } from "./edl.ts";
-import { isNeutralColor } from "./grade-color.ts";
 import { listGraphics } from "./graphics.ts";
 import { reanchorProject } from "./reanchor.ts";
 import { applyProjectTemplate } from "./templates.ts";
@@ -23,17 +25,22 @@ import { applyProjectTemplate } from "./templates.ts";
 export function applyProjectEdits(
   project: Project,
   body: {
-    words?: Array<{ id: string; deleted: boolean }>;
+    words?: Array<{ id: string; deleted: boolean; text?: string }>;
     captions?: { enabled?: boolean; maxWords?: number };
+    cuts?: { snap?: Partial<Cuts["snap"]> };
     padMs?: number;
     template?: string | null;
   }
 ): Project {
   if (body.words) {
-    const del = new Map(body.words.map((w) => [w.id, w.deleted]));
+    const patches = new Map(body.words.map((w) => [w.id, w]));
     for (const w of project.words) {
-      if (del.has(w.id)) {
-        w.deleted = Boolean(del.get(w.id));
+      const patch = patches.get(w.id);
+      if (patch) {
+        w.deleted = Boolean(patch.deleted);
+        if (typeof patch?.text === "string" && patch.text.trim()) {
+          w.text = patch.text.trim();
+        }
       }
     }
     // F2: a word-level edit can strand or revive an anchored overlay; re-resolve
@@ -50,6 +57,9 @@ export function applyProjectEdits(
   if (typeof body.padMs === "number") {
     project.padMs = Math.max(0, Math.min(500, Math.round(body.padMs)));
   }
+  if (body.cuts?.snap) {
+    setCutSnap(project, body.cuts.snap);
+  }
   if (body.template !== undefined) {
     applyProjectTemplate(project, body.template);
   }
@@ -60,7 +70,7 @@ export function applyLook(
   project: Project,
   body: {
     vignette?: boolean;
-    grade?: Grade;
+    filter?: Filter;
     lut?: string | null;
     color?: Partial<ColorAdjust>;
   }
@@ -68,8 +78,8 @@ export function applyLook(
   if (typeof body.vignette === "boolean") {
     project.look = { ...project.look, vignette: body.vignette };
   }
-  if (body.grade !== undefined) {
-    project.look = { ...project.look, grade: body.grade };
+  if (body.filter !== undefined) {
+    project.look = { ...project.look, filter: body.filter };
   }
   if (body.lut !== undefined) {
     if (body.lut === null || body.lut === "") {

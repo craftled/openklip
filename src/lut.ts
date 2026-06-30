@@ -1,6 +1,6 @@
 // LUT grading: apply a 3D color lookup table (.cube) to the picture at export.
 // This is the technically-correct answer to log footage (the deck's S-Log3):
-// a LUT converts/maps color in a way a parametric eq grade cannot. LUTs are a
+// a LUT converts/maps color in a way a parametric filter cannot. LUTs are a
 // named seam like brands : drop `name.cube` into luts/ at the repo root and
 // reference it by name, so project.json stays portable (no absolute paths).
 //

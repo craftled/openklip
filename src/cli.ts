@@ -15,6 +15,7 @@ import {
   runTranscriptPhrase,
   runTranscriptSpan,
 } from "./cli-query.ts";
+import { colorAdjustSummary } from "./color-adjust.ts";
 import { runDoctor } from "./doctor.ts";
 import {
   type Broll,
@@ -28,8 +29,7 @@ import {
 } from "./edl.ts";
 import { exportCut } from "./exporter.ts";
 import { FFMPEG, FFPROBE } from "./ffmpeg.ts";
-import { GRADE_NAMES, isGrade } from "./grade.ts";
-import { colorAdjustSummary } from "./grade-color.ts";
+import { FILTER_NAMES, isFilter } from "./filter.ts";
 import { ingest } from "./ingest.ts";
 import { loadIngesters } from "./ingesters.ts";
 import { listLuts, lutPath } from "./lut.ts";
@@ -1059,20 +1059,20 @@ try {
       break;
     }
     case "look": {
-      const gradeUsage = `openklip look <slug> grade <${GRADE_NAMES.join("|")}>`;
+      const filterUsage = `openklip look <slug> filter <${FILTER_NAMES.join("|")}>`;
       if (!(rest[0] && rest[1] && rest[2])) {
         throw new Error(
-          `usage: openklip look <slug> vignette <on|off>\n       ${gradeUsage}\n       openklip look <slug> lut <name|none>`
+          `usage: openklip look <slug> vignette <on|off>\n       ${filterUsage}\n       openklip look <slug> lut <name|none>`
         );
       }
-      if (rest[1] === "grade") {
-        if (!isGrade(rest[2])) {
-          throw new Error(`usage: ${gradeUsage}`);
+      if (rest[1] === "filter") {
+        if (!isFilter(rest[2])) {
+          throw new Error(`usage: ${filterUsage}`);
         }
         const project = await loadProject(rest[0]);
-        runAction("look-grade", project, { grade: rest[2] });
+        runAction("look-filter", project, { filter: rest[2] });
         await saveProject(rest[0], project);
-        console.log(`grade: ${project.look.grade}`);
+        console.log(`filter: ${project.look.filter}`);
         break;
       }
       if (rest[1] === "lut") {
@@ -1143,7 +1143,7 @@ try {
       }
       if (rest[1] !== "vignette") {
         throw new Error(
-          `usage: openklip look <slug> vignette <on|off>\n       ${gradeUsage}\n       openklip look <slug> lut <name|none>\n       openklip look <slug> color [--temp n] [--tint n] [--bright n] [--contrast n] [--sat n] | --reset`
+          `usage: openklip look <slug> vignette <on|off>\n       ${filterUsage}\n       openklip look <slug> lut <name|none>\n       openklip look <slug> color [--temp n] [--tint n] [--bright n] [--contrast n] [--sat n] | --reset`
         );
       }
       const vignette = parseOnOff(rest[2], "openklip look <slug> vignette");
@@ -1235,7 +1235,7 @@ try {
         `  captions:     ${project.captions.enabled ? "on" : "off"}  (max ${project.captions.maxWords ?? 6} words/line)`
       );
       console.log(
-        `  look:         vignette ${project.look?.vignette ? "on" : "off"}, grade ${project.look?.grade ?? "none"}${project.look?.lut ? `, lut ${project.look.lut}` : ""}${project.look?.color ? `, color ${colorAdjustSummary(project.look.color)}` : ""}`
+        `  look:         vignette ${project.look?.vignette ? "on" : "off"}, filter ${project.look?.filter ?? "none"}${project.look?.lut ? `, lut ${project.look.lut}` : ""}${project.look?.color ? `, color ${colorAdjustSummary(project.look.color)}` : ""}`
       );
       console.log(
         `  motion:       speed ${project.motion.speed}, fade ${project.motion.fadeMs}ms`

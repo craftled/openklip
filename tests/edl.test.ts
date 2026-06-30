@@ -103,6 +103,56 @@ test("ProjectSchema defaults graphics to [] (backward-compat parse)", () => {
   assert.deepEqual(project.graphics, []);
 });
 
+test("ProjectSchema defaults cut snapping off (backward-compat parse)", () => {
+  const project = ProjectSchema.parse({
+    version: 1,
+    slug: "no-cuts",
+    source: "/tmp/source.mp4",
+    proxy: "proxy.mp4",
+    sampleRate: SAMPLE_RATE,
+    fps: 30,
+    width: 1920,
+    height: 1080,
+    durationSamples: SAMPLE_RATE,
+    words: [],
+  });
+  assert.deepEqual(project.cuts, {
+    snap: {
+      enabled: false,
+      mode: "off",
+      maxShiftMs: 120,
+      crossfadeMs: 24,
+    },
+  });
+});
+
+test("ProjectSchema round-trips VAD cut snap settings", () => {
+  const project = ProjectSchema.parse({
+    version: 1,
+    slug: "with-cut-snap",
+    source: "/tmp/source.mp4",
+    proxy: "proxy.mp4",
+    sampleRate: SAMPLE_RATE,
+    fps: 30,
+    width: 1920,
+    height: 1080,
+    durationSamples: SAMPLE_RATE,
+    words: [],
+    cuts: {
+      snap: {
+        enabled: true,
+        mode: "vad",
+        maxShiftMs: 160,
+        crossfadeMs: 32,
+      },
+    },
+  });
+  assert.equal(project.cuts.snap.enabled, true);
+  assert.equal(project.cuts.snap.mode, "vad");
+  assert.equal(project.cuts.snap.maxShiftMs, 160);
+  assert.equal(project.cuts.snap.crossfadeMs, 32);
+});
+
 test("ProjectSchema parses a project that already has graphics", () => {
   const project = ProjectSchema.parse({
     version: 1,

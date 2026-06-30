@@ -1,7 +1,7 @@
 "use server";
 
 import { existsSync } from "node:fs";
-import type { ColorAdjust, Grade, Motion } from "@engine/edl";
+import type { ColorAdjust, Cuts, Filter, Motion } from "@engine/edl";
 import { exportCut } from "@engine/exporter";
 import { projectPaths } from "@engine/paths";
 import {
@@ -39,8 +39,9 @@ function fail(error: unknown): { ok: false; error: string; stack?: string } {
 export async function saveProjectEdits(
   slug: string,
   body: {
-    words?: Array<{ id: string; deleted: boolean }>;
+    words?: Array<{ id: string; deleted: boolean; text?: string }>;
     captions?: { enabled?: boolean; maxWords?: number };
+    cuts?: { snap?: Partial<Cuts["snap"]> };
     padMs?: number;
     template?: string | null;
   }
@@ -57,7 +58,7 @@ export async function saveLook(
   slug: string,
   body: {
     vignette?: boolean;
-    grade?: Grade;
+    filter?: Filter;
     lut?: string | null;
     color?: Partial<ColorAdjust>;
   }

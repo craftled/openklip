@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { ColorAdjustSchema, GradeSchema } from "@engine/edl";
+import { ColorAdjustSchema, FilterSchema } from "@engine/edl";
 import { assertValidSlug, projectPaths } from "@engine/paths";
 import { type PreviewLook, renderPreviewFrame } from "@engine/preview-frame";
 import { loadProject } from "@engine/projectStore";
@@ -30,10 +30,10 @@ function resolveLook(
   params: URLSearchParams,
   saved: PreviewLook
 ): { look: PreviewLook; atSec: number } {
-  const gradeRaw = params.get("grade");
-  const grade = gradeRaw
-    ? (GradeSchema.safeParse(gradeRaw).data ?? saved.grade)
-    : saved.grade;
+  const filterRaw = params.get("filter");
+  const filter = filterRaw
+    ? (FilterSchema.safeParse(filterRaw).data ?? saved.filter)
+    : saved.filter;
 
   const lutRaw = params.get("lut");
   let lut = saved.lut ?? null;
@@ -59,7 +59,10 @@ function resolveLook(
     });
   }
 
-  return { look: { grade, lut, color }, atSec: numParam(params.get("t")) ?? 1 };
+  return {
+    look: { filter, lut, color },
+    atSec: numParam(params.get("t")) ?? 1,
+  };
 }
 
 export async function GET(req: NextRequest, { params }: RouteParams) {
@@ -80,7 +83,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
   try {
     const project = await loadProject(slug);
     const { look, atSec } = resolveLook(req.nextUrl.searchParams, {
-      grade: project.look?.grade,
+      filter: project.look?.filter,
       lut: project.look?.lut ?? null,
       color: project.look?.color ?? null,
     });

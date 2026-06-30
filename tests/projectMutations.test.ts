@@ -24,6 +24,15 @@ test("applyProjectEdits toggles deleted words and caption settings", () => {
   assert.equal(project.padMs, 120);
 });
 
+test("applyProjectEdits persists transcript word text corrections", () => {
+  const project = makeProject();
+  applyProjectEdits(project, {
+    words: [{ id: "w0", deleted: false, text: "Howdy" }],
+  });
+  assert.equal(project.words[0].text, "Howdy");
+  assert.equal(project.words[0].deleted, false);
+});
+
 test("applyProjectEdits re-anchors overlays when its words cut deletes the phrase", () => {
   const project = makeProject();
   // Anchor a title onto the second word ("world"); stored span already correct.
@@ -46,6 +55,26 @@ test("applyProjectEdits clamps caption maxWords and padMs", () => {
   applyProjectEdits(project, { captions: { maxWords: 99 }, padMs: 9999 });
   assert.equal(project.captions.maxWords, 12);
   assert.equal(project.padMs, 500);
+});
+
+test("applyProjectEdits stores clamped cut snap settings", () => {
+  const project = makeProject();
+  applyProjectEdits(project, {
+    cuts: {
+      snap: {
+        enabled: true,
+        mode: "vad",
+        maxShiftMs: 999,
+        crossfadeMs: -4,
+      },
+    },
+  });
+  assert.deepEqual(project.cuts.snap, {
+    enabled: true,
+    mode: "vad",
+    maxShiftMs: 500,
+    crossfadeMs: 0,
+  });
 });
 
 test("applyLook toggles vignette", () => {

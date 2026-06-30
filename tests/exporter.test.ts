@@ -210,7 +210,7 @@ function noteGuardFixture(withNotes: boolean): Project {
         ...note("cover the intro"),
       },
     ],
-    look: { vignette: false, grade: "none" },
+    look: { vignette: false, filter: "none" },
     zooms: [],
     titles: [],
     stills: [],

@@ -7,7 +7,7 @@
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { z } from "zod";
-import { GradeSchema, type Project } from "./edl.ts";
+import { FilterSchema, type Project } from "./edl.ts";
 
 // brands/ lives at the repo root next to projects/.
 export function brandsRoot(): string {
@@ -28,7 +28,7 @@ export const BrandSchema = z
     look: z
       .object({
         vignette: z.boolean().optional(),
-        grade: GradeSchema.optional(),
+        filter: FilterSchema.optional(),
         lut: z.string().optional(),
       })
       .optional(),
@@ -79,8 +79,8 @@ export function applyBrand(project: Project, brand: Brand): Project {
   if (brand.look?.vignette !== undefined) {
     project.look = { ...project.look, vignette: brand.look.vignette };
   }
-  if (brand.look?.grade !== undefined) {
-    project.look = { ...project.look, grade: brand.look.grade };
+  if (brand.look?.filter !== undefined) {
+    project.look = { ...project.look, filter: brand.look.filter };
   }
   if (brand.look?.lut !== undefined) {
     project.look = { ...project.look, lut: brand.look.lut };

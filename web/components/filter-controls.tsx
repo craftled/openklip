@@ -1,18 +1,26 @@
 "use client";
 
-import type { ColorAdjust, Grade } from "@engine/edl";
-import { GRADE_OPTIONS } from "@engine/grade";
-import { NEUTRAL_COLOR } from "@engine/grade-color";
+import { NEUTRAL_COLOR } from "@engine/color-adjust";
+import type { ColorAdjust, Filter } from "@engine/edl";
+import { FILTER_OPTIONS, filterLabel } from "@engine/filter";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
 import {
   Select,
   SelectContent,
@@ -22,13 +30,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Palette, RotateCcw } from "@/lib/icon";
 
-// The deck's "control room": a live grade tuner. Five continuous knobs on top of
-// a base grade, each previewed on a real frame. Unlike the deck, there is no
-// "copy a prompt" step: releasing a slider writes project.json directly through
-// the same saveLook action a CLI or agent calls. The agent can lead (set the
-// look from chat), the human nudges here.
+// Live filter controls. A built-in filter gives the look, and continuous knobs
+// fine-tune it on a real frame before writing project.json.
 
 type ColorKey = keyof ColorAdjust;
 
@@ -117,18 +123,18 @@ function isNeutral(c: ColorAdjust): boolean {
   );
 }
 
-// Build the preview-frame URL from the current grade + color. A nonce busts the
+// Build the preview-frame URL from the current filter + color. A nonce busts the
 // browser cache so each committed change re-renders one frame server-side.
 function previewSrc(
   slug: string,
-  grade: Grade,
+  filter: Filter,
   color: ColorAdjust,
   atSec: number,
   nonce: number
 ): string {
   const p = new URLSearchParams();
   p.set("t", atSec.toFixed(3));
-  p.set("grade", grade);
+  p.set("filter", filter);
   p.set("temperature", String(color.temperature));
   p.set("tint", String(color.tint));
   p.set("brightness", String(color.brightness));
@@ -138,19 +144,19 @@ function previewSrc(
   return `/api/projects/${slug}/preview-frame?${p.toString()}`;
 }
 
-export function GradeControlRoom({
+export function FilterControls({
   slug,
-  grade,
+  filter,
   color,
   atSec,
-  onGrade,
+  onFilter,
   onColor,
 }: {
   slug: string;
-  grade: Grade;
+  filter: Filter;
   color: ColorAdjust | null;
   atSec: number;
-  onGrade: (g: Grade) => void;
+  onFilter: (filter: Filter) => void;
   // Persist the whole adjust (releasing a slider or resetting). Neutral clears.
   onColor: (next: ColorAdjust) => void;
 }) {
@@ -164,8 +170,7 @@ export function GradeControlRoom({
   const [failed, setFailed] = useState(false);
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Re-sync local state whenever the dialog opens or the saved look changes
-  // underneath us (e.g. an agent set the grade from chat).
+  // Re-sync local state whenever the dialog opens or the saved look changes.
   useEffect(() => {
     if (open) {
       setLive(fullColor(color));
@@ -200,10 +205,20 @@ export function GradeControlRoom({
     bumpPreview();
   };
 
+  const compareMode = comparing ? "before" : "after";
+  const setCompareMode = (value: string | readonly string[]) => {
+    if (value === "before") {
+      setComparing(true);
+    } else if (value === "after") {
+      setComparing(false);
+    }
+  };
+  const toggleCompare = () => setComparing((value) => !value);
+
   const previewColor = comparing ? NEUTRAL_COLOR : live;
   const src = useMemo(
-    () => previewSrc(slug, grade, previewColor, atSec, nonce),
-    [slug, grade, previewColor, atSec, nonce]
+    () => previewSrc(slug, filter, previewColor, atSec, nonce),
+    [slug, filter, previewColor, atSec, nonce]
   );
 
   const summary = isNeutral(live)
@@ -219,29 +234,31 @@ export function GradeControlRoom({
     <Dialog onOpenChange={setOpen} open={open}>
       <DialogTrigger
         render={
-          <Button
-            aria-label="Open grade control room"
-            size="sm"
-            variant="outline"
-          >
+          <Button aria-label="Open filter controls" size="sm" variant="outline">
             <Palette data-icon="inline-start" />
-            Grade
+            Filter
           </Button>
         }
       />
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Grade control room</DialogTitle>
-          <DialogDescription>
+      <DialogContent className="gap-6 p-6 sm:max-w-3xl">
+        <DialogHeader className="max-w-2xl gap-2 pr-8">
+          <DialogTitle className="text-xl">Filter</DialogTitle>
+          <DialogDescription className="text-base leading-7">
             Tune the look on a real frame. Releasing a knob writes the edit; an
             agent can set the same look from chat.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-[minmax(0,0.9fr)_minmax(20rem,1fr)]">
           {/* Live preview frame */}
-          <div className="flex flex-col gap-2">
-            <div className="relative aspect-video overflow-hidden rounded-md border bg-muted">
+          <div className="flex min-w-0 flex-col gap-3">
+            <button
+              aria-label={`Show ${comparing ? "after" : "before"} filter preview`}
+              aria-pressed={comparing}
+              className="relative aspect-video overflow-hidden rounded-md border bg-muted text-left outline-none transition-colors hover:bg-muted/80 focus-visible:ring-3 focus-visible:ring-ring/50"
+              onClick={toggleCompare}
+              type="button"
+            >
               {failed ? (
                 <div className="flex h-full items-center justify-center px-4 text-center text-muted-foreground text-xs">
                   Preview unavailable (render a proxy first).
@@ -249,7 +266,7 @@ export function GradeControlRoom({
               ) : (
                 // biome-ignore lint/performance/noImgElement: server-rendered single frame, not a Next asset
                 <img
-                  alt="Graded preview frame"
+                  alt="Filter preview frame"
                   className="h-full w-full object-cover"
                   height={360}
                   onError={() => setFailed(true)}
@@ -257,59 +274,68 @@ export function GradeControlRoom({
                   width={640}
                 />
               )}
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                className="flex-1"
-                onPointerDown={() => setComparing(true)}
-                onPointerLeave={() => setComparing(false)}
-                onPointerUp={() => setComparing(false)}
+            </button>
+            <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_9rem] md:grid-cols-1 lg:grid-cols-[minmax(0,1fr)_9rem]">
+              <ToggleGroup
+                aria-label="Preview comparison"
+                className="grid w-full grid-cols-2"
+                onValueChange={setCompareMode}
                 size="sm"
-                type="button"
+                spacing={0}
+                type="single"
+                value={compareMode}
                 variant="outline"
               >
-                Hold to compare base
-              </Button>
-              <Select
-                onValueChange={(v) => {
-                  if (v) {
-                    onGrade(v as Grade);
-                  }
-                }}
-                value={grade}
-              >
-                <SelectTrigger
-                  aria-label="Base grade"
-                  className="w-[7.5rem]"
-                  size="sm"
+                <ToggleGroupItem className="w-full" value="before">
+                  Before
+                </ToggleGroupItem>
+                <ToggleGroupItem className="w-full" value="after">
+                  After
+                </ToggleGroupItem>
+              </ToggleGroup>
+              <Field>
+                <FieldLabel className="sr-only">Filter</FieldLabel>
+                <Select
+                  onValueChange={(v) => {
+                    if (v) {
+                      onFilter(v as Filter);
+                    }
+                  }}
+                  value={filter}
                 >
-                  <SelectValue placeholder="Grade" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {GRADE_OPTIONS.map((g) => (
-                      <SelectItem key={g.id} value={g.id}>
-                        {g.label}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
+                  <SelectTrigger aria-label="Filter" size="sm">
+                    <SelectValue placeholder="Filter">
+                      {filterLabel(filter)}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {FILTER_OPTIONS.map((g) => (
+                        <SelectItem key={g.id} value={g.id}>
+                          {g.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </Field>
             </div>
           </div>
 
           {/* Knobs */}
-          <div className="flex flex-col gap-3">
+          <FieldGroup className="min-w-0 gap-5">
             {KNOBS.map((knob) => (
-              <div className="flex flex-col gap-1" key={knob.key}>
-                <div className="flex items-baseline justify-between">
-                  <span className="font-medium text-sm">{knob.label}</span>
-                  <span className="text-muted-foreground text-xs">
-                    {knob.hint}
-                  </span>
-                  <span className="ml-2 text-xs tabular-nums">
+              <Field className="gap-2" key={knob.key}>
+                <div className="grid grid-cols-[minmax(0,1fr)_4.75rem] items-start gap-3">
+                  <FieldContent>
+                    <FieldLabel>{knob.label}</FieldLabel>
+                    <FieldDescription className="truncate text-xs">
+                      {knob.hint}
+                    </FieldDescription>
+                  </FieldContent>
+                  <div className="text-right font-mono text-sm tabular-nums">
                     {formatKnob(knob, live[knob.key])}
-                  </span>
+                  </div>
                 </div>
                 <Slider
                   max={knob.max}
@@ -321,19 +347,19 @@ export function GradeControlRoom({
                   step={knob.step}
                   value={[live[knob.key]]}
                 />
-              </div>
+              </Field>
             ))}
-            <div className="mt-1 flex items-center justify-between gap-2">
-              <span className="truncate text-muted-foreground text-xs">
-                {summary}
-              </span>
-              <Button onClick={reset} size="sm" type="button" variant="ghost">
-                <RotateCcw data-icon="inline-start" />
-                Reset
-              </Button>
-            </div>
-          </div>
+          </FieldGroup>
         </div>
+        <DialogFooter className="items-center sm:justify-between">
+          <div className="min-w-0 truncate text-muted-foreground text-sm">
+            {summary}
+          </div>
+          <Button onClick={reset} size="sm" type="button" variant="outline">
+            <RotateCcw data-icon="inline-start" />
+            Reset
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

@@ -8,6 +8,7 @@ import {
   groupCaptions,
   type TitleSpan,
 } from "./captions.ts";
+import { colorAdjustFilter } from "./color-adjust.ts";
 import {
   type Asset,
   type Broll,
@@ -20,8 +21,7 @@ import {
   totalDurationSec,
 } from "./edl.ts";
 import { FFMPEG, probe, run } from "./ffmpeg.ts";
-import { gradeFilter } from "./grade.ts";
-import { colorAdjustFilter } from "./grade-color.ts";
+import { filterChain } from "./filter.ts";
 import { renderGraphicOverlay } from "./graphic-render.ts";
 import {
   defaultGraphicParams,
@@ -492,7 +492,7 @@ export async function exportCut(
     last = `sov${sp.inputIndex}`;
   }
 
-  // Technical LUT first (e.g. log → Rec.709), then the creative grade on top.
+  // Technical LUT first (e.g. log → Rec.709), then the creative filter on top.
   const lutName = project.look?.lut;
   if (lutName) {
     const lutAbs = lutPath(lutName);
@@ -503,16 +503,16 @@ export async function exportCut(
     last = "lut";
   }
 
-  // Color grade on the composited picture (the deck's "the final grade"), just
-  // before the vignette so edge darkening sits on top of the look.
-  const gradeChain = gradeFilter(project.look?.grade ?? "none");
-  if (gradeChain) {
-    parts.push(`[${last}]${gradeChain}[grd]`);
-    last = "grd";
+  // Built-in filter on the composited picture, just before the vignette
+  // so edge darkening sits on top of the look.
+  const builtInFilterChain = filterChain(project.look?.filter ?? "none");
+  if (builtInFilterChain) {
+    parts.push(`[${last}]${builtInFilterChain}[flt]`);
+    last = "flt";
   }
 
-  // Continuous color knobs (the deck's control-room sliders) on top of the base
-  // grade, in the same slot so the look composites grade then fine adjustment.
+  // Continuous color knobs on top of the filter, in the same slot so the look
+  // composites filter then fine adjustment.
   const colorChain = colorAdjustFilter(project.look?.color);
   if (colorChain) {
     parts.push(`[${last}]${colorChain}[clr]`);
@@ -525,7 +525,7 @@ export async function exportCut(
     last = "vig";
   }
 
-  // Rich graphics sit on top of the grade/vignette, just below the subtitle
+  // Rich graphics sit on top of the filter/vignette, just below the subtitle
   // burns (captions/titles/text-graphics), the same editorial layer as titles. The
   // alpha MOV carries its own duration + transparency, so just PTS-offset to its
   // output start, scale to the frame, and overlay within its enable window

@@ -1,7 +1,7 @@
 "use client";
 
-import type { ColorAdjust, Grade } from "@engine/edl";
-import { GRADE_OPTIONS } from "@engine/grade";
+import type { ColorAdjust, Filter } from "@engine/edl";
+import { FILTER_OPTIONS, filterLabel } from "@engine/filter";
 import {
   createShader,
   playSweep,
@@ -41,8 +41,8 @@ import {
   ExportDialog,
   type ExportDialogOptions,
 } from "@/components/export-dialog";
+import { FilterControls } from "@/components/filter-controls";
 import { FindFillerButton } from "@/components/find-filler-button";
-import { GradeControlRoom } from "@/components/grade-control-room";
 import type { GraphicItem } from "@/components/graphic-overlay";
 import { OverlaySortable } from "@/components/overlay-sortable";
 import { PLAYER_SPEEDS, PlayerControls } from "@/components/player-controls";
@@ -136,6 +136,10 @@ import {
   subscribeColorScheme,
 } from "@/lib/theme-preferences";
 import { exportPromiseMessages } from "@/lib/toast-notifications";
+import {
+  reconcileTranscriptText,
+  setWordRangeDeleted,
+} from "@/lib/transcript-edit";
 import { cn } from "@/lib/utils";
 import type { ActionResult } from "../app/actions.ts";
 import {
@@ -206,7 +210,7 @@ interface Project {
   fps: number;
   graphics?: GraphicItem[];
   height: number;
-  look?: { vignette: boolean; grade?: Grade; color?: ColorAdjust };
+  look?: { vignette: boolean; filter?: Filter; color?: ColorAdjust };
   mediaVersion?: number;
   motion?: { speed?: number };
   padMs: number;
@@ -349,8 +353,8 @@ export function App({
   const [vignetteOn, setVignetteOn] = useState(
     initialProject.look?.vignette ?? false
   );
-  const [grade, setGradeState] = useState<Grade>(
-    initialProject.look?.grade ?? "none"
+  const [filter, setFilterState] = useState<Filter>(
+    initialProject.look?.filter ?? "none"
   );
   const [color, setColorState] = useState<ColorAdjust | null>(
     initialProject.look?.color ?? null
@@ -634,15 +638,43 @@ export function App({
     [enqueueSave]
   );
 
-  const onWordClick = (i: number, e: React.MouseEvent) => {
-    if (e.shiftKey) {
-      setSelected(null);
-      setSelAnchor((prev) => (prev == null ? i : prev));
-      setSelFocus(i);
-    } else {
-      toggleWord(project.words[i].id);
-    }
-  };
+  const setTranscriptRangeDeleted = useCallback(
+    (range: readonly [number, number], deleted: boolean) => {
+      setProject((prev) => {
+        const words = setWordRangeDeleted(prev.words, range, deleted);
+        enqueueSave(() =>
+          saveProjectEdits(prev.slug, {
+            words: words.map((w) => ({
+              id: w.id,
+              deleted: w.deleted,
+              text: w.text,
+            })),
+          })
+        );
+        return { ...prev, words };
+      });
+    },
+    [enqueueSave]
+  );
+
+  const reconcileTranscriptEdit = useCallback(
+    (editedText: string) => {
+      setProject((prev) => {
+        const words = reconcileTranscriptText(prev.words, editedText);
+        enqueueSave(() =>
+          saveProjectEdits(prev.slug, {
+            words: words.map((w) => ({
+              id: w.id,
+              deleted: w.deleted,
+              text: w.text,
+            })),
+          })
+        );
+        return { ...prev, words };
+      });
+    },
+    [enqueueSave]
+  );
 
   const selRange =
     selAnchor != null && selFocus != null
@@ -655,6 +687,35 @@ export function App({
     setSelAnchor(null);
     setSelFocus(null);
   };
+  const selectTranscriptRange = useCallback(
+    (range: readonly [number, number] | null) => {
+      setSelected(null);
+      if (range) {
+        setSelAnchor(range[0]);
+        setSelFocus(range[1]);
+      } else {
+        setSelAnchor(null);
+        setSelFocus(null);
+      }
+    },
+    []
+  );
+  const cutSelection = useCallback(
+    (range: readonly [number, number] | null = selRange) => {
+      if (range) {
+        setTranscriptRangeDeleted(range, true);
+      }
+    },
+    [selRange, setTranscriptRangeDeleted]
+  );
+  const restoreSelection = useCallback(
+    (range: readonly [number, number] | null = selRange) => {
+      if (range) {
+        setTranscriptRangeDeleted(range, false);
+      }
+    },
+    [selRange, setTranscriptRangeDeleted]
+  );
 
   const addZoom = () => {
     if (!selRange) {
@@ -866,9 +927,9 @@ export function App({
     setVignetteOn(next);
     enqueueSave(() => saveLook(project.slug, { vignette: next }));
   };
-  const changeGrade = (next: Grade) => {
-    setGradeState(next);
-    enqueueSave(() => saveLook(project.slug, { grade: next }));
+  const changeFilter = (next: Filter) => {
+    setFilterState(next);
+    enqueueSave(() => saveLook(project.slug, { filter: next }));
   };
   const changeColor = (next: ColorAdjust) => {
     // Mirror the engine's omit-when-neutral: a fully default adjust clears.
@@ -1047,6 +1108,8 @@ export function App({
         setSelFocus(index);
         return;
       }
+      setSelAnchor(null);
+      setSelFocus(null);
       toggleWord(project.words[index].id);
     },
     [project.words, toggleWord]
@@ -1720,21 +1783,23 @@ export function App({
                           <Select
                             onValueChange={(v) => {
                               if (v) {
-                                changeGrade(v as Grade);
+                                changeFilter(v as Filter);
                               }
                             }}
-                            value={grade}
+                            value={filter}
                           >
                             <SelectTrigger
-                              aria-label="Color grade"
+                              aria-label="Filter"
                               className="w-[8.5rem]"
                               size="sm"
                             >
-                              <SelectValue placeholder="Grade" />
+                              <SelectValue placeholder="Filter">
+                                {filterLabel(filter)}
+                              </SelectValue>
                             </SelectTrigger>
                             <SelectContent>
                               <SelectGroup>
-                                {GRADE_OPTIONS.map((g) => (
+                                {FILTER_OPTIONS.map((g) => (
                                   <SelectItem key={g.id} value={g.id}>
                                     {g.label}
                                   </SelectItem>
@@ -1742,12 +1807,12 @@ export function App({
                               </SelectGroup>
                             </SelectContent>
                           </Select>
-                          <GradeControlRoom
+                          <FilterControls
                             atSec={curSec}
                             color={color}
-                            grade={grade}
+                            filter={filter}
                             onColor={changeColor}
-                            onGrade={changeGrade}
+                            onFilter={changeFilter}
                             slug={project.slug}
                           />
                           <Toggle
@@ -2319,7 +2384,10 @@ export function App({
                             curSample={curSample}
                             inBroll={inBroll}
                             inZoom={inZoom}
-                            onWordClick={onWordClick}
+                            onCutSelection={cutSelection}
+                            onRestoreSelection={restoreSelection}
+                            onSelectRange={selectTranscriptRange}
+                            onTextEdit={reconcileTranscriptEdit}
                             selRange={selRange}
                             words={project.words}
                           />

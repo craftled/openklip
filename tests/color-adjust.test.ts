@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { ColorAdjustSchema } from "../src/edl.ts";
 import {
   colorAdjustFilter,
   colorAdjustSummary,
   isNeutralColor,
   NEUTRAL_COLOR,
-} from "../src/grade-color.ts";
+} from "../src/color-adjust.ts";
+import { ColorAdjustSchema } from "../src/edl.ts";
 
 test("NEUTRAL_COLOR is the identity adjust", () => {
   assert.deepEqual(NEUTRAL_COLOR, {
