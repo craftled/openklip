@@ -1,6 +1,6 @@
 "use client";
 
-import { Command as CommandPrimitive } from "cmdk";
+import { Autocomplete as AutocompletePrimitive } from "@base-ui/react/autocomplete";
 import type * as React from "react";
 import {
   Dialog,
@@ -13,19 +13,28 @@ import { InputGroup, InputGroupAddon } from "@/components/ui/input-group";
 import { IconCheck, IconSearch } from "@/lib/icon";
 import { cn } from "@/lib/utils";
 
-function Command({
-  className,
-  ...props
-}: React.ComponentProps<typeof CommandPrimitive>) {
+type CommandProps = AutocompletePrimitive.Root.Props<unknown> & {
+  className?: string;
+  shouldFilter?: boolean;
+};
+
+function Command({ className, shouldFilter = true, ...props }: CommandProps) {
   return (
-    <CommandPrimitive
+    <div
       className={cn(
         "flex size-full flex-col overflow-hidden rounded-xl! bg-popover p-1 text-popover-foreground",
         className
       )}
       data-slot="command"
-      {...props}
-    />
+    >
+      <AutocompletePrimitive.Root
+        filter={shouldFilter ? undefined : null}
+        inline
+        mode={shouldFilter ? "list" : "none"}
+        open
+        {...props}
+      />
+    </div>
   );
 }
 
@@ -65,11 +74,11 @@ function CommandDialog({
 function CommandInput({
   className,
   ...props
-}: React.ComponentProps<typeof CommandPrimitive.Input>) {
+}: AutocompletePrimitive.Input.Props) {
   return (
     <div className="p-1 pb-0" data-slot="command-input-wrapper">
       <InputGroup className="h-8! rounded-lg! border-input/30 bg-input/30 shadow-none! *:data-[slot=input-group-addon]:pl-2!">
-        <CommandPrimitive.Input
+        <AutocompletePrimitive.Input
           className={cn(
             "w-full text-sm outline-hidden disabled:cursor-not-allowed disabled:opacity-50",
             className
@@ -88,9 +97,9 @@ function CommandInput({
 function CommandList({
   className,
   ...props
-}: React.ComponentProps<typeof CommandPrimitive.List>) {
+}: AutocompletePrimitive.List.Props) {
   return (
-    <CommandPrimitive.List
+    <AutocompletePrimitive.List
       className={cn(
         "no-scrollbar max-h-72 scroll-py-1 overflow-y-auto overflow-x-hidden outline-none",
         className
@@ -104,9 +113,9 @@ function CommandList({
 function CommandEmpty({
   className,
   ...props
-}: React.ComponentProps<typeof CommandPrimitive.Empty>) {
+}: AutocompletePrimitive.Empty.Props) {
   return (
-    <CommandPrimitive.Empty
+    <AutocompletePrimitive.Empty
       className={cn("py-6 text-center text-sm", className)}
       data-slot="command-empty"
       {...props}
@@ -117,13 +126,10 @@ function CommandEmpty({
 function CommandGroup({
   className,
   ...props
-}: React.ComponentProps<typeof CommandPrimitive.Group>) {
+}: AutocompletePrimitive.Group.Props) {
   return (
-    <CommandPrimitive.Group
-      className={cn(
-        "overflow-hidden p-1 text-foreground **:[[cmdk-group-heading]]:px-2 **:[[cmdk-group-heading]]:py-1.5 **:[[cmdk-group-heading]]:font-medium **:[[cmdk-group-heading]]:text-muted-foreground **:[[cmdk-group-heading]]:text-xs",
-        className
-      )}
+    <AutocompletePrimitive.Group
+      className={cn("overflow-hidden p-1 text-foreground", className)}
       data-slot="command-group"
       {...props}
     />
@@ -133,9 +139,9 @@ function CommandGroup({
 function CommandSeparator({
   className,
   ...props
-}: React.ComponentProps<typeof CommandPrimitive.Separator>) {
+}: AutocompletePrimitive.Separator.Props) {
   return (
-    <CommandPrimitive.Separator
+    <AutocompletePrimitive.Separator
       className={cn("-mx-1 h-px bg-border", className)}
       data-slot="command-separator"
       {...props}
@@ -143,23 +149,35 @@ function CommandSeparator({
   );
 }
 
+type CommandItemProps = Omit<
+  AutocompletePrimitive.Item.Props,
+  "onClick" | "value"
+> & {
+  onSelect?: (value: string) => void;
+  value?: string;
+};
+
 function CommandItem({
   className,
   children,
+  onSelect,
+  value = "",
   ...props
-}: React.ComponentProps<typeof CommandPrimitive.Item>) {
+}: CommandItemProps) {
   return (
-    <CommandPrimitive.Item
+    <AutocompletePrimitive.Item
       className={cn(
-        "group/command-item relative flex cursor-default select-none items-center gap-2 in-data-[slot=dialog-content]:rounded-lg! rounded-sm px-2 py-1.5 text-sm outline-hidden data-[disabled=true]:pointer-events-none data-selected:bg-muted data-selected:text-foreground data-[disabled=true]:opacity-50 [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0 data-selected:*:[svg]:text-foreground",
+        "group/command-item relative flex cursor-default select-none items-center gap-2 in-data-[slot=dialog-content]:rounded-lg! rounded-sm px-2 py-1.5 text-sm outline-hidden data-disabled:pointer-events-none data-highlighted:bg-muted data-highlighted:text-foreground data-disabled:opacity-50 [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0 data-highlighted:*:[svg]:text-foreground",
         className
       )}
       data-slot="command-item"
+      onClick={() => onSelect?.(value)}
+      value={value}
       {...props}
     >
       {children}
-      <IconCheck className="ml-auto opacity-0 group-has-data-[slot=command-shortcut]/command-item:hidden group-data-[checked=true]/command-item:opacity-100" />
-    </CommandPrimitive.Item>
+      <IconCheck className="ml-auto opacity-0 group-has-data-[slot=command-shortcut]/command-item:hidden group-data-selected/command-item:opacity-100" />
+    </AutocompletePrimitive.Item>
   );
 }
 

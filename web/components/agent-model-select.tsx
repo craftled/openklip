@@ -150,7 +150,7 @@ export function AgentModelSelect({
     >
       <SelectTrigger
         className={cn(
-          "w-full border border-border bg-muted/50 text-xs focus:ring-0 data-[state=open]:ring-0 [&_svg]:shrink-0",
+          "w-full border border-border bg-muted/50 text-xs focus:ring-0 data-popup-open:ring-0 [&_svg]:shrink-0",
           triggerClassName
         )}
       >

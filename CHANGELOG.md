@@ -2,13 +2,14 @@
 
 ## 0.9.0.0 - 2026-06-30
 
-OpenKlip now uses the default shadcn theme as its UI baseline. The editor keeps the familiar local-first workflow while removing the old custom theme layer, so future visual work can start from clean shadcn parity.
+OpenKlip now uses the default shadcn theme as its UI baseline with Base UI primitives underneath app-owned wrappers. The editor keeps the familiar local-first workflow while removing the old custom theme layer, so future visual work can start from clean shadcn parity.
 
 ### Added
 - **Static chat mockups**: added shadcn-style message, marker, attachment, empty, field, label, tabs, and message-scroller primitives for local testing of the chat UI examples.
 
 ### Changed
 - **Default shadcn theme**: replaced the custom OpenKlip theme engine and palette JSON files with shadcn default CSS variables, dark-mode class handling, and shadcn registry-aligned primitives.
+- **Base UI primitive layer**: migrated app-owned drawer and command wrappers to Base UI while preserving OpenKlip component exports and prompt menu behavior.
 - **Editor chrome**: normalized buttons, sidebars, dialogs, selects, menus, sheets, tooltips, and timeline surfaces to use default shadcn tokens instead of bespoke success, info, sidebar-active, and foreground variants.
 - **Agent chat empty state**: static marker and attachment examples now appear only in the empty mockup state, so existing chat threads stay focused on real messages.
 - **Version**: bumped OpenKlip to `0.9.0.0`.
@@ -19,6 +20,7 @@ OpenKlip now uses the default shadcn theme as its UI baseline. The editor keeps 
 
 ### Removed
 - **Old theme code**: removed the custom theme catalog, theme schema, theme engine, bundled theme JSON presets, obsolete motion tests, and unused legacy UI wrappers.
+- **Legacy primitive dependencies**: removed the old drawer and command packages now covered by Base UI wrappers.
 
 ## 0.8.10.0 - 2026-06-29
 

@@ -27,6 +27,8 @@ import { cn } from "@/lib/utils";
 interface AgentSkillsMenuProps {
   className?: string;
   embedded?: boolean;
+  highlightedIndex?: number;
+  onHighlight?: (index: number) => void;
   onSelect: (skill: SkillEntry) => void;
   open: boolean;
   query: string;
@@ -36,6 +38,8 @@ interface AgentSkillsMenuProps {
 export function AgentSkillsMenu({
   className,
   embedded = false,
+  highlightedIndex = -1,
+  onHighlight,
   onSelect,
   open,
   query,
@@ -63,35 +67,40 @@ export function AgentSkillsMenu({
       </div>
       <PromptInputCommand shouldFilter={false}>
         <PromptInputCommandList className="max-h-72">
-          <PromptInputCommandEmpty className="py-4 text-left text-sm">
-            No skills match.
-          </PromptInputCommandEmpty>
-          <PromptInputCommandGroup>
-            {filtered.map((skill) => (
-              <PromptInputCommandItem
-                className="items-start gap-3 py-2.5"
-                key={skill.id}
-                onSelect={() => onSelect(skill)}
-                value={`${skill.title} ${skill.description} ${skill.slash}`}
-              >
-                <Box className={APP_ICON_CLASS} />
-                <div className="min-w-0 flex-1">
-                  <div className="truncate font-medium text-sm">
-                    {skill.title}
-                  </div>
-                  <div className="truncate text-muted-foreground text-xs">
-                    {skill.description}
-                  </div>
-                </div>
-                <Badge
-                  className="shrink-0 font-normal text-[10px]"
-                  variant="secondary"
+          {filtered.length === 0 ? (
+            <PromptInputCommandEmpty className="py-4 text-left text-sm">
+              No skills match.
+            </PromptInputCommandEmpty>
+          ) : (
+            <PromptInputCommandGroup>
+              {filtered.map((skill, index) => (
+                <PromptInputCommandItem
+                  className="items-start gap-3 py-2.5"
+                  data-highlighted={index === highlightedIndex ? "" : undefined}
+                  key={skill.id}
+                  onMouseEnter={() => onHighlight?.(index)}
+                  onSelect={() => onSelect(skill)}
+                  value={`${skill.title} ${skill.description} ${skill.slash}`}
                 >
-                  {skillKindLabel(skill.kind)}
-                </Badge>
-              </PromptInputCommandItem>
-            ))}
-          </PromptInputCommandGroup>
+                  <Box className={APP_ICON_CLASS} />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate font-medium text-sm">
+                      {skill.title}
+                    </div>
+                    <div className="truncate text-muted-foreground text-xs">
+                      {skill.description}
+                    </div>
+                  </div>
+                  <Badge
+                    className="shrink-0 font-normal text-[10px]"
+                    variant="secondary"
+                  >
+                    {skillKindLabel(skill.kind)}
+                  </Badge>
+                </PromptInputCommandItem>
+              ))}
+            </PromptInputCommandGroup>
+          )}
         </PromptInputCommandList>
       </PromptInputCommand>
     </div>
@@ -108,6 +117,7 @@ export function useSkillsSlashMenu(options: {
 }) {
   const { inputValue, onClearInput, onSelectSkill, skills, skillSelected } =
     options;
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const [slashQuery, setSlashQuery] = useState("");
   const pendingSelect = useRef(false);
@@ -134,6 +144,14 @@ export function useSkillsSlashMenu(options: {
     () => filterSkills(skills, slashQuery),
     [skills, slashQuery]
   );
+
+  useEffect(() => {
+    if (!menuOpen || filtered.length === 0) {
+      setHighlightedIndex(0);
+      return;
+    }
+    setHighlightedIndex((current) => Math.min(current, filtered.length - 1));
+  }, [filtered.length, menuOpen]);
 
   const selectSkill = useCallback(
     (skill: SkillEntry) => {
@@ -173,25 +191,49 @@ export function useSkillsSlashMenu(options: {
         closeMenu();
         return;
       }
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        setHighlightedIndex((current) => (current + 1) % filtered.length);
+        return;
+      }
+      if (event.key === "ArrowUp") {
+        event.preventDefault();
+        setHighlightedIndex(
+          (current) => (current - 1 + filtered.length) % filtered.length
+        );
+        return;
+      }
+      if (event.key === "Home") {
+        event.preventDefault();
+        setHighlightedIndex(0);
+        return;
+      }
+      if (event.key === "End") {
+        event.preventDefault();
+        setHighlightedIndex(filtered.length - 1);
+        return;
+      }
       if (event.key === "Enter" && !event.shiftKey) {
         event.preventDefault();
         event.stopPropagation();
-        const first = filtered[0];
-        if (first) {
-          selectSkill(first);
+        const selected = filtered[highlightedIndex] ?? filtered[0];
+        if (selected) {
+          selectSkill(selected);
         }
       }
     },
-    [closeMenu, filtered, menuOpen, selectSkill]
+    [closeMenu, filtered, highlightedIndex, menuOpen, selectSkill]
   );
 
   return {
     closeMenu,
     filtered,
     handleInputKeyDown,
+    highlightedIndex,
     menuOpen,
     openMenu,
     selectSkill,
+    setHighlightedIndex,
     slashQuery,
   };
 }

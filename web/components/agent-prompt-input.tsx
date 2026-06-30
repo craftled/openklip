@@ -176,6 +176,8 @@ function AgentPromptInputInner({
   return (
     <div className="relative w-full">
       <AgentSkillsMenu
+        highlightedIndex={slashMenu.highlightedIndex}
+        onHighlight={slashMenu.setHighlightedIndex}
         onSelect={selectSkill}
         open={slashMenu.menuOpen}
         query={slashMenu.slashQuery}

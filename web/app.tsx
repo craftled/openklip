@@ -1501,11 +1501,13 @@ export function App({
                             onOpenChange={setTimelineOpen}
                             open={timelineOpen}
                           >
-                            <DrawerTrigger asChild>
-                              <Button size="sm" variant="outline">
-                                Timeline
-                              </Button>
-                            </DrawerTrigger>
+                            <DrawerTrigger
+                              render={
+                                <Button size="sm" variant="outline">
+                                  Timeline
+                                </Button>
+                              }
+                            />
                             <DrawerContent className="max-h-[85vh]">
                               <DrawerHeader className="pb-2">
                                 <DrawerTitle className="flex items-center justify-between font-medium text-sm">

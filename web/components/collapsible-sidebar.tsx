@@ -55,7 +55,7 @@ export function CollapsibleSidebarMenuItem({
       {badge ? <SidebarMenuBadge>{badge}</SidebarMenuBadge> : null}
       <CollapsibleTrigger
         render={
-          <SidebarMenuAction className="data-[state=open]:rotate-90">
+          <SidebarMenuAction className="data-panel-open:rotate-90">
             <ChevronRight />
             <span className="sr-only">Toggle {label}</span>
           </SidebarMenuAction>
@@ -92,7 +92,7 @@ export function CollapsibleSidebarSection({
             render={
               <Button
                 className={cn(
-                  "group h-7 w-full min-w-0 justify-start gap-1 px-2 py-0.5 text-left focus-visible:ring-1 focus-visible:ring-inset [&[data-state=open]>svg.chevron]:rotate-90",
+                  "group h-7 w-full min-w-0 justify-start gap-1 px-2 py-0.5 text-left focus-visible:ring-1 focus-visible:ring-inset [&[data-panel-open]>svg.chevron]:rotate-90",
                   SIDEBAR_SECTION_LABEL_CLASS
                 )}
                 type="button"
@@ -103,12 +103,12 @@ export function CollapsibleSidebarSection({
                     <FolderClosed
                       className={cn(
                         APP_ICON_CLASS,
-                        "group-data-[state=open]:hidden"
+                        "group-data-panel-open:hidden"
                       )}
                     />
                     <FolderOpen
                       className={cn(
-                        "hidden group-data-[state=open]:block",
+                        "hidden group-data-panel-open:block",
                         APP_ICON_CLASS
                       )}
                     />

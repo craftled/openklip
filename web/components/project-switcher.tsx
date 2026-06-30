@@ -145,7 +145,7 @@ export function ProjectSwitcher({
                 <SidebarMenuButton
                   className={cn(
                     SIDEBAR_MENU_HEADER_CLASS,
-                    "data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                    "data-popup-open:bg-sidebar-accent data-popup-open:text-sidebar-accent-foreground"
                   )}
                   size="sm"
                 >
@@ -178,7 +178,7 @@ export function ProjectSwitcher({
             />
             <DropdownMenuContent
               align="start"
-              className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg"
+              className="w-(--anchor-width) min-w-56 rounded-lg data-instant:animate-none data-instant:duration-[0.01ms]"
               data-instant={menuInstant ? "" : undefined}
               side={isMobile ? "bottom" : "right"}
               sideOffset={4}
