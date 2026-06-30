@@ -60,6 +60,7 @@ import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -67,7 +68,6 @@ import {
 import {
   Sidebar,
   SidebarContent,
-  type SidebarContextProps,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -81,7 +81,6 @@ import {
   SidebarMenuSubItem,
   SidebarProvider,
   SidebarRail,
-  SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Slider } from "@/components/ui/slider";
@@ -103,6 +102,7 @@ import {
   toastSaveError,
 } from "@/lib/app-toast";
 import {
+  APP_ICON_CLASS,
   Captions,
   Clock3,
   Download,
@@ -110,6 +110,7 @@ import {
   ImageIcon,
   Moon,
   PanelLeft,
+  PanelRight,
   Sparkles,
   Sun,
   Trash2,
@@ -126,13 +127,10 @@ import { buildProjectHoverContext } from "@/lib/project-context";
 import type { ProjectListing } from "@/lib/project-list";
 import type { SettingsSectionId } from "@/lib/settings-navigation";
 import {
-  applyAppTheme,
   applyColorScheme,
   type ColorScheme,
-  getAppTheme,
   getColorScheme,
   setColorScheme,
-  subscribeAppTheme,
   subscribeColorScheme,
 } from "@/lib/theme-preferences";
 import { exportPromiseMessages } from "@/lib/toast-notifications";
@@ -232,6 +230,16 @@ const ZOOM_PRESETS: Record<string, { scale: number; rampSec: number }> = {
 // Thin Paper-style slider: short track, small thumb, soft gray fill.
 const SLIDER =
   "[&_[data-slot=slider-track]]:h-1 [&_[data-slot=slider-thumb]]:size-3 [&_[data-slot=slider-range]]:bg-foreground/35";
+
+function firstSliderValue(value: number | readonly number[]): number {
+  return typeof value === "number" ? value : value[0];
+}
+
+function firstToggleValue(
+  value: string | readonly string[]
+): string | undefined {
+  return typeof value === "string" ? value : value[0];
+}
 
 const CUT_SWEEP_OPTIONS = {
   bandTight: 18,
@@ -402,17 +410,7 @@ export function App({
   const projectLoaded = true;
   useEffect(() => {
     applyColorScheme(getColorScheme());
-    const unsubTheme = subscribeAppTheme((theme) => {
-      applyAppTheme(theme, getColorScheme());
-    });
-    const unsubScheme = subscribeColorScheme((scheme) => {
-      setColorSchemeState(scheme);
-      applyAppTheme(getAppTheme(), scheme);
-    });
-    return () => {
-      unsubTheme();
-      unsubScheme();
-    };
+    return subscribeColorScheme(setColorSchemeState);
   }, []);
 
   useEffect(() => {
@@ -1321,7 +1319,6 @@ export function App({
     >
       <SidebarProvider
         className="min-h-screen flex-col overflow-auto bg-background text-foreground md:h-screen md:min-h-0 md:flex-row md:overflow-hidden"
-        cookieName="openklip_sidebar_agent"
         keyboardShortcut={false}
         style={
           {
@@ -1384,7 +1381,6 @@ export function App({
           {(agentSidebar) => (
             <SidebarProvider
               className="min-h-screen flex-1 flex-col overflow-auto bg-background text-foreground md:h-screen md:min-h-0 md:flex-row md:overflow-hidden"
-              cookieName="openklip_sidebar_inspector"
               keyboardShortcut={false}
               style={
                 {
@@ -1395,7 +1391,7 @@ export function App({
             >
               <EditorSidebarShortcuts agentSidebar={agentSidebar} />
               {/* CENTER : preview + transcript (or settings) */}
-              <SidebarInset className="flex min-h-[28rem] min-w-0 flex-col bg-app-shell md:min-h-0">
+              <SidebarInset className="flex min-h-[28rem] min-w-0 flex-col bg-background md:min-h-0">
                 {settingsOpen ? (
                   <SettingsView
                     activeSection={settingsSection}
@@ -1416,8 +1412,8 @@ export function App({
                         <div className="h-4 w-px bg-foreground/10" />
                       ) : null}
                       <div className="min-w-0">
-                        <div className="font-medium text-ui">Editor</div>
-                        <div className="truncate text-caption text-tertiary">
+                        <div className="font-medium text-sm">Editor</div>
+                        <div className="truncate text-muted-foreground text-xs">
                           {ranges.length} cuts · {fmt(keptDuration)} /{" "}
                           {fmt(fullDur)}
                         </div>
@@ -1441,7 +1437,7 @@ export function App({
                             {exportLabel}
                           </Button>
                         </ExportDialog>
-                        <div className="flex items-center gap-0.5 rounded-lg border border-border bg-surface-2 p-0.5">
+                        <div className="flex items-center gap-0.5 rounded-lg border border-border bg-accent p-0.5">
                           {(
                             ["landscape", "portrait", "square"] as Orientation[]
                           ).map((o) => (
@@ -1475,7 +1471,7 @@ export function App({
                         <div className="mx-auto flex w-full max-w-2xl flex-wrap items-center gap-2">
                           <FindFillerButton />
                           <VerifyCutButton />
-                          <div className="flex items-center gap-0.5 rounded-lg border border-border bg-surface-2 p-0.5">
+                          <div className="flex items-center gap-0.5 rounded-lg border border-border bg-accent p-0.5">
                             <Button
                               aria-pressed={centerPanel === "transcript"}
                               onClick={() => setCenterPanel("transcript")}
@@ -1505,16 +1501,18 @@ export function App({
                             onOpenChange={setTimelineOpen}
                             open={timelineOpen}
                           >
-                            <DrawerTrigger asChild>
-                              <Button size="sm" variant="outline">
-                                Timeline
-                              </Button>
-                            </DrawerTrigger>
+                            <DrawerTrigger
+                              render={
+                                <Button size="sm" variant="outline">
+                                  Timeline
+                                </Button>
+                              }
+                            />
                             <DrawerContent className="max-h-[85vh]">
                               <DrawerHeader className="pb-2">
                                 <DrawerTitle className="flex items-center justify-between font-medium text-sm">
                                   <span>Timeline</span>
-                                  <span className="font-normal text-tertiary tabular-nums">
+                                  <span className="font-normal text-muted-foreground tabular-nums">
                                     {fmt(curSec)} / {fmt(fullDur)}
                                   </span>
                                 </DrawerTitle>
@@ -1605,7 +1603,7 @@ export function App({
                               ref={transitionCanvasRef}
                             />
                             {(exporting || pendingSaves > 0) && (
-                              <div className="pointer-events-none absolute top-2 right-2 z-[5] flex items-center gap-1.5 rounded-md bg-black/70 px-2 py-1 font-medium text-caption text-white backdrop-blur">
+                              <div className="pointer-events-none absolute top-2 right-2 z-[5] flex items-center gap-1.5 rounded-md bg-black/70 px-2 py-1 font-medium text-white text-xs backdrop-blur">
                                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
                                 {exporting ? "Exporting…" : "Rebuilding…"}
                               </div>
@@ -1640,7 +1638,7 @@ export function App({
 
                         {/* OpenKlip-specific controls (no Linear analogue) */}
                         <div className="mx-auto flex w-full max-w-2xl flex-wrap items-center gap-2 md:flex-nowrap md:gap-3">
-                          <span className="shrink-0 text-tertiary text-xs tabular-nums">
+                          <span className="shrink-0 text-muted-foreground text-xs tabular-nums">
                             {fmt(outPos)} / {fmt(keptDuration)}
                           </span>
                           <div className="flex shrink-0 items-center gap-1">
@@ -1672,7 +1670,7 @@ export function App({
                             {loop && (
                               <Button
                                 aria-label="Clear loop region"
-                                className="text-caption text-tertiary"
+                                className="text-muted-foreground text-xs"
                                 onClick={() => {
                                   setLoop(null);
                                   setLoopInPending(null);
@@ -1685,38 +1683,50 @@ export function App({
                             )}
                           </div>
                           <Select
-                            onValueChange={(v) => changeMotionSpeed(Number(v))}
+                            onValueChange={(v) => {
+                              if (v) {
+                                changeMotionSpeed(Number(v));
+                              }
+                            }}
                             value={String(motionSpeed)}
                           >
                             <SelectTrigger
                               aria-label="Motion speed"
-                              className="ml-auto h-8 w-[8rem]"
+                              className="ml-auto w-[8rem]"
                             >
                               <SelectValue placeholder="Motion" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="0.7">Slower</SelectItem>
-                              <SelectItem value="1">Default</SelectItem>
-                              <SelectItem value="1.4">Snappy</SelectItem>
-                              <SelectItem value="1.8">Snappier</SelectItem>
+                              <SelectGroup>
+                                <SelectItem value="0.7">Slower</SelectItem>
+                                <SelectItem value="1">Default</SelectItem>
+                                <SelectItem value="1.4">Snappy</SelectItem>
+                                <SelectItem value="1.8">Snappier</SelectItem>
+                              </SelectGroup>
                             </SelectContent>
                           </Select>
                           <Select
-                            onValueChange={(v) => changeGrade(v as Grade)}
+                            onValueChange={(v) => {
+                              if (v) {
+                                changeGrade(v as Grade);
+                              }
+                            }}
                             value={grade}
                           >
                             <SelectTrigger
                               aria-label="Color grade"
-                              className="h-8 w-[8.5rem]"
+                              className="w-[8.5rem]"
                             >
                               <SelectValue placeholder="Grade" />
                             </SelectTrigger>
                             <SelectContent>
-                              {GRADE_OPTIONS.map((g) => (
-                                <SelectItem key={g.id} value={g.id}>
-                                  {g.label}
-                                </SelectItem>
-                              ))}
+                              <SelectGroup>
+                                {GRADE_OPTIONS.map((g) => (
+                                  <SelectItem key={g.id} value={g.id}>
+                                    {g.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectGroup>
                             </SelectContent>
                           </Select>
                           <GradeControlRoom
@@ -1775,15 +1785,15 @@ export function App({
                               (selZoom || selTitle || selBroll || selStill) ? (
                                 <div className="group-data-[collapsible=icon]:hidden">
                                   <div className="px-3 py-3">
-                                    <div className="flex items-center gap-2 font-medium text-ui">
+                                    <div className="flex items-center gap-2 font-medium text-sm">
                                       {selZoom ? (
-                                        <ZoomIn className="size-3.5 text-tertiary" />
+                                        <ZoomIn className={APP_ICON_CLASS} />
                                       ) : selTitle ? (
-                                        <Type className="size-3.5 text-tertiary" />
+                                        <Type className={APP_ICON_CLASS} />
                                       ) : selStill ? (
-                                        <ImageIcon className="size-3.5 text-tertiary" />
+                                        <ImageIcon className={APP_ICON_CLASS} />
                                       ) : (
-                                        <Film className="size-3.5 text-tertiary" />
+                                        <Film className={APP_ICON_CLASS} />
                                       )}
                                       {selZoom
                                         ? "Push-in"
@@ -1792,7 +1802,7 @@ export function App({
                                           : selStill
                                             ? "Still"
                                             : "B-roll"}
-                                      <span className="ml-auto text-caption text-tertiary tabular-nums">
+                                      <span className="ml-auto text-muted-foreground text-xs tabular-nums">
                                         {selZoom &&
                                           `${fmt(selZoom.startSample / sr)}–${fmt(selZoom.endSample / sr)}`}
                                         {selTitle &&
@@ -1816,9 +1826,9 @@ export function App({
                                             className={SLIDER}
                                             max={3}
                                             min={1}
-                                            onValueChange={([v]) =>
+                                            onValueChange={(value) =>
                                               updateZoom(selZoom.id, {
-                                                scale: v,
+                                                scale: firstSliderValue(value),
                                               })
                                             }
                                             step={0.05}
@@ -1833,9 +1843,10 @@ export function App({
                                             className={SLIDER}
                                             max={5}
                                             min={0}
-                                            onValueChange={([v]) =>
+                                            onValueChange={(value) =>
                                               updateZoom(selZoom.id, {
-                                                rampSec: v,
+                                                rampSec:
+                                                  firstSliderValue(value),
                                               })
                                             }
                                             step={0.1}
@@ -1846,22 +1857,30 @@ export function App({
                                       <Section title="Preset">
                                         <ToggleGroup
                                           className="w-full"
-                                          onValueChange={(v) =>
-                                            v &&
-                                            updateZoom(
-                                              selZoom.id,
-                                              ZOOM_PRESETS[v]
-                                            )
-                                          }
+                                          onValueChange={(value) => {
+                                            const preset =
+                                              firstToggleValue(value);
+                                            if (
+                                              preset &&
+                                              ZOOM_PRESETS[preset]
+                                            ) {
+                                              updateZoom(
+                                                selZoom.id,
+                                                ZOOM_PRESETS[preset]
+                                              );
+                                            }
+                                          }}
+                                          size="sm"
                                           spacing={0}
-                                          type="single"
-                                          value={presetOf(selZoom)}
+                                          value={[presetOf(selZoom)].filter(
+                                            Boolean
+                                          )}
                                           variant="outline"
                                         >
                                           {Object.keys(ZOOM_PRESETS).map(
                                             (k) => (
                                               <ToggleGroupItem
-                                                className="h-7 flex-1 text-xs"
+                                                className="flex-1"
                                                 key={k}
                                                 value={k}
                                               >
@@ -1903,29 +1922,33 @@ export function App({
                                       )}
                                       <div className="mt-2">
                                         <Select
-                                          onValueChange={(v) =>
-                                            updateTitle(selTitle.id, {
-                                              position: v as
-                                                | "lower"
-                                                | "center"
-                                                | "hero",
-                                            })
-                                          }
+                                          onValueChange={(v) => {
+                                            if (v) {
+                                              updateTitle(selTitle.id, {
+                                                position: v as
+                                                  | "lower"
+                                                  | "center"
+                                                  | "hero",
+                                              });
+                                            }
+                                          }}
                                           value={selTitle.position}
                                         >
                                           <SelectTrigger className="w-full">
                                             <SelectValue />
                                           </SelectTrigger>
                                           <SelectContent>
-                                            <SelectItem value="lower">
-                                              Lower third
-                                            </SelectItem>
-                                            <SelectItem value="center">
-                                              Centered
-                                            </SelectItem>
-                                            <SelectItem value="hero">
-                                              Hero card
-                                            </SelectItem>
+                                            <SelectGroup>
+                                              <SelectItem value="lower">
+                                                Lower third
+                                              </SelectItem>
+                                              <SelectItem value="center">
+                                                Centered
+                                              </SelectItem>
+                                              <SelectItem value="hero">
+                                                Hero card
+                                              </SelectItem>
+                                            </SelectGroup>
                                           </SelectContent>
                                         </Select>
                                       </div>
@@ -1936,6 +1959,7 @@ export function App({
                                     <Section title="Source">
                                       <Select
                                         onValueChange={(v) =>
+                                          v &&
                                           updateBroll(selBroll.id, {
                                             assetId: v,
                                           })
@@ -1946,16 +1970,21 @@ export function App({
                                           <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
-                                          {brollAssets.map((a) => (
-                                            <SelectItem key={a.id} value={a.id}>
-                                              {a.name}
-                                            </SelectItem>
-                                          ))}
+                                          <SelectGroup>
+                                            {brollAssets.map((a) => (
+                                              <SelectItem
+                                                key={a.id}
+                                                value={a.id}
+                                              >
+                                                {a.name}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectGroup>
                                         </SelectContent>
                                       </Select>
                                       {(project.broll ?? []).length > 1 && (
                                         <div className="mt-3">
-                                          <span className="text-caption text-tertiary">
+                                          <span className="text-muted-foreground text-xs">
                                             Paint order : drag to restack
                                           </span>
                                           <div className="mt-1.5">
@@ -1986,6 +2015,7 @@ export function App({
                                       <Section title="Source">
                                         <Select
                                           onValueChange={(v) =>
+                                            v &&
                                             updateStill(selStill.id, {
                                               assetId: v,
                                             })
@@ -1996,14 +2026,16 @@ export function App({
                                             <SelectValue />
                                           </SelectTrigger>
                                           <SelectContent>
-                                            {stillAssets.map((a) => (
-                                              <SelectItem
-                                                key={a.id}
-                                                value={a.id}
-                                              >
-                                                {a.name}
-                                              </SelectItem>
-                                            ))}
+                                            <SelectGroup>
+                                              {stillAssets.map((a) => (
+                                                <SelectItem
+                                                  key={a.id}
+                                                  value={a.id}
+                                                >
+                                                  {a.name}
+                                                </SelectItem>
+                                              ))}
+                                            </SelectGroup>
                                           </SelectContent>
                                         </Select>
                                       </Section>
@@ -2016,9 +2048,9 @@ export function App({
                                             className={SLIDER}
                                             max={3}
                                             min={1}
-                                            onValueChange={([v]) =>
+                                            onValueChange={(value) =>
                                               updateStill(selStill.id, {
-                                                scale: v,
+                                                scale: firstSliderValue(value),
                                               })
                                             }
                                             step={0.05}
@@ -2036,15 +2068,16 @@ export function App({
                                       size="sm"
                                       variant="destructive"
                                     >
-                                      <Trash2 /> Remove effect
+                                      <Trash2 data-icon="inline-start" /> Remove
+                                      effect
                                     </Button>
                                   </div>
                                 </div>
                               ) : selRange ? (
                                 <div className="group-data-[collapsible=icon]:hidden">
-                                  <div className="px-3 py-3 font-medium text-ui">
+                                  <div className="px-3 py-3 font-medium text-sm">
                                     Selection
-                                    <span className="ml-2 text-caption text-tertiary">
+                                    <span className="ml-2 text-muted-foreground text-xs">
                                       {selRange[1] - selRange[0] + 1} words
                                     </span>
                                   </div>
@@ -2055,11 +2088,16 @@ export function App({
                                       size="sm"
                                       variant="secondary"
                                     >
-                                      <ZoomIn /> Push in
+                                      <ZoomIn data-icon="inline-start" /> Push
+                                      in
                                     </Button>
                                     <div className="mt-2 flex gap-2">
                                       <Select
-                                        onValueChange={setChosenAsset}
+                                        onValueChange={(value) => {
+                                          if (value) {
+                                            setChosenAsset(value);
+                                          }
+                                        }}
                                         value={chosenAsset}
                                       >
                                         <SelectTrigger
@@ -2069,18 +2107,23 @@ export function App({
                                           <SelectValue placeholder="No b-roll" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                          {brollAssets.map((a) => (
-                                            <SelectItem key={a.id} value={a.id}>
-                                              {a.name}
-                                            </SelectItem>
-                                          ))}
+                                          <SelectGroup>
+                                            {brollAssets.map((a) => (
+                                              <SelectItem
+                                                key={a.id}
+                                                value={a.id}
+                                              >
+                                                {a.name}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectGroup>
                                         </SelectContent>
                                       </Select>
                                       <Button
                                         aria-label="Add b-roll"
                                         disabled={brollAssets.length === 0}
                                         onClick={addBroll}
-                                        size="sm"
+                                        size="icon-sm"
                                         variant="secondary"
                                       >
                                         <Film />
@@ -2088,7 +2131,11 @@ export function App({
                                     </div>
                                     <div className="mt-2 flex gap-2">
                                       <Select
-                                        onValueChange={setChosenStillAsset}
+                                        onValueChange={(value) => {
+                                          if (value) {
+                                            setChosenStillAsset(value);
+                                          }
+                                        }}
                                         value={chosenStillAsset}
                                       >
                                         <SelectTrigger
@@ -2098,18 +2145,23 @@ export function App({
                                           <SelectValue placeholder="No still" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                          {stillAssets.map((a) => (
-                                            <SelectItem key={a.id} value={a.id}>
-                                              {a.name}
-                                            </SelectItem>
-                                          ))}
+                                          <SelectGroup>
+                                            {stillAssets.map((a) => (
+                                              <SelectItem
+                                                key={a.id}
+                                                value={a.id}
+                                              >
+                                                {a.name}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectGroup>
                                         </SelectContent>
                                       </Select>
                                       <Button
                                         aria-label="Add still"
                                         disabled={stillAssets.length === 0}
                                         onClick={addStill}
-                                        size="sm"
+                                        size="icon-sm"
                                         variant="secondary"
                                       >
                                         <ImageIcon />
@@ -2140,33 +2192,37 @@ export function App({
                                     )}
                                     <div className="mt-2 flex gap-2">
                                       <Select
-                                        onValueChange={(v) =>
-                                          setTitlePos(
-                                            v as "lower" | "center" | "hero"
-                                          )
-                                        }
+                                        onValueChange={(v) => {
+                                          if (v) {
+                                            setTitlePos(
+                                              v as "lower" | "center" | "hero"
+                                            );
+                                          }
+                                        }}
                                         value={titlePos}
                                       >
                                         <SelectTrigger className="flex-1">
                                           <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
-                                          <SelectItem value="lower">
-                                            Lower third
-                                          </SelectItem>
-                                          <SelectItem value="center">
-                                            Centered
-                                          </SelectItem>
-                                          <SelectItem value="hero">
-                                            Hero card
-                                          </SelectItem>
+                                          <SelectGroup>
+                                            <SelectItem value="lower">
+                                              Lower third
+                                            </SelectItem>
+                                            <SelectItem value="center">
+                                              Centered
+                                            </SelectItem>
+                                            <SelectItem value="hero">
+                                              Hero card
+                                            </SelectItem>
+                                          </SelectGroup>
                                         </SelectContent>
                                       </Select>
                                       <Button
                                         aria-label="Add title"
                                         disabled={!titleText.trim()}
                                         onClick={addTitle}
-                                        size="sm"
+                                        size="icon-sm"
                                         variant="secondary"
                                       >
                                         <Type />
@@ -2175,7 +2231,7 @@ export function App({
                                   </Section>
                                   <div className="p-3">
                                     <Button
-                                      className="text-tertiary"
+                                      className="text-muted-foreground"
                                       onClick={clearSel}
                                       size="sm"
                                       variant="ghost"
@@ -2197,7 +2253,9 @@ export function App({
                                         className={SLIDER}
                                         max={12}
                                         min={1}
-                                        onValueChange={([v]) => setMaxWords(v)}
+                                        onValueChange={(value) =>
+                                          setMaxWords(firstSliderValue(value))
+                                        }
                                         step={1}
                                         value={[
                                           project.captions?.maxWords ?? 6,
@@ -2214,13 +2272,15 @@ export function App({
                                         className={SLIDER}
                                         max={200}
                                         min={0}
-                                        onValueChange={([v]) => setPad(v)}
+                                        onValueChange={(value) =>
+                                          setPad(firstSliderValue(value))
+                                        }
                                         step={5}
                                         value={[project.padMs ?? 50]}
                                       />
                                     </PropRow>
                                   </Section>
-                                  <p className="px-3 py-3 text-tertiary text-xs leading-relaxed">
+                                  <p className="px-3 py-3 text-muted-foreground text-xs leading-relaxed">
                                     Select a word range in the transcript to add
                                     a push-in, b-roll, or title. Click an effect
                                     to edit it here.
@@ -2301,15 +2361,17 @@ function InfoSubItem({
 }) {
   return (
     <SidebarMenuSubItem>
-      <SidebarMenuSubButton asChild>
-        <span>
-          <Icon className="size-3.5 shrink-0 text-tertiary" />
-          <span className="min-w-0 flex-1 truncate">{label}</span>
-          <span className="ml-auto shrink-0 text-caption text-quaternary tabular-nums">
-            {value}
+      <SidebarMenuSubButton
+        render={
+          <span>
+            <Icon className={APP_ICON_CLASS} />
+            <span className="min-w-0 flex-1 truncate">{label}</span>
+            <span className="ml-auto shrink-0 text-muted-foreground text-xs tabular-nums">
+              {value}
+            </span>
           </span>
-        </span>
-      </SidebarMenuSubButton>
+        }
+      />
     </SidebarMenuSubItem>
   );
 }
@@ -2317,7 +2379,7 @@ function InfoSubItem({
 function SidebarContextBridge({
   children,
 }: {
-  children: (context: SidebarContextProps) => ReactNode;
+  children: (context: ReturnType<typeof useSidebar>) => ReactNode;
 }) {
   return children(useSidebar());
 }
@@ -2335,13 +2397,13 @@ function AgentSidebarToolbarTrigger({ onToggle }: { onToggle: () => void }) {
       title={label}
       variant="ghost"
     >
-      <PanelLeft className="size-4" />
+      <PanelLeft />
     </Button>
   );
 }
 
 function InspectorSidebarToolbarTrigger({ className }: { className?: string }) {
-  const { isMobile, open } = useSidebar();
+  const { isMobile, open, toggleSidebar } = useSidebar();
   const shortcut = useModShortcut("i");
   const label = `Toggle inspector (${shortcut})`;
 
@@ -2350,19 +2412,23 @@ function InspectorSidebarToolbarTrigger({ className }: { className?: string }) {
   }
 
   return (
-    <SidebarTrigger
+    <Button
       aria-label={label}
-      className={className}
-      side="right"
+      className={cn("size-7 shrink-0", className)}
+      onClick={toggleSidebar}
+      size="icon-sm"
       title={label}
-    />
+      variant="ghost"
+    >
+      <PanelRight />
+    </Button>
   );
 }
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <SidebarGroup className="border-border border-t px-3 py-3">
-      <SidebarGroupLabel className="mb-2.5 h-auto px-0 font-medium text-tertiary">
+      <SidebarGroupLabel className="mb-2.5 h-auto px-0 font-medium text-muted-foreground">
         {title}
       </SidebarGroupLabel>
       <SidebarGroupContent>{children}</SidebarGroupContent>
@@ -2381,7 +2447,7 @@ function PropRow({
 }) {
   return (
     <div className="grid h-7 grid-cols-[4.25rem_1fr_2.5rem] items-center gap-2.5">
-      <span className="text-tertiary text-xs">{label}</span>
+      <span className="text-muted-foreground text-xs">{label}</span>
       {children}
       <span className="text-right text-xs tabular-nums">{value}</span>
     </div>

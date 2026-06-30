@@ -15,7 +15,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuShortcut,
   DropdownMenuTrigger,
-  MENU_INSTANT_ATTR,
 } from "@/components/ui/dropdown-menu";
 import {
   SidebarMenu,
@@ -25,7 +24,13 @@ import {
 } from "@/components/ui/sidebar";
 import { useProjectCreate } from "@/hooks/use-project-create";
 import { toastProjectDeleted, toastProjectDeleteFailed } from "@/lib/app-toast";
-import { Check, ChevronsUpDown, FolderOpen, Plus } from "@/lib/icon";
+import {
+  APP_ICON_CLASS,
+  Check,
+  ChevronsUpDown,
+  FolderOpen,
+  Plus,
+} from "@/lib/icon";
 import type { IngestProgressView } from "@/lib/project-create";
 import type { ProjectListing } from "@/lib/project-list";
 import {
@@ -36,8 +41,8 @@ import {
 import { relativeTimeAgo } from "@/lib/relative-time";
 import {
   SIDEBAR_HEADER_ICON_CLASS,
+  SIDEBAR_MENU_HEADER_CLASS,
   SIDEBAR_ROW_LABEL_TEXT_CLASS,
-  sidebarHeaderRowClass,
 } from "@/lib/sidebar-row-styles";
 import { cn } from "@/lib/utils";
 
@@ -135,51 +140,55 @@ export function ProjectSwitcher({
             }}
             open={menuOpen}
           >
-            <DropdownMenuTrigger asChild>
-              <SidebarMenuButton
-                className={cn(
-                  sidebarHeaderRowClass(),
-                  "data-[state=open]:bg-[var(--sidebar-accent-active)] data-[state=open]:text-sidebar-accent-foreground"
-                )}
-                size="sm"
-              >
-                <FolderOpen className={SIDEBAR_HEADER_ICON_CLASS} />
-                <span
+            <DropdownMenuTrigger
+              render={
+                <SidebarMenuButton
                   className={cn(
-                    "min-w-0 flex-1 truncate pr-6",
-                    SIDEBAR_ROW_LABEL_TEXT_CLASS
+                    SIDEBAR_MENU_HEADER_CLASS,
+                    "data-popup-open:bg-sidebar-accent data-popup-open:text-sidebar-accent-foreground"
                   )}
+                  size="sm"
                 >
-                  {active.slug}
-                </span>
-                {creating ? (
-                  <span className="shrink-0 text-[12px] text-tertiary/58">
-                    Creating…
+                  <FolderOpen className={SIDEBAR_HEADER_ICON_CLASS} />
+                  <span
+                    className={cn(
+                      "min-w-0 flex-1 truncate pr-6",
+                      SIDEBAR_ROW_LABEL_TEXT_CLASS
+                    )}
+                  >
+                    {active.slug}
                   </span>
-                ) : (
-                  <span className="shrink-0 text-[12px] text-tertiary/40 tabular-nums">
-                    <RelativeTimeLabel
-                      format={relativeTimeAgo}
-                      ms={active.mtimeMs}
-                    />
-                  </span>
-                )}
-                <ChevronsUpDown className="absolute right-2 size-4 shrink-0 opacity-60" />
-              </SidebarMenuButton>
-            </DropdownMenuTrigger>
+                  {creating ? (
+                    <span className="shrink-0 text-[12px] text-muted-foreground/58">
+                      Creating…
+                    </span>
+                  ) : (
+                    <span className="shrink-0 text-[12px] text-muted-foreground/40 tabular-nums">
+                      <RelativeTimeLabel
+                        format={relativeTimeAgo}
+                        ms={active.mtimeMs}
+                      />
+                    </span>
+                  )}
+                  <ChevronsUpDown
+                    className={cn("absolute right-2", APP_ICON_CLASS)}
+                  />
+                </SidebarMenuButton>
+              }
+            />
             <DropdownMenuContent
               align="start"
-              className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg"
+              className="w-(--anchor-width) min-w-56 rounded-lg data-instant:animate-none data-instant:duration-[0.01ms]"
+              data-instant={menuInstant ? "" : undefined}
               side={isMobile ? "bottom" : "right"}
               sideOffset={4}
-              {...(menuInstant ? { [MENU_INSTANT_ATTR]: "" } : {})}
             >
               <DropdownMenuGroup>
-                <DropdownMenuLabel className="text-tertiary text-xs">
+                <DropdownMenuLabel className="text-muted-foreground text-xs">
                   Projects
                 </DropdownMenuLabel>
                 {projects.length === 0 && (
-                  <DropdownMenuItem className="text-tertiary" disabled>
+                  <DropdownMenuItem className="text-muted-foreground" disabled>
                     No projects yet
                   </DropdownMenuItem>
                 )}
@@ -233,7 +242,12 @@ export function ProjectSwitcher({
                       ) : (
                         <>
                           {selected ? (
-                            <Check className="ml-auto size-3.5 shrink-0 group-hover/project:invisible" />
+                            <Check
+                              className={cn(
+                                "ml-auto group-hover/project:invisible",
+                                APP_ICON_CLASS
+                              )}
+                            />
                           ) : (
                             <DropdownMenuShortcut className="ml-auto group-hover/project:invisible">
                               ⌘{index + 1}
@@ -267,9 +281,9 @@ export function ProjectSwitcher({
                   }}
                 >
                   <div className="flex size-6 items-center justify-center rounded-md bg-foreground/5">
-                    <Plus className="size-4" />
+                    <Plus className={APP_ICON_CLASS} />
                   </div>
-                  <span className="font-medium text-tertiary">
+                  <span className="font-medium text-muted-foreground">
                     {creating ? "Creating…" : "Create new project"}
                   </span>
                 </DropdownMenuItem>

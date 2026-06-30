@@ -1,39 +1,45 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useTheme } from "next-themes";
 import { Toaster as Sonner, type ToasterProps } from "sonner";
 import {
-  type ColorScheme,
-  getColorScheme,
-  subscribeColorScheme,
-} from "@/lib/theme-preferences";
+  IconAlertOctagon,
+  IconAlertTriangle,
+  IconCircleCheck,
+  IconInfoCircle,
+  IconLoader,
+} from "@/lib/icon";
 
-function Toaster({ ...props }: ToasterProps) {
-  const [scheme, setScheme] = useState<ColorScheme>(() =>
-    typeof window === "undefined" ? "light" : getColorScheme()
-  );
-
-  useEffect(() => subscribeColorScheme(setScheme), []);
+const Toaster = ({ ...props }: ToasterProps) => {
+  const { theme = "system" } = useTheme();
 
   return (
     <Sonner
       className="toaster group"
-      closeButton
-      position="bottom-right"
-      theme={scheme}
+      icons={{
+        success: <IconCircleCheck className="size-4" />,
+        info: <IconInfoCircle className="size-4" />,
+        warning: <IconAlertTriangle className="size-4" />,
+        error: <IconAlertOctagon className="size-4" />,
+        loading: <IconLoader className="size-4 animate-spin" />,
+      }}
+      style={
+        {
+          "--normal-bg": "var(--popover)",
+          "--normal-text": "var(--popover-foreground)",
+          "--normal-border": "var(--border)",
+          "--border-radius": "var(--radius)",
+        } as React.CSSProperties
+      }
+      theme={theme as ToasterProps["theme"]}
       toastOptions={{
         classNames: {
-          toast:
-            "group toast group-[.toaster]:bg-background group-[.toaster]:text-foreground group-[.toaster]:border-border group-[.toaster]:shadow-sm",
-          description: "group-[.toast]:text-tertiary",
-          actionButton:
-            "group-[.toast]:bg-primary group-[.toast]:text-primary-foreground",
-          cancelButton: "group-[.toast]:bg-muted group-[.toast]:text-tertiary",
+          toast: "cn-toast",
         },
       }}
       {...props}
     />
   );
-}
+};
 
 export { Toaster };

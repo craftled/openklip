@@ -47,7 +47,7 @@ function findChrome(): string {
     try {
       inners = readdirSync(buildDir);
     } catch {
-      // Stray file (not a build dir) under the cache root — skip it.
+      // Stray file (not a build dir) under the cache root: skip it.
       continue;
     }
     for (const inner of inners) {
@@ -138,7 +138,7 @@ export async function renderHeadlessAlpha(
     await page.evaluate(() => document.fonts.ready);
     await page.addScriptTag({ content: bundle });
 
-    // Params are static for the whole render — bind text/accent ONCE, not per
+    // Params are static for the whole render. Bind text/accent ONCE, not per
     // frame (the per-frame loop only re-seeks the animation).
     await page.evaluate((params: unknown) => {
       const api = (

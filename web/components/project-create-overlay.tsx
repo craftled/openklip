@@ -32,9 +32,9 @@ export function ProjectCreateOverlay({
       <div className="flex w-full max-w-xs flex-col items-center gap-4 px-6 text-center">
         {phase === "creating" ? (
           <>
-            <Spinner className="size-10 text-tertiary" />
+            <Spinner />
             <div className="flex w-full flex-col items-center gap-2">
-              <p className="text-sm text-tertiary">
+              <p className="text-muted-foreground text-sm">
                 {progress
                   ? `${progress.message}… (${progress.step}/${progress.total})`
                   : "Creating project…"}
@@ -51,7 +51,7 @@ export function ProjectCreateOverlay({
           </>
         ) : (
           <>
-            <SuccessCheck className="text-success" size={64} />
+            <SuccessCheck />
             {slug ? <p className="font-medium text-sm">{slug}</p> : null}
           </>
         )}

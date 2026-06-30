@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { Trash2, X } from "@/lib/icon";
 import { cn } from "@/lib/utils";
 
@@ -28,49 +29,55 @@ export function ProjectDeleteAction({
         className={cn("ml-auto flex shrink-0 items-center gap-1", className)}
         onClick={(e) => e.stopPropagation()}
       >
-        <span className="text-[11px] text-tertiary">Delete?</span>
-        <button
+        <span className="text-[11px] text-muted-foreground">Delete?</span>
+        <Button
           aria-label={`Confirm delete project ${slug}`}
-          className="inline-flex size-5 cursor-pointer items-center justify-center rounded-sm text-destructive hover:bg-destructive/10 disabled:opacity-50"
+          className="rounded-sm text-destructive hover:bg-destructive/10"
           disabled={deleting}
           onClick={(e) => {
             e.stopPropagation();
             onConfirm();
           }}
+          size="icon-sm"
           type="button"
+          variant="ghost"
         >
-          <Trash2 className="size-3" />
-        </button>
-        <button
+          <Trash2 />
+        </Button>
+        <Button
           aria-label={`Cancel delete project ${slug}`}
-          className="inline-flex size-5 cursor-pointer items-center justify-center rounded-sm text-tertiary hover:bg-muted disabled:opacity-50"
+          className="rounded-sm text-muted-foreground hover:bg-muted"
           disabled={deleting}
           onClick={(e) => {
             e.stopPropagation();
             onCancel();
           }}
+          size="icon-sm"
           type="button"
+          variant="ghost"
         >
-          <X className="size-3" />
-        </button>
+          <X />
+        </Button>
       </span>
     );
   }
 
   return (
-    <button
+    <Button
       aria-label={`Delete project ${slug}`}
       className={cn(
-        "ml-auto inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-sm text-tertiary opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive focus-visible:opacity-100 group-hover/project:opacity-100",
+        "ml-auto shrink-0 rounded-sm text-muted-foreground opacity-0 hover:bg-destructive/10 hover:text-destructive focus-visible:opacity-100 group-hover/project:opacity-100",
         className
       )}
       onClick={(e) => {
         e.stopPropagation();
         onRequestDelete();
       }}
+      size="icon-sm"
       type="button"
+      variant="ghost"
     >
-      <Trash2 className="size-3.5" />
-    </button>
+      <Trash2 />
+    </Button>
   );
 }

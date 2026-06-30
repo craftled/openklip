@@ -63,13 +63,13 @@ projects/<slug>/
 | `working/chats.json` | Agent sidebar threads (`src/chats.ts`, `/api/projects/[slug]/chats`) |
 | `output/out.mp4` | `openklip export` / export API |
 
-Agent sidebar chats use `working/chats.json`, not `localStorage` (theme and default-agent preferences still use `localStorage` in the browser).
+Agent sidebar chats use `working/chats.json`, not `localStorage` (color scheme and default-agent preferences still use `localStorage` in the browser).
 
 ---
 
 ## What works today
 
-Verified against the current codebase (585 tests, v0.8.10.0):
+Verified against the current codebase (572 tests, v0.8.10.0):
 
 - **Ingest**: video → local transcript + preview proxy + `project.json` (`openklip ingest`; refuses re-ingest unless `--force`)
 - **Transcript editing**: click words to toggle `deleted`; `openklip cut` / `cut --text` / `restore` on CLI
@@ -94,7 +94,7 @@ Verified against the current codebase (585 tests, v0.8.10.0):
 - **MCP server**: `openklip mcp` (stdio) exposes 52 tools with CLI/GUI parity; `.cursor/mcp.json` wired for Cursor
 - **Edit templates**: `templates/<id>/skill.md` playbooks; `openklip template set`; brand presets at ingest (`openklip brand`)
 - **Agent selector**: drive filler cuts via Claude Code, Codex, Cursor, or Grok subscription CLIs
-- **Design system**: OKLCH theme tokens (`themes/*.json`, `app/theme-base.css`); icons via `web/lib/icon.tsx`; swappable theme presets with light/dark scheme
+- **Design system**: default shadcn/ui tokens with Base UI primitives (`app/globals.css`, `components.json`); light/dark via `.dark` class; icons via `web/lib/icon.tsx`
 - **Agent demo**: `bun run agent-demo` (phrase list → cut → status → optional export)
 
 Phrase-based cutting is CLI/MCP-only today (`openklip cut --text`). The transcript UI is word click, not phrase search. First project on a machine: use `openklip ingest` from the CLI, or pick a folder in the GUI (macOS) that already contains ingested projects. Known gaps: **[TODO.md](./TODO.md)**.

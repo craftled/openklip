@@ -16,6 +16,7 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -89,6 +90,10 @@ const KNOBS: KnobDef[] = [
     kind: "mult",
   },
 ];
+
+function firstSliderValue(value: number | readonly number[]): number {
+  return typeof value === "number" ? value : value[0];
+}
 
 function formatKnob(knob: KnobDef, value: number): string {
   if (knob.kind === "mult") {
@@ -212,17 +217,14 @@ export function GradeControlRoom({
 
   return (
     <Dialog onOpenChange={setOpen} open={open}>
-      <DialogTrigger asChild>
-        <Button
-          aria-label="Open grade control room"
-          className="h-8 gap-1.5"
-          size="sm"
-          variant="outline"
-        >
-          <Palette className="size-3.5" />
-          Grade
-        </Button>
-      </DialogTrigger>
+      <DialogTrigger
+        render={
+          <Button aria-label="Open grade control room" variant="outline">
+            <Palette data-icon="inline-start" />
+            Grade
+          </Button>
+        }
+      />
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Grade control room</DialogTitle>
@@ -254,7 +256,7 @@ export function GradeControlRoom({
             </div>
             <div className="flex items-center gap-2">
               <Button
-                className="h-7 flex-1"
+                className="flex-1"
                 onPointerDown={() => setComparing(true)}
                 onPointerLeave={() => setComparing(false)}
                 onPointerUp={() => setComparing(false)}
@@ -264,19 +266,29 @@ export function GradeControlRoom({
               >
                 Hold to compare base
               </Button>
-              <Select onValueChange={(v) => onGrade(v as Grade)} value={grade}>
+              <Select
+                onValueChange={(v) => {
+                  if (v) {
+                    onGrade(v as Grade);
+                  }
+                }}
+                value={grade}
+              >
                 <SelectTrigger
                   aria-label="Base grade"
-                  className="h-7 w-[7.5rem]"
+                  className="w-[7.5rem]"
+                  size="sm"
                 >
                   <SelectValue placeholder="Grade" />
                 </SelectTrigger>
                 <SelectContent>
-                  {GRADE_OPTIONS.map((g) => (
-                    <SelectItem key={g.id} value={g.id}>
-                      {g.label}
-                    </SelectItem>
-                  ))}
+                  <SelectGroup>
+                    {GRADE_OPTIONS.map((g) => (
+                      <SelectItem key={g.id} value={g.id}>
+                        {g.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
                 </SelectContent>
               </Select>
             </div>
@@ -298,8 +310,10 @@ export function GradeControlRoom({
                 <Slider
                   max={knob.max}
                   min={knob.min}
-                  onValueChange={(v) => onKnob(knob.key, v[0])}
-                  onValueCommit={(v) => commit(knob.key, v[0])}
+                  onValueChange={(v) => onKnob(knob.key, firstSliderValue(v))}
+                  onValueCommitted={(v) =>
+                    commit(knob.key, firstSliderValue(v))
+                  }
                   step={knob.step}
                   value={[live[knob.key]]}
                 />
@@ -309,14 +323,8 @@ export function GradeControlRoom({
               <span className="truncate text-muted-foreground text-xs">
                 {summary}
               </span>
-              <Button
-                className="h-7 gap-1.5"
-                onClick={reset}
-                size="sm"
-                type="button"
-                variant="ghost"
-              >
-                <RotateCcw className="size-3.5" />
+              <Button onClick={reset} size="sm" type="button" variant="ghost">
+                <RotateCcw data-icon="inline-start" />
                 Reset
               </Button>
             </div>

@@ -22,7 +22,7 @@ import {
   toastError,
   toastWorkspacePickFailed,
 } from "@/lib/app-toast";
-import { Check, Film, FolderOpen, Upload } from "@/lib/icon";
+import { APP_ICON_CLASS, Check, Film, FolderOpen, Upload } from "@/lib/icon";
 import { workspacePickerToasts } from "@/lib/toast-notifications";
 import { cn } from "@/lib/utils";
 import {
@@ -60,20 +60,20 @@ function StepPill({
         "flex items-center gap-2 rounded-full border px-3 py-1 text-xs transition-colors",
         active
           ? "border-border bg-foreground/5 text-foreground"
-          : "border-transparent text-tertiary"
+          : "border-transparent text-muted-foreground"
       )}
     >
       <span
         className={cn(
           "flex size-5 items-center justify-center rounded-full font-medium",
           done
-            ? "bg-success/15 text-success"
+            ? "bg-primary/15 text-primary"
             : active
               ? "bg-foreground text-background"
               : "bg-foreground/10"
         )}
       >
-        {done ? <Check className="size-3" /> : step}
+        {done ? <Check /> : step}
       </span>
       {label}
     </div>
@@ -220,23 +220,23 @@ export function NewProjectDialog({
 
         {loadingWorkspace && !workspace ? (
           <div className="flex justify-center py-8">
-            <Spinner className="size-6 text-tertiary" />
+            <Spinner />
           </div>
         ) : showFolderStep ? (
           <div className="space-y-4">
-            <div className="rounded-lg border border-border border-dashed bg-foreground-2 p-5">
+            <div className="rounded-lg border border-border border-dashed bg-muted/40 p-5">
               <div className="flex items-start gap-3">
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-foreground-5">
-                  <FolderOpen className="size-5 text-tertiary" />
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+                  <FolderOpen className={APP_ICON_CLASS} />
                 </div>
                 <div className="min-w-0 space-y-1">
                   <p className="font-medium text-sm">Workspace folder</p>
-                  <p className="text-tertiary text-xs leading-relaxed">
+                  <p className="text-muted-foreground text-xs leading-relaxed">
                     Projects, transcripts, and exports live here as plain
                     folders you can back up or sync.
                   </p>
                   {workspace?.displayRoot ? (
-                    <p className="truncate text-code text-tertiary">
+                    <p className="truncate font-mono text-muted-foreground text-xs">
                       {workspace.displayRoot}
                     </p>
                   ) : null}
@@ -249,7 +249,7 @@ export function NewProjectDialog({
                 onClick={() => void onChooseFolder()}
                 type="button"
               >
-                <FolderOpen className="size-4" />
+                <FolderOpen data-icon="inline-start" />
                 {pickingFolder ? "Choosing…" : "Choose folder…"}
               </Button>
             </DialogFooter>
@@ -257,7 +257,7 @@ export function NewProjectDialog({
         ) : (
           <div className="space-y-4">
             {workspace?.displayRoot ? (
-              <p className="truncate text-code text-tertiary">
+              <p className="truncate font-mono text-muted-foreground text-xs">
                 {workspace.displayRoot}
               </p>
             ) : null}
@@ -265,8 +265,8 @@ export function NewProjectDialog({
               className={cn(
                 "rounded-lg border border-dashed p-8 text-center transition-colors",
                 dragging
-                  ? "border-success bg-success/10"
-                  : "border-border bg-foreground-2"
+                  ? "border-primary bg-primary/10"
+                  : "border-border bg-muted/40"
               )}
               onDragEnter={(e) => {
                 e.preventDefault();
@@ -281,11 +281,11 @@ export function NewProjectDialog({
               onDragOver={(e) => e.preventDefault()}
               onDrop={onDrop}
             >
-              <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-full bg-foreground-5">
-                <Film className="size-6 text-tertiary" />
+              <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-full bg-muted">
+                <Film className={APP_ICON_CLASS} />
               </div>
               <p className="font-medium text-sm">Drop a video here</p>
-              <p className="mt-1 text-tertiary text-xs">
+              <p className="mt-1 text-muted-foreground text-xs">
                 MP4, MOV, or WebM. OpenKlip transcribes speech and builds your
                 edit.
               </p>
@@ -295,12 +295,12 @@ export function NewProjectDialog({
                 type="button"
                 variant="default"
               >
-                <Upload className="size-4" />
+                <Upload data-icon="inline-start" />
                 Choose video…
               </Button>
             </div>
             {workspace?.pickerSupported || workspace?.configured ? null : (
-              <p className="text-tertiary text-xs leading-relaxed">
+              <p className="text-muted-foreground text-xs leading-relaxed">
                 Set <code>OPENKLIP_PROJECTS_ROOT</code> to choose a custom
                 projects directory on this platform.
               </p>

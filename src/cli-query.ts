@@ -109,8 +109,8 @@ export function runOverlays(
   if (options.json) {
     return jsonOut(overlays);
   }
-  // Append the human rationale (F1 note) as a trailing ` — <why>` on the line.
-  const noteSuffix = (note?: string) => (note ? ` — ${note}` : "");
+  // Append the human rationale (F1 note) as a trailing `: <why>` on the line.
+  const noteSuffix = (note?: string) => (note ? `: ${note}` : "");
   const lines: string[] = [];
   lines.push(`b-roll (${overlays.broll.length}):`);
   for (const b of overlays.broll) {

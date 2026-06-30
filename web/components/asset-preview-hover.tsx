@@ -4,7 +4,7 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { BinAsset } from "@/components/asset-bin";
 import { MediaAudioVisualizerWave } from "@/components/media-audio-visualizer-wave";
-import { Music } from "@/lib/icon";
+import { APP_ICON_CLASS, Music } from "@/lib/icon";
 import { cn } from "@/lib/utils";
 
 const PREVIEW_WIDTH = 192;
@@ -66,7 +66,7 @@ function MusicPreview({ src }: { src: string }) {
         />
       ) : (
         <>
-          <Music className="size-10 text-white/40" />
+          <Music className={APP_ICON_CLASS} />
           <span className="text-white/50 text-xs">
             {failed ? "Preview unavailable" : "Loading…"}
           </span>
@@ -142,7 +142,9 @@ function AssetPreviewPanel({
           />
         )}
       </div>
-      <p className="truncate px-2 py-1.5 text-tertiary text-xs">{asset.name}</p>
+      <p className="truncate px-2 py-1.5 text-muted-foreground text-xs">
+        {asset.name}
+      </p>
     </div>,
     document.body
   );

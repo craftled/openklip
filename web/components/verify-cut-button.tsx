@@ -47,7 +47,8 @@ export function VerifyCutButton() {
       variant="outline"
     >
       <Check
-        className={cn("size-3.5", verifying && "animate-pulse text-tertiary")}
+        className={cn(verifying && "animate-pulse")}
+        data-icon="inline-start"
       />
       {verifying ? "Verifying cut…" : "Verify cut"}
     </Button>

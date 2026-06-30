@@ -2,7 +2,7 @@
 
 import { type KeyboardEvent, useEffect, useRef } from "react";
 import { PromptInputTextarea } from "@/components/ai-elements/prompt-input";
-import { Box } from "@/lib/icon";
+import { APP_ICON_CLASS, Box } from "@/lib/icon";
 import type { SkillEntry } from "@/lib/skills-catalog";
 import { cn } from "@/lib/utils";
 
@@ -56,7 +56,7 @@ export function AgentSkillTokenField({
       ref={containerRef}
     >
       <span className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-muted px-1.5 py-0.5 text-foreground">
-        <Box aria-hidden className="size-4 shrink-0" />
+        <Box aria-hidden className={APP_ICON_CLASS} />
         <span className="font-medium text-sm">{skill.title}</span>
       </span>
       <PromptInputTextarea

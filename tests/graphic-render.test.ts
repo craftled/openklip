@@ -117,7 +117,7 @@ test("text-kind graphic authors a local timebase starting at t=0", async () => {
 
 // Rich path: gated on chrome-headless-shell (the only optional runtime dep). When
 // absent, renderGraphicOverlay must throw a clear, actionable error rather than
-// hang or fake success. When present, this test is skipped — the real render
+// hang or fake success. When present, this test is skipped, the real render
 // spawns headless Chrome and is covered by manual/integration verification.
 function chromeHeadlessInstalled(): boolean {
   const base = join(homedir(), ".cache", "puppeteer", "chrome-headless-shell");

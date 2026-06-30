@@ -16,6 +16,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { Button } from "@/components/ui/button";
 import { applyDragReorder } from "@/lib/dnd-reorder";
 import { GripVertical } from "@/lib/icon";
 import { cn } from "@/lib/utils";
@@ -54,22 +55,25 @@ function Row({
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
     >
-      <button
+      <Button
         aria-label={`Drag ${label} to reorder`}
-        className="cursor-grab touch-none text-tertiary active:cursor-grabbing"
+        className="cursor-grab touch-none rounded-sm text-muted-foreground active:cursor-grabbing"
+        size="icon-sm"
         type="button"
+        variant="ghost"
         {...attributes}
         {...listeners}
       >
-        <GripVertical className="size-3.5" />
-      </button>
-      <button
-        className="min-w-0 flex-1 cursor-pointer truncate text-left"
+        <GripVertical />
+      </Button>
+      <Button
+        className="h-auto min-w-0 flex-1 justify-start truncate rounded-sm px-1 py-0 text-left"
         onClick={() => onSelect?.(id)}
         type="button"
+        variant="ghost"
       >
         {label}
-      </button>
+      </Button>
     </div>
   );
 }

@@ -279,11 +279,11 @@ export async function exportCut(
   //   - kind 'text' -> an ASS burn (combined into one graphics.ass below, exactly
   //     like titles; the seam's per-overlay text path is the unit-testable
   //     surface but the exporter builds the combined file directly for parity
-  //     with titles — keep this duplication, do NOT route text graphics back
+  //     with titles. Keep this duplication, do NOT route text graphics back
   //     through the per-overlay seam or the local/output timebase will mismatch).
   //   - kind 'rich' -> a transparent ProRes MOV composited as one extra input.
   // One planning pass: map each Graphic to its output window + manifest + merged
-  // params. NO renderer-seam call here — text graphics are burned directly into
+  // params. NO renderer-seam call here: text graphics are burned directly into
   // the combined graphics.ass below (parity with titles), so only rich graphics
   // pay for a headless render and no wasted per-overlay .ass file is written.
   const graphicsPlanned = (project.graphics ?? [])
@@ -351,7 +351,7 @@ export async function exportCut(
   // never collide on one file. Input-index invariant: physical -i order is
   // source(0), b-roll plans, stills, THEN rich graphics. The
   // `1 + plans.length + stillPlans.length + j` math MUST match the flatMap append
-  // order in the inputs array — the single most likely off-by-one bug, so the
+  // order in the inputs array. This is the single most likely off-by-one bug, so the
   // index math and the append order live together.
   const richRendered = await Promise.all(
     graphicsPlanned
@@ -526,7 +526,7 @@ export async function exportCut(
   }
 
   // Rich graphics sit on top of the grade/vignette, just below the subtitle
-  // burns (captions/titles/text-graphics) — same editorial layer as titles. The
+  // burns (captions/titles/text-graphics), the same editorial layer as titles. The
   // alpha MOV carries its own duration + transparency, so just PTS-offset to its
   // output start, scale to the frame, and overlay within its enable window
   // (mirrors the still overlay loop above; eof_action=pass like b-roll/stills).

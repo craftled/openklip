@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Check } from "@/lib/icon";
 import { cn } from "@/lib/utils";
 import {
   type SuccessCheckState,
@@ -31,21 +32,7 @@ export function SuccessCheck({
       className={cn("t-success-check", className)}
       data-state={state}
     >
-      <svg
-        aria-hidden="true"
-        fill="none"
-        height={size}
-        viewBox="0 0 48 48"
-        width={size}
-      >
-        <path
-          d="M14 26 L22 34 L36 16"
-          stroke="currentColor"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth="3"
-        />
-      </svg>
+      <Check aria-hidden="true" height={size} width={size} />
     </span>
   );
 }

@@ -25,14 +25,14 @@ export function SettingsView({
   const section = settingsSectionMeta(activeSection);
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col bg-app-shell">
+    <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col bg-background">
       <div className="flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-2xl px-6 py-8">
           <header className="mb-8">
             <h1 className="font-medium text-foreground text-xl tracking-tight">
               {section.label}
             </h1>
-            <p className="mt-1.5 text-[13px] text-tertiary leading-relaxed">
+            <p className="mt-1.5 text-[13px] text-muted-foreground leading-relaxed">
               {section.description}
             </p>
           </header>

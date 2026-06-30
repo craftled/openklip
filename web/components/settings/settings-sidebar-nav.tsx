@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CornerDownLeftIcon, Search } from "@/lib/icon";
 import {
@@ -49,26 +50,33 @@ export function SettingsSidebarNav({
   return (
     <div className="px-1.5 py-1.5">
       <div className="mb-3">
-        <button
+        <Button
           className={cn(
+            "h-auto justify-start",
             sidebarHeaderRowClass(),
             SIDEBAR_ROW_IDLE_TEXT_CLASS,
             SIDEBAR_ROW_HOVER_CLASS
           )}
           onClick={onBack}
           type="button"
+          variant="ghost"
         >
           <CornerDownLeftIcon className={SIDEBAR_HEADER_ICON_CLASS} />
           <span className={SIDEBAR_ROW_LABEL_TEXT_CLASS}>Back to app</span>
-        </button>
+        </Button>
       </div>
 
       <div className="mb-3 px-1">
         <div className="relative">
-          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground/70" />
+          <Search
+            className={cn(
+              "pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2",
+              SIDEBAR_HEADER_ICON_CLASS
+            )}
+          />
           <Input
             aria-label="Search settings"
-            className="h-7 border-border bg-background pl-8 text-[12px] shadow-none"
+            className="h-7 rounded-[min(var(--radius-md),12px)] border-border bg-background px-2 pl-8 text-xs shadow-none"
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search settings..."
             value={query}
@@ -88,23 +96,20 @@ export function SettingsSidebarNav({
               const isActive = item.id === activeSection;
               return (
                 <li key={item.id}>
-                  <button
+                  <Button
                     aria-current={isActive ? "page" : undefined}
                     className={cn(
+                      "h-auto justify-start",
                       sidebarHeaderRowClass(isActive),
-                      isActive
-                        ? SIDEBAR_ROW_ACTIVE_CLASS
-                        : cn(
-                            SIDEBAR_ROW_LABEL_TEXT_CLASS,
-                            SIDEBAR_ROW_HOVER_CLASS
-                          )
+                      SIDEBAR_ROW_LABEL_TEXT_CLASS
                     )}
                     onClick={() => onSelectSection(item.id)}
                     type="button"
+                    variant="ghost"
                   >
                     <Icon className={SIDEBAR_HEADER_ICON_CLASS} />
                     <span className="truncate">{item.label}</span>
-                  </button>
+                  </Button>
                 </li>
               );
             })}
@@ -137,9 +142,10 @@ export function SettingsSidebarNav({
                     const isActive = item.id === activeSection;
                     return (
                       <li key={item.id}>
-                        <button
+                        <Button
                           aria-current={isActive ? "page" : undefined}
                           className={cn(
+                            "h-auto justify-start",
                             sidebarHeaderRowClass(isActive),
                             isActive
                               ? SIDEBAR_ROW_ACTIVE_CLASS
@@ -150,10 +156,11 @@ export function SettingsSidebarNav({
                           )}
                           onClick={() => onSelectSection(item.id)}
                           type="button"
+                          variant="ghost"
                         >
                           <Icon className={SIDEBAR_HEADER_ICON_CLASS} />
                           <span className="truncate">{item.label}</span>
-                        </button>
+                        </Button>
                       </li>
                     );
                   })}

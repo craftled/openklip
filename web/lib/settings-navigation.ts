@@ -23,7 +23,7 @@ export const SETTINGS_NAV_ITEMS: ReadonlyArray<SettingsNavItem> = [
     id: "appearance",
     group: "app",
     label: "Appearance",
-    description: "Color scheme and editor theme presets.",
+    description: "Light or dark color scheme.",
     icon: Palette,
   },
   {

@@ -28,15 +28,20 @@ import {
   setDefaultAgentModel,
   subscribeDefaultAgent,
 } from "@/lib/agent-preferences";
-import { Film, FolderOpen, Plus, SettingsIcon, Sparkles } from "@/lib/icon";
+import {
+  APP_ICON_CLASS,
+  Film,
+  FolderOpen,
+  Plus,
+  SettingsIcon,
+  Sparkles,
+} from "@/lib/icon";
 import { createProjectFromVideo } from "@/lib/project-create";
 import type { SettingsSectionId } from "@/lib/settings-navigation";
 import {
   SIDEBAR_LEADING_GLYPH_CLASS,
-  SIDEBAR_ROW_HOVER_CLASS,
-  SIDEBAR_ROW_IDLE_TEXT_CLASS,
+  SIDEBAR_MENU_HEADER_CLASS,
   SIDEBAR_ROW_LABEL_TEXT_CLASS,
-  sidebarHeaderRowClass,
 } from "@/lib/sidebar-row-styles";
 import { cn } from "@/lib/utils";
 import { fetchWorkspace, type WorkspaceInfo } from "@/lib/workspace-client";
@@ -144,16 +149,16 @@ export function EmptyWorkspace() {
                   <SidebarMenuItem>
                     <SidebarMenuButton
                       className={cn(
-                        sidebarHeaderRowClass(),
+                        SIDEBAR_MENU_HEADER_CLASS,
                         "pointer-events-none"
                       )}
                       size="sm"
                     >
-                      <FolderOpen className="size-4 shrink-0 opacity-70" />
+                      <FolderOpen className={APP_ICON_CLASS} />
                       <span className="min-w-0 flex-1 truncate text-foreground/95">
                         No project yet
                       </span>
-                      <span className="shrink-0 text-[12px] text-tertiary/40">
+                      <span className="shrink-0 text-[12px] text-muted-foreground/40">
                         {folderReady ? "Add a video" : "Choose folder"}
                       </span>
                     </SidebarMenuButton>
@@ -164,11 +169,11 @@ export function EmptyWorkspace() {
                 <SidebarMenu className="px-1.5 pt-1">
                   <SidebarMenuItem>
                     <SidebarMenuButton
-                      className={sidebarHeaderRowClass()}
+                      className={SIDEBAR_MENU_HEADER_CLASS}
                       onClick={() => setDialogOpen(true)}
                       size="sm"
                     >
-                      <Plus className="size-4 shrink-0" />
+                      <Plus className={APP_ICON_CLASS} />
                       <span>New project</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -178,11 +183,7 @@ export function EmptyWorkspace() {
                 <SidebarMenu>
                   <SidebarMenuItem>
                     <SidebarMenuButton
-                      className={cn(
-                        sidebarHeaderRowClass(),
-                        SIDEBAR_ROW_IDLE_TEXT_CLASS,
-                        SIDEBAR_ROW_HOVER_CLASS
-                      )}
+                      className={SIDEBAR_MENU_HEADER_CLASS}
                       onClick={() => setSettingsOpen(true)}
                       size="sm"
                     >
@@ -198,7 +199,7 @@ export function EmptyWorkspace() {
           )}
           <SidebarRail />
         </Sidebar>
-        <SidebarInset className="flex min-h-svh flex-col bg-app-shell">
+        <SidebarInset className="flex min-h-svh flex-col bg-background">
           {settingsOpen ? (
             <SettingsView
               activeSection={settingsSection}
@@ -209,20 +210,20 @@ export function EmptyWorkspace() {
             />
           ) : (
             <main className="flex flex-1 flex-col items-center justify-center gap-6 p-8 text-center">
-              <div className="flex size-14 items-center justify-center rounded-lg border border-border bg-surface-1">
-                <Sparkles className="size-7 text-tertiary" />
+              <div className="flex size-14 items-center justify-center rounded-lg border border-border bg-muted">
+                <Sparkles className={APP_ICON_CLASS} />
               </div>
               <div className="max-w-md space-y-2">
                 <h1 className="font-semibold text-xl tracking-tight">
                   Welcome to OpenKlip
                 </h1>
-                <p className="text-sm text-tertiary leading-relaxed">
+                <p className="text-muted-foreground text-sm leading-relaxed">
                   {folderReady
                     ? "Your workspace is ready. Add a video to transcribe, cut filler, and export."
                     : "Choose a folder for your projects, then add a video to get started."}
                 </p>
                 {workspace?.displayRoot ? (
-                  <p className="truncate text-code text-tertiary">
+                  <p className="truncate font-mono text-muted-foreground text-xs">
                     {workspace.displayRoot}
                   </p>
                 ) : null}
@@ -230,30 +231,30 @@ export function EmptyWorkspace() {
               <div className="flex flex-wrap items-center justify-center gap-3">
                 {folderReady ? (
                   <Button onClick={() => setDialogOpen(true)} type="button">
-                    <Film className="size-4" />
+                    <Film data-icon="inline-start" />
                     Add video
                   </Button>
                 ) : (
                   <Button onClick={() => setDialogOpen(true)} type="button">
-                    <FolderOpen className="size-4" />
+                    <FolderOpen data-icon="inline-start" />
                     Choose folder
                   </Button>
                 )}
               </div>
               {inboxJobs.length > 0 ? (
-                <div className="flex flex-col items-center gap-1 rounded-lg border border-border bg-surface-1 px-4 py-3">
+                <div className="flex flex-col items-center gap-1 rounded-lg border border-border bg-muted px-4 py-3">
                   {inboxJobs.map((job) => (
-                    <p className="text-sm text-tertiary" key={job.id}>
+                    <p className="text-muted-foreground text-sm" key={job.id}>
                       Ingesting {job.filename}
                       {job.progress
-                        ? ` — ${job.progress.message}… (${job.progress.step}/${job.progress.total})`
+                        ? `: ${job.progress.message}… (${job.progress.step}/${job.progress.total})`
                         : "…"}
                     </p>
                   ))}
                 </div>
               ) : null}
               {!dialogOpen && folderReady && inboxJobs.length === 0 ? (
-                <p className="max-w-sm text-tertiary text-xs">
+                <p className="max-w-sm text-muted-foreground text-xs">
                   Tip: drop a video into your projects folder to auto-ingest it,
                   or use <code>openklip ingest &lt;video&gt;</code> from the
                   CLI.

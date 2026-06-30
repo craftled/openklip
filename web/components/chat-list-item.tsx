@@ -13,6 +13,7 @@ import { ChatProgressIndicator } from "@/components/chat-progress-indicator";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
@@ -26,6 +27,7 @@ import {
 import type { AgentThread } from "@/lib/agent-threads";
 import { isChatThreadCompleted } from "@/lib/chat-list";
 import {
+  APP_ICON_CLASS,
   Archive,
   MessageSquare,
   MoreHorizontal,
@@ -34,7 +36,7 @@ import {
   Trash2,
 } from "@/lib/icon";
 import type { ProjectHoverContext } from "@/lib/project-context";
-import { sidebarThreadRowClass } from "@/lib/sidebar-row-styles";
+import { SIDEBAR_MENU_THREAD_CLASS } from "@/lib/sidebar-row-styles";
 import { cn } from "@/lib/utils";
 
 interface ChatListItemProps {
@@ -110,7 +112,7 @@ export function ChatListItem({
     <SidebarMenuItem>
       {isRenaming ? (
         <Input
-          className="h-7 border-border bg-background px-2 text-xs shadow-none focus-visible:ring-1"
+          className="h-7 rounded-[min(var(--radius-md),12px)] border-border bg-background px-2 text-xs shadow-none focus-visible:ring-1"
           onBlur={commitRename}
           onChange={(e) => setDraftTitle(e.target.value)}
           onKeyDown={onRenameKeyDown}
@@ -126,10 +128,7 @@ export function ChatListItem({
         >
           <SidebarMenuButton
             aria-busy={inProgress}
-            className={cn(
-              sidebarThreadRowClass(isActive),
-              archived && "opacity-70"
-            )}
+            className={cn(SIDEBAR_MENU_THREAD_CLASS, archived && "opacity-70")}
             isActive={isActive}
             onClick={onSelect}
             size="sm"
@@ -139,10 +138,10 @@ export function ChatListItem({
             ) : isChatThreadCompleted(thread) ? (
               <ChatCompletedIndicator />
             ) : (
-              <MessageSquare className="size-4 shrink-0 opacity-70" />
+              <MessageSquare className={APP_ICON_CLASS} />
             )}
             <span className="min-w-0 flex-1 truncate">{thread.title}</span>
-            <span className="shrink-0 text-[12px] text-tertiary/58 tabular-nums">
+            <span className="shrink-0 text-[12px] text-muted-foreground/58 tabular-nums">
               {timeLabel}
             </span>
           </SidebarMenuButton>
@@ -153,20 +152,22 @@ export function ChatListItem({
               }
             }}
           >
-            <DropdownMenuTrigger asChild>
-              <SidebarMenuAction
-                aria-label={`Chat actions for ${thread.title}`}
-                onClick={(e) => e.stopPropagation()}
-                showOnHover
-              >
-                <MoreHorizontal className="size-4" />
-              </SidebarMenuAction>
-            </DropdownMenuTrigger>
+            <DropdownMenuTrigger
+              render={
+                <SidebarMenuAction
+                  aria-label={`Chat actions for ${thread.title}`}
+                  onClick={(e) => e.stopPropagation()}
+                  showOnHover
+                >
+                  <MoreHorizontal />
+                </SidebarMenuAction>
+              }
+            />
             <DropdownMenuContent align="start" side="right">
               {confirmDelete ? (
-                <>
+                <DropdownMenuGroup>
                   <DropdownMenuItem
-                    className="text-tertiary text-xs focus:bg-transparent"
+                    className="text-muted-foreground text-xs focus:bg-transparent"
                     disabled
                   >
                     Delete &ldquo;{thread.title}&rdquo;?
@@ -190,9 +191,9 @@ export function ChatListItem({
                   >
                     Cancel
                   </DropdownMenuItem>
-                </>
+                </DropdownMenuGroup>
               ) : (
-                <>
+                <DropdownMenuGroup>
                   <DropdownMenuItem
                     onClick={(e) => {
                       e.stopPropagation();
@@ -234,7 +235,7 @@ export function ChatListItem({
                     <Trash2 />
                     Delete
                   </DropdownMenuItem>
-                </>
+                </DropdownMenuGroup>
               )}
             </DropdownMenuContent>
           </DropdownMenu>

@@ -1,6 +1,7 @@
 "use client";
 
 import { type MouseEvent, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { toastRevealError } from "@/lib/app-toast";
 import { FolderOpen } from "@/lib/icon";
 import {
@@ -59,20 +60,22 @@ export function ProjectInlineFolderAction({
   const label = `Open ${slug} ${REVEAL_LABEL[target]}`;
 
   return (
-    <button
+    <Button
       aria-label={label}
       className={cn(
-        "inline-flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-sm text-tertiary opacity-0 transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100 disabled:opacity-50",
+        "shrink-0 rounded-sm text-muted-foreground opacity-0 hover:bg-muted hover:text-foreground focus-visible:opacity-100",
         hoverClass,
         className
       )}
       disabled={opening}
       onClick={reveal}
+      size="icon-sm"
       title={label}
       type="button"
+      variant="ghost"
     >
-      <FolderOpen className="size-3" />
-    </button>
+      <FolderOpen />
+    </Button>
   );
 }
 
@@ -89,19 +92,21 @@ export function ProjectFolderButton({
   const label = `Open ${slug} ${REVEAL_LABEL[target]}`;
 
   return (
-    <button
+    <Button
       aria-label={label}
       className={cn(
-        "inline-flex h-8 max-w-[10rem] shrink-0 cursor-pointer items-center gap-1.5 rounded-md px-2 font-medium text-sm text-tertiary transition-colors hover:bg-foreground/3 hover:text-foreground disabled:opacity-50",
+        "max-w-[10rem] shrink-0 justify-start text-muted-foreground hover:bg-foreground/3 hover:text-foreground",
         className
       )}
       disabled={opening}
       onClick={reveal}
+      size="sm"
       title={label}
       type="button"
+      variant="ghost"
     >
-      <FolderOpen className="size-3.5 shrink-0" />
+      <FolderOpen data-icon="inline-start" />
       <span className="truncate">{slug}</span>
-    </button>
+    </Button>
   );
 }

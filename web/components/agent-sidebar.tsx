@@ -50,10 +50,8 @@ import { relativeTimeShort } from "@/lib/relative-time";
 import type { SettingsSectionId } from "@/lib/settings-navigation";
 import {
   SIDEBAR_LEADING_GLYPH_CLASS,
-  SIDEBAR_ROW_HOVER_CLASS,
-  SIDEBAR_ROW_IDLE_TEXT_CLASS,
+  SIDEBAR_MENU_HEADER_CLASS,
   SIDEBAR_ROW_LABEL_TEXT_CLASS,
-  sidebarHeaderRowClass,
 } from "@/lib/sidebar-row-styles";
 import { cn } from "@/lib/utils";
 
@@ -203,7 +201,7 @@ export function AgentSidebar({
               <SidebarMenu className="gap-0.5">
                 <SidebarMenuItem>
                   <SidebarMenuButton
-                    className={sidebarHeaderRowClass()}
+                    className={SIDEBAR_MENU_HEADER_CLASS}
                     onClick={onNewChat}
                     size="sm"
                   >
@@ -214,7 +212,12 @@ export function AgentSidebar({
                 <SidebarMenuItem>
                   {searchOpen ? (
                     <div className="relative">
-                      <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground/70" />
+                      <Search
+                        className={cn(
+                          "pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2",
+                          SIDEBAR_LEADING_GLYPH_CLASS
+                        )}
+                      />
                       <SidebarInput
                         autoFocus
                         className="pl-8"
@@ -230,11 +233,7 @@ export function AgentSidebar({
                     </div>
                   ) : (
                     <SidebarMenuButton
-                      className={cn(
-                        sidebarHeaderRowClass(),
-                        SIDEBAR_ROW_IDLE_TEXT_CLASS,
-                        SIDEBAR_ROW_HOVER_CLASS
-                      )}
+                      className={SIDEBAR_MENU_HEADER_CLASS}
                       onClick={() => setSearchOpen(true)}
                       size="sm"
                     >
@@ -255,7 +254,7 @@ export function AgentSidebar({
               <CollapsibleSidebarSection defaultOpen title="Chats">
                 <SidebarMenu>
                   {chatEmptyLabel && (
-                    <p className="px-2 py-1 text-[12px] text-tertiary/58">
+                    <p className="px-2 py-1 text-[12px] text-muted-foreground/58">
                       {chatEmptyLabel}
                     </p>
                   )}
@@ -281,7 +280,7 @@ export function AgentSidebar({
                 </SidebarMenu>
                 {filteredArchivedChats.length > 0 && (
                   <>
-                    <p className="mt-2 mb-1 px-2 text-[12px] text-tertiary/58">
+                    <p className="mt-2 mb-1 px-2 text-[12px] text-muted-foreground/58">
                       Archived
                     </p>
                     <SidebarMenu>
@@ -343,11 +342,7 @@ export function AgentSidebar({
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton
-                  className={cn(
-                    sidebarHeaderRowClass(),
-                    SIDEBAR_ROW_IDLE_TEXT_CLASS,
-                    SIDEBAR_ROW_HOVER_CLASS
-                  )}
+                  className={SIDEBAR_MENU_HEADER_CLASS}
                   onClick={onOpenSettings}
                   size="sm"
                 >
@@ -382,7 +377,7 @@ export function AgentSidebarTrigger({ className }: { className?: string }) {
       title={label}
       variant="ghost"
     >
-      <PanelLeft className="size-4" />
+      <PanelLeft />
     </Button>
   );
 }

@@ -4,12 +4,13 @@ import { useCallback, useEffect, useState } from "react";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
 import { toastError } from "@/lib/app-toast";
-import { LayoutTemplate } from "@/lib/icon";
+import { APP_ICON_CLASS, LayoutTemplate } from "@/lib/icon";
 import { saveProjectEdits } from "../../app/actions.ts";
 
 export interface TemplateOption {
@@ -88,31 +89,37 @@ export function TemplateSelect({
   return (
     <Select
       disabled={saving}
-      onValueChange={(v) => void onValueChange(v)}
+      onValueChange={(v) => {
+        if (v) {
+          void onValueChange(v);
+        }
+      }}
       value={value}
     >
       <SelectTrigger
         aria-label="Edit template"
-        className="h-8 w-[min(100%,11rem)] gap-1.5 text-xs"
+        className="w-[min(100%,11rem)] gap-1.5 text-xs"
       >
-        <LayoutTemplate className="size-3.5 shrink-0 text-tertiary" />
+        <LayoutTemplate className={APP_ICON_CLASS} />
         <SelectValue placeholder="Template">
           {active?.label ?? value}
         </SelectValue>
       </SelectTrigger>
       <SelectContent align="start">
-        {options.map((opt) => (
-          <SelectItem key={opt.id} textValue={opt.label} value={opt.id}>
-            <div className="flex flex-col gap-0.5">
-              <span>{opt.label}</span>
-              {opt.description ? (
-                <span className="text-tertiary text-xs leading-snug">
-                  {opt.description}
-                </span>
-              ) : null}
-            </div>
-          </SelectItem>
-        ))}
+        <SelectGroup>
+          {options.map((opt) => (
+            <SelectItem key={opt.id} value={opt.id}>
+              <div className="flex flex-col gap-0.5">
+                <span>{opt.label}</span>
+                {opt.description ? (
+                  <span className="text-muted-foreground text-xs leading-snug">
+                    {opt.description}
+                  </span>
+                ) : null}
+              </div>
+            </SelectItem>
+          ))}
+        </SelectGroup>
       </SelectContent>
     </Select>
   );

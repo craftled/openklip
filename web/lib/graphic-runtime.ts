@@ -6,7 +6,7 @@
 // The contract a graphics/<id>/composition.html author relies on: the runtime
 // injects ONE number (the current frame) and every animated value is computed
 // from it (frame-purity, Remotion-style). No wall-clock, no CSS transitions,
-// no animation keyframes — those desync from frame-stepped export.
+// no animation keyframes. Those desync from frame-stepped export.
 import { cubicBezier, easeInOut, easeOut } from "motion";
 
 export type EaseName = "easeOut" | "easeInOut" | "spring";
@@ -48,7 +48,7 @@ function intAttr(el: Element, name: string, fallback: number): number {
 
 // Resolve a frame value that may be negative ("frames before the end"). A
 // non-negative value is absolute; a negative value N resolves to durFrames + N.
-// This is the SINGLE resolver shared by preview and export — keep it here only.
+// This is the SINGLE resolver shared by preview and export. Keep it here only.
 export function resolveFrame(value: number, durFrames: number): number {
   return value < 0 ? durFrames + value : value;
 }
@@ -92,7 +92,7 @@ function readAnim(el: Element, durFrames: number, height: number): AnimState {
 }
 
 // Inject bound params into [data-bind] elements (textContent, auto-escaped by
-// the DOM). Idempotent — safe to call whenever params change.
+// the DOM). Idempotent, safe to call whenever params change.
 export function applyGraphicParams(
   root: HTMLElement,
   params: Record<string, string | number | boolean>

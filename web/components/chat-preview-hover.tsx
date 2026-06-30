@@ -10,9 +10,16 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
+import { Button } from "@/components/ui/button";
 import type { AgentThread } from "@/lib/agent-threads";
 import { toastRevealError } from "@/lib/app-toast";
-import { Clock3, Film, FolderOpen, MessageSquare } from "@/lib/icon";
+import {
+  APP_ICON_CLASS,
+  Clock3,
+  Film,
+  FolderOpen,
+  MessageSquare,
+} from "@/lib/icon";
 import {
   basenamePath,
   formatDurationSec,
@@ -44,11 +51,11 @@ function InfoRow({
 }) {
   return (
     <div className="flex items-start gap-2.5">
-      <Icon className="mt-0.5 size-3.5 shrink-0 text-tertiary" />
+      <Icon className={cn("mt-0.5", APP_ICON_CLASS)} />
       <div className="min-w-0">
         <p className="truncate text-foreground text-xs">{label}</p>
         {detail ? (
-          <p className="truncate text-[11px] text-tertiary">{detail}</p>
+          <p className="truncate text-[11px] text-muted-foreground">{detail}</p>
         ) : null}
       </div>
     </div>
@@ -75,8 +82,8 @@ function FolderRow({ dirPath, slug }: { dirPath: string; slug: string }) {
 
   return (
     <div className="min-w-0">
-      <button
-        className="flex w-full cursor-pointer items-start gap-2.5 rounded-md px-0.5 py-0.5 text-left transition-colors hover:bg-muted/60 disabled:cursor-wait disabled:opacity-70"
+      <Button
+        className="h-auto w-full items-start justify-start gap-2.5 rounded-md px-0.5 py-0.5 text-left hover:bg-muted/60 disabled:cursor-wait disabled:opacity-70"
         disabled={opening}
         onMouseDown={(e) => {
           e.preventDefault();
@@ -84,12 +91,13 @@ function FolderRow({ dirPath, slug }: { dirPath: string; slug: string }) {
           void onOpen();
         }}
         type="button"
+        variant="ghost"
       >
-        <FolderOpen className="mt-0.5 size-3.5 shrink-0 text-tertiary" />
+        <FolderOpen className={cn("mt-0.5", APP_ICON_CLASS)} />
         <span className="min-w-0 truncate text-foreground text-xs underline-offset-2 hover:underline">
           {opening ? "Opening…" : dirPath}
         </span>
-      </button>
+      </Button>
     </div>
   );
 }
@@ -122,7 +130,7 @@ function ChatPreviewPanel({
 
   return createPortal(
     <div
-      className="popover-styled fixed z-[100] w-60 overflow-hidden rounded-lg p-3"
+      className="fixed z-[100] w-60 overflow-hidden rounded-lg border border-border bg-popover p-3 text-popover-foreground shadow-md"
       onPointerEnter={onPointerEnter}
       onPointerLeave={onPointerLeave}
       style={{ left: position.left, top: position.top }}

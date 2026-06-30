@@ -9,6 +9,7 @@ import {
 } from "react";
 import { AssetPreviewRow } from "@/components/asset-preview-hover";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   toastAssetRemoved,
   toastAssetRemoveFailed,
@@ -24,7 +25,15 @@ import {
   assetCardTooltip,
 } from "@/lib/asset-card-display";
 import { syncProjectAssets, uploadProjectAssets } from "@/lib/asset-upload";
-import { Film, ImageIcon, Music, Trash2, Upload, X } from "@/lib/icon";
+import {
+  APP_ICON_CLASS,
+  Film,
+  ImageIcon,
+  Music,
+  Trash2,
+  Upload,
+  X,
+} from "@/lib/icon";
 import { countNewAssetIds } from "@/lib/toast-notifications";
 import { cn } from "@/lib/utils";
 
@@ -118,53 +127,59 @@ function AssetBinRow({
       >
         <span className="truncate">{asset.name}</span>
         {asset.card ? (
-          <span className="truncate text-caption text-tertiary">
+          <span className="truncate text-muted-foreground text-xs">
             {assetCardCaption(asset.card)}
           </span>
         ) : null}
       </span>
       {confirmDelete ? (
         <span className="flex shrink-0 items-center gap-1">
-          <span className="text-[11px] text-tertiary">Delete?</span>
-          <button
+          <span className="text-[11px] text-muted-foreground">Delete?</span>
+          <Button
             aria-label={`Confirm delete ${asset.name}`}
-            className="inline-flex size-5 cursor-pointer items-center justify-center rounded-sm text-destructive hover:bg-destructive/10 disabled:opacity-50"
+            className="rounded-sm text-destructive hover:bg-destructive/10"
             disabled={deleting}
             onClick={(e) => {
               e.stopPropagation();
               onConfirmDelete();
             }}
+            size="icon-sm"
             type="button"
+            variant="ghost"
           >
-            <Trash2 className="size-3" />
-          </button>
-          <button
+            <Trash2 />
+          </Button>
+          <Button
             aria-label={`Cancel delete ${asset.name}`}
-            className="inline-flex size-5 cursor-pointer items-center justify-center rounded-sm text-tertiary hover:bg-muted disabled:opacity-50"
+            className="rounded-sm text-muted-foreground hover:bg-muted"
             disabled={deleting}
             onClick={(e) => {
               e.stopPropagation();
               onCancelDelete();
             }}
+            size="icon-sm"
             type="button"
+            variant="ghost"
           >
-            <X className="size-3" />
-          </button>
+            <X />
+          </Button>
         </span>
       ) : (
         <>
-          <button
+          <Button
             aria-label={`Delete ${asset.name}`}
-            className="inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-sm text-tertiary opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive focus-visible:opacity-100 group-hover/asset:opacity-100"
+            className="shrink-0 rounded-sm text-muted-foreground opacity-0 hover:bg-destructive/10 hover:text-destructive focus-visible:opacity-100 group-hover/asset:opacity-100"
             onClick={(e) => {
               e.stopPropagation();
               onRequestDelete();
             }}
+            size="icon-sm"
             type="button"
+            variant="ghost"
           >
-            <Trash2 className="size-3" />
-          </button>
-          <span className="shrink-0 text-caption text-tertiary tabular-nums">
+            <Trash2 />
+          </Button>
+          <span className="shrink-0 text-muted-foreground text-xs tabular-nums">
             {fmtDur(asset.durationSamples, sampleRate)}
           </span>
         </>
@@ -299,11 +314,11 @@ export function AssetBin({
 
   return (
     <div className="px-1">
-      <button
+      <Button
         className={cn(
-          "mx-0 mb-2 flex w-full cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed px-3 py-3 text-center transition-colors",
+          "mx-0 mb-2 h-auto w-full flex-col gap-1.5 rounded-lg border border-dashed px-3 py-3 text-center",
           dragging
-            ? "border-success bg-success/10"
+            ? "border-primary bg-primary/10"
             : "border-foreground/20 bg-background/60 hover:border-foreground/30 hover:bg-foreground/5",
           uploading && "pointer-events-none opacity-60"
         )}
@@ -321,8 +336,9 @@ export function AssetBin({
         onDragOver={(e) => e.preventDefault()}
         onDrop={onDrop}
         type="button"
+        variant="ghost"
       >
-        <Upload className="size-4 text-tertiary" />
+        <Upload data-icon="inline-start" />
         <span className="font-medium text-xs">
           {uploading ? "Registering…" : "Drop or click to add"}
         </span>
@@ -339,7 +355,7 @@ export function AssetBin({
           ref={inputRef}
           type="file"
         />
-      </button>
+      </Button>
 
       <div className="flex flex-col gap-2 pb-1">
         {(Object.keys(KIND_META) as AssetKind[]).map((kind) => {
@@ -351,18 +367,18 @@ export function AssetBin({
               className="min-w-0 overflow-hidden rounded-md border border-border bg-foreground/3 p-2.5"
               key={kind}
             >
-              <div className="mb-2 flex items-center gap-1.5 text-section-label text-tertiary">
-                <Icon className="size-3.5" />
+              <div className="mb-2 flex items-center gap-1.5 font-medium text-muted-foreground text-xs uppercase tracking-wide">
+                <Icon className={APP_ICON_CLASS} />
                 {meta.label}
                 <Badge
-                  className="ml-auto h-4 px-1.5 text-caption"
+                  className="ml-auto h-4 px-1.5 text-xs"
                   variant="secondary"
                 >
                   {items.length}
                 </Badge>
               </div>
               {items.length === 0 ? (
-                <p className="text-caption text-quaternary">
+                <p className="text-muted-foreground text-xs">
                   No {meta.label.toLowerCase()} yet
                 </p>
               ) : (
