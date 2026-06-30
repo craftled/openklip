@@ -10,8 +10,7 @@ import { useMediaElementVolume } from "@/hooks/use-media-element-volume";
 import { useThemeColorHex } from "@/hooks/use-theme-color-hex";
 import { cn } from "@/lib/utils";
 
-/** SSR fallback: openklip default zoom track amber */
-const WAVEFORM_MEDIA_FALLBACK = "#d78100";
+const WAVEFORM_MEDIA_FALLBACK = "#737373";
 
 export function MediaAudioVisualizerWave({
   mediaRef,
@@ -47,7 +46,7 @@ export function MediaAudioVisualizerWave({
   });
 
   const themeColor = useThemeColorHex(
-    "--waveform-media",
+    "--muted-foreground",
     WAVEFORM_MEDIA_FALLBACK
   );
   const resolvedColor = (color ?? themeColor) as `#${string}`;

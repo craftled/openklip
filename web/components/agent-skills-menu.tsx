@@ -112,22 +112,14 @@ export function useSkillsSlashMenu(options: {
   onClearInput: () => void;
   onSelectSkill: (skill: SkillEntry) => void;
   skills: SkillEntry[];
-  /** When true, slash menu stays closed (e.g. skill token already selected). */
-  skillSelected?: boolean;
 }) {
-  const { inputValue, onClearInput, onSelectSkill, skills, skillSelected } =
-    options;
+  const { inputValue, onClearInput, onSelectSkill, skills } = options;
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const [slashQuery, setSlashQuery] = useState("");
   const pendingSelect = useRef(false);
 
   useEffect(() => {
-    if (skillSelected) {
-      setMenuOpen(false);
-      setSlashQuery("");
-      return;
-    }
     const slash = parseSlashFromValue(inputValue);
     if (slash) {
       setMenuOpen(true);
@@ -138,7 +130,7 @@ export function useSkillsSlashMenu(options: {
       setMenuOpen(false);
       setSlashQuery("");
     }
-  }, [inputValue, skillSelected]);
+  }, [inputValue]);
 
   const filtered = useMemo(
     () => filterSkills(skills, slashQuery),

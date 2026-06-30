@@ -1,6 +1,6 @@
 "use client";
 
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
 
 export type SidebarSegmentView = "chats" | "assets";
@@ -25,25 +25,30 @@ export function SidebarSegmentedPicker({
 
   return (
     <div className="w-full px-1.5 pt-0.5 pb-1">
-      <Tabs
+      <ToggleGroup
+        aria-label="Sidebar view"
+        className={cn(
+          "grid w-full",
+          views.length === 2 ? "grid-cols-2" : "grid-cols-3"
+        )}
         onValueChange={(value) => {
-          onSelectView(value as SidebarSegmentView);
+          const nextView = Array.isArray(value) ? value[0] : value;
+          if (nextView) {
+            onSelectView(nextView as SidebarSegmentView);
+          }
         }}
+        size="sm"
+        spacing={0}
+        type="single"
         value={activeView}
+        variant="outline"
       >
-        <TabsList
-          className={cn(
-            "grid h-8 w-full",
-            views.length === 2 ? "grid-cols-2" : "grid-cols-3"
-          )}
-        >
-          {views.map((view) => (
-            <TabsTrigger key={view} value={view}>
-              {VIEW_LABELS[view]}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
+        {views.map((view) => (
+          <ToggleGroupItem className="w-full" key={view} value={view}>
+            {VIEW_LABELS[view]}
+          </ToggleGroupItem>
+        ))}
+      </ToggleGroup>
     </div>
   );
 }

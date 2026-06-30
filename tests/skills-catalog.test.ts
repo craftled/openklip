@@ -3,6 +3,7 @@ import { test } from "node:test";
 import {
   buildSkillCatalog,
   buildSkillMessage,
+  buildSkillsMessage,
   filterSkills,
   parseSlashQuery,
 } from "../web/lib/skills-catalog.ts";
@@ -52,4 +53,34 @@ test("buildSkillMessage composes invoke text with optional follow-up", () => {
     "Cut all filler words. focus on um and uh"
   );
   assert.equal(buildSkillMessage(skill, "   "), "Cut all filler words");
+});
+
+test("buildSkillsMessage composes ordered skill invokes with optional follow-up", () => {
+  const skills = [
+    {
+      id: "filler",
+      title: "Cut filler words",
+      description: "",
+      slash: "filler",
+      invokeText: "Cut all filler words",
+      kind: "workflow" as const,
+    },
+    {
+      id: "zoom",
+      title: "Add a push-in zoom",
+      description: "",
+      slash: "zoom",
+      invokeText: "Add a push-in zoom",
+      kind: "workflow" as const,
+    },
+  ];
+
+  assert.equal(
+    buildSkillsMessage(skills),
+    "Cut all filler words. Add a push-in zoom"
+  );
+  assert.equal(
+    buildSkillsMessage(skills, "focus on the intro"),
+    "Cut all filler words. Add a push-in zoom. focus on the intro"
+  );
 });

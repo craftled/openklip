@@ -2,6 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAgentChat } from "@/components/agent-chat-context";
+import {
+  AgentModelGroupLabel,
+  AgentModelOptionContent,
+  AgentModelTriggerValue,
+} from "@/components/agent-model-select";
 import { AgentSkillTokenField } from "@/components/agent-skill-token-field";
 import {
   AgentSkillsMenu,
@@ -25,29 +30,23 @@ import {
 } from "@/components/ai-elements/prompt-input";
 import { ProjectFolderButton } from "@/components/project-folder-action";
 import type { TemplateOption } from "@/components/template-select";
-import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { SelectGroup, SelectLabel } from "@/components/ui/select";
-import { AGENT_GROUP_ICONS, AgentProviderIcon } from "@/lib/agent-icons";
-import {
-  AGENT_MODEL_GROUPS,
-  type AgentModelId,
-  getAgentModelLabel,
-} from "@/lib/agent-preferences";
+import { SelectGroup } from "@/components/ui/select";
+import { AGENT_MODEL_GROUPS, type AgentModelId } from "@/lib/agent-preferences";
 import {
   toastAssetUploadFailed,
   toastChatAssetUploadSuccess,
 } from "@/lib/app-toast";
 import type { AssetBinUpdate } from "@/lib/asset-bin-update";
 import { syncProjectAssets, uploadProjectAssets } from "@/lib/asset-upload";
-import { APP_ICON_CLASS, Plus, Sparkles } from "@/lib/icon";
+import { Plus, Sparkles } from "@/lib/icon";
 import {
   buildSkillCatalog,
-  buildSkillMessage,
+  buildSkillsMessage,
   type SkillEntry,
 } from "@/lib/skills-catalog";
 
@@ -74,7 +73,7 @@ function AgentPromptInputInner({
   const [uploadingAssets, setUploadingAssets] = useState(false);
   const [templates, setTemplates] = useState<TemplateOption[]>([]);
   const [skillsOpen, setSkillsOpen] = useState(false);
-  const [selectedSkill, setSelectedSkill] = useState<SkillEntry | null>(null);
+  const [selectedSkills, setSelectedSkills] = useState<SkillEntry[]>([]);
 
   useEffect(() => {
     let alive = true;
@@ -103,17 +102,32 @@ function AgentPromptInputInner({
 
   const selectSkill = useCallback(
     (skill: SkillEntry) => {
-      setSelectedSkill(skill);
+      setSelectedSkills((current) => {
+        if (current.some((selected) => selected.id === skill.id)) {
+          return current;
+        }
+        return [...current, skill];
+      });
       setSkillsOpen(false);
       clearInput();
     },
     [clearInput]
   );
 
-  const clearSelectedSkill = useCallback(() => {
-    setSelectedSkill(null);
+  const clearSelectedSkills = useCallback(() => {
+    setSelectedSkills([]);
     clearInput();
   }, [clearInput]);
+
+  const removeSelectedSkill = useCallback(
+    (skillId: string) => {
+      setSelectedSkills((current) =>
+        current.filter((skill) => skill.id !== skillId)
+      );
+      clearInput();
+    },
+    [clearInput]
+  );
 
   const inputValue = controller?.textInput.value ?? "";
 
@@ -121,14 +135,13 @@ function AgentPromptInputInner({
     inputValue,
     onClearInput: clearInput,
     onSelectSkill: selectSkill,
-    skillSelected: selectedSkill !== null,
     skills,
   });
 
   const onSubmit = async ({ text }: PromptInputMessage) => {
-    if (selectedSkill) {
-      const message = buildSkillMessage(selectedSkill, text);
-      setSelectedSkill(null);
+    if (selectedSkills.length > 0) {
+      const message = buildSkillsMessage(selectedSkills, text);
+      setSelectedSkills([]);
       clearInput();
       await onSubmitMessage(message);
       return;
@@ -189,11 +202,13 @@ function AgentPromptInputInner({
         onSubmit={onSubmit}
       >
         <PromptInputBody>
-          {selectedSkill ? (
+          {selectedSkills.length > 0 ? (
             <AgentSkillTokenField
               disabled={isRunning || chatsLoading || uploadingAssets}
-              onClearSkill={clearSelectedSkill}
-              skill={selectedSkill}
+              onClearSkills={clearSelectedSkills}
+              onKeyDown={slashMenu.handleInputKeyDown}
+              onRemoveSkill={removeSelectedSkill}
+              skills={selectedSkills}
             />
           ) : (
             <PromptInputTextarea
@@ -265,46 +280,31 @@ function AgentPromptInputInner({
               }}
               value={agent}
             >
-              <PromptInputSelectTrigger
-                aria-label={`Model: ${getAgentModelLabel(agent)}`}
-                className="max-w-[11rem]"
-              >
-                <AgentProviderIcon className={APP_ICON_CLASS} value={agent} />
-                <span className="truncate">{getAgentModelLabel(agent)}</span>
+              <PromptInputSelectTrigger className="max-w-[11rem]" size="sm">
+                <AgentModelTriggerValue value={agent} />
               </PromptInputSelectTrigger>
-              <PromptInputSelectContent>
-                {AGENT_MODEL_GROUPS.map((group) => {
-                  const Icon = AGENT_GROUP_ICONS[group.id];
-                  return (
-                    <SelectGroup key={group.id}>
-                      <SelectLabel className="flex items-center gap-2 font-medium text-xs uppercase tracking-wide">
-                        <Icon className={APP_ICON_CLASS} />
-                        {group.label}
-                      </SelectLabel>
-                      {group.models.map((model) => (
-                        <PromptInputSelectItem
-                          key={model.value}
+              <PromptInputSelectContent className="w-72">
+                {AGENT_MODEL_GROUPS.map((group) => (
+                  <SelectGroup key={group.id}>
+                    <AgentModelGroupLabel
+                      groupId={group.id}
+                      label={group.label}
+                    />
+                    {group.models.map((model) => (
+                      <PromptInputSelectItem
+                        key={model.value}
+                        value={model.value}
+                      >
+                        <AgentModelOptionContent
+                          defaultAgent={defaultAgent}
+                          groupId={group.id}
+                          label={model.label}
                           value={model.value}
-                        >
-                          <span className="flex w-full items-center gap-2">
-                            <Icon className={APP_ICON_CLASS} />
-                            <span className="min-w-0 flex-1 truncate">
-                              {model.label}
-                            </span>
-                            {defaultAgent === model.value && (
-                              <Badge
-                                className="h-4 shrink-0 px-1.5 font-normal text-xs"
-                                variant="secondary"
-                              >
-                                Default
-                              </Badge>
-                            )}
-                          </span>
-                        </PromptInputSelectItem>
-                      ))}
-                    </SelectGroup>
-                  );
-                })}
+                        />
+                      </PromptInputSelectItem>
+                    ))}
+                  </SelectGroup>
+                ))}
               </PromptInputSelectContent>
             </PromptInputSelect>
           </PromptInputTools>

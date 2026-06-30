@@ -362,9 +362,9 @@ function EditableClipBlock({
   return (
     <div
       className={cn(
-        "absolute top-1 bottom-1 truncate rounded text-xs leading-none transition-opacity hover:opacity-100",
+        "absolute top-1 bottom-1 cursor-grab truncate rounded text-xs leading-none transition-opacity hover:opacity-100 active:cursor-grabbing",
         active
-          ? "z-20 ring-2 ring-live ring-offset-1 ring-offset-background"
+          ? "z-20 ring-2 ring-ring ring-offset-1 ring-offset-background"
           : "z-10 opacity-90",
         className
       )}
@@ -643,7 +643,7 @@ export function EditTimeline({
           >
             {ranges.map((r, i) => (
               <div
-                className="absolute top-1 bottom-1 rounded bg-live/20 ring-1 ring-live/30"
+                className="absolute top-1 bottom-1 rounded bg-primary/15 ring-1 ring-primary/20"
                 key={`${r.startSec}-${r.endSec}-${i}`}
                 style={{
                   left: clipLeftPx(r.startSec, zoom),
@@ -665,11 +665,11 @@ export function EditTimeline({
                   }
                   aria-pressed={w.deleted}
                   className={cn(
-                    "absolute top-2 bottom-2 rounded-sm border border-transparent",
+                    "absolute top-2 bottom-2 cursor-pointer rounded-sm border border-transparent",
                     w.deleted
                       ? "bg-foreground/10 hover:bg-foreground/15"
                       : "bg-foreground/10 hover:bg-foreground/20",
-                    inSel && "border-live/50 bg-live/15"
+                    inSel && "border-ring bg-accent"
                   )}
                   key={w.id}
                   onClick={(e) => {
@@ -691,7 +691,7 @@ export function EditTimeline({
 
           <ClipTrack
             {...clipTrackProps}
-            clipClassName="bg-broll/25 text-foreground"
+            clipClassName="bg-muted text-foreground"
             clips={broll}
             icon={Film}
             label="B-roll"
@@ -700,7 +700,7 @@ export function EditTimeline({
 
           <ClipTrack
             {...clipTrackProps}
-            clipClassName="bg-zoom/20 text-foreground"
+            clipClassName="bg-secondary text-secondary-foreground"
             clips={zooms}
             icon={ZoomIn}
             label="Push-in"
@@ -709,7 +709,7 @@ export function EditTimeline({
 
           <ClipTrack
             {...clipTrackProps}
-            clipClassName="border border-title/30 bg-title/15 text-foreground"
+            clipClassName="border border-border bg-accent text-accent-foreground"
             clips={titles}
             icon={Type}
             label="Titles"
@@ -718,7 +718,7 @@ export function EditTimeline({
 
           <ClipTrack
             {...clipTrackProps}
-            clipClassName="border border-zoom/40 bg-zoom/10 text-foreground"
+            clipClassName="border border-border bg-muted/60 text-foreground"
             clips={stills}
             icon={ImageIcon}
             label="Stills"
@@ -770,11 +770,11 @@ export function EditTimeline({
             style={{ left: LABEL_W, width: contentWidthPx }}
           >
             <div
-              className="absolute inset-y-0 w-px bg-live"
+              className="absolute inset-y-0 w-px bg-primary"
               style={{ left: playheadPx }}
             />
             <div
-              className="absolute top-0 size-2 -translate-x-1/2 rounded-full bg-live"
+              className="absolute top-0 size-2 -translate-x-1/2 rounded-full bg-primary"
               style={{ left: playheadPx, marginTop: RULER_H - 4 }}
             />
           </div>

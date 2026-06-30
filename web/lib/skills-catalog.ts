@@ -94,3 +94,15 @@ export function buildSkillMessage(
   }
   return `${skill.invokeText}. ${extra}`;
 }
+
+export function buildSkillsMessage(
+  skills: readonly SkillEntry[],
+  followUp?: string
+): string {
+  const invokeText = skills.map((skill) => skill.invokeText).join(". ");
+  const extra = followUp?.trim();
+  if (!extra) {
+    return invokeText;
+  }
+  return `${invokeText}. ${extra}`;
+}

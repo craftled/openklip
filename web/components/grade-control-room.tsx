@@ -219,7 +219,11 @@ export function GradeControlRoom({
     <Dialog onOpenChange={setOpen} open={open}>
       <DialogTrigger
         render={
-          <Button aria-label="Open grade control room" variant="outline">
+          <Button
+            aria-label="Open grade control room"
+            size="sm"
+            variant="outline"
+          >
             <Palette data-icon="inline-start" />
             Grade
           </Button>

@@ -12,8 +12,7 @@ import { useAgentAudioVisualizerWave } from "@/hooks/agents-ui/use-agent-audio-v
 import { useThemeColorHex } from "@/hooks/use-theme-color-hex";
 import { cn } from "@/lib/utils";
 
-/** SSR fallback: openklip default broll track cyan */
-const WAVEFORM_AGENT_FALLBACK = "#00a0c1";
+const WAVEFORM_AGENT_FALLBACK = "#171717";
 
 function hexToRgb(hexColor: string) {
   try {
@@ -171,7 +170,7 @@ interface WaveShaderProps {
   className?: string;
   /**
    * Color of the oscilloscope in hexidecimal format.
-   * Defaults to `--waveform-agent` (theme broll track hue).
+   * Defaults to the theme primary color.
    */
   color?: `#${string}`;
   /**
@@ -276,7 +275,7 @@ export interface AgentAudioVisualizerWaveProps {
   className?: string;
   /**
    * The color of the wave in hexidecimal format.
-   * Defaults to `--waveform-agent` (theme broll track hue).
+   * Defaults to the theme primary color.
    */
   color?: `#${string}`;
   /**
@@ -351,10 +350,7 @@ export function AgentAudioVisualizerWave({
     state,
     audioTrack,
   });
-  const themeColor = useThemeColorHex(
-    "--waveform-agent",
-    WAVEFORM_AGENT_FALLBACK
-  );
+  const themeColor = useThemeColorHex("--primary", WAVEFORM_AGENT_FALLBACK);
   const resolvedColor = (color ?? themeColor) as `#${string}`;
 
   return (

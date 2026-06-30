@@ -98,7 +98,7 @@ export function PreviewOverlays({
               const on = curSec >= w.startSec - 0.02 && curSec < next;
               return (
                 <span
-                  className={cn(on ? "text-live" : "text-white/70")}
+                  className={cn(on ? "text-white" : "text-white/70")}
                   key={`${w.text}-${i}`}
                 >
                   {w.text}{" "}

@@ -2,6 +2,7 @@
 
 import { useAgentChat } from "@/components/agent-chat-context";
 import { AgentPromptInput } from "@/components/agent-prompt-input";
+import { ChatMarkdown } from "@/components/chat-markdown";
 import {
   Attachment,
   AttachmentAction,
@@ -147,8 +148,14 @@ export function AgentChatPanel({ onAssetsUpdated, slug }: AgentChatPanelProps) {
                         </MessageAvatar>
                         <MessageContent>
                           <Bubble align={isUser ? "end" : "start"}>
-                            <BubbleContent className="whitespace-pre-wrap">
-                              {m.content}
+                            <BubbleContent
+                              className={isUser ? "whitespace-pre-wrap" : ""}
+                            >
+                              {isUser ? (
+                                m.content
+                              ) : (
+                                <ChatMarkdown>{m.content}</ChatMarkdown>
+                              )}
                             </BubbleContent>
                           </Bubble>
                         </MessageContent>

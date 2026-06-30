@@ -56,6 +56,7 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from "@/components/ui/drawer";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -84,6 +85,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Slider } from "@/components/ui/slider";
+import { Textarea } from "@/components/ui/textarea";
 import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { VerifyCutButton } from "@/components/verify-cut-button";
@@ -1437,24 +1439,34 @@ export function App({
                             {exportLabel}
                           </Button>
                         </ExportDialog>
-                        <div className="flex items-center gap-0.5 rounded-lg border border-border bg-accent p-0.5">
+                        <ToggleGroup
+                          aria-label="Preview aspect ratio"
+                          onValueChange={(value) => {
+                            const nextOrientation = Array.isArray(value)
+                              ? value[0]
+                              : value;
+                            if (nextOrientation) {
+                              setOrientation(nextOrientation as Orientation);
+                            }
+                          }}
+                          size="sm"
+                          spacing={0}
+                          type="single"
+                          value={orientation}
+                          variant="outline"
+                        >
                           {(
                             ["landscape", "portrait", "square"] as Orientation[]
                           ).map((o) => (
-                            <Button
+                            <ToggleGroupItem
                               aria-label={`Preview ${ORIENTATION_LABEL[o]}`}
-                              aria-pressed={orientation === o}
                               key={o}
-                              onClick={() => setOrientation(o)}
-                              size="sm"
-                              variant={
-                                orientation === o ? "secondary" : "ghost"
-                              }
+                              value={o}
                             >
                               {ORIENTATION_LABEL[o]}
-                            </Button>
+                            </ToggleGroupItem>
                           ))}
-                        </div>
+                        </ToggleGroup>
                         <Button
                           aria-label="Toggle color scheme"
                           onClick={toggleColorScheme}
@@ -1471,32 +1483,31 @@ export function App({
                         <div className="mx-auto flex w-full max-w-2xl flex-wrap items-center gap-2">
                           <FindFillerButton />
                           <VerifyCutButton />
-                          <div className="flex items-center gap-0.5 rounded-lg border border-border bg-accent p-0.5">
-                            <Button
-                              aria-pressed={centerPanel === "transcript"}
-                              onClick={() => setCenterPanel("transcript")}
-                              size="sm"
-                              variant={
-                                centerPanel === "transcript"
-                                  ? "secondary"
-                                  : "ghost"
+                          <ToggleGroup
+                            aria-label="Center panel"
+                            onValueChange={(value) => {
+                              const nextPanel = Array.isArray(value)
+                                ? value[0]
+                                : value;
+                              if (nextPanel) {
+                                setCenterPanel(
+                                  nextPanel as "properties" | "transcript"
+                                );
                               }
-                            >
+                            }}
+                            size="sm"
+                            spacing={0}
+                            type="single"
+                            value={centerPanel}
+                            variant="outline"
+                          >
+                            <ToggleGroupItem value="transcript">
                               Transcript
-                            </Button>
-                            <Button
-                              aria-pressed={centerPanel === "properties"}
-                              onClick={() => setCenterPanel("properties")}
-                              size="sm"
-                              variant={
-                                centerPanel === "properties"
-                                  ? "secondary"
-                                  : "ghost"
-                              }
-                            >
+                            </ToggleGroupItem>
+                            <ToggleGroupItem value="properties">
                               Properties
-                            </Button>
-                          </div>
+                            </ToggleGroupItem>
+                          </ToggleGroup>
                           <Drawer
                             onOpenChange={setTimelineOpen}
                             open={timelineOpen}
@@ -1693,6 +1704,7 @@ export function App({
                             <SelectTrigger
                               aria-label="Motion speed"
                               className="ml-auto w-[8rem]"
+                              size="sm"
                             >
                               <SelectValue placeholder="Motion" />
                             </SelectTrigger>
@@ -1716,6 +1728,7 @@ export function App({
                             <SelectTrigger
                               aria-label="Color grade"
                               className="w-[8.5rem]"
+                              size="sm"
                             >
                               <SelectValue placeholder="Grade" />
                             </SelectTrigger>
@@ -1896,8 +1909,7 @@ export function App({
                                   {selTitle && (
                                     <Section title="Title">
                                       {selTitle.position === "hero" ? (
-                                        <textarea
-                                          className="field-sizing-content min-h-16 w-full resize-y rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                                        <Textarea
                                           onChange={(e) =>
                                             updateTitle(selTitle.id, {
                                               text: e.target.value,
@@ -1934,7 +1946,10 @@ export function App({
                                           }}
                                           value={selTitle.position}
                                         >
-                                          <SelectTrigger className="w-full">
+                                          <SelectTrigger
+                                            className="w-full"
+                                            size="sm"
+                                          >
                                             <SelectValue />
                                           </SelectTrigger>
                                           <SelectContent>
@@ -1966,7 +1981,10 @@ export function App({
                                         }
                                         value={selBroll.assetId}
                                       >
-                                        <SelectTrigger className="w-full">
+                                        <SelectTrigger
+                                          className="w-full"
+                                          size="sm"
+                                        >
                                           <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -2022,7 +2040,10 @@ export function App({
                                           }
                                           value={selStill.assetId}
                                         >
-                                          <SelectTrigger className="w-full">
+                                          <SelectTrigger
+                                            className="w-full"
+                                            size="sm"
+                                          >
                                             <SelectValue />
                                           </SelectTrigger>
                                           <SelectContent>
@@ -2103,6 +2124,7 @@ export function App({
                                         <SelectTrigger
                                           className="flex-1"
                                           disabled={brollAssets.length === 0}
+                                          size="sm"
                                         >
                                           <SelectValue placeholder="No b-roll" />
                                         </SelectTrigger>
@@ -2141,6 +2163,7 @@ export function App({
                                         <SelectTrigger
                                           className="flex-1"
                                           disabled={stillAssets.length === 0}
+                                          size="sm"
                                         >
                                           <SelectValue placeholder="No still" />
                                         </SelectTrigger>
@@ -2170,8 +2193,7 @@ export function App({
                                   </Section>
                                   <Section title="Title">
                                     {titlePos === "hero" ? (
-                                      <textarea
-                                        className="field-sizing-content min-h-16 w-full resize-y rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                                      <Textarea
                                         onChange={(e) =>
                                           setTitleText(e.target.value)
                                         }
@@ -2201,7 +2223,10 @@ export function App({
                                         }}
                                         value={titlePos}
                                       >
-                                        <SelectTrigger className="flex-1">
+                                        <SelectTrigger
+                                          className="flex-1"
+                                          size="sm"
+                                        >
                                           <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -2431,7 +2456,9 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
       <SidebarGroupLabel className="mb-2.5 h-auto px-0 font-medium text-muted-foreground">
         {title}
       </SidebarGroupLabel>
-      <SidebarGroupContent>{children}</SidebarGroupContent>
+      <SidebarGroupContent>
+        <FieldGroup className="gap-3">{children}</FieldGroup>
+      </SidebarGroupContent>
     </SidebarGroup>
   );
 }
@@ -2446,10 +2473,10 @@ function PropRow({
   children: ReactNode;
 }) {
   return (
-    <div className="grid h-7 grid-cols-[4.25rem_1fr_2.5rem] items-center gap-2.5">
-      <span className="text-muted-foreground text-xs">{label}</span>
+    <Field className="grid h-7 grid-cols-[4.25rem_1fr_2.5rem] items-center gap-2.5">
+      <FieldLabel className="text-muted-foreground text-xs">{label}</FieldLabel>
       {children}
       <span className="text-right text-xs tabular-nums">{value}</span>
-    </div>
+    </Field>
   );
 }

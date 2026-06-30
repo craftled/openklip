@@ -11,11 +11,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AGENT_GROUP_ICONS, agentProviderId } from "@/lib/agent-icons";
-import { AGENT_MODEL_GROUPS, type AgentModelId } from "@/lib/agent-preferences";
-import { APP_ICON_CLASS } from "@/lib/icon";
+import {
+  AGENT_GROUP_ICONS,
+  AgentProviderIcon,
+  agentProviderId,
+} from "@/lib/agent-icons";
+import {
+  AGENT_MODEL_GROUPS,
+  type AgentModelId,
+  getAgentModelLabel,
+} from "@/lib/agent-preferences";
 import { cn } from "@/lib/utils";
 import { type AgentStatus, getAgentStatuses } from "../../app/agent-actions.ts";
+
+export const AGENT_MODEL_ICON_CLASS = "size-3.5 shrink-0 opacity-70";
 
 function badgeState(status?: AgentStatus): {
   dot: string;
@@ -97,6 +106,62 @@ function StatusBadge({
   );
 }
 
+export function AgentModelTriggerValue({ value }: { value: AgentModelId }) {
+  return (
+    <>
+      <AgentProviderIcon className={AGENT_MODEL_ICON_CLASS} value={value} />
+      <span className="min-w-0 truncate">{getAgentModelLabel(value)}</span>
+    </>
+  );
+}
+
+export function AgentModelGroupLabel({
+  groupId,
+  label,
+  status,
+}: {
+  groupId: keyof typeof AGENT_GROUP_ICONS;
+  label: string;
+  status?: AgentStatus;
+}) {
+  const Icon = AGENT_GROUP_ICONS[groupId];
+  return (
+    <SelectLabel className="flex items-center gap-2 pr-2 font-medium uppercase tracking-wide">
+      <Icon className={cn(AGENT_MODEL_ICON_CLASS, "text-muted-foreground")} />
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+      {status ? <StatusBadge status={status} /> : null}
+    </SelectLabel>
+  );
+}
+
+export function AgentModelOptionContent({
+  defaultAgent,
+  groupId,
+  label,
+  value,
+}: {
+  defaultAgent?: AgentModelId;
+  groupId: keyof typeof AGENT_GROUP_ICONS;
+  label: string;
+  value: AgentModelId;
+}) {
+  const Icon = AGENT_GROUP_ICONS[groupId];
+  return (
+    <span className="flex min-w-0 flex-1 items-center gap-2">
+      <Icon className={AGENT_MODEL_ICON_CLASS} />
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+      {defaultAgent === value ? (
+        <Badge
+          className="mr-4 h-4 shrink-0 px-1.5 font-normal text-xs"
+          variant="secondary"
+        >
+          Default
+        </Badge>
+      ) : null}
+    </span>
+  );
+}
+
 export interface AgentModelSelectProps {
   className?: string;
   /** Marks the global default model with a badge in the list. */
@@ -150,44 +215,36 @@ export function AgentModelSelect({
     >
       <SelectTrigger
         className={cn(
-          "w-full border border-border bg-muted/50 text-xs focus:ring-0 data-popup-open:ring-0 [&_svg]:shrink-0",
+          "w-full justify-start [&_svg]:shrink-0",
           triggerClassName
         )}
+        size="sm"
       >
-        <SelectValue />
+        <SelectValue>
+          <AgentModelTriggerValue value={value} />
+        </SelectValue>
         <StatusDot className="ml-auto" status={statuses[providerId]} />
       </SelectTrigger>
-      <SelectContent className={className}>
-        {AGENT_MODEL_GROUPS.map((group) => {
-          const Icon = AGENT_GROUP_ICONS[group.id];
-          return (
-            <SelectGroup key={group.id}>
-              <SelectLabel className="flex items-center gap-2 font-medium text-xs uppercase tracking-wide">
-                <Icon className={APP_ICON_CLASS} />
-                <span>{group.label}</span>
-                <StatusBadge className="ml-auto" status={statuses[group.id]} />
-              </SelectLabel>
-              {group.models.map((model) => (
-                <SelectItem key={model.value} value={model.value}>
-                  <span className="flex w-full items-center gap-2">
-                    <Icon className={APP_ICON_CLASS} />
-                    <span className="min-w-0 flex-1 truncate">
-                      {model.label}
-                    </span>
-                    {defaultAgent === model.value && (
-                      <Badge
-                        className="h-4 shrink-0 px-1.5 font-normal text-xs"
-                        variant="secondary"
-                      >
-                        Default
-                      </Badge>
-                    )}
-                  </span>
-                </SelectItem>
-              ))}
-            </SelectGroup>
-          );
-        })}
+      <SelectContent className={cn("w-72", className)}>
+        {AGENT_MODEL_GROUPS.map((group) => (
+          <SelectGroup key={group.id}>
+            <AgentModelGroupLabel
+              groupId={group.id}
+              label={group.label}
+              status={statuses[group.id]}
+            />
+            {group.models.map((model) => (
+              <SelectItem key={model.value} value={model.value}>
+                <AgentModelOptionContent
+                  defaultAgent={defaultAgent}
+                  groupId={group.id}
+                  label={model.label}
+                  value={model.value}
+                />
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        ))}
       </SelectContent>
     </Select>
   );
