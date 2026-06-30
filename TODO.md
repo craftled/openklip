@@ -4,7 +4,7 @@
 
 OpenKlip is a lean, local-first **agent-native video toolchain**: external agents drive the edit loop via CLI; humans review in the browser. Both read/write the same `project.json` on disk.
 
-**Current release:** v0.8.10.0 (2026-06-29). Working local editor: cut → captions → b-roll → vignette → push-in zoom → titles → grade/LUT → rich graphics → export; cinema player with live graphics/titles/captions overlays; resizable right chat sidebar with Claude MCP edits; asset cards (`openklip analyze` + **Describe assets**); skills slash menu; MCP agent tools (52 tools); edit templates; native HTML/CSS graphics templates (pixel-faithful headless-Chrome export to ProRes 4444 alpha); Linear-style UI (Inter Variable + OKLCH, Phosphor fill icons); export dialog; macOS workspace folder picker; multi-agent filler cuts; sidebar asset bin with folder sync; written rationale notes on cuts/overlays; phrase-anchored cues that re-snap after a re-cut; multi-take assembly; 585 tests; MIT.
+**Current release:** v0.8.10.0 (2026-06-29). Working local editor: cut → captions → b-roll → vignette → push-in zoom → titles → grade/LUT → rich graphics → export; cinema player with live graphics/titles/captions overlays; resizable right chat sidebar with Claude MCP edits; asset cards (`openklip analyze` + **Describe assets**); skills slash menu; MCP agent tools (52 tools); edit templates; native HTML/CSS graphics templates (pixel-faithful headless-Chrome export to ProRes 4444 alpha); default shadcn neutral theme; export dialog; macOS workspace folder picker; multi-agent filler cuts; sidebar asset bin with folder sync; written rationale notes on cuts/overlays; phrase-anchored cues that re-snap after a re-cut; multi-take assembly; 572 tests; MIT.
 
 Preview cuts get a Glimm WebGL sweep in the browser; exported MP4s still hard-cut until the ffmpeg transition graph lands.
 
@@ -32,11 +32,11 @@ Preview cuts get a Glimm WebGL sweep in the browser; exported MP4s still hard-cu
 - [x] **Unified action registry** (`src/registry.ts`: one Zod-schema'd definition per `project.json` mutation; CLI routes every edit command through `runAction`; `openklip actions [--json] [--surface]` prints the capability manifest)
 - [x] **Multi-agent driver** (Claude Code, Codex, Cursor, Grok via `src/agent-driver.ts`; "Find filler" in the editor)
 - [x] **Cinema player + Linear-parity transport bar** (`cinema-player.tsx`, `player-controls.tsx`)
-- [x] **Editor shell refresh** (sidebar asset bin, project switcher, persisted chats, theme engine, keyboard shortcuts)
+- [x] **Editor shell refresh** (sidebar asset bin, project switcher, persisted chats, color scheme toggle, keyboard shortcuts)
 - [x] **Project write serialization** (`src/project-lock.ts`, `mutateProject()`; in-process per-slug locks for `project.json` and `chats.json`)
 - [x] **Chats + asset hardening** (atomic `chats.json` writes, POST folder sync, re-ingest guard with `--force`, external still copy-in)
-- [x] **Design system: Inter Variable + OKLCH** ([DESIGN.md](./DESIGN.md): Linear-style surfaces, semantic tokens, blue-only-when-it-matters CTA hierarchy; swappable theme presets)
-- [x] **TDD test suite** (`bun test`: 585 tests across actions, captions, EDL, exporter, project lock, chats, assets, workspace, agent-tools, templates, graphics, headless render, reanchor, multi-take assembly, and more)
+- [x] **Design system: default shadcn theme** (`components.json` + `app/globals.css`: stock neutral tokens, light/dark color scheme, editor-only tokens isolated in `app/editor-tokens.css`)
+- [x] **TDD test suite** (`bun test`: 572 tests across actions, captions, EDL, exporter, project lock, chats, assets, workspace, agent-tools, templates, graphics, headless render, reanchor, multi-take assembly, and more)
 - [x] **GitHub Actions CI** (`check`, `typecheck`, `test`, `build`)
 - [x] **Open-sourced** (public GitHub repo, MIT license, source media gitignored + purged from history)
 - [x] **Center chat panel** (agent threads + prompt input in center column; chat list in left sidebar; PR #12)
@@ -47,11 +47,11 @@ Preview cuts get a Glimm WebGL sweep in the browser; exported MP4s still hard-cu
 - [x] **Skills chat UX** (`/` slash menu, inline skill tokens, skills catalog; PR #14)
 - [x] **Edit templates + brand presets** (`templates/`, `openklip template set`, `openklip brand`; PR #14)
 - [x] **Empty workspace + project create flow** (folder picker landing, new-project dialog, Sonner toasts; PR #14)
-- [x] **Linear UI refactor v0.8.1–v0.8.2** (DESIGN.md, semantic `text-tertiary`/`bg-surface-*` tokens, timeline track colors, CTA hierarchy)
+- [x] **shadcn theme parity cleanup** (default neutral tokens, direct shadcn color utilities, editor-only track colors isolated)
 - [x] **Agentic chat edits (Claude)** (MCP-loaded chat applies cut/zoom/b-roll/title/export; non-Claude agents stay read-only or CLI-answer; v0.8.5)
 - [x] **Resizable chat sidebar** (full-height right column, drag handle 340–760px, localStorage persistence; v0.8.5)
 - [x] **Asset cards / analyze assets** (`src/asset-cards.ts`, `openklip analyze`, GUI **Describe assets** button; v0.8.5)
-- [x] **Phosphor fill icons** (`@phosphor-icons/react` via `web/lib/icon.tsx`; v0.8.5)
+- [x] **Tabler icons** (`@tabler/icons-react` via `web/lib/icon.tsx`; v0.8.5)
 - [x] **Written rationale (`note`)** (v0.8.10.0): optional `note` on cuts and overlays records the *why* of a pick; surfaces in CLI / query / transcript / MCP; metadata only, never reaches ffmpeg (`--note ""` clears it; pinned by an exporter no-op test)
 - [x] **Phrase-anchored cues** (`src/reanchor.ts`; v0.8.10.0): `*-add-phrase` overlays remember the spoken phrase and re-resolve onto the kept words after a re-cut (CLI + GUI via `applyProjectEdits`); flag `stale` and keep the last good span when the phrase is deleted; follow a surviving instance on duplicates; `openklip reanchor`
 - [x] **Multi-take assembly** (`src/assembly-plan.ts` pure planner + `src/assembly.ts`; v0.8.10.0): `take-add` / `takes` / `assemble` ingest alternate takes into `takes/<id>/` and splice the best line per take into one single-source `project.json` (integer-exact re-timing, provenance block) the cut/overlay/export engine edits unchanged
@@ -157,7 +157,7 @@ Single list of current gaps (code is truth). README and release notes point here
 ### Design & UI (non-blocking polish)
 
 - Hero title inspector uses a hand-rolled `<textarea>` instead of the shared `Textarea` primitive (`web/app.tsx`).
-- Delete confirmation microcopy uses `text-[11px]` instead of the `text-caption` token (asset bin, project delete, chat preview).
+- Delete confirmation microcopy uses `text-[11px]` in asset bin, project delete, and chat preview.
 - Video player layer stays black/white by design (Linear cinema parity); not tokenized to the editor chrome.
 
 ### Architecture & parity

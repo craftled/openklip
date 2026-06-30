@@ -16,7 +16,7 @@ import {
   PromptInputCommandList,
 } from "@/components/ai-elements/prompt-input";
 import { Badge } from "@/components/ui/badge";
-import { Box } from "@/lib/icon";
+import { APP_ICON_CLASS, Box } from "@/lib/icon";
 import {
   filterSkills,
   type SkillEntry,
@@ -52,12 +52,14 @@ export function AgentSkillsMenu({
       className={cn(
         embedded
           ? "overflow-hidden rounded-lg bg-popover text-popover-foreground"
-          : "popover-styled absolute right-0 bottom-full left-0 z-50 mb-2 overflow-hidden",
+          : "absolute right-0 bottom-full left-0 z-50 mb-2 overflow-hidden border border-border bg-popover text-popover-foreground shadow-md",
         className
       )}
     >
       <div className="border-border border-b px-3 py-2">
-        <p className="text-section-label text-tertiary">Skills</p>
+        <p className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
+          Skills
+        </p>
       </div>
       <PromptInputCommand shouldFilter={false}>
         <PromptInputCommandList className="max-h-72">
@@ -72,12 +74,12 @@ export function AgentSkillsMenu({
                 onSelect={() => onSelect(skill)}
                 value={`${skill.title} ${skill.description} ${skill.slash}`}
               >
-                <Box className="size-4 shrink-0 text-tertiary" />
+                <Box className={APP_ICON_CLASS} />
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-medium text-sm">
                     {skill.title}
                   </div>
-                  <div className="truncate text-tertiary text-xs">
+                  <div className="truncate text-muted-foreground text-xs">
                     {skill.description}
                   </div>
                 </div>

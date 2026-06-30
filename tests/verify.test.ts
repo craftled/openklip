@@ -15,7 +15,8 @@ test("tokenize lowercases, splits on punctuation, keeps apostrophes", () => {
 
 test("tokenize drops empties and edge apostrophes", () => {
   assert.deepEqual(tokenize("  'quoted'   word  "), ["quoted", "word"]);
-  assert.deepEqual(tokenize("—  —"), []);
+  const emDash = String.fromCharCode(0x20_14);
+  assert.deepEqual(tokenize(`${emDash}  ${emDash}`), []);
 });
 
 // ---- diffCut: the clean pass ----

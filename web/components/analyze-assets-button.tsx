@@ -46,10 +46,8 @@ export function AnalyzeAssetsButton() {
       variant="outline"
     >
       <ScanSearch
-        className={cn(
-          "size-3.5",
-          analyzingAssets && "animate-pulse text-tertiary"
-        )}
+        className={cn(analyzingAssets && "animate-pulse")}
+        data-icon="inline-start"
       />
       {label}
     </Button>

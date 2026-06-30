@@ -4,8 +4,8 @@ Project guidance for AI agents working in OpenKlip.
 
 ## Design System
 
-The visual language is still being iterated, so there is no frozen design spec.
-Theme tokens live in `themes/*.json` and `app/theme-base.css` (OKLCH, light/dark).
+The visual language uses default shadcn/ui (Nova preset): `app/globals.css` and `app/editor-tokens.css`.
+Light/dark mode is toggled via the `.dark` class (`web/lib/theme-preferences.ts`).
 Icon imports go through `@/lib/icon`.
 
 ## Agent workflow

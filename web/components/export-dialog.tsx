@@ -1,6 +1,12 @@
 "use client";
 
-import { type ComponentType, type ReactNode, useMemo, useState } from "react";
+import {
+  type ComponentType,
+  type ReactElement,
+  type ReactNode,
+  useMemo,
+  useState,
+} from "react";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -16,12 +22,14 @@ import { Kbd } from "@/components/ui/kbd";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
+  APP_ICON_CLASS,
   Aperture,
   Copy,
   Download,
@@ -92,6 +100,12 @@ const COMPRESSION_COPY: Record<
 
 const FRAME_RATES = [24, 25, 30, 48, 60] as const;
 
+function firstToggleValue(
+  value: string | readonly string[]
+): string | undefined {
+  return typeof value === "string" ? value : value[0];
+}
+
 function outputDimensions(
   resolution: ExportResolution,
   sourceWidth: number,
@@ -144,7 +158,7 @@ function ExportOptionLabel({
 }) {
   return (
     <div className="mb-2 flex items-center gap-2 font-medium text-sm">
-      <Icon className="size-4 text-tertiary" />
+      <Icon className={APP_ICON_CLASS} />
       {label}
     </div>
   );
@@ -195,9 +209,10 @@ export function ExportDialog({
 
   return (
     <AlertDialog onOpenChange={setOpen} open={open}>
-      <AlertDialogTrigger asChild disabled={disabled}>
-        {children}
-      </AlertDialogTrigger>
+      <AlertDialogTrigger
+        disabled={disabled}
+        render={children as ReactElement}
+      />
       <AlertDialogContent className="gap-5 sm:max-w-2xl">
         <AlertDialogHeader className="text-left">
           <AlertDialogTitle>Export video</AlertDialogTitle>
@@ -213,8 +228,7 @@ export function ExportDialog({
             <ToggleGroup
               className="w-full"
               disabled
-              type="single"
-              value="mp4"
+              value={["mp4"]}
               variant="outline"
             >
               <ToggleGroupItem className="flex-1" value="mp4">
@@ -233,14 +247,16 @@ export function ExportDialog({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {FRAME_RATES.map((fps) => (
-                  <SelectItem key={fps} value={String(fps)}>
-                    {fps} FPS
-                  </SelectItem>
-                ))}
+                <SelectGroup>
+                  {FRAME_RATES.map((fps) => (
+                    <SelectItem key={fps} value={String(fps)}>
+                      {fps} FPS
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
               </SelectContent>
             </Select>
-            <p className="mt-1.5 text-caption text-tertiary">
+            <p className="mt-1.5 text-muted-foreground text-xs">
               Exports at source frame rate. Custom rates coming soon.
             </p>
           </div>
@@ -249,13 +265,13 @@ export function ExportDialog({
             <ExportOptionLabel icon={Scan} label="Resolution" />
             <ToggleGroup
               className="w-full"
-              onValueChange={(v) => {
-                if (v) {
-                  setResolution(v as ExportResolution);
+              onValueChange={(value) => {
+                const resolutionValue = firstToggleValue(value);
+                if (resolutionValue) {
+                  setResolution(resolutionValue as ExportResolution);
                 }
               }}
-              type="single"
-              value={resolution}
+              value={[resolution]}
               variant="outline"
             >
               <ToggleGroupItem className="flex-1" value="720">
@@ -268,7 +284,7 @@ export function ExportDialog({
                 4K
               </ToggleGroupItem>
             </ToggleGroup>
-            <p className="mt-1.5 text-caption text-tertiary tabular-nums">
+            <p className="mt-1.5 text-muted-foreground text-xs tabular-nums">
               {dims.width}px × {dims.height}px
             </p>
           </div>
@@ -278,8 +294,7 @@ export function ExportDialog({
             <ToggleGroup
               className="w-full flex-wrap"
               disabled
-              type="single"
-              value={compression}
+              value={[compression]}
               variant="outline"
             >
               <ToggleGroupItem value="studio">Studio</ToggleGroupItem>
@@ -287,7 +302,7 @@ export function ExportDialog({
               <ToggleGroupItem value="web">Web</ToggleGroupItem>
               <ToggleGroupItem value="web-low">Web (Low)</ToggleGroupItem>
             </ToggleGroup>
-            <p className="mt-2 text-caption text-tertiary leading-relaxed">
+            <p className="mt-2 text-muted-foreground text-xs leading-relaxed">
               Compression presets coming soon. Exports use the default encoder
               settings.
             </p>
@@ -299,12 +314,11 @@ export function ExportDialog({
           <ToggleGroup
             className="w-full sm:max-w-xs"
             disabled
-            type="single"
-            value={destination}
+            value={[destination]}
             variant="outline"
           >
             <ToggleGroupItem className="flex-1 gap-2" value="file">
-              <Upload className="size-4" />
+              <Upload data-icon="inline-start" />
               File
             </ToggleGroupItem>
             <ToggleGroupItem
@@ -312,14 +326,14 @@ export function ExportDialog({
               disabled
               value="clipboard"
             >
-              <Copy className="size-4" />
+              <Copy data-icon="inline-start" />
               Clipboard
             </ToggleGroupItem>
           </ToggleGroup>
         </div>
 
         <AlertDialogFooter className="items-end gap-3 sm:justify-between">
-          <p className="text-caption text-tertiary sm:max-w-[55%] sm:text-left">
+          <p className="text-muted-foreground text-xs sm:max-w-[55%] sm:text-left">
             Estimation: Export time {formatDurationEstimate(exportTimeSec)}.
             Output size {formatBytes(outputBytes)}.
           </p>
@@ -330,7 +344,7 @@ export function ExportDialog({
               disabled={destination !== "file"}
               onClick={handleExport}
             >
-              <Download />
+              <Download data-icon="inline-start" />
               Export to file…
               <Kbd className="bg-primary-foreground/15 text-primary-foreground">
                 ↵

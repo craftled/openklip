@@ -188,7 +188,7 @@ test("reanchorProject reports moved / stale / unchanged across all five kinds", 
   p.graphics = [];
 
   const results = reanchorProject(p);
-  // One row per anchored overlay only (title, broll, zoom) — not the still.
+  // One row per anchored overlay only (title, broll, zoom), not the still.
   assert.equal(results.length, 3);
   const byId = new Map(results.map((r) => [r.id, r]));
   assert.equal(byId.get("t1")?.status, "moved");

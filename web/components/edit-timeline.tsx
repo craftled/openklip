@@ -13,6 +13,7 @@ import {
 } from "react";
 import { Button } from "@/components/ui/button";
 import {
+  APP_ICON_CLASS,
   Film,
   ImageIcon,
   Music,
@@ -131,7 +132,7 @@ function TimelineToolbar({
         title="Snap to words and clips"
         variant={snappingEnabled ? "secondary" : "ghost"}
       >
-        <Scan className="size-3.5" />
+        <Scan data-icon="inline-start" />
       </Button>
       <Button
         aria-label="Zoom out"
@@ -142,7 +143,7 @@ function TimelineToolbar({
       >
         −
       </Button>
-      <span className="min-w-[3rem] text-center text-caption text-tertiary tabular-nums">
+      <span className="min-w-[3rem] text-center text-muted-foreground text-xs tabular-nums">
         {Math.round(zoom * 100)}%
       </span>
       <Button
@@ -208,7 +209,7 @@ function LibraryBlock({
   return (
     <div
       className={cn(
-        "absolute top-1 bottom-1 truncate rounded border border-dashed px-1 text-caption leading-none opacity-75",
+        "absolute top-1 bottom-1 truncate rounded border border-dashed px-1 text-xs leading-none opacity-75",
         className
       )}
       style={{
@@ -361,7 +362,7 @@ function EditableClipBlock({
   return (
     <div
       className={cn(
-        "absolute top-1 bottom-1 truncate rounded text-caption leading-none transition-opacity hover:opacity-100",
+        "absolute top-1 bottom-1 truncate rounded text-xs leading-none transition-opacity hover:opacity-100",
         active
           ? "z-20 ring-2 ring-live ring-offset-1 ring-offset-background"
           : "z-10 opacity-90",
@@ -426,10 +427,10 @@ function TrackRow({
   return (
     <div className="flex border-foreground/10 border-b last:border-b-0">
       <div
-        className="flex shrink-0 items-center gap-1.5 border-border border-r bg-surface-1 px-2 text-caption text-tertiary"
+        className="flex shrink-0 items-center gap-1.5 border-border border-r bg-muted px-2 text-muted-foreground text-xs"
         style={{ width: LABEL_W }}
       >
-        <Icon className="size-3 shrink-0" />
+        <Icon className={APP_ICON_CLASS} />
         <span className="truncate">{label}</span>
       </div>
       <div
@@ -619,7 +620,7 @@ export function EditTimeline({
             >
               {ticks.map((t) => (
                 <span
-                  className="absolute top-0 text-caption text-quaternary tabular-nums"
+                  className="absolute top-0 text-muted-foreground text-xs tabular-nums"
                   key={t}
                   style={{
                     left: secToPx(t, zoom),
@@ -735,7 +736,7 @@ export function EditTimeline({
             >
               {libraryMusic.map((clip) => (
                 <LibraryBlock
-                  className="border-info/40 bg-info/10 text-foreground"
+                  className="border-border bg-muted/50 text-foreground"
                   clip={clip}
                   key={clip.id}
                   zoom={zoom}
@@ -755,7 +756,7 @@ export function EditTimeline({
             >
               {libraryStills.map((clip) => (
                 <LibraryBlock
-                  className="border-info/30 bg-info/8 text-foreground"
+                  className="border-border bg-muted/40 text-foreground"
                   clip={clip}
                   key={clip.id}
                   zoom={zoom}

@@ -3,9 +3,13 @@ import Script from "next/script";
 import type { ReactNode } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import { THEME_NO_FLASH_SCRIPT } from "../web/lib/theme-preferences";
-import { inter, jetbrainsMono } from "./fonts";
+import { geistMono } from "./fonts";
 import "./globals.css";
+import { Geist } from "next/font/google";
+
+const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
   title: "OpenKlip",
@@ -15,7 +19,12 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html
-      className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased`}
+      className={cn(
+        "antialiased",
+        geistMono.variable,
+        "font-sans",
+        geist.variable
+      )}
       lang="en"
       suppressHydrationWarning
     >

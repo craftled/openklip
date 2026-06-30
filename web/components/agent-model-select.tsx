@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/select";
 import { AGENT_GROUP_ICONS, agentProviderId } from "@/lib/agent-icons";
 import { AGENT_MODEL_GROUPS, type AgentModelId } from "@/lib/agent-preferences";
+import { APP_ICON_CLASS } from "@/lib/icon";
 import { cn } from "@/lib/utils";
 import { type AgentStatus, getAgentStatuses } from "../../app/agent-actions.ts";
 
@@ -25,7 +26,7 @@ function badgeState(status?: AgentStatus): {
   if (!status) {
     return {
       dot: "bg-foreground/30",
-      text: "text-tertiary",
+      text: "text-muted-foreground",
       label: "Checking…",
       title: "Checking…",
     };
@@ -33,22 +34,22 @@ function badgeState(status?: AgentStatus): {
   if (!status.installed) {
     return {
       dot: "bg-foreground/40",
-      text: "text-tertiary",
+      text: "text-muted-foreground",
       label: "Not installed",
       title: `${status.cli} CLI not found on PATH`,
     };
   }
   if (status.connected) {
     return {
-      dot: "bg-success",
-      text: "text-success-text",
+      dot: "bg-primary",
+      text: "text-foreground",
       label: "Signed in",
       title: `${status.cli} signed in`,
     };
   }
   return {
-    dot: "bg-info",
-    text: "text-info-text",
+    dot: "bg-muted-foreground",
+    text: "text-muted-foreground",
     label: "Sign in",
     title: status.signInCmd
       ? `Not signed in : run: ${status.signInCmd}`
@@ -85,7 +86,7 @@ function StatusBadge({
   return (
     <span
       className={cn(
-        "flex items-center gap-1 font-medium text-caption normal-case tracking-normal",
+        "flex items-center gap-1 font-medium text-xs normal-case tracking-normal",
         className
       )}
       title={s.title}
@@ -149,7 +150,7 @@ export function AgentModelSelect({
     >
       <SelectTrigger
         className={cn(
-          "h-8 w-full border border-border bg-muted/50 text-xs focus:ring-0 data-[state=open]:ring-0 [&_svg]:shrink-0",
+          "w-full border border-border bg-muted/50 text-xs focus:ring-0 data-[state=open]:ring-0 [&_svg]:shrink-0",
           triggerClassName
         )}
       >
@@ -161,21 +162,21 @@ export function AgentModelSelect({
           const Icon = AGENT_GROUP_ICONS[group.id];
           return (
             <SelectGroup key={group.id}>
-              <SelectLabel className="flex items-center gap-2 text-section-label">
-                <Icon className="size-3.5 shrink-0" />
+              <SelectLabel className="flex items-center gap-2 font-medium text-xs uppercase tracking-wide">
+                <Icon className={APP_ICON_CLASS} />
                 <span>{group.label}</span>
                 <StatusBadge className="ml-auto" status={statuses[group.id]} />
               </SelectLabel>
               {group.models.map((model) => (
                 <SelectItem key={model.value} value={model.value}>
                   <span className="flex w-full items-center gap-2">
-                    <Icon className="size-3.5 shrink-0" />
+                    <Icon className={APP_ICON_CLASS} />
                     <span className="min-w-0 flex-1 truncate">
                       {model.label}
                     </span>
                     {defaultAgent === model.value && (
                       <Badge
-                        className="h-4 shrink-0 px-1.5 font-normal text-caption"
+                        className="h-4 shrink-0 px-1.5 font-normal text-xs"
                         variant="secondary"
                       >
                         Default

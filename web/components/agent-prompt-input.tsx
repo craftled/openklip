@@ -44,7 +44,7 @@ import {
 } from "@/lib/app-toast";
 import type { AssetBinUpdate } from "@/lib/asset-bin-update";
 import { syncProjectAssets, uploadProjectAssets } from "@/lib/asset-upload";
-import { Plus, Sparkles } from "@/lib/icon";
+import { APP_ICON_CLASS, Plus, Sparkles } from "@/lib/icon";
 import {
   buildSkillCatalog,
   buildSkillMessage,
@@ -210,7 +210,7 @@ function AgentPromptInputInner({
               onClick={() => uploadInputRef.current?.click()}
               tooltip="Upload b-roll, music, or stills"
             >
-              <Plus className="size-4" />
+              <Plus />
             </PromptInputButton>
             <input
               accept="video/*,audio/*,image/*"
@@ -228,17 +228,19 @@ function AgentPromptInputInner({
               onOpenChange={setSkillsOpen}
               open={skillsOpen && !slashMenu.menuOpen}
             >
-              <DropdownMenuTrigger asChild>
-                <PromptInputButton
-                  aria-label="Skills"
-                  tooltip="Browse edit skills"
-                >
-                  <Sparkles className="size-4" />
-                  <span className="sr-only sm:not-sr-only sm:inline">
-                    Skills
-                  </span>
-                </PromptInputButton>
-              </DropdownMenuTrigger>
+              <DropdownMenuTrigger
+                render={
+                  <PromptInputButton
+                    aria-label="Skills"
+                    tooltip="Browse edit skills"
+                  >
+                    <Sparkles data-icon="inline-start" />
+                    <span className="sr-only sm:not-sr-only sm:inline">
+                      Skills
+                    </span>
+                  </PromptInputButton>
+                }
+              />
               <DropdownMenuContent
                 align="start"
                 className="w-[min(100vw-2rem,28rem)] p-0"
@@ -254,17 +256,18 @@ function AgentPromptInputInner({
               </DropdownMenuContent>
             </DropdownMenu>
             <PromptInputSelect
-              onValueChange={(value) => setAgent(value as AgentModelId)}
+              onValueChange={(value) => {
+                if (value) {
+                  setAgent(value as AgentModelId);
+                }
+              }}
               value={agent}
             >
               <PromptInputSelectTrigger
                 aria-label={`Model: ${getAgentModelLabel(agent)}`}
                 className="max-w-[11rem]"
               >
-                <AgentProviderIcon
-                  className="size-3.5 shrink-0"
-                  value={agent}
-                />
+                <AgentProviderIcon className={APP_ICON_CLASS} value={agent} />
                 <span className="truncate">{getAgentModelLabel(agent)}</span>
               </PromptInputSelectTrigger>
               <PromptInputSelectContent>
@@ -272,24 +275,23 @@ function AgentPromptInputInner({
                   const Icon = AGENT_GROUP_ICONS[group.id];
                   return (
                     <SelectGroup key={group.id}>
-                      <SelectLabel className="flex items-center gap-2 text-section-label">
-                        <Icon className="size-3.5 shrink-0" />
+                      <SelectLabel className="flex items-center gap-2 font-medium text-xs uppercase tracking-wide">
+                        <Icon className={APP_ICON_CLASS} />
                         {group.label}
                       </SelectLabel>
                       {group.models.map((model) => (
                         <PromptInputSelectItem
                           key={model.value}
-                          textValue={model.label}
                           value={model.value}
                         >
                           <span className="flex w-full items-center gap-2">
-                            <Icon className="size-3.5 shrink-0" />
+                            <Icon className={APP_ICON_CLASS} />
                             <span className="min-w-0 flex-1 truncate">
                               {model.label}
                             </span>
                             {defaultAgent === model.value && (
                               <Badge
-                                className="h-4 shrink-0 px-1.5 font-normal text-caption"
+                                className="h-4 shrink-0 px-1.5 font-normal text-xs"
                                 variant="secondary"
                               >
                                 Default

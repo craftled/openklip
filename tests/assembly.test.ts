@@ -11,7 +11,7 @@ import { withTempProjectsRoot } from "./helpers/projectFixture.ts";
 // The ffmpeg shell (probe/proxy/concat) gets one skip-gated smoke test only; the
 // correctness budget lives in tests/assembly-plan.test.ts (the pure planner).
 // This skips when the bundled ffmpeg binary is unavailable so CI without media
-// tooling stays green. Whisper is NOT exercised here — we seed take.json records
+// tooling stays green. Whisper is NOT exercised here, we seed take.json records
 // with hand-written words and let assembleFromSelection drive the real concat.
 const FFMPEG_OK = typeof FFMPEG === "string" && existsSync(FFMPEG);
 

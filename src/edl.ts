@@ -17,7 +17,7 @@ export type Word = z.infer<typeof WordSchema>;
 
 // A transcript anchor remembered on an overlay so its sample span can be
 // re-resolved from the CURRENT kept words after a re-cut (resolve-and-REMEMBER,
-// vs the old resolve-and-forget). Metadata only — the exporter still reads
+// vs the old resolve-and-forget). Metadata only: the exporter still reads
 // startSample/endSample. `phrase` = spoken text placed at; `wordIds` = the kept
 // run it last resolved to (provenance/hint); `stale` = true when re-resolution
 // can no longer find the phrase (last good span is preserved).

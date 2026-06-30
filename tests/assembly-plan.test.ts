@@ -84,7 +84,7 @@ test("planAssembly splices two takes end-to-end with no gap at the seam", () => 
     ["one", "two", "foxtrot", "golf"]
   );
 
-  // B's first word now starts exactly where A ended — no gap at the seam.
+  // B's first word now starts exactly where A ended, with no gap at the seam.
   assert.equal(plan.words[2].startSample, sec(2));
   assert.equal(plan.words[1].endSample, sec(2));
   assert.equal(plan.words[2].startSample, plan.words[1].endSample);

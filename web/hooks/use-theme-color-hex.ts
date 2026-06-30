@@ -15,7 +15,7 @@ export function useThemeColorHex(cssVar: string, fallback = "#000000"): string {
     const observer = new MutationObserver(resolve);
     observer.observe(document.documentElement, {
       attributes: true,
-      attributeFilter: ["class", "data-color-theme", "style"],
+      attributeFilter: ["class"],
     });
 
     return () => observer.disconnect();

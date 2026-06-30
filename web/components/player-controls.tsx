@@ -1,6 +1,7 @@
 "use client";
 
 import { type ReactNode, useCallback, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
 import {
   Captions,
   Maximize,
@@ -15,9 +16,8 @@ import { cn } from "@/lib/utils";
 
 export const PLAYER_SPEEDS = [0.5, 1, 1.25, 1.5, 2] as const;
 
-const CTRL_ICON = "size-3.5";
 const TRANSPORT_NUM =
-  "shrink-0 font-black text-caption tabular-nums leading-none tracking-small";
+  "shrink-0 font-black text-xs tabular-nums leading-none tracking-tight";
 
 export function fmtClock(sec: number): string {
   if (!Number.isFinite(sec) || sec < 0) {
@@ -197,27 +197,17 @@ export function PlayerControls({
       onClick={(e) => e.stopPropagation()}
     >
       <CtrlButton label={playing ? "Pause" : "Play"} onClick={onPlayToggle}>
-        {playing ? (
-          <Pause className={cn(CTRL_ICON, "fill-current")} />
-        ) : (
-          <Play className={cn(CTRL_ICON, "fill-current")} />
-        )}
+        {playing ? <Pause /> : <Play />}
       </CtrlButton>
 
       <CtrlButton label={muted ? "Unmute" : "Mute"} onClick={onToggleMute}>
-        {muted || volume === 0 ? (
-          <VolumeX className={CTRL_ICON} />
-        ) : (
-          <Volume2 className={CTRL_ICON} />
-        )}
+        {muted || volume === 0 ? <VolumeX /> : <Volume2 />}
       </CtrlButton>
 
       <span className={cn(TRANSPORT_NUM, "text-white")}>
         {fmtClock(current)}
       </span>
-      <span className="shrink-0 text-caption text-white/30 leading-none">
-        •
-      </span>
+      <span className="shrink-0 text-white/30 text-xs leading-none">•</span>
 
       {/* Hairline scrubber with dot handle + hover preview */}
       <div
@@ -242,7 +232,7 @@ export function PlayerControls({
               style={{ left: `${hoverFrac * 100}%` }}
             />
             <div
-              className="pointer-events-none absolute bottom-full z-10 mb-3.5 -translate-x-1/2 whitespace-nowrap text-[0.6875rem] text-white/75 tabular-nums leading-none tracking-small"
+              className="pointer-events-none absolute bottom-full z-10 mb-3.5 -translate-x-1/2 whitespace-nowrap text-[0.6875rem] text-white/75 tabular-nums leading-none tracking-tight"
               style={{
                 left: `clamp(2rem, ${hoverFrac * 100}%, calc(100% - 2rem))`,
               }}
@@ -280,24 +270,25 @@ export function PlayerControls({
         -{fmtClock(remaining)}
       </span>
 
-      <button
+      <Button
         aria-label="Playback speed"
         className={cn(
           TRANSPORT_NUM,
-          "cursor-pointer rounded-md px-1 py-0.5 text-white/90 transition-[transform,background-color,color] duration-150 ease-out fine-hover:hover:bg-white/10 fine-hover:hover:text-white active:scale-[0.97]"
+          "h-auto rounded-md px-1 py-0.5 text-white/90 fine-hover:hover:bg-white/10 fine-hover:hover:text-white active:scale-[0.97]"
         )}
         onClick={onCycleSpeed}
         type="button"
+        variant="ghost"
       >
         {rate}×
-      </button>
+      </Button>
 
       <CtrlButton
         active={captionsOn}
         label="Captions"
         onClick={onToggleCaptions}
       >
-        <Captions className={CTRL_ICON} />
+        <Captions />
       </CtrlButton>
 
       {onTogglePip && (
@@ -306,7 +297,7 @@ export function PlayerControls({
           label="Picture in picture"
           onClick={onTogglePip}
         >
-          <PictureInPicture2 className={CTRL_ICON} />
+          <PictureInPicture2 />
         </CtrlButton>
       )}
 
@@ -318,11 +309,7 @@ export function PlayerControls({
         }
         onClick={onFullscreen}
       >
-        {fullscreenActive ? (
-          <Minimize className={CTRL_ICON} />
-        ) : (
-          <Maximize className={CTRL_ICON} />
-        )}
+        {fullscreenActive ? <Minimize /> : <Maximize />}
       </CtrlButton>
     </div>
   );
@@ -340,17 +327,19 @@ export function CtrlButton({
   onClick: () => void;
 }) {
   return (
-    <button
+    <Button
       aria-label={label}
       aria-pressed={active}
       className={cn(
-        "flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-white/75 transition-[transform,background-color,color] duration-150 ease-out fine-hover:hover:bg-white/10 fine-hover:hover:text-white active:scale-[0.97]",
+        "size-7 shrink-0 rounded-full text-white/75 fine-hover:hover:bg-white/10 fine-hover:hover:text-white active:scale-[0.97]",
         active && "text-white ring-1 ring-white/40 ring-inset"
       )}
       onClick={onClick}
+      size="icon-sm"
       type="button"
+      variant="ghost"
     >
       {children}
-    </button>
+    </Button>
   );
 }

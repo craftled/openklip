@@ -2,7 +2,7 @@
 // lives in src/assembly-plan.ts (planAssembly); this module is the IO/ffmpeg
 // boundary around it: it ingests individual takes into takes/<id>/, and it
 // splices an agent-supplied selection into a brand-new single-source project
-// (originals parked in takes/, the engine untouched — it still reads one
+// (originals parked in takes/, the engine untouched: it still reads one
 // project.source/project.proxy). The shared probe → 720p proxy → 16k PCM →
 // Whisper core is reused from src/ingest.ts so the two ingest paths cannot drift.
 import { existsSync, readdirSync } from "node:fs";

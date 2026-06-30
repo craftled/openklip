@@ -422,7 +422,11 @@ export const PromptInputActionAddAttachments = ({
   const attachments = usePromptInputAttachments();
 
   const handleSelect = useCallback(
-    (e: Event) => {
+    (
+      e: Parameters<
+        NonNullable<ComponentProps<typeof DropdownMenuItem>["onSelect"]>
+      >[0]
+    ) => {
       e.preventDefault();
       attachments.openFileDialog();
     },
@@ -431,7 +435,7 @@ export const PromptInputActionAddAttachments = ({
 
   return (
     <DropdownMenuItem {...props} onSelect={handleSelect}>
-      <ImageIcon className="mr-2 size-4" /> {label}
+      <ImageIcon /> {label}
     </DropdownMenuItem>
   );
 };
@@ -450,7 +454,11 @@ export const PromptInputActionAddScreenshot = ({
   const attachments = usePromptInputAttachments();
 
   const handleSelect = useCallback(
-    async (event: Event) => {
+    async (
+      event: Parameters<
+        NonNullable<ComponentProps<typeof DropdownMenuItem>["onSelect"]>
+      >[0]
+    ) => {
       onSelect?.(event);
       if (event.defaultPrevented) {
         return;
@@ -476,7 +484,7 @@ export const PromptInputActionAddScreenshot = ({
 
   return (
     <DropdownMenuItem {...props} onSelect={handleSelect}>
-      <Monitor className="mr-2 size-4" />
+      <Monitor />
       {label}
     </DropdownMenuItem>
   );
@@ -1161,10 +1169,12 @@ export const PromptInputButton = ({
 
   return (
     <Tooltip>
-      <TooltipTrigger asChild>{button}</TooltipTrigger>
+      <TooltipTrigger render={button} />
       <TooltipContent side={side}>
         {tooltipContent}
-        {shortcut && <span className="ml-2 text-tertiary">{shortcut}</span>}
+        {shortcut && (
+          <span className="ml-2 text-muted-foreground">{shortcut}</span>
+        )}
       </TooltipContent>
     </Tooltip>
   );
@@ -1182,11 +1192,13 @@ export const PromptInputActionMenuTrigger = ({
   children,
   ...props
 }: PromptInputActionMenuTriggerProps) => (
-  <DropdownMenuTrigger asChild>
-    <PromptInputButton className={className} {...props}>
-      {children ?? <PlusIcon className="size-4" />}
-    </PromptInputButton>
-  </DropdownMenuTrigger>
+  <DropdownMenuTrigger
+    render={
+      <PromptInputButton className={className} {...props}>
+        {children ?? <PlusIcon />}
+      </PromptInputButton>
+    }
+  />
 );
 
 export type PromptInputActionMenuContentProps = ComponentProps<
@@ -1229,18 +1241,22 @@ export const PromptInputSubmit = ({
 }: PromptInputSubmitProps) => {
   const isGenerating = status === "submitted" || status === "streaming";
 
-  let Icon = <CornerDownLeftIcon className="size-4" />;
+  let Icon = <CornerDownLeftIcon />;
 
   if (status === "submitted") {
     Icon = <Spinner />;
   } else if (status === "streaming") {
-    Icon = <SquareIcon className="size-4" />;
+    Icon = <SquareIcon />;
   } else if (status === "error") {
-    Icon = <XIcon className="size-4" />;
+    Icon = <XIcon />;
   }
 
   const handleClick = useCallback(
-    (e: React.MouseEvent<HTMLButtonElement>) => {
+    (
+      e: Parameters<
+        NonNullable<ComponentProps<typeof InputGroupButton>["onClick"]>
+      >[0]
+    ) => {
       if (isGenerating && onStop) {
         e.preventDefault();
         onStop();
@@ -1282,7 +1298,7 @@ export const PromptInputSelectTrigger = ({
 }: PromptInputSelectTriggerProps) => (
   <SelectTrigger
     className={cn(
-      "border-none bg-transparent font-medium text-tertiary shadow-none transition-colors",
+      "border-none bg-transparent font-medium text-muted-foreground shadow-none transition-colors",
       "hover:bg-foreground/3 hover:text-foreground aria-expanded:bg-foreground/5 aria-expanded:text-foreground",
       className
     )}
@@ -1319,15 +1335,16 @@ export const PromptInputSelectValue = ({
   <SelectValue className={cn(className)} {...props} />
 );
 
-export type PromptInputHoverCardProps = ComponentProps<typeof HoverCard>;
+export type PromptInputHoverCardProps = ComponentProps<typeof HoverCard> & {
+  closeDelay?: number;
+  openDelay?: number;
+};
 
 export const PromptInputHoverCard = ({
-  openDelay = 0,
-  closeDelay = 0,
+  openDelay: _openDelay = 0,
+  closeDelay: _closeDelay = 0,
   ...props
-}: PromptInputHoverCardProps) => (
-  <HoverCard closeDelay={closeDelay} openDelay={openDelay} {...props} />
-);
+}: PromptInputHoverCardProps) => <HoverCard {...props} />;
 
 export type PromptInputHoverCardTriggerProps = ComponentProps<
   typeof HoverCardTrigger
@@ -1371,7 +1388,10 @@ export const PromptInputTabLabel = ({
   // Content provided via children in props
   // oxlint-disable-next-line eslint-plugin-jsx-a11y(heading-has-content)
   <h3
-    className={cn("mb-2 px-3 font-medium text-tertiary text-xs", className)}
+    className={cn(
+      "mb-2 px-3 font-medium text-muted-foreground text-xs",
+      className
+    )}
     {...props}
   />
 );

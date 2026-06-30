@@ -1,20 +1,19 @@
 "use client";
 
-import type { SidebarContextProps } from "@/components/ui/sidebar";
 import { useSidebar } from "@/components/ui/sidebar";
 import { useEditorSidebarShortcuts } from "@/hooks/use-editor-sidebar-shortcuts";
 
-/** Registers ⌘B (agent) and ⌘I (inspector) once : must render inside the inspector SidebarProvider. */
+/** Registers Mod+B (agent) and Mod+I (inspector) once inside the inspector SidebarProvider. */
 export function EditorSidebarShortcuts({
   agentSidebar,
 }: {
-  agentSidebar: Pick<SidebarContextProps, "toggleSidebarInstant">;
+  agentSidebar: Pick<ReturnType<typeof useSidebar>, "toggleSidebar">;
 }) {
   const inspectorSidebar = useSidebar();
 
   useEditorSidebarShortcuts({
-    onToggleAgent: agentSidebar.toggleSidebarInstant,
-    onToggleInspector: inspectorSidebar.toggleSidebarInstant,
+    onToggleAgent: agentSidebar.toggleSidebar,
+    onToggleInspector: inspectorSidebar.toggleSidebar,
   });
 
   return null;

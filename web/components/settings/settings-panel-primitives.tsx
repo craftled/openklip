@@ -11,7 +11,7 @@ export const SETTINGS_CARD_ROW_TITLE_CLASS =
   "text-[12px] font-medium text-foreground";
 
 export const SETTINGS_CARD_ROW_DESCRIPTION_CLASS =
-  "text-[12px] text-tertiary leading-relaxed";
+  "text-[12px] text-muted-foreground leading-relaxed";
 
 export const SETTINGS_PANEL_SECTION_CLASS =
   "flex flex-col gap-1.5 not-first:mt-4";
@@ -49,7 +49,7 @@ export function SettingsRow({
   return (
     <div className={SETTINGS_CARD_ROW_CLASS} data-slot="settings-row">
       <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0 flex-1 space-y-0.5">
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <h3 className={SETTINGS_CARD_ROW_TITLE_CLASS}>{title}</h3>
           <p className={SETTINGS_CARD_ROW_DESCRIPTION_CLASS}>{description}</p>
           {children}

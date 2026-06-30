@@ -1,18 +1,12 @@
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, test } from "node:test";
 import {
-  DEFAULT_APP_THEME,
-  getThemeLabel,
-  THEME_CATALOG,
-} from "../web/lib/theme-catalog.ts";
-import {
-  getAppTheme,
+  applyColorScheme,
   getColorScheme,
   resetThemePreferencesForTests,
-  setAppTheme,
   setColorScheme,
-  subscribeAppTheme,
   subscribeColorScheme,
+  THEME_NO_FLASH_SCRIPT,
 } from "../web/lib/theme-preferences.ts";
 import {
   installLocalStorageMock,
@@ -26,35 +20,32 @@ beforeEach(() => {
 
 afterEach(() => {
   resetThemePreferencesForTests();
+  // @ts-expect-error test cleanup
+  globalThis.document = undefined;
   uninstallLocalStorageMock();
 });
 
-test("getAppTheme returns OpenKlip when storage is empty", () => {
-  assert.equal(getAppTheme(), DEFAULT_APP_THEME);
-});
-
-test("setAppTheme persists the chosen theme", () => {
-  setAppTheme("openklip");
-  assert.equal(localStorage.getItem("openklip-theme-id"), "openklip");
-  assert.equal(getAppTheme(), "openklip");
-});
-
-test("getThemeLabel maps ids to human labels", () => {
-  assert.equal(getThemeLabel("openklip"), "OpenKlip");
-  assert.equal(getThemeLabel("unknown"), "unknown");
-});
-
-test("subscribeAppTheme fires when the theme changes", () => {
-  const seen: string[] = [];
-  const unsub = subscribeAppTheme((theme) => {
-    seen.push(theme);
-  });
-
-  setAppTheme("openklip");
-
-  assert.deepEqual(seen, ["openklip"]);
-  unsub();
-});
+function installDocumentClassListMock() {
+  const classes = new Set<string>();
+  const classList = {
+    contains(name: string) {
+      return classes.has(name);
+    },
+    toggle(name: string, force?: boolean) {
+      const shouldAdd = force ?? !classes.has(name);
+      if (shouldAdd) {
+        classes.add(name);
+        return true;
+      }
+      classes.delete(name);
+      return false;
+    },
+  };
+  globalThis.document = {
+    documentElement: { classList },
+  } as unknown as Document;
+  return classList;
+}
 
 test("getColorScheme returns light when storage is empty", () => {
   assert.equal(getColorScheme(), "light");
@@ -64,6 +55,16 @@ test("setColorScheme persists the chosen scheme", () => {
   setColorScheme("dark");
   assert.equal(localStorage.getItem("openklip-color-scheme"), "dark");
   assert.equal(getColorScheme(), "dark");
+});
+
+test("applyColorScheme toggles the document dark class", () => {
+  const classList = installDocumentClassListMock();
+
+  applyColorScheme("dark");
+  assert.equal(classList.contains("dark"), true);
+
+  applyColorScheme("light");
+  assert.equal(classList.contains("dark"), false);
 });
 
 test("subscribeColorScheme fires when the scheme changes", () => {
@@ -79,8 +80,14 @@ test("subscribeColorScheme fires when the scheme changes", () => {
   unsub();
 });
 
-test("THEME_CATALOG lists OpenKlip as the default catalog entry", () => {
-  assert.equal(THEME_CATALOG.length >= 1, true);
-  assert.equal(THEME_CATALOG[0]?.id, "openklip");
-  assert.equal(THEME_CATALOG[0]?.name, "OpenKlip");
+test("THEME_NO_FLASH_SCRIPT applies the stored dark scheme", () => {
+  const classList = installDocumentClassListMock();
+  localStorage.setItem("openklip-color-scheme", "dark");
+
+  new Function("localStorage", "document", THEME_NO_FLASH_SCRIPT)(
+    localStorage,
+    document
+  );
+
+  assert.equal(classList.contains("dark"), true);
 });

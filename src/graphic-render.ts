@@ -147,7 +147,7 @@ async function renderRichGraphic(
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
     throw new Error(
-      `rich graphic "${input.template}" failed to render (${detail}). Rich graphics need chrome-headless-shell — install once with: bunx puppeteer browsers install chrome-headless-shell — or set the template's manifest kind to "text".`
+      `rich graphic "${input.template}" failed to render (${detail}). Rich graphics need chrome-headless-shell. Install once with: bunx puppeteer browsers install chrome-headless-shell. Or set the template's manifest kind to "text".`
     );
   }
 

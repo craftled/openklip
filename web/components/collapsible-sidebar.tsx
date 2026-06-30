@@ -1,6 +1,7 @@
 "use client";
 
 import type { ComponentType, ReactNode } from "react";
+import { Button } from "@/components/ui/button";
 import {
   Collapsible,
   CollapsibleContent,
@@ -16,7 +17,12 @@ import {
   SidebarMenuItem,
   SidebarMenuSub,
 } from "@/components/ui/sidebar";
-import { ChevronRight, FolderClosed, FolderOpen } from "@/lib/icon";
+import {
+  APP_ICON_CLASS,
+  ChevronRight,
+  FolderClosed,
+  FolderOpen,
+} from "@/lib/icon";
 import {
   SIDEBAR_NESTED_LIST_GAP_CLASS,
   SIDEBAR_NESTED_LIST_OFFSET_CLASS,
@@ -41,23 +47,23 @@ export function CollapsibleSidebarMenuItem({
   tooltip?: string;
 }) {
   return (
-    <Collapsible asChild defaultOpen={defaultOpen}>
-      <SidebarMenuItem>
-        <SidebarMenuButton size="sm" tooltip={tooltip}>
-          {icon}
-          <span>{label}</span>
-        </SidebarMenuButton>
-        {badge ? <SidebarMenuBadge>{badge}</SidebarMenuBadge> : null}
-        <CollapsibleTrigger asChild>
+    <Collapsible defaultOpen={defaultOpen} render={<SidebarMenuItem />}>
+      <SidebarMenuButton size="sm" tooltip={tooltip}>
+        {icon}
+        <span>{label}</span>
+      </SidebarMenuButton>
+      {badge ? <SidebarMenuBadge>{badge}</SidebarMenuBadge> : null}
+      <CollapsibleTrigger
+        render={
           <SidebarMenuAction className="data-[state=open]:rotate-90">
             <ChevronRight />
             <span className="sr-only">Toggle {label}</span>
           </SidebarMenuAction>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <SidebarMenuSub>{children}</SidebarMenuSub>
-        </CollapsibleContent>
-      </SidebarMenuItem>
+        }
+      />
+      <CollapsibleContent>
+        <SidebarMenuSub>{children}</SidebarMenuSub>
+      </CollapsibleContent>
     </Collapsible>
   );
 }
@@ -80,45 +86,61 @@ export function CollapsibleSidebarSection({
 }) {
   return (
     <SidebarGroup className={cn("py-1.5", className)}>
-      <Collapsible asChild defaultOpen={defaultOpen}>
-        <div>
-          <div className="group/section-header relative my-1">
-            <CollapsibleTrigger asChild>
-              <button
+      <Collapsible defaultOpen={defaultOpen} render={<div />}>
+        <div className="group/section-header relative my-1">
+          <CollapsibleTrigger
+            render={
+              <Button
                 className={cn(
-                  "group flex h-7 w-full min-w-0 cursor-pointer items-center gap-1 rounded-md px-2 py-0.5 text-left outline-hidden transition-colors focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-inset [&[data-state=open]>svg.chevron]:rotate-90",
+                  "group h-7 w-full min-w-0 justify-start gap-1 px-2 py-0.5 text-left focus-visible:ring-1 focus-visible:ring-inset [&[data-state=open]>svg.chevron]:rotate-90",
                   SIDEBAR_SECTION_LABEL_CLASS
                 )}
                 type="button"
+                variant="ghost"
               >
                 {showFolderIcon ? (
-                  <span className="relative inline-flex size-3.5 shrink-0 items-center justify-center">
-                    <FolderClosed className="size-3.5 shrink-0 opacity-60 group-data-[state=open]:hidden" />
-                    <FolderOpen className="hidden size-3.5 shrink-0 opacity-60 group-data-[state=open]:block" />
+                  <span className="relative inline-flex size-4 shrink-0 items-center justify-center">
+                    <FolderClosed
+                      className={cn(
+                        APP_ICON_CLASS,
+                        "group-data-[state=open]:hidden"
+                      )}
+                    />
+                    <FolderOpen
+                      className={cn(
+                        "hidden group-data-[state=open]:block",
+                        APP_ICON_CLASS
+                      )}
+                    />
                   </span>
                 ) : null}
                 <span className="min-w-0 flex-1 truncate">{title}</span>
-                <ChevronRight className="chevron size-3.5 shrink-0 opacity-60 transition-transform duration-200" />
-              </button>
-            </CollapsibleTrigger>
-            {action ? (
-              <div className="absolute top-1/2 right-7 z-10 -translate-y-1/2">
-                {action}
-              </div>
-            ) : null}
-          </div>
-          <CollapsibleContent>
-            <SidebarGroupContent
-              className={cn(
-                SIDEBAR_NESTED_LIST_OFFSET_CLASS,
-                SIDEBAR_NESTED_LIST_GAP_CLASS,
-                "flex flex-col px-0"
-              )}
-            >
-              {children}
-            </SidebarGroupContent>
-          </CollapsibleContent>
+                <ChevronRight
+                  className={cn(
+                    "chevron transition-transform duration-200",
+                    APP_ICON_CLASS
+                  )}
+                />
+              </Button>
+            }
+          />
+          {action ? (
+            <div className="absolute top-1/2 right-7 z-10 -translate-y-1/2">
+              {action}
+            </div>
+          ) : null}
         </div>
+        <CollapsibleContent>
+          <SidebarGroupContent
+            className={cn(
+              SIDEBAR_NESTED_LIST_OFFSET_CLASS,
+              SIDEBAR_NESTED_LIST_GAP_CLASS,
+              "flex flex-col px-0"
+            )}
+          >
+            {children}
+          </SidebarGroupContent>
+        </CollapsibleContent>
       </Collapsible>
     </SidebarGroup>
   );
@@ -135,9 +157,11 @@ export function CollapsibleSidebarMetaItem({
 }) {
   return (
     <div className="flex h-7 items-center gap-2 px-2 text-[12px] text-sidebar-foreground">
-      <Icon className="size-4 shrink-0 text-inherit opacity-70" />
+      <Icon className={APP_ICON_CLASS} />
       <span className="min-w-0 flex-1 truncate">{label}</span>
-      <span className="shrink-0 text-tertiary/70 tabular-nums">{value}</span>
+      <span className="shrink-0 text-muted-foreground/70 tabular-nums">
+        {value}
+      </span>
     </div>
   );
 }
@@ -153,11 +177,11 @@ export function SidebarSettingsLabel({
   return (
     <SidebarGroupLabel
       className={cn(
-        "mb-1 h-7 px-2 font-normal text-tertiary/58",
+        "mb-1 h-7 px-2 font-normal text-muted-foreground/58",
         SIDEBAR_SECTION_LABEL_CLASS
       )}
     >
-      {Icon ? <Icon className="size-4 shrink-0 opacity-70" /> : null}
+      {Icon ? <Icon className={APP_ICON_CLASS} /> : null}
       <span>{children}</span>
     </SidebarGroupLabel>
   );

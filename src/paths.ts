@@ -83,7 +83,7 @@ export function projectPaths(slug: string) {
 
 // One ingested take's folder under the project's takes/. The take id is itself a
 // slug, so the same path gate that protects [slug] in network routes protects it
-// here before any join — a hostile take id cannot traverse out of takes/.
+// here before any join. A hostile take id cannot traverse out of takes/.
 export function takeDir(slug: string, takeId: string): string {
   return join(projectDir(slug), "takes", assertValidSlug(takeId));
 }

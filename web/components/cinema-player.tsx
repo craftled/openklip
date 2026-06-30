@@ -11,6 +11,7 @@ import {
   PlayerControls,
   PLAYER_SPEEDS as SPEEDS,
 } from "@/components/player-controls";
+import { Button } from "@/components/ui/button";
 import { Download, Play, X } from "@/lib/icon";
 import { cn } from "@/lib/utils";
 
@@ -366,14 +367,16 @@ export function CinemaPlayer({
 
       {/* Center play affordance when paused */}
       {!playing && (
-        <button
+        <Button
           aria-label="Play"
-          className="absolute top-1/2 left-1/2 z-20 flex size-16 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-[transform,background-color] duration-150 ease-out fine-hover:hover:scale-105 fine-hover:hover:bg-black/55 active:scale-[0.97]"
+          className="absolute top-1/2 left-1/2 z-20 size-16 -translate-x-1/2 -translate-y-1/2 rounded-full bg-black/40 text-white backdrop-blur-sm fine-hover:hover:scale-105 fine-hover:hover:bg-black/55 active:scale-[0.97]"
           onClick={togglePlay}
+          size="icon-lg"
           type="button"
+          variant="ghost"
         >
-          <Play className="ml-0.5 size-7 fill-current" />
-        </button>
+          <Play />
+        </Button>
       )}
 
       {/* ── Top bar ─────────────────────────────────────────────── */}
@@ -385,7 +388,7 @@ export function CinemaPlayer({
       >
         <div className="min-w-0 leading-tight">
           {label && (
-            <div className="truncate text-section-label text-white/45">
+            <div className="truncate font-medium text-white/45 text-xs uppercase tracking-wide">
               {label}
             </div>
           )}
@@ -395,24 +398,27 @@ export function CinemaPlayer({
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
           {onExport && (
-            <button
-              className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 font-medium text-ui text-white/90 backdrop-blur-sm transition-[transform,background-color] duration-150 ease-out fine-hover:hover:bg-white/20 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
+            <Button
+              className="h-auto gap-1.5 rounded-full bg-white/10 px-3 py-1.5 font-medium text-sm text-white/90 backdrop-blur-sm fine-hover:hover:bg-white/20 active:scale-[0.97] disabled:cursor-not-allowed"
               disabled={exportDisabled}
               onClick={onExport}
               type="button"
+              variant="ghost"
             >
-              <Download className="size-3.5" />
+              <Download data-icon="inline-start" />
               {exportLabel}
-            </button>
+            </Button>
           )}
-          <button
+          <Button
             aria-label="Close player"
-            className="flex size-8 cursor-pointer items-center justify-center rounded-full text-white/70 transition-[transform,background-color,color] duration-150 ease-out fine-hover:hover:bg-white/10 fine-hover:hover:text-white active:scale-[0.97]"
+            className="size-8 rounded-full text-white/70 fine-hover:hover:bg-white/10 fine-hover:hover:text-white active:scale-[0.97]"
             onClick={onClose}
+            size="icon"
             type="button"
+            variant="ghost"
           >
-            <X className="size-[18px]" />
-          </button>
+            <X />
+          </Button>
         </div>
       </div>
 

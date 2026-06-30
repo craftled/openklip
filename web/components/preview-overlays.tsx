@@ -24,7 +24,7 @@ interface PreviewOverlaysProps {
 
 // The live overlay stack (hero title, graphics, lower/center title, captions)
 // keyed purely on the current SOURCE sample. Shared by the inline editor preview
-// and the fullscreen CinemaPlayer so both render identical overlays — the only
+// and the fullscreen CinemaPlayer so both render identical overlays. The only
 // difference is which video's playback drives `curSample`.
 export function PreviewOverlays({
   captionGroups,
