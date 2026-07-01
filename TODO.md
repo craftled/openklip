@@ -4,7 +4,7 @@
 
 OpenKlip is a lean, local-first **agent-native video toolchain**: external agents drive the edit loop via CLI; humans review in the browser. Both read/write the same `project.json` on disk.
 
-**Current release:** v0.10.0.0 (2026-07-01). Working local editor: cut → captions → b-roll → vignette → push-in zoom → titles → grade/LUT → rich graphics → json-render product announcement graphics → export; cinema player with live graphics/titles/captions overlays; resizable right chat sidebar with Claude MCP edits; right-side Config shell with color temperature controls; smaller-screen Chat and Config overlays; asset cards (`openklip analyze` + **Describe assets**); skills slash menu; MCP agent tools (52 tools); edit templates; native HTML/CSS graphics templates (pixel-faithful headless-Chrome export to ProRes 4444 alpha); default shadcn neutral theme with Base UI primitives; export dialog; macOS workspace folder picker; multi-agent filler cuts; sidebar asset bin with folder sync; written rationale notes on cuts/overlays; phrase-anchored cues that re-snap after a re-cut; multi-take assembly; 618 tests; MIT.
+**Current release:** v0.10.0.0 (2026-07-01). Working local editor: cut → captions → b-roll → vignette → push-in zoom → titles → grade/LUT → rich graphics → json-render product announcement graphics → export; cinema player with live graphics/titles/captions overlays; resizable right chat sidebar with Claude MCP edits; right-side Config shell with color temperature controls; smaller-screen Chat and Config overlays; asset cards (`openklip analyze` + **Describe assets**); skills slash menu; MCP agent tools (55 tools); edit templates; native HTML/CSS graphics templates (pixel-faithful headless-Chrome export to ProRes 4444 alpha); default shadcn neutral theme with Base UI primitives; export dialog; macOS workspace folder picker; multi-agent filler cuts; sidebar asset bin with folder sync; written rationale notes on cuts/overlays; phrase-anchored cues that re-snap after a re-cut; multi-take assembly; 619 tests; MIT.
 
 Preview cuts get a Glimm WebGL sweep in the browser; exported MP4s still hard-cut until the ffmpeg transition graph lands.
 
@@ -36,7 +36,7 @@ Preview cuts get a Glimm WebGL sweep in the browser; exported MP4s still hard-cu
 - [x] **Project write serialization** (`src/project-lock.ts`, `mutateProject()`; in-process per-slug locks for `project.json` and `chats.json`)
 - [x] **Chats + asset hardening** (atomic `chats.json` writes, POST folder sync, re-ingest guard with `--force`, external still copy-in)
 - [x] **Design system: default shadcn theme + Base UI primitives** (`components.json` + `app/globals.css`: stock neutral tokens, light/dark color scheme)
-- [x] **TDD test suite** (`bun test`: 572 tests across actions, captions, EDL, exporter, project lock, chats, assets, workspace, agent-tools, templates, graphics, headless render, reanchor, multi-take assembly, and more)
+- [x] **TDD test suite** (`bun test`: 619 tests across actions, captions, EDL, exporter, project lock, chats, assets, workspace, agent-tools, templates, graphics, headless render, reanchor, multi-take assembly, product announcement, and more)
 - [x] **GitHub Actions CI** (`check`, `typecheck`, `test`, `build`)
 - [x] **Open-sourced** (public GitHub repo, MIT license, source media gitignored + purged from history)
 - [x] **Center chat panel** (agent threads + prompt input in center column; chat list in left sidebar; PR #12)
@@ -137,6 +137,8 @@ Single list of current gaps (code is truth). README and release notes point here
 - Glimm cut transitions are preview-only; exported MP4 hard-jumps between kept ranges.
 - B-roll is full-cover only (no PiP mode or b-roll audio ducking yet).
 - HyperFrames post-export (`openklip package`) is opt-in: requires separate `hyperframes` npm install and Chrome; not bundled.
+- `product-announcement` is the only json-render graphic catalog today; `json-graphic-add` / `json-graphic-set` accept no other type. An invalid json-render spec is skipped (preview and export both degrade gracefully) rather than surfacing an inline authoring error.
+- json-render timeline interactions (select / trim / reload) and the smaller-screen Chat/Config overlay flows are wired and unit-covered but not yet verified end to end in a browser.
 
 ### Editing & transcript
 

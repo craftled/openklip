@@ -4,6 +4,45 @@ Use these bodies when publishing releases. Each section matches a tag in `CHANGE
 
 ---
 
+## v0.10.0.0
+
+**JSON specs become export-ready motion graphics: catalog-constrained product announcements, authored by agents and previewed pixel-for-pixel.**
+
+### Highlights
+- **Product announcement graphics** (`src/product-announcement.ts`, `web/components/product-announcement-frame.tsx`): a catalog-constrained `product-announcement` json-render graphic type. Agents author a validated JSON spec, the editor previews the exact same static React render, and it exports through the normal project timeline
+- **JSON graphic actions**: `openklip json-graphic-add` and `json-graphic-set` across CLI, GUI, MCP, and the action registry, plus overlay summaries for json-render graphics
+- **Product announcement playbook**: bundled `templates/product-announcement/skill.md` and a pinned slash-catalog entry so agents attach the playbook and create validated graphics with tools instead of only describing JSON
+- **Spec hardening**: specs reject invalid accent values, oversized graph shapes, cyclic child graphs, orphaned elements, non-scene roots, and missing catalog/spec fields before they reach preview or export; an invalid spec is skipped (preview and export both degrade gracefully) rather than bricking the render
+- **Config shell + responsive panels**: right-side Config panel with a color temperature pad; Chat and Config stay reachable below the desktop sidebar breakpoint via overlay buttons
+- **Agent tool scoping**: Claude edit mode allows the full OpenKlip MCP namespace while scoped sessions only expose the active project through project-listing tools
+- MCP server now exposes 55 tools with CLI/GUI parity; built red-green (585 to 619 tests)
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations) for the full list (current).
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#01000---2026-07-01)
+
+---
+
+## v0.9.0.0
+
+**Default shadcn theme as the UI baseline: clean parity to build future visual work from.**
+
+### Highlights
+- **Default shadcn theme**: replaced the custom OpenKlip theme engine and palette JSON files with shadcn default CSS variables, dark-mode class handling, and registry-aligned primitives; editor chrome (buttons, sidebars, dialogs, selects, menus, sheets, tooltips, timeline) now uses stock shadcn tokens instead of bespoke success/info/sidebar-active variants
+- **Base UI primitive layer**: app-owned drawer and command wrappers migrated to Base UI while preserving OpenKlip component exports and prompt-menu behavior
+- **Static chat mockups**: shadcn-style message, marker, attachment, empty, field, label, tabs, and message-scroller primitives for local testing of the chat UI (mockup examples only appear in the empty state)
+- **Removed**: the custom theme catalog, theme schema, theme engine, bundled theme JSON presets, obsolete motion tests, and the old drawer/command packages now covered by Base UI wrappers
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations) for the full list (current).
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#0900---2026-06-30)
+
+---
+
 ## v0.8.10.0
 
 **The edit carries its own reasoning: written rationale, phrase-anchored cues, multi-take assembly.**
@@ -70,7 +109,7 @@ See [TODO.md](../TODO.md#known-limitations) for the full list (current).
 - Export and Choose video use primary blue; skill tokens and secondary chrome stay grey
 - `text-tertiary`, `text-quaternary`, `bg-surface-*` replace ad-hoc muted classes across the editor shell
 - Timeline music, stills, and title tracks use theme tokens instead of arbitrary Tailwind hues
-- Inputs, focus rings, popovers, and chat/transcript typography aligned to [DESIGN.md](../DESIGN.md)
+- Inputs, focus rings, popovers, and chat/transcript typography aligned to DESIGN.md (the design spec, since removed in the v0.9.0.0 shadcn migration)
 
 ### Fixed
 - Typecheck: `agent-tools.ts`, `mcp-server.ts`, `new-project-dialog.tsx`
@@ -89,7 +128,7 @@ See [TODO.md](../TODO.md#known-limitations) for the full list (current).
 **Design system source of truth: OKLCH surfaces and Inter Variable typography.**
 
 ### Highlights
-- [DESIGN.md](../DESIGN.md) and [CLAUDE.md](../CLAUDE.md) document typography, color, spacing, and motion
+- DESIGN.md (since removed in the v0.9.0.0 shadcn migration) and [CLAUDE.md](../CLAUDE.md) documented typography, color, spacing, and motion
 - Inter Variable with Linear weight recipe (510/590/680); JetBrains Mono for timestamps and paths
 - Surface ladder (`--surface-0` through `--surface-3`) and text hierarchy tokens
 - Modal overlays use a shared `bg-overlay` scrim token

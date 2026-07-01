@@ -55,6 +55,7 @@ Time is integer audio samples at 48 kHz. The CLI takes seconds where a human num
 | Place / patch / remove b-roll | `openklip broll-add`, `broll-set`, `broll-rm`, `broll-add-phrase` |
 | Place / patch / remove still (Ken Burns) | `openklip still-add`, `still-set`, `still-rm` |
 | Place / patch / remove graphic (HTML/CSS template) | `openklip graphic-add`, `graphic-set`, `graphic-rm` |
+| Add / patch json-render graphic (product announcement) | `openklip json-graphic-add`, `json-graphic-set` |
 | Place / patch / remove title | `openklip title-add`, `title-set`, `title-rm`, `title-add-phrase` |
 | Add / patch / remove zoom | `openklip zoom-add`, `zoom-set`, `zoom-rm`, `zoom-add-phrase` |
 | Reorder overlay (paint order) | `openklip reorder <slug> <broll\|title\|zoom> <id> <toIndex>` |
@@ -144,6 +145,8 @@ Add `--note "<why>"` to any `cut` or overlay-add to record the rationale on the 
 | `openklip graphic-add <slug> <template> <fromSec> <toSec>` | Overlay an HTML/CSS graphic template. `--param key=value` (repeatable), `--track broll\|title\|zoom` (z-layer). Text templates (`kind: "text"`) render via ASS and stay browser-free; rich templates (`kind: "rich"`) render pixel-faithfully through headless Chrome to a transparent ProRes 4444 MOV (install once: `bunx puppeteer browsers install chrome-headless-shell`). |
 | `openklip graphic-set <slug> <graphicId>` | Patch a graphic: `--template`, `--from`, `--to`, `--param`, `--track`. |
 | `openklip graphic-rm <slug> <graphicId>` | Remove a graphic overlay. |
+| `openklip json-graphic-add <slug> product-announcement <fromSec> <toSec> --spec-file spec.json` | Add a catalog-constrained json-render graphic (only `product-announcement` today). `--spec-file` is required; `--track broll\|title\|zoom` sets the z-layer. The spec is hard-validated (accent values, size caps, graph cycles, orphans, non-scene root, missing catalog/spec fields) before it persists; the editor previews the same React render and it exports through the normal timeline. See `templates/product-announcement/skill.md`. |
+| `openklip json-graphic-set <slug> <graphicId>` | Patch a json-render graphic: `--from`, `--to`, `--spec-file`, `--track`. Shares the same span + spec validation path as `json-graphic-add`. |
 | `openklip reorder <slug> <broll\|title\|zoom> <id> <toIndex>` | Restack an overlay within its track. Array order is paint order: a later index paints on top (matters when b-roll covers overlap). |
 | `openklip reanchor <slug> [overlayId]` | Re-resolve phrase-anchored overlays onto the current kept words. Reports each overlay as `moved`, `unchanged`, or `stale`. Runs automatically after every word-deletion path (`cut`, `cut --text`, `restore`, GUI word toggles); call it manually only to re-snap after editing the transcript out of band. |
 
