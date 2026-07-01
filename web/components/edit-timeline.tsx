@@ -19,6 +19,7 @@ import {
   Music,
   Scan,
   Scissors,
+  Sparkles,
   Type,
   ZoomIn,
 } from "@/lib/icon";
@@ -47,7 +48,7 @@ import {
 } from "@/lib/timeline-zoom";
 import { cn } from "@/lib/utils";
 
-export type TimelineClipKind = "broll" | "zoom" | "title" | "still";
+export type TimelineClipKind = "broll" | "zoom" | "title" | "still" | "graphic";
 
 export interface TimelineClip {
   endSample: number;
@@ -83,6 +84,7 @@ interface EditTimelineProps {
   curSec: number;
   durationSamples: number;
   durationSec: number;
+  graphics: TimelineClip[];
   libraryMusic?: TimelineClip[];
   libraryStills?: TimelineClip[];
   onClipTiming: (
@@ -412,6 +414,7 @@ function TrackRow({
   label,
   onSeek,
   scrollLeft,
+  ticks = [],
   trackRef,
   zoom,
 }: {
@@ -421,25 +424,34 @@ function TrackRow({
   label: string;
   onSeek: (sec: number) => void;
   scrollLeft: number;
+  ticks?: number[];
   trackRef?: (el: HTMLDivElement | null) => void;
   zoom: number;
 }) {
   return (
     <div className="flex border-foreground/10 border-b last:border-b-0">
       <div
-        className="flex shrink-0 items-center gap-1.5 border-border border-r bg-muted px-2 text-muted-foreground text-xs"
+        className="sticky left-0 z-20 flex shrink-0 items-center gap-1.5 border-border border-r bg-muted px-2 text-muted-foreground text-xs shadow-[1px_0_0_var(--border)]"
         style={{ width: LABEL_W }}
       >
         <Icon className={APP_ICON_CLASS} />
         <span className="truncate">{label}</span>
       </div>
       <div
-        className="relative shrink-0 cursor-pointer bg-background/50"
+        className="relative shrink-0 cursor-pointer overflow-hidden bg-background/50"
         onClick={(e) => seekFromClick(e, onSeek, scrollLeft, zoom)}
         ref={trackRef}
         role="presentation"
         style={{ width: contentWidthPx, height: TRACK_H }}
       >
+        {ticks.map((t) => (
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 w-px bg-border/40"
+            key={t}
+            style={{ left: secToPx(t, zoom) }}
+          />
+        ))}
         {children}
       </div>
     </div>
@@ -464,6 +476,7 @@ function ClipTrack({
   selected,
   snappingEnabled,
   snapThresholdSamples,
+  ticks,
   trackKind,
   wordSpans,
   zoom,
@@ -485,6 +498,7 @@ function ClipTrack({
   selected: EditTimelineProps["selected"];
   snappingEnabled: boolean;
   snapThresholdSamples: number;
+  ticks: number[];
   trackKind: TimelineClipKind;
   wordSpans: TimelineWord[];
   zoom: number;
@@ -498,6 +512,7 @@ function ClipTrack({
       label={label}
       onSeek={onSeek}
       scrollLeft={scrollLeft}
+      ticks={ticks}
       trackRef={setTrackEl}
       zoom={zoom}
     >
@@ -540,6 +555,7 @@ export function EditTimeline({
   durationSec,
   libraryMusic = [],
   libraryStills = [],
+  graphics,
   onClipTiming,
   onSeek,
   onSelect,
@@ -564,10 +580,11 @@ export function EditTimeline({
   const playheadSample = Math.round(curSec * sampleRate);
   const snapThresholdSamples = defaultSnapThresholdSamples(sampleRate);
   const ticks = rulerTicks(durationSec);
+  const gridTicks = ticks.filter((t) => t > 0 && t < durationSec);
 
   const allOverlays = useMemo(
-    () => [...broll, ...zooms, ...titles, ...stills],
-    [broll, stills, titles, zooms]
+    () => [...broll, ...zooms, ...titles, ...stills, ...graphics],
+    [broll, graphics, stills, titles, zooms]
   );
 
   const onScroll = useCallback(() => {
@@ -588,6 +605,7 @@ export function EditTimeline({
     selected,
     snappingEnabled,
     snapThresholdSamples,
+    ticks: gridTicks,
     wordSpans,
     zoom,
   };
@@ -609,15 +627,23 @@ export function EditTimeline({
         <div className="relative" style={{ width: canvasWidthPx }}>
           <div className="flex border-foreground/10 border-b">
             <div
-              className="shrink-0 border-foreground/10 border-r bg-foreground/3"
+              className="sticky left-0 z-30 shrink-0 border-foreground/10 border-r bg-muted shadow-[1px_0_0_var(--border)]"
               style={{ width: LABEL_W, height: RULER_H }}
             />
             <div
-              className="relative shrink-0 cursor-pointer"
+              className="relative shrink-0 cursor-pointer bg-muted/40"
               onClick={(e) => seekFromClick(e, onSeek, scrollLeft, zoom)}
               role="presentation"
               style={{ width: contentWidthPx, height: RULER_H }}
             >
+              {gridTicks.map((t) => (
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-y-0 w-px bg-border/50"
+                  key={`tick-line-${t}`}
+                  style={{ left: secToPx(t, zoom) }}
+                />
+              ))}
               {ticks.map((t) => (
                 <span
                   className="absolute top-0 text-muted-foreground text-xs tabular-nums"
@@ -639,6 +665,7 @@ export function EditTimeline({
             label="Words"
             onSeek={onSeek}
             scrollLeft={scrollLeft}
+            ticks={gridTicks}
             zoom={zoom}
           >
             {ranges.map((r, i) => (
@@ -718,6 +745,15 @@ export function EditTimeline({
 
           <ClipTrack
             {...clipTrackProps}
+            clipClassName="border border-border bg-primary/20 text-foreground"
+            clips={graphics}
+            icon={Sparkles}
+            label="Graphics"
+            trackKind="graphic"
+          />
+
+          <ClipTrack
+            {...clipTrackProps}
             clipClassName="border border-border bg-muted/60 text-foreground"
             clips={stills}
             icon={ImageIcon}
@@ -732,6 +768,7 @@ export function EditTimeline({
               label="Music lib"
               onSeek={onSeek}
               scrollLeft={scrollLeft}
+              ticks={gridTicks}
               zoom={zoom}
             >
               {libraryMusic.map((clip) => (
@@ -752,6 +789,7 @@ export function EditTimeline({
               label="Still lib"
               onSeek={onSeek}
               scrollLeft={scrollLeft}
+              ticks={gridTicks}
               zoom={zoom}
             >
               {libraryStills.map((clip) => (
@@ -773,6 +811,12 @@ export function EditTimeline({
               className="absolute inset-y-0 w-px bg-primary"
               style={{ left: playheadPx }}
             />
+            <div
+              className="absolute top-0 -translate-x-1/2 rounded-sm bg-primary px-1.5 py-0.5 font-medium text-[10px] text-primary-foreground tabular-nums"
+              style={{ left: playheadPx }}
+            >
+              {fmtTime(curSec)}
+            </div>
             <div
               className="absolute top-0 size-2 -translate-x-1/2 rounded-full bg-primary"
               style={{ left: playheadPx, marginTop: RULER_H - 4 }}

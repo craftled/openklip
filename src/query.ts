@@ -9,6 +9,7 @@ import {
   survivingRanges,
 } from "./edl.ts";
 import { findPhraseRuns, type PhraseRun } from "./phrase-match.ts";
+import { validateProductAnnouncementSpec } from "./product-announcement.ts";
 
 export interface TranscriptWordView {
   deleted: boolean;
@@ -49,6 +50,19 @@ export interface OverlayViews {
     note?: string;
     srcInSec: number;
     toSec: number;
+  }>;
+  graphics: Array<{
+    anchor: PhraseAnchor | null;
+    catalog?: string;
+    fromSec: number;
+    id: string;
+    note?: string;
+    params?: Record<string, string | number | boolean>;
+    template: string;
+    toSec: number;
+    track: string;
+    type: "template" | "json-render";
+    validation?: { issues: string[]; success: boolean };
   }>;
   stills: Array<{
     anchor: PhraseAnchor | null;
@@ -232,6 +246,33 @@ export function listOverlays(project: Project): OverlayViews {
       anchor: s.anchor ?? null,
       ...(s.note === undefined ? {} : { note: s.note }),
     })),
+    graphics: (project.graphics ?? []).map((g) => {
+      const type = g.type ?? "template";
+      const validation =
+        type === "json-render"
+          ? validateProductAnnouncementSpec(g.spec)
+          : undefined;
+      return {
+        id: g.id,
+        type,
+        template: g.template,
+        track: g.track,
+        fromSec: sec(g.startSample),
+        toSec: sec(g.endSample),
+        anchor: g.anchor ?? null,
+        ...(g.catalog === undefined ? {} : { catalog: g.catalog }),
+        ...(type === "template" ? { params: g.params } : {}),
+        ...(validation === undefined
+          ? {}
+          : {
+              validation: {
+                success: validation.success,
+                issues: validation.issues,
+              },
+            }),
+        ...(g.note === undefined ? {} : { note: g.note }),
+      };
+    }),
   };
 }
 

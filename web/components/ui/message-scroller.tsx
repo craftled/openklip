@@ -1,6 +1,11 @@
 "use client";
 
-import { MessageScroller as MessageScrollerPrimitive } from "@shadcn/react/message-scroller";
+import {
+  MessageScroller as MessageScrollerPrimitive,
+  useMessageScroller as useMessageScrollerPrimitive,
+  useMessageScrollerScrollable as useMessageScrollerScrollablePrimitive,
+  useMessageScrollerVisibility as useMessageScrollerVisibilityPrimitive,
+} from "@shadcn/react/message-scroller";
 import type * as React from "react";
 import { Button } from "@/components/ui/button";
 import { IconArrowDown } from "@/lib/icon";
@@ -10,6 +15,18 @@ function MessageScrollerProvider(
   props: React.ComponentProps<typeof MessageScrollerPrimitive.Provider>
 ) {
   return <MessageScrollerPrimitive.Provider {...props} />;
+}
+
+function useMessageScroller() {
+  return useMessageScrollerPrimitive();
+}
+
+function useMessageScrollerScrollable() {
+  return useMessageScrollerScrollablePrimitive();
+}
+
+function useMessageScrollerVisibility() {
+  return useMessageScrollerVisibilityPrimitive();
 }
 
 function MessageScroller({
@@ -118,4 +135,7 @@ export {
   MessageScrollerItem,
   MessageScrollerProvider,
   MessageScrollerViewport,
+  useMessageScroller,
+  useMessageScrollerScrollable,
+  useMessageScrollerVisibility,
 };

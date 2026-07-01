@@ -31,6 +31,13 @@ import {
 import { buildStillZoompan } from "./ken-burns.ts";
 import { lut3dExpr, lutPath } from "./lut.ts";
 import { projectPaths } from "./paths.ts";
+import {
+  assertProductAnnouncementSpec,
+  PRODUCT_ANNOUNCEMENT_CATALOG,
+  PRODUCT_ANNOUNCEMENT_FPS,
+  PRODUCT_ANNOUNCEMENT_HEIGHT,
+  PRODUCT_ANNOUNCEMENT_WIDTH,
+} from "./product-announcement.ts";
 import { buildTitlesAss, type TitleItem } from "./titles.ts";
 import { buildZoompanZExpr, type ZoomWindow } from "./zoom-ramp.ts";
 
@@ -286,28 +293,55 @@ export async function exportCut(
   // params. NO renderer-seam call here: text graphics are burned directly into
   // the combined graphics.ass below (parity with titles), so only rich graphics
   // pay for a headless render and no wasted per-overlay .ass file is written.
-  const graphicsPlanned = (project.graphics ?? [])
-    .map((g) => {
-      const win = planGraphicWindow({
-        startSample: g.startSample,
-        endSample: g.endSample,
-        sampleRate: sr,
-        ranges,
-      });
-      if (!win) {
-        return null;
-      }
-      const manifest: GraphicManifest = loadGraphicManifest(g.template);
-      const params = { ...defaultGraphicParams(manifest), ...g.params };
-      return {
-        graphic: g,
-        outStart: win.outStart,
-        outEnd: win.outEnd,
-        manifest,
-        params,
-      };
-    })
-    .filter((x): x is NonNullable<typeof x> => x !== null);
+  const graphicsPlanned = (
+    await Promise.all(
+      (project.graphics ?? []).map(async (g) => {
+        const win = planGraphicWindow({
+          startSample: g.startSample,
+          endSample: g.endSample,
+          sampleRate: sr,
+          ranges,
+        });
+        if (!win) {
+          return null;
+        }
+        if (g.type === "json-render") {
+          const { renderProductAnnouncementHtml } = await import(
+            "./product-announcement-html.tsx"
+          );
+          const spec = assertProductAnnouncementSpec(g.spec);
+          const params: Record<string, string | number | boolean> = {};
+          const manifest: GraphicManifest = {
+            id: PRODUCT_ANNOUNCEMENT_CATALOG,
+            name: "Product announcement",
+            kind: "rich",
+            width: PRODUCT_ANNOUNCEMENT_WIDTH,
+            height: PRODUCT_ANNOUNCEMENT_HEIGHT,
+            fps: PRODUCT_ANNOUNCEMENT_FPS,
+            params: {},
+          };
+          return {
+            graphic: g,
+            outStart: win.outStart,
+            outEnd: win.outEnd,
+            manifest,
+            params,
+            compositionHtml: await renderProductAnnouncementHtml(spec),
+          };
+        }
+        const manifest: GraphicManifest = loadGraphicManifest(g.template);
+        const params = { ...defaultGraphicParams(manifest), ...g.params };
+        return {
+          graphic: g,
+          outStart: win.outStart,
+          outEnd: win.outEnd,
+          manifest,
+          params,
+          compositionHtml: undefined,
+        };
+      })
+    )
+  ).filter((x): x is NonNullable<typeof x> => x !== null);
 
   // Text graphics burn as a single combined ASS at OUTPUT time (mirrors titles).
   // A representative accent (first text graphic that sets one) is threaded so the
@@ -361,6 +395,7 @@ export async function exportCut(
           manifest: x.manifest,
           id: x.graphic.id,
           template: x.graphic.template,
+          compositionHtml: x.compositionHtml,
           params: x.params,
           durationSamples: x.graphic.endSample - x.graphic.startSample,
           fps: outFps,

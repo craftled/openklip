@@ -1,94 +1,146 @@
 "use client";
 
 import { Toggle as TogglePrimitive } from "@base-ui/react/toggle";
-import { ToggleGroup as ToggleGroupPrimitive } from "@base-ui/react/toggle-group";
 import type { VariantProps } from "class-variance-authority";
 import * as React from "react";
 import { toggleVariants } from "@/components/ui/toggle";
 import { cn } from "@/lib/utils";
 
+type ToggleGroupValue = string | readonly string[];
+
 const ToggleGroupContext = React.createContext<
   VariantProps<typeof toggleVariants> & {
-    spacing?: number;
     orientation?: "horizontal" | "vertical";
+    onItemPressed?: (value: string, pressed: boolean) => void;
+    selectedValues: readonly string[];
+    spacing?: number;
   }
 >({
-  size: "default",
-  variant: "default",
-  spacing: 2,
   orientation: "horizontal",
+  selectedValues: [],
+  size: "default",
+  spacing: 2,
+  variant: "default",
 });
 
+const normalizeValue = (value?: ToggleGroupValue): readonly string[] => {
+  if (typeof value === "string") {
+    return value ? [value] : [];
+  }
+  return value ?? [];
+};
+
 function ToggleGroup({
+  children,
   className,
-  variant,
+  defaultValue,
+  disabled = false,
+  onValueChange,
+  orientation = "horizontal",
+  role = "group",
   size,
   spacing = 2,
-  orientation = "horizontal",
-  children,
-  defaultValue,
-  onValueChange,
+  style,
   type,
   value,
+  variant,
   ...props
-}: Omit<
-  ToggleGroupPrimitive.Props,
-  "defaultValue" | "onValueChange" | "type" | "value"
-> &
+}: Omit<React.ComponentProps<"div">, "defaultValue" | "onChange"> &
   VariantProps<typeof toggleVariants> & {
-    defaultValue?: string | readonly string[];
-    onValueChange?: (value: string | readonly string[]) => void;
+    defaultValue?: ToggleGroupValue;
+    disabled?: boolean;
+    onValueChange?: (value: ToggleGroupValue) => void;
     orientation?: "horizontal" | "vertical";
     spacing?: number;
     type?: "multiple" | "single";
-    value?: string | readonly string[];
+    value?: ToggleGroupValue;
   }) {
-  const isSingle = type === "single";
-  const primitiveValue =
-    typeof value === "string" ? (value ? [value] : []) : value;
-  const primitiveDefaultValue =
-    typeof defaultValue === "string"
-      ? defaultValue
-        ? [defaultValue]
-        : []
-      : defaultValue;
+  const isMultiple = type === "multiple";
+  const isControlled = value !== undefined;
+  const [internalValue, setInternalValue] = React.useState(() =>
+    normalizeValue(defaultValue)
+  );
+  const selectedValues = isControlled ? normalizeValue(value) : internalValue;
+
+  const setSelectedValues = React.useCallback(
+    (nextValues: readonly string[]) => {
+      if (!isControlled) {
+        setInternalValue(nextValues);
+      }
+      onValueChange?.(isMultiple ? nextValues : (nextValues[0] ?? ""));
+    },
+    [isControlled, isMultiple, onValueChange]
+  );
+
+  const onItemPressed = React.useCallback(
+    (itemValue: string, pressed: boolean) => {
+      if (isMultiple) {
+        const nextValues = pressed
+          ? [...selectedValues, itemValue]
+          : selectedValues.filter(
+              (selectedValue) => selectedValue !== itemValue
+            );
+        setSelectedValues(nextValues);
+        return;
+      }
+      setSelectedValues(pressed ? [itemValue] : []);
+    },
+    [isMultiple, selectedValues, setSelectedValues]
+  );
 
   return (
-    <ToggleGroupPrimitive
-      className={cn(
-        "group/toggle-group flex w-fit flex-row items-center gap-[--spacing(var(--gap))] rounded-lg data-vertical:flex-col data-vertical:items-stretch data-[size=sm]:rounded-[min(var(--radius-md),10px)]",
-        className
-      )}
-      data-orientation={orientation}
-      data-size={size}
-      data-slot="toggle-group"
-      data-spacing={spacing}
-      data-variant={variant}
-      defaultValue={primitiveDefaultValue}
-      onValueChange={(nextValue) => {
-        onValueChange?.(isSingle ? (nextValue[0] ?? "") : nextValue);
+    <ToggleGroupContext.Provider
+      value={{
+        onItemPressed: disabled ? undefined : onItemPressed,
+        orientation,
+        selectedValues,
+        size,
+        spacing,
+        variant,
       }}
-      style={{ "--gap": spacing } as React.CSSProperties}
-      value={primitiveValue}
-      {...props}
     >
-      <ToggleGroupContext.Provider
-        value={{ variant, size, spacing, orientation }}
+      <div
+        aria-disabled={disabled || undefined}
+        className={cn(
+          "group/toggle-group flex w-fit flex-row items-center gap-[--spacing(var(--gap))] rounded-lg data-vertical:flex-col data-vertical:items-stretch data-[size=sm]:rounded-[min(var(--radius-md),10px)]",
+          className
+        )}
+        data-horizontal={orientation === "horizontal" ? "" : undefined}
+        data-orientation={orientation}
+        data-size={size}
+        data-slot="toggle-group"
+        data-spacing={spacing}
+        data-variant={variant}
+        data-vertical={orientation === "vertical" ? "" : undefined}
+        role={role}
+        style={
+          {
+            ...style,
+            "--gap": spacing,
+          } as React.CSSProperties
+        }
+        {...props}
       >
         {children}
-      </ToggleGroupContext.Provider>
-    </ToggleGroupPrimitive>
+      </div>
+    </ToggleGroupContext.Provider>
   );
 }
 
 function ToggleGroupItem({
   className,
   children,
-  variant = "default",
+  disabled,
+  onPressedChange,
+  pressed,
   size = "default",
+  value,
+  variant = "default",
   ...props
 }: TogglePrimitive.Props & VariantProps<typeof toggleVariants>) {
   const context = React.useContext(ToggleGroupContext);
+  const isGroupedItem =
+    context.onItemPressed !== undefined && typeof value === "string";
 
   return (
     <TogglePrimitive
@@ -104,6 +156,16 @@ function ToggleGroupItem({
       data-slot="toggle-group-item"
       data-spacing={context.spacing}
       data-variant={context.variant || variant}
+      disabled={disabled}
+      onPressedChange={(nextPressed, details) => {
+        onPressedChange?.(nextPressed, details);
+        if (details.isCanceled || !isGroupedItem) {
+          return;
+        }
+        context.onItemPressed?.(value, nextPressed);
+      }}
+      pressed={isGroupedItem ? context.selectedValues.includes(value) : pressed}
+      value={value}
       {...props}
     >
       {children}

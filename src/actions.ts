@@ -26,6 +26,11 @@ import {
   loadGraphicManifest,
 } from "./graphics.ts";
 import { findPhraseRuns } from "./phrase-match.ts";
+import {
+  assertProductAnnouncementSpec,
+  PRODUCT_ANNOUNCEMENT_CATALOG,
+  ProductAnnouncementCatalogSchema,
+} from "./product-announcement.ts";
 
 // Apply an optional `note` patch to an overlay item: a non-empty string sets the
 // rationale, an empty string CLEARS it (delete-on-empty, mirroring look-lut), and
@@ -610,6 +615,73 @@ export function addGraphic(
   return item;
 }
 
+// Add a json-render powered product announcement graphic over a source-time
+// span. The spec is validated before it is written into project.json, so agents
+// can be creative inside the catalog without storing arbitrary UI/code.
+export function addJsonGraphic(
+  project: Project,
+  input: {
+    catalog: typeof PRODUCT_ANNOUNCEMENT_CATALOG;
+    fromSec: number;
+    toSec: number;
+    spec: unknown;
+    track?: Graphic["track"];
+    note?: string;
+    anchor?: PhraseAnchor;
+  }
+): Graphic {
+  const {
+    catalog,
+    fromSec,
+    toSec,
+    spec: rawSpec,
+    track = "title",
+    note,
+    anchor,
+  } = input;
+  ProductAnnouncementCatalogSchema.parse(catalog);
+  if (![fromSec, toSec].every(Number.isFinite)) {
+    throw new Error("json graphic timing values must be finite numbers");
+  }
+  if (fromSec < 0 || toSec < 0) {
+    throw new Error("json graphic timing values must be non-negative");
+  }
+  if (toSec <= fromSec) {
+    throw new Error(
+      `json graphic span is empty: toSec (${toSec}) must be greater than fromSec (${fromSec})`
+    );
+  }
+  const projectDurationSec = project.durationSamples / SAMPLE_RATE;
+  if (fromSec >= projectDurationSec) {
+    throw new Error("json graphic span starts after the project ends");
+  }
+  const endSec = Math.min(toSec, projectDurationSec);
+  if (endSec <= fromSec) {
+    throw new Error(
+      "json graphic span is empty after clamping to project duration"
+    );
+  }
+  const spec = assertProductAnnouncementSpec(rawSpec);
+  const item: Graphic = {
+    id: `g${Date.now()}`,
+    type: "json-render",
+    template: PRODUCT_ANNOUNCEMENT_CATALOG,
+    catalog,
+    spec,
+    params: {},
+    startSample: Math.round(fromSec * SAMPLE_RATE),
+    endSample: Math.round(endSec * SAMPLE_RATE),
+    track,
+    ...(note === undefined ? {} : { note }),
+    ...(anchor === undefined ? {} : { anchor }),
+  };
+  if (!project.graphics) {
+    project.graphics = [];
+  }
+  project.graphics.push(item);
+  return item;
+}
+
 // Remove a graphic overlay by id. Returns whether one was removed.
 export function removeGraphic(project: Project, id: string): boolean {
   const graphics = project.graphics ?? [];
@@ -677,6 +749,59 @@ export function updateGraphic(
         };
   item.template = template;
   item.params = { ...base, ...(patch.params ?? {}) };
+  item.track = track;
+  item.startSample = Math.round(fromSec * SAMPLE_RATE);
+  item.endSample = Math.round(endSec * SAMPLE_RATE);
+  patchNote(item, patch.note);
+  return item;
+}
+
+export function updateJsonGraphic(
+  project: Project,
+  id: string,
+  patch: {
+    catalog?: typeof PRODUCT_ANNOUNCEMENT_CATALOG;
+    fromSec?: number;
+    toSec?: number;
+    spec?: unknown;
+    track?: Graphic["track"];
+    note?: string;
+  }
+): Graphic {
+  const item = findGraphic(project, id);
+  if (item.type !== "json-render") {
+    throw new Error(`graphic "${id}" is not a json-render graphic`);
+  }
+  const catalog = patch.catalog ?? item.catalog;
+  ProductAnnouncementCatalogSchema.parse(catalog);
+  const fromSec = patch.fromSec ?? item.startSample / SAMPLE_RATE;
+  const toSec = patch.toSec ?? item.endSample / SAMPLE_RATE;
+  const track = patch.track ?? item.track;
+  if (![fromSec, toSec].every(Number.isFinite)) {
+    throw new Error("json graphic timing values must be finite numbers");
+  }
+  if (fromSec < 0 || toSec < 0) {
+    throw new Error("json graphic timing values must be non-negative");
+  }
+  if (toSec <= fromSec) {
+    throw new Error(
+      `json graphic span is empty: toSec (${toSec}) must be greater than fromSec (${fromSec})`
+    );
+  }
+  const projectDurationSec = project.durationSamples / SAMPLE_RATE;
+  if (fromSec >= projectDurationSec) {
+    throw new Error("json graphic span starts after the project ends");
+  }
+  const endSec = Math.min(toSec, projectDurationSec);
+  if (endSec <= fromSec) {
+    throw new Error(
+      "json graphic span is empty after clamping to project duration"
+    );
+  }
+  item.catalog = catalog;
+  item.spec = assertProductAnnouncementSpec(patch.spec ?? item.spec);
+  item.template = PRODUCT_ANNOUNCEMENT_CATALOG;
+  item.params = {};
   item.track = track;
   item.startSample = Math.round(fromSec * SAMPLE_RATE);
   item.endSample = Math.round(endSec * SAMPLE_RATE);

@@ -10,6 +10,7 @@ import { z } from "zod";
 import {
   addBroll,
   addGraphic,
+  addJsonGraphic,
   addStill,
   addTitle,
   addZoom,
@@ -33,12 +34,18 @@ import {
   setPadMs,
   updateBroll,
   updateGraphic,
+  updateJsonGraphic,
   updateStill,
   updateTitle,
   updateZoom,
 } from "./actions.ts";
 import { NEUTRAL_COLOR } from "./color-adjust.ts";
 import { FilterSchema, PhraseAnchorSchema, type Project } from "./edl.ts";
+import {
+  PRODUCT_ANNOUNCEMENT_CATALOG,
+  ProductAnnouncementCatalogSchema,
+  ProductAnnouncementSpecSchema,
+} from "./product-announcement.ts";
 import { reanchorOne, reanchorProject } from "./reanchor.ts";
 
 // Where an action is exposed. The CLI dispatch, the editor's server actions, and
@@ -301,6 +308,41 @@ export const actions: ActionDef[] = [
       note: z.string().optional(),
     }),
     run: (p, i) => updateGraphic(p, i.id, i),
+  }),
+  defineAction({
+    name: "json-graphic-add",
+    summary:
+      "Overlay a validated json-render product announcement spec over a source-time span.",
+    surfaces: ["cli", "gui", "mcp"],
+    schema: z.object({
+      catalog: ProductAnnouncementCatalogSchema,
+      fromSec: sec,
+      toSec: sec,
+      spec: ProductAnnouncementSpecSchema,
+      track: track.optional(),
+      note: z.string().optional(),
+      anchor: PhraseAnchorSchema.optional(),
+    }),
+    run: (p, i) =>
+      addJsonGraphic(p, {
+        ...i,
+        catalog: i.catalog ?? PRODUCT_ANNOUNCEMENT_CATALOG,
+      }),
+  }),
+  defineAction({
+    name: "json-graphic-set",
+    summary: "Patch a json-render graphic overlay (spec, span, track).",
+    surfaces: ["cli", "gui", "mcp"],
+    schema: z.object({
+      id: z.string(),
+      catalog: ProductAnnouncementCatalogSchema.optional(),
+      fromSec: sec.optional(),
+      toSec: sec.optional(),
+      spec: ProductAnnouncementSpecSchema.optional(),
+      track: track.optional(),
+      note: z.string().optional(),
+    }),
+    run: (p, i) => updateJsonGraphic(p, i.id, i),
   }),
   defineAction({
     name: "graphic-rm",

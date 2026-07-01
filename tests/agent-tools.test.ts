@@ -21,6 +21,8 @@ test("agentToolManifest includes query tools and registry mutations", () => {
   assert.ok(names.includes("project_status"));
   assert.ok(names.includes("cut"));
   assert.ok(names.includes("broll-add"));
+  assert.ok(names.includes("json-graphic-add"));
+  assert.ok(names.includes("json-graphic-set"));
   assert.ok(names.includes("title-add-phrase"));
   assert.ok(names.includes("export"));
   const manifest = agentToolManifest("mcp");

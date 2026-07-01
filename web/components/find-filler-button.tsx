@@ -1,9 +1,8 @@
 "use client";
 
+import { ActionStatusButton } from "@/components/action-status-button";
 import { useAgentChat } from "@/components/agent-chat-context";
-import { Button } from "@/components/ui/button";
 import { Sparkles } from "@/lib/icon";
-import { cn } from "@/lib/utils";
 
 export function FindFillerButton() {
   const {
@@ -33,8 +32,11 @@ export function FindFillerButton() {
   })();
 
   return (
-    <Button
+    <ActionStatusButton
+      busy={isRunning}
       disabled={isRunning || !agentUsable || chatsLoading}
+      icon={Sparkles}
+      label={label}
       onClick={() => void onFindFiller()}
       size="sm"
       title={
@@ -47,12 +49,6 @@ export function FindFillerButton() {
               : `${providerLabel} CLI is not installed`
       }
       variant="outline"
-    >
-      <Sparkles
-        className={cn(isRunning && "animate-pulse")}
-        data-icon="inline-start"
-      />
-      {label}
-    </Button>
+    />
   );
 }

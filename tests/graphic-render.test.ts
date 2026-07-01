@@ -191,3 +191,33 @@ test("rich-kind graphic errors clearly when composition.html is missing", async 
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("rich-kind graphic accepts inline composition HTML", async () => {
+  if (chromeHeadlessInstalled()) {
+    return;
+  }
+
+  const dir = tmp();
+  try {
+    const manifest = loadGraphicManifest("title-card");
+    await assert.rejects(
+      () =>
+        renderGraphicOverlay({
+          manifest,
+          id: "g7",
+          template: "generated-announcement",
+          compositionHtml:
+            '<section data-graphic-root style="width:1920px;height:1080px"></section>',
+          params: {},
+          durationSamples: SAMPLE_RATE,
+          fps: 30,
+          width: 1920,
+          height: 1080,
+          outDir: dir,
+        }),
+      /chrome-headless-shell/
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

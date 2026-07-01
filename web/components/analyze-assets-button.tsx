@@ -1,9 +1,8 @@
 "use client";
 
+import { ActionStatusButton } from "@/components/action-status-button";
 import { useAgentChat } from "@/components/agent-chat-context";
-import { Button } from "@/components/ui/button";
 import { ScanSearch } from "@/lib/icon";
-import { cn } from "@/lib/utils";
 
 // Triggers the "understand my media" subagent pass: one agent run per
 // un-described b-roll / still writes an "asset card", and one run over the main
@@ -31,9 +30,12 @@ export function AnalyzeAssetsButton() {
   })();
 
   return (
-    <Button
+    <ActionStatusButton
+      busy={analyzingAssets}
       className="w-full"
       disabled={analyzingAssets || !agentUsable}
+      icon={ScanSearch}
+      label={label}
       onClick={() => void onAnalyzeAssets()}
       size="sm"
       title={
@@ -44,12 +46,6 @@ export function AnalyzeAssetsButton() {
             : `${providerLabel} CLI is not installed`
       }
       variant="outline"
-    >
-      <ScanSearch
-        className={cn(analyzingAssets && "animate-pulse")}
-        data-icon="inline-start"
-      />
-      {label}
-    </Button>
+    />
   );
 }

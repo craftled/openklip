@@ -2,7 +2,6 @@
 
 import { existsSync } from "node:fs";
 import type { ColorAdjust, Cuts, Filter, Motion } from "@engine/edl";
-import { exportCut } from "@engine/exporter";
 import { projectPaths } from "@engine/paths";
 import {
   applyBroll,
@@ -18,6 +17,7 @@ import {
   type clampZoomItems,
 } from "@engine/projectMutations";
 import { mutateProject } from "@engine/projectStore";
+import { getAction, runAction } from "@engine/registry";
 import { revealInFileManager } from "@engine/reveal-path";
 
 export type ActionResult<T = void> =
@@ -34,6 +34,28 @@ function fail(error: unknown): { ok: false; error: string; stack?: string } {
     return base;
   }
   return { ...base, stack: e?.stack };
+}
+
+export async function runGuiAction(
+  slug: string,
+  actionName: string,
+  input: unknown
+): Promise<ActionResult<{ result: unknown }>> {
+  try {
+    const action = getAction(actionName);
+    if (!action) {
+      throw new Error(`unknown GUI action: ${actionName}`);
+    }
+    if (!action.surfaces.includes("gui")) {
+      throw new Error(`action is not available in the GUI: ${actionName}`);
+    }
+    const result = await mutateProject(slug, (project) =>
+      runAction(actionName, project, input)
+    );
+    return { ok: true, data: { result } };
+  } catch (e) {
+    return fail(e);
+  }
 }
 
 export async function saveProjectEdits(
@@ -155,6 +177,7 @@ export async function exportProject(
   }>
 > {
   try {
+    const { exportCut } = await import("@engine/exporter");
     const result = await exportCut(slug, { maxHeight });
     return { ok: true, data: result };
   } catch (e) {

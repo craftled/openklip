@@ -137,6 +137,18 @@ export function runOverlays(
       `  ${s.id}  asset ${s.assetId}  ${s.fromSec.toFixed(3)}s-${s.toSec.toFixed(3)}s${noteSuffix(s.note)}`
     );
   }
+  lines.push(`graphics (${overlays.graphics.length}):`);
+  for (const g of overlays.graphics) {
+    const label =
+      g.type === "json-render"
+        ? `Announcement graphic (${g.catalog ?? "product-announcement"})`
+        : `template ${g.template}`;
+    const validation =
+      g.validation && !g.validation.success ? "  [invalid]" : "";
+    lines.push(
+      `  ${g.id}  ${label}  ${g.fromSec.toFixed(3)}s-${g.toSec.toFixed(3)}s  ${g.track}${validation}${noteSuffix(g.note)}`
+    );
+  }
   return `${lines.join("\n")}\n`;
 }
 

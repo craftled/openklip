@@ -1,12 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { ActionStatusButton } from "@/components/action-status-button";
 import { useAgentChat } from "@/components/agent-chat-context";
-import { Button } from "@/components/ui/button";
 import { toastPromise } from "@/lib/app-toast";
 import { Check } from "@/lib/icon";
 import { verifyPromiseMessages } from "@/lib/toast-notifications";
-import { cn } from "@/lib/utils";
 import { verifyProjectCut } from "../../app/agent-actions.ts";
 
 // The verify loop, one click: re-transcribe the rendered cut (output/out.mp4)
@@ -39,18 +38,16 @@ export function VerifyCutButton() {
   };
 
   return (
-    <Button
+    <ActionStatusButton
+      busy={verifying}
+      busyLabel="Verifying cut…"
       disabled={verifying}
+      icon={Check}
+      label="Verify cut"
       onClick={() => void onVerify()}
       size="sm"
       title="Re-transcribe the rendered cut and check it against the edit"
       variant="outline"
-    >
-      <Check
-        className={cn(verifying && "animate-pulse")}
-        data-icon="inline-start"
-      />
-      {verifying ? "Verifying cut…" : "Verify cut"}
-    </Button>
+    />
   );
 }

@@ -43,6 +43,7 @@ import {
   resolvePackagePass,
 } from "./package-pass.ts";
 import { projectPaths } from "./paths.ts";
+import { PRODUCT_ANNOUNCEMENT_CATALOG } from "./product-announcement.ts";
 import {
   latestProject,
   listProjects,
@@ -125,6 +126,11 @@ Overlays
                                        --param key=value (repeatable)  --track broll|title|zoom
   openklip graphic-set <slug> <graphicId> patch graphic (--template --from --to --param --track)
   openklip graphic-rm <slug> <graphicId> remove a graphic overlay
+  openklip json-graphic-add <slug> product-announcement <fromSec> <toSec>
+                                     overlay a validated json-render announcement spec
+                                       --spec-file spec.json  --track broll|title|zoom
+  openklip json-graphic-set <slug> <graphicId>
+                                     patch a json-render graphic (--from --to --spec-file --track)
   openklip title-add-phrase <slug> "spoken phrase" "title text"
                                      place title at first phrase match
                                        --position lower|center|hero
@@ -236,6 +242,19 @@ function flagNumber(args: string[], flag: string): number | undefined {
     throw new Error(`${flag} must be a number`);
   }
   return n;
+}
+
+async function readJsonSpecFile(args: string[]): Promise<unknown> {
+  const specFile = flagValue(args, "--spec-file");
+  if (!specFile) {
+    throw new Error("--spec-file is required");
+  }
+  try {
+    return JSON.parse(await Bun.file(specFile).text());
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(`could not read --spec-file ${specFile}: ${detail}`);
+  }
 }
 
 // Collect repeated `--param key=value` flags into a params record for graphic
@@ -827,6 +846,63 @@ try {
       await saveProject(slug, project);
       console.log(
         `updated graphic ${item.id} (template "${item.template}", ${secSpan(item.startSample, item.endSample)}, ${item.track})`
+      );
+      break;
+    }
+    case "json-graphic-add": {
+      if (!(rest[0] && rest[1] && rest[2] && rest[3])) {
+        throw new Error(
+          "usage: openklip json-graphic-add <slug> product-announcement <fromSec> <toSec> --spec-file spec.json [--track broll|title|zoom]"
+        );
+      }
+      const slug = rest[0];
+      const catalog = rest[1];
+      if (catalog !== PRODUCT_ANNOUNCEMENT_CATALOG) {
+        throw new Error(
+          `unknown json-render catalog "${catalog}". Available: ${PRODUCT_ANNOUNCEMENT_CATALOG}`
+        );
+      }
+      const fromSec = Number(rest[2]);
+      const toSec = Number(rest[3]);
+      if (!(Number.isFinite(fromSec) && Number.isFinite(toSec))) {
+        throw new Error("fromSec and toSec must be numbers (seconds)");
+      }
+      const project = await loadProject(slug);
+      const item = runAction("json-graphic-add", project, {
+        catalog,
+        fromSec,
+        toSec,
+        spec: await readJsonSpecFile(rest),
+        track: trackFlag(rest),
+      }) as Graphic;
+      await saveProject(slug, project);
+      console.log(
+        `added JSON graphic ${item.id} (catalog "${item.catalog}", ${fromSec}s-${toSec}s, ${item.track})`
+      );
+      break;
+    }
+    case "json-graphic-set": {
+      if (!(rest[0] && rest[1])) {
+        throw new Error(
+          "usage: openklip json-graphic-set <slug> <graphicId> [--from N] [--to N] [--spec-file spec.json] [--track broll|title|zoom]"
+        );
+      }
+      const slug = rest[0];
+      const args = rest.slice(2);
+      const spec = args.includes("--spec-file")
+        ? await readJsonSpecFile(args)
+        : undefined;
+      const project = await loadProject(slug);
+      const item = runAction("json-graphic-set", project, {
+        id: rest[1],
+        fromSec: flagNumber(args, "--from"),
+        toSec: flagNumber(args, "--to"),
+        spec,
+        track: trackFlag(args),
+      }) as Graphic;
+      await saveProject(slug, project);
+      console.log(
+        `updated JSON graphic ${item.id} (catalog "${item.catalog}", ${secSpan(item.startSample, item.endSample)}, ${item.track})`
       );
       break;
     }

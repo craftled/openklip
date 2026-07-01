@@ -13,12 +13,15 @@ import {
 // it at that intrinsic size and CSS-scale it to fill the preview box, so font
 // sizes and slide distances match export pixel-for-pixel rather than reflowing.
 export interface GraphicItem {
+  catalog?: string;
   endSample: number;
   id: string;
   params: Record<string, string | number | boolean>;
+  spec?: unknown;
   startSample: number;
   template: string;
   track: string;
+  type?: "template" | "json-render";
 }
 
 interface Composition {

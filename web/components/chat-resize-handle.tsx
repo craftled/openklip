@@ -39,10 +39,12 @@ function persist(px: number): void {
  * pinned to the right. rAF-throttled to one update per frame.
  */
 export function ChatResizeHandle({
+  rightOffset = 0,
   width,
   onResize,
 }: {
   onResize: (px: number) => void;
+  rightOffset?: number;
   width: number;
 }) {
   const lastRef = useRef(width);
@@ -59,7 +61,9 @@ export function ChatResizeHandle({
       document.body.style.userSelect = "none";
 
       const move = (ev: PointerEvent) => {
-        lastRef.current = clampWidth(window.innerWidth - ev.clientX);
+        lastRef.current = clampWidth(
+          window.innerWidth - rightOffset - ev.clientX
+        );
         if (rafRef.current) {
           return;
         }
@@ -83,7 +87,7 @@ export function ChatResizeHandle({
       window.addEventListener("pointermove", move);
       window.addEventListener("pointerup", up);
     },
-    [onResize]
+    [onResize, rightOffset]
   );
 
   const onKeyDown = useCallback(

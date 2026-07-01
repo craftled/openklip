@@ -31,6 +31,22 @@ test("buildSkillCatalog merges workflow and template skills", () => {
   );
 });
 
+test("product announcement template skill tells Claude to use json tools", () => {
+  const catalog = buildSkillCatalog([
+    {
+      id: "product-announcement",
+      label: "Product Announcement",
+      description: "Short technical launch video.",
+    },
+  ]);
+  const skill = catalog.find((s) => s.id === "template:product-announcement");
+  assert.ok(skill);
+  assert.match(skill.invokeText, /template_show/);
+  assert.match(skill.invokeText, /template_set/);
+  assert.match(skill.invokeText, /json-graphic-add/);
+  assert.match(skill.invokeText, /3-6 second span/);
+});
+
 test("filterSkills matches title slash and description", () => {
   const catalog = buildSkillCatalog([]);
   const filtered = filterSkills(catalog, "filler");

@@ -50,11 +50,18 @@ export function buildSkillCatalog(
       template.description ||
       `Load the ${template.label} edit playbook for this project.`,
     slash: template.id,
-    invokeText: `Apply template ${template.id}`,
+    invokeText: templateInvokeText(template),
     kind: "template" as const,
   }));
 
   return [...workflows, ...templateSkills];
+}
+
+function templateInvokeText(template: TemplateSkillSource): string {
+  if (template.id === "product-announcement") {
+    return 'Use the product-announcement playbook: call template_show with id "product-announcement", attach it with template_set, then create a validated json-render product announcement graphic with json-graphic-add over the strongest product claim. Use transcript tools to choose a 3-6 second span. Do not only describe JSON.';
+  }
+  return `Use template ${template.id}: call template_show with id "${template.id}", then apply the playbook to this edit.`;
 }
 
 export function filterSkills(

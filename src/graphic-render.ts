@@ -18,6 +18,9 @@ import { graphicCompositionPath } from "./graphics.ts";
 import { buildTitlesAss, type TitleItem } from "./titles.ts";
 
 export interface RenderGraphicInput {
+  // Optional inline composition for generated graphics. Template graphics still
+  // load graphics/<template>/composition.html.
+  compositionHtml?: string;
   // Overlay span length on the 48kHz sample grid (endSample - startSample).
   durationSamples: number;
   // Output fps (exporter passes Math.max(1, Math.round(sourceMeta.fps))).
@@ -122,15 +125,17 @@ async function renderRichGraphic(
     Math.round((input.durationSamples / SAMPLE_RATE) * input.fps)
   );
 
-  let compositionHtml: string;
-  try {
-    compositionHtml = await Bun.file(
-      graphicCompositionPath(input.template)
-    ).text();
-  } catch {
-    throw new Error(
-      `rich graphic "${input.template}": composition.html not found in graphics/${input.template}/.`
-    );
+  let compositionHtml = input.compositionHtml;
+  if (!compositionHtml) {
+    try {
+      compositionHtml = await Bun.file(
+        graphicCompositionPath(input.template)
+      ).text();
+    } catch {
+      throw new Error(
+        `rich graphic "${input.template}": composition.html not found in graphics/${input.template}/.`
+      );
+    }
   }
 
   try {

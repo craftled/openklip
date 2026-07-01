@@ -3,6 +3,7 @@ import { test } from "node:test";
 import {
   exportProject,
   revealProjectFolder,
+  runGuiAction,
   saveBroll,
   saveLook,
   saveProjectEdits,
@@ -37,6 +38,41 @@ test("saveLook persists vignette toggle", async () => {
     const result = await saveLook(slug, { vignette: true });
     assert.equal(result.ok, true);
     assert.equal((await loadProject(slug)).look.vignette, true);
+  });
+});
+
+test("runGuiAction persists registry-backed GUI actions", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const vignette = await runGuiAction(slug, "look-vignette", {
+      vignette: true,
+    });
+    assert.equal(vignette.ok, true);
+    const captions = await runGuiAction(slug, "captions", { enabled: false });
+    assert.equal(captions.ok, true);
+    const captionMax = await runGuiAction(slug, "captions-max", {
+      maxWords: 4,
+    });
+    assert.equal(captionMax.ok, true);
+    const motion = await runGuiAction(slug, "motion", { speed: 1.4 });
+    assert.equal(motion.ok, true);
+
+    const loaded = await loadProject(slug);
+    assert.equal(loaded.look.vignette, true);
+    assert.equal(loaded.captions.enabled, false);
+    assert.equal(loaded.captions.maxWords, 4);
+    assert.equal(loaded.motion?.speed, 1.4);
+  });
+});
+
+test("runGuiAction rejects actions outside the GUI surface", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const result = await runGuiAction(slug, "cut-text", { phrase: "hello" });
+    assert.equal(result.ok, false);
+    if (!result.ok) {
+      assert.match(result.error, /not available in the GUI/);
+    }
   });
 });
 

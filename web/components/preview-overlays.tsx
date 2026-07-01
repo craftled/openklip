@@ -4,6 +4,7 @@ import type { CaptionGroup } from "../../src/captions.ts";
 import { cn } from "../lib/utils";
 import { type GraphicItem, GraphicOverlay } from "./graphic-overlay";
 import { HeroTitleOverlay } from "./hero-title-overlay";
+import { JsonRenderGraphicOverlay } from "./json-render-graphic-overlay";
 
 export interface OverlayTitleItem {
   endSample: number;
@@ -54,14 +55,23 @@ export function PreviewOverlays({
   return (
     <>
       <HeroTitleOverlay title={heroTitle} />
-      {activeGraphics.map((g) => (
-        <GraphicOverlay
-          curSample={curSample}
-          graphic={g}
-          key={g.id}
-          sampleRate={sampleRate}
-        />
-      ))}
+      {activeGraphics.map((g) =>
+        g.type === "json-render" ? (
+          <JsonRenderGraphicOverlay
+            curSample={curSample}
+            graphic={g}
+            key={g.id}
+            sampleRate={sampleRate}
+          />
+        ) : (
+          <GraphicOverlay
+            curSample={curSample}
+            graphic={g}
+            key={g.id}
+            sampleRate={sampleRate}
+          />
+        )
+      )}
       {standardTitle && (
         <div
           className={cn(

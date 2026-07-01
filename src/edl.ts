@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+  ProductAnnouncementCatalogSchema,
+  ProductAnnouncementSpecSchema,
+} from "./product-announcement.ts";
 
 // Canonical time base: integer audio samples at 48 kHz. Preview and export both
 // derive seconds from this one grid via samplesToSec() so they cannot drift.
@@ -153,7 +157,10 @@ export type Title = z.infer<typeof TitleSchema>;
 // scalar inputs that template's manifest declares (text, colors, etc).
 export const GraphicSchema = z.object({
   id: z.string(),
+  type: z.enum(["template", "json-render"]).optional(),
   template: z.string(),
+  catalog: ProductAnnouncementCatalogSchema.optional(),
+  spec: ProductAnnouncementSpecSchema.optional(),
   params: z
     .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
     .default({}),

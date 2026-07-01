@@ -79,6 +79,8 @@ const EXPECTED = [
   "zoom-rm",
   "graphic-add",
   "graphic-set",
+  "json-graphic-add",
+  "json-graphic-set",
   "graphic-rm",
   "captions",
   "captions-max",

@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: ["127.0.0.1"],
   outputFileTracingExcludes: {
     // Prevent the warning sentinel itself from being copied into any trace.
     "/*": ["./next.config.ts"],

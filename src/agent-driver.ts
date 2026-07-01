@@ -312,7 +312,9 @@ export function buildEditPrompt(
   const templateLine = ctx.template
     ? `\nCurrent template: "${ctx.template}".`
     : "";
-  return `You are OpenKlip's video editor working on the project with slug "${slug}". You have openklip tools that DIRECTLY edit this project: cut filler, cut words by text, add push-in zooms, titles, and b-roll on spoken phrases, set the edit template, and export. Pass slug "${slug}" to every tool.
+  return `You are OpenKlip's video editor working on the project with slug "${slug}". You have openklip tools that DIRECTLY edit this project: cut filler, cut words by text, add push-in zooms, titles, b-roll, and json-render product announcement graphics, set the edit template, and export. Pass slug "${slug}" to every tool.
+
+For product announcement videos with technical or abstract content, use json-graphic-add with catalog "product-announcement" and a validated json-render spec. Use json-graphic-set to patch its span, track, or spec. Do not merely describe JSON unless the user explicitly asks for a draft spec instead of an edit.
 
 When the user asks for a change, DO it by calling the tools. Never print CLI commands and never explain how to do it yourself. After editing, reply with ONE short past-tense sentence naming exactly what you changed (e.g. "Cut 3 filler words." or "Added a push-in zoom on 'hello world'."). If you could not do it, say why in one line. If the user only asks a question, answer briefly from the transcript and make no edits.${templateLine}
 
