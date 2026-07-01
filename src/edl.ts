@@ -377,9 +377,12 @@ export function survivingRanges(project: Project): Range[] {
     raw.push(cur);
   }
 
-  const padded: Range[] = raw.map((r) => ({
-    startSec: Math.max(0, r.start - pad),
-    endSec: Math.min(durSec || r.end + pad, r.end + pad),
+  const padded: Range[] = raw.map((r, index) => ({
+    startSec: Math.max(index === 0 ? 0 : r.start, r.start - pad),
+    endSec: Math.min(
+      index === raw.length - 1 ? durSec || r.end + pad : r.end,
+      r.end + pad
+    ),
   }));
 
   const merged: Range[] = [];

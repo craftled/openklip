@@ -4,6 +4,7 @@ import {
   findPlayingRangeIndex,
   nextRangeIndex,
   playbackStartIndex,
+  rangeBoundaryAudioDelaySec,
   shouldJumpToNextRange,
 } from "../src/schedulerLogic.ts";
 
@@ -31,4 +32,16 @@ test("nextRangeIndex returns null at the final range", () => {
 test("playbackStartIndex resets to first range outside kept spans", () => {
   assert.equal(playbackStartIndex(ranges, 6), 1);
   assert.equal(playbackStartIndex(ranges, 3), 0);
+});
+
+test("rangeBoundaryAudioDelaySec schedules boundary mutes at media rate", () => {
+  assert.equal(
+    Math.round(rangeBoundaryAudioDelaySec(13.2, 13.46, 1) * 1000),
+    260
+  );
+  assert.equal(
+    Math.round(rangeBoundaryAudioDelaySec(13.2, 13.46, 2) * 1000),
+    130
+  );
+  assert.equal(rangeBoundaryAudioDelaySec(13.47, 13.46, 1), 0);
 });

@@ -1,6 +1,11 @@
 "use client";
 
-import { type KeyboardEvent, useEffect, useRef, useState } from "react";
+import {
+  type KeyboardEvent as ReactKeyboardEvent,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -62,6 +67,33 @@ export function EditorTranscriptPanel({
   }, []);
 
   useEffect(() => {
+    if (!selRange) {
+      return;
+    }
+    const onDocumentKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey || event.altKey) {
+        return;
+      }
+      if (shouldIgnoreTranscriptShortcut(event.target, editorRef.current)) {
+        return;
+      }
+      if (event.key === "Backspace" || event.key === "Delete") {
+        event.preventDefault();
+        onCutSelection(selRange);
+      } else if (event.key.toLowerCase() === "r") {
+        event.preventDefault();
+        onRestoreSelection(selRange);
+      } else if (event.key === "Escape") {
+        event.preventDefault();
+        window.getSelection()?.removeAllRanges();
+        onSelectRange(null);
+      }
+    };
+    document.addEventListener("keydown", onDocumentKeyDown);
+    return () => document.removeEventListener("keydown", onDocumentKeyDown);
+  }, [onCutSelection, onRestoreSelection, onSelectRange, selRange]);
+
+  useEffect(() => {
     const syncSelection = () => {
       const root = editorRef.current;
       const selection = window.getSelection();
@@ -85,7 +117,7 @@ export function EditorTranscriptPanel({
     onTextEdit(text);
   };
 
-  const onEditorKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+  const onEditorKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (event.metaKey || event.ctrlKey || event.altKey) {
       return;
     }
@@ -94,12 +126,10 @@ export function EditorTranscriptPanel({
       onSelectRange(nativeRange);
     }
     if (event.key === "Backspace" || event.key === "Delete") {
-      if (nativeRange) {
-        return;
-      }
-      if (selRange) {
+      const range = nativeRange ?? selRange;
+      if (range) {
         event.preventDefault();
-        onCutSelection(selRange);
+        onCutSelection(range);
       }
     } else if (event.key.toLowerCase() === "r") {
       if (nativeRange || selRange) {
@@ -205,7 +235,10 @@ export function EditorTranscriptPanel({
                       index <= selRange[1]
                     }
                     key={word.id}
-                    onSelect={() => onSelectRange([index, index])}
+                    onSelect={() => {
+                      editorRef.current?.focus();
+                      onSelectRange([index, index]);
+                    }}
                     word={word}
                   />
                 ))}
@@ -233,7 +266,10 @@ function TranscriptSelectionToolbar({
 }) {
   return (
     <TooltipProvider>
-      <div className="mx-auto mb-3 flex w-full max-w-[80ch] items-center gap-1.5 rounded-md border bg-background/95 p-1 shadow-sm">
+      <div
+        className="mx-auto mb-3 flex w-full max-w-[80ch] items-center gap-1.5 rounded-md border bg-background/95 p-1 shadow-sm"
+        data-transcript-selection-toolbar
+      >
         <Badge className="shrink-0" variant="secondary">
           {selection.total} selected
         </Badge>
@@ -340,6 +376,12 @@ function TranscriptWordButton({
       )}
       data-word-index={index}
       onDoubleClick={onSelect}
+      onMouseDown={(event) => {
+        if (event.detail === 2) {
+          event.preventDefault();
+          onSelect();
+        }
+      }}
       title={word.deleted ? "Deleted word" : "Kept word"}
     >
       {word.text}{" "}
@@ -383,6 +425,27 @@ function closestWordIndex(node: Node): number | null {
   }
   const index = Number(raw);
   return Number.isInteger(index) ? index : null;
+}
+
+function shouldIgnoreTranscriptShortcut(
+  target: EventTarget | null,
+  root: HTMLElement | null
+): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+  if (root?.contains(target)) {
+    return true;
+  }
+  if (target.closest("[data-transcript-selection-toolbar]")) {
+    return false;
+  }
+  return (
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    target instanceof HTMLSelectElement ||
+    target.isContentEditable
+  );
 }
 
 function transcriptParagraphs(words: TranscriptWord[]) {

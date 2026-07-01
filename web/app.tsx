@@ -3,13 +3,6 @@
 import type { ColorAdjust, Filter } from "@engine/edl";
 import { FILTER_OPTIONS, filterLabel } from "@engine/filter";
 import {
-  createShader,
-  playSweep,
-  type ShaderController,
-  type SweepHandle,
-  type SweepOptions,
-} from "glimm";
-import {
   type ComponentType,
   type CSSProperties,
   type MouseEvent,
@@ -247,22 +240,6 @@ function firstToggleValue(
   return typeof value === "string" ? value : value[0];
 }
 
-const CUT_SWEEP_OPTIONS = {
-  bandTight: 18,
-  brightness: 0.9,
-  direction: "ltr",
-  easing: "easeOutCubic",
-  midpoint: 0.42,
-  outroMs: 170,
-  palette: "azure",
-  peakAlpha: 0.92,
-  rippleAmount: 0.65,
-  swellAmount: 0.55,
-  sweepMs: 260,
-  waveAmount: 0.7,
-  waveSpeed: 1.2,
-} satisfies SweepOptions;
-
 function survivingRanges(project: Project): Range[] {
   const pad = (project.padMs ?? 50) / 1000;
   const dur = project.durationSamples / project.sampleRate;
@@ -287,9 +264,12 @@ function survivingRanges(project: Project): Range[] {
   if (cur) {
     raw.push(cur);
   }
-  const padded: Range[] = raw.map((r) => ({
-    startSec: Math.max(0, r.start - pad),
-    endSec: Math.min(dur || r.end + pad, r.end + pad),
+  const padded: Range[] = raw.map((r, index) => ({
+    startSec: Math.max(index === 0 ? 0 : r.start, r.start - pad),
+    endSec: Math.min(
+      index === raw.length - 1 ? dur || r.end + pad : r.end,
+      r.end + pad
+    ),
   }));
   const merged: Range[] = [];
   for (const r of padded) {
@@ -413,7 +393,6 @@ export function App({
   const [colorScheme, setColorSchemeState] = useState<ColorScheme>(() =>
     getColorScheme()
   );
-  const projectLoaded = true;
   useEffect(() => {
     applyColorScheme(getColorScheme());
     return subscribeColorScheme(setColorSchemeState);
@@ -428,63 +407,11 @@ export function App({
   }, [colorScheme]);
   const videoRef = useRef<HTMLVideoElement>(null);
   const brollRef = useRef<HTMLVideoElement>(null);
-  const transitionCanvasRef = useRef<HTMLCanvasElement>(null);
-  const transitionShaderRef = useRef<ShaderController | null>(null);
-  const transitionSweepRef = useRef<SweepHandle | null>(null);
   const schedRef = useRef<CutScheduler | null>(null);
   const projectRef = useRef<Project | null>(null);
   const saveChainRef = useRef<Promise<void>>(Promise.resolve());
   const saveErrorRef = useRef<string | null>(null);
   projectRef.current = project;
-
-  useEffect(() => {
-    if (!projectLoaded) {
-      return;
-    }
-    const canvas = transitionCanvasRef.current;
-    if (!canvas) {
-      return;
-    }
-    const shader = createShader({
-      canvas,
-      bandTight: CUT_SWEEP_OPTIONS.bandTight,
-      direction: CUT_SWEEP_OPTIONS.direction,
-    });
-    transitionShaderRef.current = shader;
-    return () => {
-      transitionSweepRef.current?.cancel();
-      shader?.destroy();
-      transitionShaderRef.current = null;
-      transitionSweepRef.current = null;
-    };
-  }, [projectLoaded]);
-
-  const playCutSweep = useCallback(
-    ({ jump, resume }: { jump: () => void; resume: () => void }) => {
-      const shader = transitionShaderRef.current;
-      const reduceMotion =
-        window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ??
-        false;
-      if (reduceMotion || !shader) {
-        jump();
-        resume();
-        return;
-      }
-      transitionSweepRef.current?.cancel();
-      const handle = playSweep(shader, {
-        ...CUT_SWEEP_OPTIONS,
-        onMidpoint: jump,
-      });
-      transitionSweepRef.current = handle;
-      void handle.done.finally(() => {
-        if (transitionSweepRef.current === handle) {
-          transitionSweepRef.current = null;
-        }
-        resume();
-      });
-    },
-    []
-  );
 
   useEffect(() => {
     if (!(videoRef.current && project) || schedRef.current) {
@@ -493,7 +420,6 @@ export function App({
     const sched = new CutScheduler(videoRef.current, () =>
       survivingRanges(projectRef.current as Project)
     );
-    sched.onCutBoundary = playCutSweep;
     sched.onTick = (sourceSec) => {
       const lr = loopRef.current;
       if (lr && videoRef.current && sourceSec >= lr.outSec - 0.03) {
@@ -505,7 +431,7 @@ export function App({
     };
     sched.onEnd = () => setPlaying(false);
     schedRef.current = sched;
-  }, [playCutSweep, project]);
+  }, [project]);
 
   const ranges = useMemo(
     () => (project ? survivingRanges(project) : []),
@@ -1671,10 +1597,6 @@ export function App({
                               graphics={project.graphics ?? []}
                               sampleRate={sr}
                               titles={project.titles ?? []}
-                            />
-                            <canvas
-                              className="pointer-events-none absolute inset-0 z-[4] h-full w-full"
-                              ref={transitionCanvasRef}
                             />
                             {(exporting || pendingSaves > 0) && (
                               <div className="pointer-events-none absolute top-2 right-2 z-[5] flex items-center gap-1.5 rounded-md bg-black/70 px-2 py-1 font-medium text-white text-xs backdrop-blur">

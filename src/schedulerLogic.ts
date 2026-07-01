@@ -18,6 +18,15 @@ export function shouldJumpToNextRange(
   return currentTimeSec >= rangeEndSec - thresholdSec;
 }
 
+export function rangeBoundaryAudioDelaySec(
+  currentTimeSec: number,
+  rangeEndSec: number,
+  playbackRate = 1
+): number {
+  const rate = Math.max(Math.abs(playbackRate), 0.001);
+  return Math.max(0, (rangeEndSec - currentTimeSec) / rate);
+}
+
 export function nextRangeIndex(
   currentIdx: number,
   rangeCount: number

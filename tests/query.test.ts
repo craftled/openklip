@@ -165,6 +165,43 @@ test("listRanges returns padded surviving segments", () => {
   assert.ok(ranges[1].startSec >= 3.9);
 });
 
+test("listRanges does not let padding swallow a short deleted word", () => {
+  const sec = (n: number) => n * SAMPLE_RATE;
+  const p = makeProject({
+    durationSamples: sec(1),
+    padMs: 50,
+    words: [
+      {
+        id: "w0",
+        text: "one",
+        startSample: sec(0),
+        endSample: sec(0.2),
+        deleted: false,
+      },
+      {
+        id: "w1",
+        text: "um",
+        startSample: sec(0.2),
+        endSample: sec(0.3),
+        deleted: true,
+      },
+      {
+        id: "w2",
+        text: "two",
+        startSample: sec(0.3),
+        endSample: sec(0.5),
+        deleted: false,
+      },
+    ],
+  });
+
+  const ranges = listRanges(p);
+
+  assert.equal(ranges.length, 2);
+  assert.ok(ranges[0].endSec <= 0.2);
+  assert.ok(ranges[1].startSec >= 0.3);
+});
+
 test("listOverlays returns structured b-roll titles zooms stills", () => {
   const p = makeProject();
   addBroll(p, { assetId: "broll-1", fromSec: 0, toSec: 2 });

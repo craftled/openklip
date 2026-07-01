@@ -3,31 +3,27 @@ import {
   findPlayingRangeIndex,
   nextRangeIndex,
   playbackStartIndex,
+  rangeBoundaryAudioDelaySec,
   shouldJumpToNextRange,
 } from "../src/schedulerLogic.ts";
 
 export type Range = TimelineRange;
 
-export interface CutBoundaryTransition {
-  from: TimelineRange;
-  jump: () => void;
-  resume: () => void;
-  to: TimelineRange;
-}
+const AUDIO_MUTE_RAMP_SEC = 0.012;
+const AUDIO_RESUME_FADE_MS = 10;
 
 // Plays only the surviving ranges of the source proxy back to back. Because the
 // proxy is all-intra, the currentTime jump at each cut boundary is a fast seek.
-// A short gain duck masks the audio click at the jump.
+// The gain is muted at the exact source boundary so deleted words do not leak
+// while the browser catches up to the seek.
 export class CutScheduler {
   private video: HTMLVideoElement;
   private getRanges: () => TimelineRange[];
   private raf = 0;
   private idx = 0;
   private playing = false;
-  private transitioning = false;
   private ctx?: AudioContext;
   private gain?: GainNode;
-  onCutBoundary?: (transition: CutBoundaryTransition) => void;
   onTick?: (sourceSec: number) => void;
   onEnd?: () => void;
 
@@ -54,14 +50,49 @@ export class CutScheduler {
     }
   }
 
-  private duck(ms = 10): void {
+  private resetGain(): void {
     if (!(this.gain && this.ctx)) {
       return;
     }
     const now = this.ctx.currentTime;
     this.gain.gain.cancelScheduledValues(now);
+    this.gain.gain.setValueAtTime(1, now);
+  }
+
+  private primeRangeAudio(range: TimelineRange, fadeInMs = 0): void {
+    if (!(this.gain && this.ctx)) {
+      return;
+    }
+    const now = this.ctx.currentTime;
+    const boundaryAt =
+      now +
+      rangeBoundaryAudioDelaySec(
+        this.video.currentTime,
+        range.endSec,
+        this.video.playbackRate || 1
+      );
+    const fadeDoneAt = now + fadeInMs / 1000;
+    const rampStart = Math.max(now, boundaryAt - AUDIO_MUTE_RAMP_SEC);
+
+    this.gain.gain.cancelScheduledValues(now);
     this.gain.gain.setValueAtTime(0, now);
-    this.gain.gain.linearRampToValueAtTime(1, now + ms / 1000);
+    if (boundaryAt <= fadeDoneAt) {
+      return;
+    }
+    if (fadeInMs > 0) {
+      this.gain.gain.linearRampToValueAtTime(1, fadeDoneAt);
+    } else {
+      this.gain.gain.setValueAtTime(1, now);
+    }
+
+    if (boundaryAt <= now) {
+      this.gain.gain.setValueAtTime(0, now);
+      return;
+    }
+    if (rampStart > fadeDoneAt) {
+      this.gain.gain.setValueAtTime(1, rampStart);
+    }
+    this.gain.gain.linearRampToValueAtTime(0, boundaryAt);
   }
 
   get isPlaying(): boolean {
@@ -88,15 +119,16 @@ export class CutScheduler {
     }
     await this.video.play();
     this.playing = true;
+    this.primeRangeAudio(ranges[this.idx]);
     this.raf = requestAnimationFrame(this.loop);
     return true;
   }
 
   pause(): void {
     this.playing = false;
-    this.transitioning = false;
     cancelAnimationFrame(this.raf);
     this.video.pause();
+    this.resetGain();
   }
 
   seek(sourceSec: number): void {
@@ -112,35 +144,20 @@ export class CutScheduler {
       this.idx = inside;
       this.video.currentTime = t;
     }
+    if (this.playing) {
+      this.primeRangeAudio(ranges[this.idx]);
+    }
     this.onTick?.(this.video.currentTime);
   }
 
-  private resumeAfterTransition = (): void => {
-    this.transitioning = false;
-    if (!this.playing) {
-      return;
-    }
-    void this.video
-      .play()
-      .then(() => {
-        if (this.playing) {
-          this.raf = requestAnimationFrame(this.loop);
-        }
-      })
-      .catch(() => {
-        this.playing = false;
-        this.onEnd?.();
-      });
-  };
-
   private jumpToRange(range: TimelineRange): void {
-    this.duck();
     this.video.currentTime = range.startSec;
+    this.primeRangeAudio(range, AUDIO_RESUME_FADE_MS);
     this.onTick?.(this.video.currentTime);
   }
 
   private loop = (): void => {
-    if (!(this.playing && !this.transitioning)) {
+    if (!this.playing) {
       return;
     }
     const ranges = this.getRanges();
@@ -159,24 +176,7 @@ export class CutScheduler {
       }
       this.idx = nextIdx;
       const next = ranges[this.idx];
-      const jump = () => this.jumpToRange(next);
-      if (this.onCutBoundary) {
-        this.transitioning = true;
-        this.video.pause();
-        try {
-          this.onCutBoundary({
-            from: r,
-            jump,
-            resume: this.resumeAfterTransition,
-            to: next,
-          });
-        } catch {
-          jump();
-          this.resumeAfterTransition();
-        }
-        return;
-      }
-      jump();
+      this.jumpToRange(next);
       r = next;
     }
     this.onTick?.(this.video.currentTime);
