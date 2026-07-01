@@ -155,21 +155,41 @@ export type Title = z.infer<typeof TitleSchema>;
 // range; ffmpeg stays the master compositor (see src/graphic-render.ts and the
 // exporter hook). `template` is a graphics/<id> template id; `params` are the
 // scalar inputs that template's manifest declares (text, colors, etc).
-export const GraphicSchema = z.object({
-  id: z.string(),
-  type: z.enum(["template", "json-render"]).optional(),
-  template: z.string(),
-  catalog: ProductAnnouncementCatalogSchema.optional(),
-  spec: ProductAnnouncementSpecSchema.optional(),
-  params: z
-    .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
-    .default({}),
-  startSample: z.number().int().nonnegative(),
-  endSample: z.number().int().nonnegative(),
-  track: z.enum(["broll", "title", "zoom"]).default("title"),
-  note: z.string().optional(),
-  anchor: PhraseAnchorSchema.optional(),
-});
+export const GraphicSchema = z
+  .object({
+    id: z.string(),
+    type: z.enum(["template", "json-render"]).optional(),
+    template: z.string(),
+    catalog: ProductAnnouncementCatalogSchema.optional(),
+    spec: ProductAnnouncementSpecSchema.optional(),
+    params: z
+      .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
+      .default({}),
+    startSample: z.number().int().nonnegative(),
+    endSample: z.number().int().nonnegative(),
+    track: z.enum(["broll", "title", "zoom"]).default("title"),
+    note: z.string().optional(),
+    anchor: PhraseAnchorSchema.optional(),
+  })
+  .superRefine((graphic, ctx) => {
+    if (graphic.type !== "json-render") {
+      return;
+    }
+    if (!graphic.catalog) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "json-render graphics require a catalog",
+        path: ["catalog"],
+      });
+    }
+    if (!graphic.spec) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "json-render graphics require a spec",
+        path: ["spec"],
+      });
+    }
+  });
 export type Graphic = z.infer<typeof GraphicSchema>;
 
 // ── FEATURE 3: multi-take assembly ──────────────────────────────────────────

@@ -21,6 +21,15 @@ export interface TemplateSkillSource {
   label: string;
 }
 
+const BUNDLED_TEMPLATE_SKILLS: TemplateSkillSource[] = [
+  {
+    id: "product-announcement",
+    label: "Product announcement",
+    description:
+      "Short technical launch video with validated json-render announcement graphics.",
+  },
+];
+
 export function parseSlashQuery(value: string): { query: string } | null {
   if (!value.startsWith("/")) {
     return null;
@@ -42,19 +51,42 @@ export function buildSkillCatalog(
     })
   );
 
-  const templateSkills: SkillEntry[] = templates.map((template) => ({
-    id: `template:${template.id}`,
-    templateId: template.id,
-    title: template.label,
-    description:
-      template.description ||
-      `Load the ${template.label} edit playbook for this project.`,
-    slash: template.id,
-    invokeText: templateInvokeText(template),
-    kind: "template" as const,
-  }));
+  const templateSkills: SkillEntry[] = mergeTemplateSkills(templates).map(
+    (template) => ({
+      id: `template:${template.id}`,
+      templateId: template.id,
+      title: template.label,
+      description:
+        template.description ||
+        `Load the ${template.label} edit playbook for this project.`,
+      slash: template.id,
+      invokeText: templateInvokeText(template),
+      kind: "template" as const,
+    })
+  );
+  const pinnedTemplateSkills = templateSkills.filter(
+    (skill) => skill.templateId === "product-announcement"
+  );
+  const remainingTemplateSkills = templateSkills.filter(
+    (skill) => skill.templateId !== "product-announcement"
+  );
 
-  return [...workflows, ...templateSkills];
+  return [...pinnedTemplateSkills, ...workflows, ...remainingTemplateSkills];
+}
+
+function mergeTemplateSkills(
+  templates: TemplateSkillSource[]
+): TemplateSkillSource[] {
+  const byId = new Map<string, TemplateSkillSource>();
+  for (const template of templates) {
+    byId.set(template.id, template);
+  }
+  for (const template of BUNDLED_TEMPLATE_SKILLS) {
+    if (!byId.has(template.id)) {
+      byId.set(template.id, template);
+    }
+  }
+  return Array.from(byId.values());
 }
 
 function templateInvokeText(template: TemplateSkillSource): string {

@@ -169,7 +169,7 @@ const { registry } = defineRegistry(productAnnouncementCatalog, {
             data-in-dur="12"
             data-in-frame={String(10 + index * 5)}
             data-slide="42"
-            key={item}
+            key={`${item}-${index}`}
           >
             {item}
           </li>
