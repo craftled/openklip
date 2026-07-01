@@ -57,6 +57,37 @@ function zodShapeFromSchema(schema: z.ZodType): Record<string, z.ZodType> {
   return merged.shape as Record<string, z.ZodType>;
 }
 
+function scopedProjectSlug(): string | undefined {
+  const scoped = process.env.OPENKLIP_SLUG?.trim();
+  return scoped ? scoped : undefined;
+}
+
+function rawInputSlug(rawInput: unknown): string | undefined {
+  if (
+    typeof rawInput !== "object" ||
+    rawInput === null ||
+    Array.isArray(rawInput)
+  ) {
+    return;
+  }
+  const maybeSlug = (rawInput as { slug?: unknown }).slug;
+  return typeof maybeSlug === "string" ? maybeSlug : undefined;
+}
+
+function assertScopedProjectInput(toolName: string, rawInput: unknown): void {
+  const scoped = scopedProjectSlug();
+  if (!scoped) {
+    return;
+  }
+  const inputSlug = rawInputSlug(rawInput);
+  if (inputSlug === undefined || inputSlug === scoped) {
+    return;
+  }
+  throw new Error(
+    `tool "${toolName}" is scoped to project "${scoped}" and cannot access project "${inputSlug}"`
+  );
+}
+
 function mutationTool(action: ActionDef): AgentToolDef {
   const schema = toolSchemaWithSlug(action.schema);
   return {
@@ -480,6 +511,7 @@ export async function callAgentTool(
     const known = agentToolNames().join(", ");
     throw new Error(`unknown agent tool "${name}". Known tools: ${known}`);
   }
+  assertScopedProjectInput(name, rawInput);
   try {
     return await tool.run(rawInput);
   } catch (err) {

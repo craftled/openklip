@@ -96,6 +96,30 @@ test("callAgentTool cut mutates project via registry", async () => {
   });
 });
 
+test("callAgentTool rejects slug outside the pinned MCP project scope", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    const otherSlug = "other-fixture";
+    writeFixtureProject(slug, makeProject({ slug }));
+    writeFixtureProject(otherSlug, makeProject({ slug: otherSlug }));
+    const previousSlug = process.env.OPENKLIP_SLUG;
+    process.env.OPENKLIP_SLUG = slug;
+
+    try {
+      await assert.rejects(
+        () => callAgentTool("project_status", { slug: otherSlug }),
+        /scoped to project/
+      );
+
+      const status = (await callAgentTool("project_status", { slug })) as {
+        words: { total: number };
+      };
+      assert.equal(status.words.total, 2);
+    } finally {
+      process.env.OPENKLIP_SLUG = previousSlug;
+    }
+  });
+});
+
 test("callAgentTool title-add-phrase places overlay", async () => {
   await withTempProjectsRoot(async ({ slug }) => {
     writeFixtureProject(slug, makeProject({ slug }));
