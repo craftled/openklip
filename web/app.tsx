@@ -390,11 +390,11 @@ export function App({
   }, [loop]);
   const [pendingSaves, setPendingSaves] = useState(0);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [colorScheme, setColorSchemeState] = useState<ColorScheme>(() =>
-    getColorScheme()
-  );
+  const [colorScheme, setColorSchemeState] = useState<ColorScheme>("light");
   useEffect(() => {
-    applyColorScheme(getColorScheme());
+    const storedColorScheme = getColorScheme();
+    setColorSchemeState(storedColorScheme);
+    applyColorScheme(storedColorScheme);
     return subscribeColorScheme(setColorSchemeState);
   }, []);
 

@@ -1,7 +1,9 @@
 "use client";
 
 import {
+  type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
+  type RefObject,
   useEffect,
   useRef,
   useState,
@@ -57,6 +59,7 @@ export function EditorTranscriptPanel({
   words,
 }: EditorTranscriptPanelProps) {
   const editorRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
   const [editorMounted, setEditorMounted] = useState(false);
   const cutCount = words.filter((word) => word.deleted).length;
   const paragraphs = transcriptParagraphs(words);
@@ -159,7 +162,7 @@ export function EditorTranscriptPanel({
   };
 
   return (
-    <ScrollArea className="h-full min-h-0">
+    <ScrollArea className="h-full min-h-0" ref={scrollAreaRef}>
       <div className="flex min-h-full flex-col px-4 pt-4 pb-12 sm:px-6">
         <header className="mx-auto mb-4 flex w-full max-w-[78ch] flex-col gap-2 sm:flex-row sm:items-center">
           <div className="min-w-0">
@@ -247,7 +250,83 @@ export function EditorTranscriptPanel({
           </div>
         )}
       </div>
+      <TranscriptScrollFade scrollAreaRef={scrollAreaRef} />
     </ScrollArea>
+  );
+}
+
+const TRANSCRIPT_FADE_HEIGHT_PX = 64;
+const TRANSCRIPT_BOTTOM_THRESHOLD_PX = TRANSCRIPT_FADE_HEIGHT_PX * 0.5;
+
+const transcriptFadeGradientStyle = {
+  background:
+    "linear-gradient(to top, var(--background) 0%, color-mix(in srgb, var(--background) 72%, transparent) 45%, transparent 100%)",
+} satisfies CSSProperties;
+
+const transcriptFadeBlurStyle = {
+  backdropFilter: "blur(4px)",
+  maskImage:
+    "linear-gradient(to top, rgb(0 0 0 / 1) 0%, rgb(0 0 0 / 0.55) 40%, transparent 100%)",
+  WebkitBackdropFilter: "blur(4px)",
+  WebkitMaskImage:
+    "linear-gradient(to top, rgb(0 0 0 / 1) 0%, rgb(0 0 0 / 0.55) 40%, transparent 100%)",
+} satisfies CSSProperties;
+
+function TranscriptScrollFade({
+  scrollAreaRef,
+}: {
+  scrollAreaRef: RefObject<HTMLDivElement | null>;
+}) {
+  const [active, setActive] = useState(false);
+
+  useEffect(() => {
+    const viewport = scrollAreaRef.current?.querySelector<HTMLElement>(
+      "[data-slot='scroll-area-viewport']"
+    );
+    if (!viewport) {
+      return;
+    }
+
+    const update = () => {
+      const canScroll = viewport.scrollHeight > viewport.clientHeight + 1;
+      const remainingScroll =
+        viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
+      const atBottom = remainingScroll <= TRANSCRIPT_BOTTOM_THRESHOLD_PX;
+      const nextActive = canScroll && !atBottom;
+      setActive((current) => (current === nextActive ? current : nextActive));
+    };
+
+    update();
+    viewport.addEventListener("scroll", update, { passive: true });
+
+    const resizeObserver = new ResizeObserver(update);
+    resizeObserver.observe(viewport);
+    if (viewport.firstElementChild) {
+      resizeObserver.observe(viewport.firstElementChild);
+    }
+
+    return () => {
+      viewport.removeEventListener("scroll", update);
+      resizeObserver.disconnect();
+    };
+  }, [scrollAreaRef]);
+
+  return (
+    <div
+      aria-hidden
+      className={cn(
+        "pointer-events-none absolute right-2.5 bottom-0 left-0 z-10 h-16 opacity-0 transition-opacity duration-150 ease-out motion-reduce:transition-none",
+        active && "opacity-100 duration-0"
+      )}
+      data-active={active ? "true" : "false"}
+      data-slot="transcript-scroll-fade"
+    >
+      <div className="absolute inset-0" style={transcriptFadeGradientStyle} />
+      <div
+        className="absolute inset-0 motion-reduce:hidden"
+        style={transcriptFadeBlurStyle}
+      />
+    </div>
   );
 }
 

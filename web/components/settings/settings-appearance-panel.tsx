@@ -7,6 +7,7 @@ import {
 } from "@/components/settings/settings-panel-primitives";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
+  applyColorScheme,
   type ColorScheme,
   getColorScheme,
   setColorScheme,
@@ -20,11 +21,14 @@ function firstToggleValue(
 }
 
 export function SettingsAppearancePanel() {
-  const [colorScheme, setColorSchemeState] = useState<ColorScheme>(() =>
-    getColorScheme()
-  );
+  const [colorScheme, setColorSchemeState] = useState<ColorScheme>("light");
 
-  useEffect(() => subscribeColorScheme(setColorSchemeState), []);
+  useEffect(() => {
+    const storedColorScheme = getColorScheme();
+    setColorSchemeState(storedColorScheme);
+    applyColorScheme(storedColorScheme);
+    return subscribeColorScheme(setColorSchemeState);
+  }, []);
 
   return (
     <SettingsSection title="Appearance">
