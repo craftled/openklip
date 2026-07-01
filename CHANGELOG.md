@@ -5,7 +5,7 @@
 OpenKlip can now build product announcement videos from a validated json-render spec, preview that same graphic in the editor, and export it through the normal project timeline. The editor also gains a cleaner right-side Config shell, smaller-screen Chat and Config access, and stronger agent tool guardrails.
 
 ### Added
-- **Product announcement graphics**: added a catalog-constrained `product-announcement` json-render graphic type with static React rendering, preview overlays, export support, and a local `/json-render-probe` page.
+- **Product announcement graphics**: added a catalog-constrained `product-announcement` json-render graphic type with static React rendering, preview overlays, and export support.
 - **JSON graphic actions**: added `json-graphic-add` and `json-graphic-set` across CLI, GUI, MCP, and registry surfaces, plus overlay summaries for json-render graphics.
 - **Product announcement playbook**: added a bundled `templates/product-announcement/skill.md` and pinned slash-catalog entry so agents can attach the playbook and create validated announcement graphics.
 - **Chat trail and action states**: added chat thread history rendering, action status buttons, product announcement skill prompts, and focused tests for the new chat and action UI.

@@ -32,11 +32,11 @@ import { buildStillZoompan } from "./ken-burns.ts";
 import { lut3dExpr, lutPath } from "./lut.ts";
 import { projectPaths } from "./paths.ts";
 import {
-  assertProductAnnouncementSpec,
   PRODUCT_ANNOUNCEMENT_CATALOG,
   PRODUCT_ANNOUNCEMENT_FPS,
   PRODUCT_ANNOUNCEMENT_HEIGHT,
   PRODUCT_ANNOUNCEMENT_WIDTH,
+  validateProductAnnouncementSpec,
 } from "./product-announcement.ts";
 import { buildTitlesAss, type TitleItem } from "./titles.ts";
 import { buildZoompanZExpr, type ZoomWindow } from "./zoom-ramp.ts";
@@ -313,10 +313,13 @@ export async function exportCut(
           return null;
         }
         if (g.type === "json-render") {
+          const validation = validateProductAnnouncementSpec(g.spec);
+          if (!(validation.success && validation.spec)) {
+            return null;
+          }
           const { renderProductAnnouncementHtml } = await import(
             "./product-announcement-html.tsx"
           );
-          const spec = assertProductAnnouncementSpec(g.spec);
           const params: Record<string, string | number | boolean> = {};
           const manifest: GraphicManifest = {
             id: PRODUCT_ANNOUNCEMENT_CATALOG,
@@ -334,7 +337,9 @@ export async function exportCut(
             durationSamples: graphicWindowDurationSamples(win, sr),
             manifest,
             params,
-            compositionHtml: await renderProductAnnouncementHtml(spec),
+            compositionHtml: await renderProductAnnouncementHtml(
+              validation.spec
+            ),
           };
         }
         const manifest: GraphicManifest = loadGraphicManifest(g.template);

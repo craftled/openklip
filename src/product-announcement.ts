@@ -80,6 +80,7 @@ export const productAnnouncementCatalog = defineCatalog(schema, {
     AnnouncementScene: {
       description: "Full-frame product announcement composition.",
       props: z.object({
+        accent: HexColorSchema,
         product: AnnouncementTextSchema,
         claim: AnnouncementTextSchema,
         mood: z.enum(["technical", "launch", "proof"]),
@@ -102,7 +103,6 @@ export const productAnnouncementCatalog = defineCatalog(schema, {
     HeroStatement: {
       description: "Main claim for the product announcement.",
       props: z.object({
-        accent: HexColorSchema,
         eyebrow: AnnouncementTextSchema,
         headline: AnnouncementTextSchema,
       }),
@@ -350,6 +350,7 @@ export function buildProductAnnouncementSpec(
       scene: {
         type: "AnnouncementScene",
         props: {
+          accent: input.accent ?? "#f0b429",
           product: input.product ?? "OpenKlip",
           claim:
             input.claim ??
@@ -362,7 +363,6 @@ export function buildProductAnnouncementSpec(
       hero: {
         type: "HeroStatement",
         props: {
-          accent: input.accent ?? "#f0b429",
           eyebrow: input.eyebrow ?? "Product update",
           headline:
             input.headline ?? "JSON specs become export-ready motion graphics",

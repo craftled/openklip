@@ -139,6 +139,7 @@ const { registry } = defineRegistry(productAnnouncementCatalog, {
         data-mood={props.mood}
         data-product={props.product}
         data-width={PRODUCT_ANNOUNCEMENT_WIDTH}
+        style={{ "--accent": props.accent } as CSSProperties}
       >
         <style>{PRODUCT_ANNOUNCEMENT_CSS}</style>
         <div aria-hidden className="ok-pa-rule" />
@@ -177,10 +178,7 @@ const { registry } = defineRegistry(productAnnouncementCatalog, {
       </ul>
     ),
     HeroStatement: ({ props }) => (
-      <header
-        className="ok-pa-hero"
-        style={{ "--accent": props.accent } as CSSProperties}
-      >
+      <header className="ok-pa-hero">
         <p
           className="ok-pa-eyebrow"
           data-anim="fade,slideUp"

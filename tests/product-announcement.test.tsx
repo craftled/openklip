@@ -56,8 +56,8 @@ test("product announcement spec validates selected component props", () => {
   assert.match(invalidPropsResult.issues.join("\n"), /language/);
 
   const invalidAccent = structuredClone(sampleProductAnnouncementSpec);
-  invalidAccent.elements.hero.props = {
-    ...invalidAccent.elements.hero.props,
+  invalidAccent.elements.scene.props = {
+    ...invalidAccent.elements.scene.props,
     accent: "url(https://example.com/pixel)",
   };
   const invalidAccentResult = validateProductAnnouncementSpec(invalidAccent);
