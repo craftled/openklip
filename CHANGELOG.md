@@ -12,13 +12,14 @@ OpenKlip can now build product announcement videos from a validated json-render 
 - **Config controls**: added the right-side Config shell, a color temperature pad, and small-screen Chat and Config overlay buttons.
 
 ### Changed
-- **Agent edit tools**: Claude edit mode now allows the full OpenKlip MCP tool namespace, and MCP calls can be scoped to the active project slug.
-- **Graphic ids and timing**: graphic overlays now use collision-resistant ids and share the json-render span validation path between add and patch.
+- **Agent edit tools**: Claude edit mode now allows the full OpenKlip MCP tool namespace while scoped sessions only expose the active project through project-listing tools.
+- **Graphic ids and timing**: graphic overlays now use collision-resistant ids, share the json-render span validation path between add and patch, and render rich graphics for the clipped output duration after cuts.
 - **Editor layout**: chat and config panels now behave as desktop sidebars and smaller-screen overlays, keeping controls reachable without adding a new route.
 - **Version**: bumped OpenKlip to `0.10.0.0`.
 
 ### Fixed
-- **Spec hardening**: product announcement specs now reject invalid accent values, oversized graph shapes, cyclic child graphs, orphaned elements, and missing json-render catalog/spec fields before they reach preview or export.
+- **Spec hardening**: product announcement specs now reject invalid accent values, oversized graph shapes, cyclic child graphs, orphaned elements, non-scene roots, and missing json-render catalog/spec fields before they reach preview or export.
+- **Local tool hardening**: scoped MCP sessions no longer enumerate sibling projects.
 - **Small-screen panels**: the Chat and Config sidebars no longer disappear below the desktop breakpoint.
 - **Toggle group disabled state**: grouped toggle items now inherit the disabled state from their parent group.
 
