@@ -87,7 +87,18 @@ export function JsonRenderGraphicOverlay({
   ]);
 
   if (!(validation.success && validation.spec)) {
-    return null;
+    return (
+      <div className="pointer-events-none absolute inset-0 z-[3] flex items-center justify-center bg-black/45 p-6">
+        <div className="max-w-md rounded-md border border-destructive/40 bg-background/95 p-4 text-sm shadow-sm">
+          <div className="font-medium text-destructive">
+            Invalid graphic spec
+          </div>
+          <div className="mt-1 text-muted-foreground">
+            {validation.issues[0] ?? "Spec failed validation"}
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (

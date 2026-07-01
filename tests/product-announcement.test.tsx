@@ -11,7 +11,12 @@ import {
   validateProductAnnouncementSpec,
 } from "../src/product-announcement.ts";
 import { renderProductAnnouncementHtml } from "../src/product-announcement-html.tsx";
-import { actionManifest, actionTable, runAction } from "../src/registry.ts";
+import {
+  actionManifest,
+  actions,
+  actionTable,
+  runAction,
+} from "../src/registry.ts";
 import { PreviewOverlays } from "../web/components/preview-overlays";
 import {
   makeProject,
@@ -303,6 +308,43 @@ test("json-render graphics require catalog and spec in project JSON", () => {
       ],
     })
   );
+
+  assert.throws(() =>
+    ProjectSchema.parse({
+      ...makeProject({ slug: "ambiguous-json-graphic" }),
+      graphics: [
+        {
+          id: "g-json",
+          template: PRODUCT_ANNOUNCEMENT_CATALOG,
+          catalog: PRODUCT_ANNOUNCEMENT_CATALOG,
+          params: {},
+          spec: sampleProductAnnouncementSpec,
+          startSample: 0,
+          endSample: SAMPLE_RATE,
+          track: "title",
+        },
+      ],
+    })
+  );
+});
+
+test("json-graphic action schema applies product announcement validation", () => {
+  const addAction = actions.find(
+    (action) => action.name === "json-graphic-add"
+  );
+  assert.ok(addAction);
+
+  const invalidSpec = structuredClone(sampleProductAnnouncementSpec);
+  invalidSpec.elements.hero.type = "MagicDemoWidget";
+
+  const result = addAction.schema.safeParse({
+    catalog: PRODUCT_ANNOUNCEMENT_CATALOG,
+    fromSec: 0,
+    spec: invalidSpec,
+    toSec: 1,
+  });
+
+  assert.equal(result.success, false);
 });
 
 test("preview overlays branch to the json-render renderer", () => {
@@ -331,6 +373,37 @@ test("preview overlays branch to the json-render renderer", () => {
 
   assert.match(html, /ok-pa-root/);
   assert.match(html, /Announcement graphic|JSON specs become export-ready/);
+});
+
+test("preview overlays show invalid json-render graphic errors", () => {
+  const invalidSpec = structuredClone(sampleProductAnnouncementSpec);
+  invalidSpec.elements.hero.type = "MagicDemoWidget";
+
+  const html = renderToStaticMarkup(
+    <PreviewOverlays
+      captionGroups={[]}
+      captionsOn={false}
+      curSample={SAMPLE_RATE * 2}
+      graphics={[
+        {
+          id: "g-json",
+          type: "json-render",
+          template: PRODUCT_ANNOUNCEMENT_CATALOG,
+          catalog: PRODUCT_ANNOUNCEMENT_CATALOG,
+          params: {},
+          spec: invalidSpec,
+          startSample: SAMPLE_RATE,
+          endSample: SAMPLE_RATE * 5,
+          track: "title",
+        },
+      ]}
+      sampleRate={SAMPLE_RATE}
+      titles={[]}
+    />
+  );
+
+  assert.match(html, /Invalid graphic spec/);
+  assert.match(html, /MagicDemoWidget|Invalid/);
 });
 
 test("CLI json-graphic-add reads a spec file and mutates project graphics", async () => {

@@ -4,6 +4,26 @@ Use these bodies when publishing releases. Each section matches a tag in `CHANGE
 
 ---
 
+## v0.10.0.1
+
+**Hardening follow-up to the json-render product announcement graphics.**
+
+### Highlights
+- **Scoped MCP tools require an explicit slug**: a project-scoped session rejects a slug-bearing tool called with no slug instead of silently running against the pinned project
+- **JSON graphic actions validate the spec**: `json-graphic-add` and `json-graphic-set` run full product-announcement spec validation inside the action schema, rejecting invalid specs at the CLI/GUI/MCP boundary, not only at persistence
+- **EDL ambiguity guard** (`src/edl.ts`): a graphic with `catalog`/`spec` fields but no `type: "json-render"` is now rejected
+- **Invalid-spec preview** (`web/components/json-render-graphic-overlay.tsx`): the editor overlay shows an "Invalid graphic spec" card with the first validation issue instead of rendering nothing (export still degrades silently by skipping the graphic)
+- **Toggle group fix**: pressing the active item in a single-select toggle group no longer clears the selection
+- Ported the reviewed hardening from the alternate json-render branch; its frame-to-`src/` refactor and `accent`-on-`HeroStatement` change were not taken (they would revert the v0.10.0.0 accent-on-scene fix). Built red-green (619 to 623 tests)
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations) for the current list.
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#01001---2026-07-01)
+
+---
+
 ## v0.10.0.0
 
 **JSON specs become export-ready motion graphics: catalog-constrained product announcements, authored by agents and previewed pixel-for-pixel.**

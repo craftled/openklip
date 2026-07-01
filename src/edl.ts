@@ -172,6 +172,17 @@ export const GraphicSchema = z
     anchor: PhraseAnchorSchema.optional(),
   })
   .superRefine((graphic, ctx) => {
+    const hasJsonRenderFields =
+      graphic.catalog !== undefined || graphic.spec !== undefined;
+    if (hasJsonRenderFields && graphic.type !== "json-render") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          'graphics with catalog or spec fields require type "json-render"',
+        path: ["type"],
+      });
+      return;
+    }
     if (graphic.type !== "json-render") {
       return;
     }

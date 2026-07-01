@@ -74,14 +74,30 @@ function rawInputSlug(rawInput: unknown): string | undefined {
   return typeof maybeSlug === "string" ? maybeSlug : undefined;
 }
 
-function assertScopedProjectInput(toolName: string, rawInput: unknown): void {
+function assertScopedProjectInput({
+  hasSlugInput,
+  rawInput,
+  toolName,
+}: {
+  hasSlugInput: boolean;
+  rawInput: unknown;
+  toolName: string;
+}): void {
   const scoped = scopedProjectSlug();
   if (!scoped) {
     return;
   }
   const inputSlug = rawInputSlug(rawInput);
-  if (inputSlug === undefined || inputSlug === scoped) {
+  if (!hasSlugInput && inputSlug === undefined) {
     return;
+  }
+  if (inputSlug === scoped) {
+    return;
+  }
+  if (inputSlug === undefined) {
+    throw new Error(
+      `tool "${toolName}" is scoped to project "${scoped}" and requires a slug`
+    );
   }
   throw new Error(
     `tool "${toolName}" is scoped to project "${scoped}" and cannot access project "${inputSlug}"`
@@ -517,7 +533,11 @@ export async function callAgentTool(
     const known = agentToolNames().join(", ");
     throw new Error(`unknown agent tool "${name}". Known tools: ${known}`);
   }
-  assertScopedProjectInput(name, rawInput);
+  assertScopedProjectInput({
+    hasSlugInput: Object.hasOwn(tool.zodShape, "slug"),
+    rawInput,
+    toolName: name,
+  });
   try {
     return await tool.run(rawInput);
   } catch (err) {
