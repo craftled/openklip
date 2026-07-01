@@ -131,12 +131,18 @@ const queryTools: AgentToolDef[] = [
     name: "list_projects",
     summary: "List OpenKlip projects (most recent first).",
     schema: z.object({}),
-    run: () => ({
-      projects: listProjects().map((p) => ({
-        slug: p.slug,
-        mtimeMs: p.mtimeMs,
-      })),
-    }),
+    run: () => {
+      const scoped = scopedProjectSlug();
+      const projects = scoped
+        ? listProjects().filter((p) => p.slug === scoped)
+        : listProjects();
+      return {
+        projects: projects.map((p) => ({
+          slug: p.slug,
+          mtimeMs: p.mtimeMs,
+        })),
+      };
+    },
   }),
   defineQueryTool({
     name: "list_assets",

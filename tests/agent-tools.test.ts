@@ -110,6 +110,14 @@ test("callAgentTool rejects slug outside the pinned MCP project scope", async ()
         /scoped to project/
       );
 
+      const projects = (await callAgentTool("list_projects", {})) as {
+        projects: Array<{ slug: string }>;
+      };
+      assert.deepEqual(
+        projects.projects.map((p) => p.slug),
+        [slug]
+      );
+
       const status = (await callAgentTool("project_status", { slug })) as {
         words: { total: number };
       };

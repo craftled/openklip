@@ -66,6 +66,12 @@ test("product announcement spec validates selected component props", () => {
 });
 
 test("product announcement spec rejects unsafe graph shapes", () => {
+  const wrongRoot = structuredClone(sampleProductAnnouncementSpec);
+  wrongRoot.root = "hero";
+  const wrongRootResult = validateProductAnnouncementSpec(wrongRoot);
+  assert.equal(wrongRootResult.success, false);
+  assert.match(wrongRootResult.issues.join("\n"), /AnnouncementScene/);
+
   const cyclic = structuredClone(sampleProductAnnouncementSpec);
   cyclic.elements.scene.children = ["scene"];
   const cyclicResult = validateProductAnnouncementSpec(cyclic);

@@ -185,6 +185,13 @@ export function planGraphicWindow(input: {
   return { outStart, outEnd };
 }
 
+export function graphicWindowDurationSamples(
+  win: GraphicWindow,
+  sampleRate: number
+): number {
+  return Math.max(1, Math.round((win.outEnd - win.outStart) * sampleRate));
+}
+
 export async function exportCut(
   slug: string,
   opts: ExportOptions = {}
@@ -324,6 +331,7 @@ export async function exportCut(
             graphic: g,
             outStart: win.outStart,
             outEnd: win.outEnd,
+            durationSamples: graphicWindowDurationSamples(win, sr),
             manifest,
             params,
             compositionHtml: await renderProductAnnouncementHtml(spec),
@@ -335,6 +343,7 @@ export async function exportCut(
           graphic: g,
           outStart: win.outStart,
           outEnd: win.outEnd,
+          durationSamples: graphicWindowDurationSamples(win, sr),
           manifest,
           params,
           compositionHtml: undefined,
@@ -397,7 +406,7 @@ export async function exportCut(
           template: x.graphic.template,
           compositionHtml: x.compositionHtml,
           params: x.params,
-          durationSamples: x.graphic.endSample - x.graphic.startSample,
+          durationSamples: x.durationSamples,
           fps: outFps,
           width: outW,
           height: outH,

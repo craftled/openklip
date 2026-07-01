@@ -221,6 +221,13 @@ export function validateProductAnnouncementSpec(
   }
 
   const normalized = ProductAnnouncementSpecSchema.parse(structure.data);
+  if (normalized.elements[normalized.root]?.type !== "AnnouncementScene") {
+    return {
+      issues: ["root: product announcement root must be AnnouncementScene"],
+      success: false,
+    };
+  }
+
   const graphIssues = validateProductAnnouncementGraph(normalized);
   if (graphIssues.length > 0) {
     return {
