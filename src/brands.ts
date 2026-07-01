@@ -5,13 +5,14 @@
 // manifest : applying a brand mutates the relevant fields of project.json, which
 // remains the single source of truth. Words and overlays are never touched.
 import { existsSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { z } from "zod";
 import { FilterSchema, type Project } from "./edl.ts";
+import { repoPath } from "./repo-paths.ts";
 
 // brands/ lives at the repo root next to projects/.
 export function brandsRoot(): string {
-  return resolve(process.cwd(), "brands");
+  return repoPath("brands");
 }
 
 const BRAND_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;

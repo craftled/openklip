@@ -4,7 +4,7 @@
 // in memory, which fits OpenKlip's local single-process server (the running
 // `serve` / dev process owns it); it is not durable across restarts.
 import { randomUUID } from "node:crypto";
-import type { IngestProgress } from "./ingest.ts";
+import type { IngestProgress } from "./ingest-types.ts";
 
 export type IngestJobStatus = "running" | "done" | "error";
 

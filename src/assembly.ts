@@ -7,7 +7,7 @@
 // Whisper core is reused from src/ingest.ts so the two ingest paths cannot drift.
 import { existsSync, readdirSync } from "node:fs";
 import { mkdir, rm } from "node:fs/promises";
-import { isAbsolute, join, resolve } from "node:path";
+import { isAbsolute, join } from "node:path";
 import type { z } from "zod";
 import { planAssembly } from "./assembly-plan.ts";
 import {
@@ -22,6 +22,7 @@ import { FFMPEG, probe, run } from "./ffmpeg.ts";
 import { buildProxy, extractAudio, transcribeToWords } from "./ingest.ts";
 import { assertProjectCanBeIngested } from "./ingest-guard.ts";
 import { projectPaths, slugify, takeDir, takeFile } from "./paths.ts";
+import { cwdPath } from "./repo-paths.ts";
 import { defaultTemplateId } from "./templates.ts";
 
 // The pre-default selection shape an agent supplies (padMs optional before the
@@ -44,9 +45,7 @@ export async function ingestTake(
   videoArg: string,
   opts?: { id?: string; label?: string }
 ): Promise<Take> {
-  const source = isAbsolute(videoArg)
-    ? videoArg
-    : resolve(process.cwd(), videoArg);
+  const source = isAbsolute(videoArg) ? videoArg : cwdPath(videoArg);
   if (!existsSync(source)) {
     throw new Error(`take video not found: ${source}`);
   }

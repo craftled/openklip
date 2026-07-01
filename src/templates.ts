@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
+import { repoPath } from "./repo-paths.ts";
 
 const TEMPLATE_ID = /^[a-z][a-z0-9-]*$/;
 
@@ -10,7 +11,7 @@ export interface TemplateListing {
 }
 
 export function templatesRoot(): string {
-  return resolve(process.cwd(), "templates");
+  return repoPath("templates");
 }
 
 export function assertValidTemplateId(id: string): string {

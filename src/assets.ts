@@ -18,6 +18,7 @@ import {
 } from "./edl.ts";
 import { FFMPEG, probe, probeAudio, run } from "./ffmpeg.ts";
 import { assetProxyRelative, projectPaths, slugify } from "./paths.ts";
+import { cwdPath } from "./repo-paths.ts";
 
 const IMAGE_EXT = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif"]);
 const AUDIO_EXT = new Set([".mp3", ".wav", ".aac", ".m4a", ".flac", ".ogg"]);
@@ -192,7 +193,7 @@ export async function registerAsset(
   fileArg: string,
   kind?: AssetKind
 ): Promise<Asset> {
-  const src = isAbsolute(fileArg) ? fileArg : resolve(process.cwd(), fileArg);
+  const src = isAbsolute(fileArg) ? fileArg : cwdPath(fileArg);
   if (!existsSync(src)) {
     throw new Error(`asset file not found: ${src}`);
   }

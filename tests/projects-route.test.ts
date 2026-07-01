@@ -1,6 +1,12 @@
-import { mock } from "bun:test";
 import assert from "node:assert/strict";
+import { mkdtemp, readdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "node:test";
+import {
+  createProjectsPost,
+  loadProjectIngest,
+} from "../app/api/projects/post.ts";
 import { GET, POST } from "../app/api/projects/route.ts";
 import { getIngestJob, type IngestJob } from "../src/ingest-jobs.ts";
 import {
@@ -34,6 +40,11 @@ function ingestRequest(file?: File) {
   }) as unknown as Parameters<typeof POST>[0];
 }
 
+async function openKlipTempDirs(root: string): Promise<Set<string>> {
+  const names = await readdir(root);
+  return new Set(names.filter((name) => name.startsWith("openklip-ingest-")));
+}
+
 test("GET /api/projects lists ingested projects", async () => {
   await withTempProjectsRoot(async ({ slug }) => {
     writeFixtureProject(slug, makeProject({ slug }));
@@ -56,11 +67,11 @@ test("POST /api/projects returns 400 when file is missing", async () => {
 
 test("POST /api/projects starts an ingest job and returns its id + slug", async () => {
   await withTempProjectsRoot(async () => {
-    mock.module("@engine/ingest", () => ({
-      ingest: async () => "uploaded-demo",
-    }));
+    const post = createProjectsPost({
+      loadIngest: async () => async () => "uploaded-demo",
+    });
 
-    const res = await POST(
+    const res = await post(
       ingestRequest(new File(["fake-bytes"], "clip.mp4", { type: "video/mp4" }))
     );
     assert.equal(res.status, 200);
@@ -68,12 +79,39 @@ test("POST /api/projects starts an ingest job and returns its id + slug", async 
     assert.ok(json.jobId);
     assert.equal(json.slug, "clip"); // derived from the filename, returned now
 
-    // The job runs the (mocked) ingest to completion.
+    // The job runs the injected ingest to completion.
     const done = await pollJob(json.jobId as string);
     assert.equal(done.status, "done");
     assert.equal(done.slug, "uploaded-demo");
+  });
+});
 
-    mock.restore();
+test("POST /api/projects production ingest loader resolves the route import", async () => {
+  const ingest = await loadProjectIngest();
+  assert.equal(typeof ingest, "function");
+});
+
+test("POST /api/projects cleans temp upload when ingest load fails", async () => {
+  await withTempProjectsRoot(async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "openklip-route-test-"));
+    try {
+      const before = await openKlipTempDirs(tempRoot);
+      const post = createProjectsPost({
+        loadIngest: () => Promise.reject(new Error("load failed")),
+        tempRoot,
+      });
+
+      await assert.rejects(
+        post(ingestRequest(new File(["fake-bytes"], "cleanup.mp4"))),
+        /load failed/
+      );
+
+      const after = await openKlipTempDirs(tempRoot);
+      const leaked = [...after].filter((name) => !before.has(name));
+      assert.deepEqual(leaked, []);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
   });
 });
 
@@ -94,12 +132,12 @@ test("POST /api/projects returns 409 when the project already exists", async () 
 test("POST /api/projects?force=1 passes force through to ingest", async () => {
   await withTempProjectsRoot(async () => {
     let receivedForce: boolean | undefined;
-    mock.module("@engine/ingest", () => ({
-      ingest: (_video: string, opts?: { force?: boolean }) => {
+    const post = createProjectsPost({
+      loadIngest: async () => (_video, opts) => {
         receivedForce = opts?.force;
-        return "force-demo";
+        return Promise.resolve("force-demo");
       },
-    }));
+    });
 
     const form = new FormData();
     form.append("file", new File(["fake-bytes"], "demo.mp4"));
@@ -107,10 +145,11 @@ test("POST /api/projects?force=1 passes force through to ingest", async () => {
       method: "POST",
       body: form,
     }) as unknown as Parameters<typeof POST>[0];
-    const res = await POST(req);
+    const res = await post(req);
     assert.equal(res.status, 200);
+    const json = (await res.json()) as { jobId?: string };
+    assert.ok(json.jobId);
+    await pollJob(json.jobId);
     assert.equal(receivedForce, true);
-
-    mock.restore();
   });
 });

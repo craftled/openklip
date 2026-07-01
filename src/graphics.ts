@@ -7,8 +7,9 @@
 // never imports the renderer or hyperframes, so typecheck/build/tests pass with the
 // optional rich backend absent.
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { z } from "zod";
+import { repoPath } from "./repo-paths.ts";
 
 const GRAPHIC_ID = /^[a-z][a-z0-9-]*$/;
 
@@ -40,7 +41,7 @@ export type GraphicManifest = z.infer<typeof GraphicManifestSchema>;
 
 // graphics/ lives at the repo root next to templates/ and brands/.
 export function graphicsRoot(): string {
-  return resolve(process.cwd(), "graphics");
+  return repoPath("graphics");
 }
 
 export function graphicDir(id: string): string {

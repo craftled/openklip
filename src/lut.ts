@@ -7,14 +7,15 @@
 // The path-name guard and the filtergraph escaping are pure and unit tested;
 // only listLuts touches the filesystem.
 import { existsSync, readdirSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
+import { repoPath } from "./repo-paths.ts";
 
 // Same traversal guard as brand/slug names: a LUT name can never escape luts/.
 const LUT_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
 // luts/ lives at the repo root next to projects/ and brands/.
 export function lutsRoot(): string {
-  return resolve(process.cwd(), "luts");
+  return repoPath("luts");
 }
 
 // Resolve a LUT name to luts/<name>.cube, rejecting any traversal attempt.

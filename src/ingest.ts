@@ -4,8 +4,12 @@ import { isAbsolute, resolve } from "node:path";
 import { type Project, ProjectSchema, SAMPLE_RATE, type Word } from "./edl.ts";
 import { FFMPEG, probe, run } from "./ffmpeg.ts";
 import { assertProjectCanBeIngested } from "./ingest-guard.ts";
+import type { IngestPhase, IngestProgress } from "./ingest-types.ts";
 import { projectPaths, slugFromVideo } from "./paths.ts";
+import { cwdPath } from "./repo-paths.ts";
 import { defaultTemplateId } from "./templates.ts";
+
+export type { IngestPhase, IngestProgress } from "./ingest-types.ts";
 
 interface RawChunk {
   end: number | null;
@@ -116,23 +120,6 @@ export async function transcribeToWords(
   return wordsFromRawChunks(raw);
 }
 
-export type IngestPhase =
-  | "probe"
-  | "proxy"
-  | "audio"
-  | "frames"
-  | "transcribe"
-  | "finalize"
-  | "done";
-
-export interface IngestProgress {
-  message: string;
-  phase: IngestPhase;
-  /** 1-based step index (the work phases, excluding "done"). */
-  step: number;
-  total: number;
-}
-
 // The ordered work phases, so progress is a stable step/total the UI can show.
 const INGEST_STEPS: Array<{ message: string; phase: IngestPhase }> = [
   { phase: "probe", message: "Reading video" },
@@ -162,9 +149,7 @@ export async function ingest(
       });
     }
   };
-  const source = isAbsolute(videoArg)
-    ? videoArg
-    : resolve(process.cwd(), videoArg);
+  const source = isAbsolute(videoArg) ? videoArg : cwdPath(videoArg);
   if (!existsSync(source)) {
     throw new Error(`video not found: ${source}`);
   }

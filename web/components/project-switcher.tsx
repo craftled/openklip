@@ -5,7 +5,6 @@ import { NewProjectDialog } from "@/components/new-project-dialog";
 import { ProjectCreateOverlay } from "@/components/project-create-overlay";
 import { ProjectDeleteAction } from "@/components/project-delete-action";
 import { ProjectInlineFolderAction } from "@/components/project-folder-action";
-import { RelativeTimeLabel } from "@/components/relative-time-label";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -38,7 +37,6 @@ import {
   projectAtShortcutIndex,
   projectInitial,
 } from "@/lib/project-list";
-import { relativeTimeAgo } from "@/lib/relative-time";
 import {
   SIDEBAR_HEADER_ICON_CLASS,
   SIDEBAR_MENU_HEADER_CLASS,
@@ -162,14 +160,7 @@ export function ProjectSwitcher({
                     <span className="shrink-0 text-[12px] text-muted-foreground/58">
                       Creating…
                     </span>
-                  ) : (
-                    <span className="shrink-0 text-[12px] text-muted-foreground/40 tabular-nums">
-                      <RelativeTimeLabel
-                        format={relativeTimeAgo}
-                        ms={active.mtimeMs}
-                      />
-                    </span>
-                  )}
+                  ) : null}
                   <ChevronsUpDown
                     className={cn("absolute right-2", APP_ICON_CLASS)}
                   />

@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { IngestProgress } from "../src/ingest.ts";
 import {
   getIngestJob,
   isSlugInFlight,
   startIngestJob,
 } from "../src/ingest-jobs.ts";
+import type { IngestProgress } from "../src/ingest-types.ts";
 
 const tick = () => new Promise((r) => setTimeout(r, 5));
 

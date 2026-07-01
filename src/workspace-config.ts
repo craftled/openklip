@@ -6,9 +6,10 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join, resolve } from "node:path";
+import { repoPath } from "./repo-paths.ts";
 
 function configDir(): string {
-  return join(process.cwd(), ".openklip");
+  return repoPath(".openklip");
 }
 
 function configPath(): string {

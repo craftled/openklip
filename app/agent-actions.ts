@@ -4,7 +4,6 @@
 // the user's Claude subscription (via `claude -p`) to suggest + apply cuts on
 // the same project.json the editor reads. No API keys. Kept in its own file so
 // it doesn't touch the hand-written action surface.
-import { join } from "node:path";
 import {
   buildChatPrompt,
   buildEditPrompt,
@@ -17,6 +16,7 @@ import {
 import { analyzeAssets, assetCardLines } from "@engine/asset-cards";
 import { projectsRoot } from "@engine/paths";
 import { loadProject, mutateProject } from "@engine/projectStore";
+import { cwdPath } from "@engine/repo-paths";
 import { analyzeSceneLog, sceneLogLines } from "@engine/scene-log";
 import { type VerifyReport, verifyCut, verifyVerdict } from "@engine/verify";
 
@@ -180,7 +180,7 @@ export async function chatWithAgent(
         agent,
         slug,
         projectsRoot: projectsRoot(),
-        mcpServerPath: join(process.cwd(), "src", "mcp-server.ts"),
+        mcpServerPath: cwdPath("src", "mcp-server.ts"),
       });
       return { ok: true, edited: true, text: text.trim() || "(done)" };
     }

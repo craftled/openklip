@@ -5,11 +5,12 @@
 // templating; the actual fetch command (e.g. yt-dlp) is the plugin author's dep,
 // not bundled. Pure + dependency-free so it is unit-testable.
 import { existsSync, readdirSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { z } from "zod";
+import { repoPath } from "./repo-paths.ts";
 
 export function ingestersRoot(): string {
-  return resolve(process.cwd(), "ingesters");
+  return repoPath("ingesters");
 }
 
 export const IngesterFieldSchema = z.object({
