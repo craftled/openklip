@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.10.0.0 - 2026-07-01
+
+OpenKlip can now build product announcement videos from a validated json-render spec, preview that same graphic in the editor, and export it through the normal project timeline. The editor also gains a cleaner right-side Config shell, smaller-screen Chat and Config access, and stronger agent tool guardrails.
+
+### Added
+- **Product announcement graphics**: added a catalog-constrained `product-announcement` json-render graphic type with static React rendering, preview overlays, export support, and a local `/json-render-probe` page.
+- **JSON graphic actions**: added `json-graphic-add` and `json-graphic-set` across CLI, GUI, MCP, and registry surfaces, plus overlay summaries for json-render graphics.
+- **Product announcement playbook**: added a bundled `templates/product-announcement/skill.md` and pinned slash-catalog entry so agents can attach the playbook and create validated announcement graphics.
+- **Chat trail and action states**: added chat thread history rendering, action status buttons, product announcement skill prompts, and focused tests for the new chat and action UI.
+- **Config controls**: added the right-side Config shell, a color temperature pad, and small-screen Chat and Config overlay buttons.
+
+### Changed
+- **Agent edit tools**: Claude edit mode now allows the full OpenKlip MCP tool namespace, and MCP calls can be scoped to the active project slug.
+- **Graphic ids and timing**: graphic overlays now use collision-resistant ids and share the json-render span validation path between add and patch.
+- **Editor layout**: chat and config panels now behave as desktop sidebars and smaller-screen overlays, keeping controls reachable without adding a new route.
+- **Version**: bumped OpenKlip to `0.10.0.0`.
+
+### Fixed
+- **Spec hardening**: product announcement specs now reject invalid accent values, oversized graph shapes, cyclic child graphs, orphaned elements, and missing json-render catalog/spec fields before they reach preview or export.
+- **Small-screen panels**: the Chat and Config sidebars no longer disappear below the desktop breakpoint.
+- **Toggle group disabled state**: grouped toggle items now inherit the disabled state from their parent group.
+
 ## 0.9.0.0 - 2026-06-30
 
 OpenKlip now uses the default shadcn theme as its UI baseline with Base UI primitives underneath app-owned wrappers. The editor keeps the familiar local-first workflow while removing the old custom theme layer, so future visual work can start from clean shadcn parity.
