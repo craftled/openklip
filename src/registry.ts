@@ -45,6 +45,7 @@ import {
   PRODUCT_ANNOUNCEMENT_CATALOG,
   ProductAnnouncementCatalogSchema,
   ProductAnnouncementSpecSchema,
+  validateProductAnnouncementSpec,
 } from "./product-announcement.ts";
 import { reanchorOne, reanchorProject } from "./reanchor.ts";
 
@@ -83,6 +84,19 @@ function defineAction<S extends z.ZodType>(def: {
 const sec = z.number();
 const position = z.enum(["lower", "center", "hero"]);
 const track = z.enum(["broll", "title", "zoom"]);
+const ProductAnnouncementActionSpecSchema =
+  ProductAnnouncementSpecSchema.superRefine((spec, ctx) => {
+    const validation = validateProductAnnouncementSpec(spec);
+    if (validation.success) {
+      return;
+    }
+    for (const issue of validation.issues) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `invalid product announcement spec: ${issue}`,
+      });
+    }
+  });
 
 export const actions: ActionDef[] = [
   defineAction({
@@ -318,7 +332,7 @@ export const actions: ActionDef[] = [
       catalog: ProductAnnouncementCatalogSchema,
       fromSec: sec,
       toSec: sec,
-      spec: ProductAnnouncementSpecSchema,
+      spec: ProductAnnouncementActionSpecSchema,
       track: track.optional(),
       note: z.string().optional(),
       anchor: PhraseAnchorSchema.optional(),
@@ -338,7 +352,7 @@ export const actions: ActionDef[] = [
       catalog: ProductAnnouncementCatalogSchema.optional(),
       fromSec: sec.optional(),
       toSec: sec.optional(),
-      spec: ProductAnnouncementSpecSchema.optional(),
+      spec: ProductAnnouncementActionSpecSchema.optional(),
       track: track.optional(),
       note: z.string().optional(),
     }),

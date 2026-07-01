@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.10.0.1 - 2026-07-01
+
+Hardening follow-up to the json-render product announcement graphics. The reviewed hardening from the alternate json-render branch was ported onto the shipped v0.10.0.0 implementation; the branch's frame-to-`src/` refactor and its `accent`-on-`HeroStatement` change were intentionally not taken (they would have reverted the v0.10.0.0 accent-on-scene fix).
+
+### Changed
+- **Scoped MCP tools require an explicit slug**: a project-scoped session now rejects a slug-bearing tool called with no slug instead of silently running against the pinned project; genuinely slug-less tools still pass.
+- **JSON graphic actions validate the spec**: `json-graphic-add` and `json-graphic-set` run full product-announcement spec validation inside the action schema, so invalid specs are rejected at the action boundary (CLI, GUI, MCP), not only at persistence.
+
+### Fixed
+- **EDL graphic ambiguity**: a graphic carrying `catalog` or `spec` fields without `type: "json-render"` is now rejected instead of parsed ambiguously.
+- **Invalid json-render preview**: the editor overlay shows an "Invalid graphic spec" card with the first validation issue instead of rendering nothing.
+- **Toggle group selection**: pressing the active item in a single-select toggle group no longer clears the selection; grouped multi-select removal is unchanged.
+
 ## 0.10.0.0 - 2026-07-01
 
 OpenKlip can now build product announcement videos from a validated json-render spec, preview that same graphic in the editor, and export it through the normal project timeline. The editor also gains a cleaner right-side Config shell, smaller-screen Chat and Config access, and stronger agent tool guardrails.

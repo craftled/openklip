@@ -31,6 +31,33 @@ const normalizeValue = (value?: ToggleGroupValue): readonly string[] => {
   return value ?? [];
 };
 
+export const getNextToggleGroupValues = ({
+  isMultiple,
+  itemValue,
+  pressed,
+  selectedValues,
+}: {
+  isMultiple: boolean;
+  itemValue: string;
+  pressed: boolean;
+  selectedValues: readonly string[];
+}): readonly string[] => {
+  if (isMultiple) {
+    if (pressed) {
+      return selectedValues.includes(itemValue)
+        ? selectedValues
+        : [...selectedValues, itemValue];
+    }
+    return selectedValues.filter(
+      (selectedValue) => selectedValue !== itemValue
+    );
+  }
+  if (!pressed) {
+    return selectedValues;
+  }
+  return [itemValue];
+};
+
 function ToggleGroup({
   children,
   className,
@@ -75,16 +102,16 @@ function ToggleGroup({
 
   const onItemPressed = React.useCallback(
     (itemValue: string, pressed: boolean) => {
-      if (isMultiple) {
-        const nextValues = pressed
-          ? [...selectedValues, itemValue]
-          : selectedValues.filter(
-              (selectedValue) => selectedValue !== itemValue
-            );
-        setSelectedValues(nextValues);
+      const nextValues = getNextToggleGroupValues({
+        isMultiple,
+        itemValue,
+        pressed,
+        selectedValues,
+      });
+      if (nextValues === selectedValues) {
         return;
       }
-      setSelectedValues(pressed ? [itemValue] : []);
+      setSelectedValues(nextValues);
     },
     [isMultiple, selectedValues, setSelectedValues]
   );
