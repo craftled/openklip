@@ -78,7 +78,13 @@ export function JsonRenderGraphicOverlay({
       PRODUCT_ANNOUNCEMENT_FPS
     );
     applyGraphicFrame(root, frame, durFrames, PRODUCT_ANNOUNCEMENT_HEIGHT);
-  }, [curSample, sampleRate, graphic.startSample, graphic.endSample]);
+  }, [
+    curSample,
+    sampleRate,
+    graphic.startSample,
+    graphic.endSample,
+    validation.spec,
+  ]);
 
   if (!(validation.success && validation.spec)) {
     return null;

@@ -3,6 +3,7 @@
 // so the CLI and the GUI operate on the SAME project.json shape (parity). These
 // are the operations an external coding agent drives from the terminal.
 
+import { randomUUID } from "node:crypto";
 import { isNeutralColor } from "./color-adjust.ts";
 import {
   type Broll,
@@ -44,6 +45,15 @@ function patchNote(item: { note?: string }, note: string | undefined): void {
   } else {
     item.note = note;
   }
+}
+
+function graphicId(project: Project): string {
+  const used = new Set((project.graphics ?? []).map((g) => g.id));
+  let id = "";
+  do {
+    id = `g-${randomUUID()}`;
+  } while (used.has(id));
+  return id;
 }
 
 // Mark words (by id) deleted (or, with deleted=false, restored). An optional
@@ -599,7 +609,7 @@ export function addGraphic(
     ...(params ?? {}),
   };
   const item: Graphic = {
-    id: `g${Date.now()}`,
+    id: graphicId(project),
     template,
     params: merged,
     startSample: Math.round(fromSec * SAMPLE_RATE),
@@ -618,6 +628,35 @@ export function addGraphic(
 // Add a json-render powered product announcement graphic over a source-time
 // span. The spec is validated before it is written into project.json, so agents
 // can be creative inside the catalog without storing arbitrary UI/code.
+function resolveJsonGraphicSpan(
+  project: Project,
+  fromSec: number,
+  toSec: number
+): { endSec: number; fromSec: number } {
+  if (![fromSec, toSec].every(Number.isFinite)) {
+    throw new Error("json graphic timing values must be finite numbers");
+  }
+  if (fromSec < 0 || toSec < 0) {
+    throw new Error("json graphic timing values must be non-negative");
+  }
+  if (toSec <= fromSec) {
+    throw new Error(
+      `json graphic span is empty: toSec (${toSec}) must be greater than fromSec (${fromSec})`
+    );
+  }
+  const projectDurationSec = project.durationSamples / SAMPLE_RATE;
+  if (fromSec >= projectDurationSec) {
+    throw new Error("json graphic span starts after the project ends");
+  }
+  const endSec = Math.min(toSec, projectDurationSec);
+  if (endSec <= fromSec) {
+    throw new Error(
+      "json graphic span is empty after clamping to project duration"
+    );
+  }
+  return { endSec, fromSec };
+}
+
 export function addJsonGraphic(
   project: Project,
   input: {
@@ -640,37 +679,17 @@ export function addJsonGraphic(
     anchor,
   } = input;
   ProductAnnouncementCatalogSchema.parse(catalog);
-  if (![fromSec, toSec].every(Number.isFinite)) {
-    throw new Error("json graphic timing values must be finite numbers");
-  }
-  if (fromSec < 0 || toSec < 0) {
-    throw new Error("json graphic timing values must be non-negative");
-  }
-  if (toSec <= fromSec) {
-    throw new Error(
-      `json graphic span is empty: toSec (${toSec}) must be greater than fromSec (${fromSec})`
-    );
-  }
-  const projectDurationSec = project.durationSamples / SAMPLE_RATE;
-  if (fromSec >= projectDurationSec) {
-    throw new Error("json graphic span starts after the project ends");
-  }
-  const endSec = Math.min(toSec, projectDurationSec);
-  if (endSec <= fromSec) {
-    throw new Error(
-      "json graphic span is empty after clamping to project duration"
-    );
-  }
+  const span = resolveJsonGraphicSpan(project, fromSec, toSec);
   const spec = assertProductAnnouncementSpec(rawSpec);
   const item: Graphic = {
-    id: `g${Date.now()}`,
+    id: graphicId(project),
     type: "json-render",
     template: PRODUCT_ANNOUNCEMENT_CATALOG,
     catalog,
     spec,
     params: {},
-    startSample: Math.round(fromSec * SAMPLE_RATE),
-    endSample: Math.round(endSec * SAMPLE_RATE),
+    startSample: Math.round(span.fromSec * SAMPLE_RATE),
+    endSample: Math.round(span.endSec * SAMPLE_RATE),
     track,
     ...(note === undefined ? {} : { note }),
     ...(anchor === undefined ? {} : { anchor }),
@@ -777,34 +796,14 @@ export function updateJsonGraphic(
   const fromSec = patch.fromSec ?? item.startSample / SAMPLE_RATE;
   const toSec = patch.toSec ?? item.endSample / SAMPLE_RATE;
   const track = patch.track ?? item.track;
-  if (![fromSec, toSec].every(Number.isFinite)) {
-    throw new Error("json graphic timing values must be finite numbers");
-  }
-  if (fromSec < 0 || toSec < 0) {
-    throw new Error("json graphic timing values must be non-negative");
-  }
-  if (toSec <= fromSec) {
-    throw new Error(
-      `json graphic span is empty: toSec (${toSec}) must be greater than fromSec (${fromSec})`
-    );
-  }
-  const projectDurationSec = project.durationSamples / SAMPLE_RATE;
-  if (fromSec >= projectDurationSec) {
-    throw new Error("json graphic span starts after the project ends");
-  }
-  const endSec = Math.min(toSec, projectDurationSec);
-  if (endSec <= fromSec) {
-    throw new Error(
-      "json graphic span is empty after clamping to project duration"
-    );
-  }
+  const span = resolveJsonGraphicSpan(project, fromSec, toSec);
   item.catalog = catalog;
   item.spec = assertProductAnnouncementSpec(patch.spec ?? item.spec);
   item.template = PRODUCT_ANNOUNCEMENT_CATALOG;
   item.params = {};
   item.track = track;
-  item.startSample = Math.round(fromSec * SAMPLE_RATE);
-  item.endSample = Math.round(endSec * SAMPLE_RATE);
+  item.startSample = Math.round(span.fromSec * SAMPLE_RATE);
+  item.endSample = Math.round(span.endSec * SAMPLE_RATE);
   patchNote(item, patch.note);
   return item;
 }

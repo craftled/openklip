@@ -28,8 +28,8 @@ openklip json-graphic-add <slug> product-announcement <fromSec> <toSec> --spec-f
 
 The spec may use only these components:
 
-- `AnnouncementScene`: full-frame root with `product`, `claim`, and `mood`.
-- `HeroStatement`: `eyebrow`, `headline`, and `accent`.
+- `AnnouncementScene`: full-frame root with `accent`, `product`, `claim`, and `mood`.
+- `HeroStatement`: `eyebrow` and `headline`.
 - `FeatureStack`: exactly three feature strings.
 - `CodeSnippet`: short `bash`, `ts`, or `json` proof snippet.
 - `ProofPoint`: compact `label`, `value`, and `note`.

@@ -102,6 +102,7 @@ import {
   toastPromise,
   toastSaveError,
 } from "@/lib/app-toast";
+import type { AssetBinUpdate } from "@/lib/asset-bin-update";
 import {
   APP_ICON_CLASS,
   Captions,
@@ -110,6 +111,7 @@ import {
   Download,
   Film,
   ImageIcon,
+  MessageSquare,
   Moon,
   PanelLeft,
   PanelRight,
@@ -358,6 +360,9 @@ export function App({
   const [defaultAgent, setDefaultAgent] =
     useState<AgentModelId>(DEFAULT_AGENT_MODEL);
   const [configOpen, setConfigOpen] = useState(true);
+  const [mobileRightPanel, setMobileRightPanel] = useState<
+    "chat" | "config" | null
+  >(null);
   // Chat sidebar width (px), drag-adjustable. Default on server; the stored
   // value is read after mount so SSR and first client render agree.
   const [chatWidth, setChatWidth] = useState(CHAT_WIDTH_DEFAULT);
@@ -450,6 +455,23 @@ export function App({
   const projectHover = useMemo(
     () => buildProjectHoverContext(project, project.dirPath),
     [project]
+  );
+  const applyAssetUpdate = useCallback(
+    (update: AssetBinUpdate) => {
+      setProject((p) => ({
+        ...p,
+        assets: update.assets,
+        ...(update.broll === undefined ? {} : { broll: update.broll }),
+        ...(update.stills === undefined ? {} : { stills: update.stills }),
+      }));
+      const nextBroll = update.assets.find(
+        (a) => (a.kind ?? "broll") === "broll"
+      );
+      if (nextBroll && !update.assets.some((a) => a.id === chosenAsset)) {
+        setChosenAsset(nextBroll.id);
+      }
+    },
+    [chosenAsset]
   );
   const keptDuration = ranges.reduce((a, r) => a + (r.endSec - r.startSec), 0);
   const sr = project?.sampleRate ?? 48_000;
@@ -1140,10 +1162,15 @@ export function App({
     selected?.kind === "graphic"
       ? project.graphics?.find((g) => g.id === selected.id)
       : undefined;
-  const selGraphicValidation =
-    selGraphic?.type === "json-render"
-      ? validateProductAnnouncementSpec(selGraphic.spec)
-      : null;
+  const selectedJsonGraphicSpec =
+    selGraphic?.type === "json-render" ? selGraphic.spec : undefined;
+  const selGraphicValidation = useMemo(
+    () =>
+      selectedJsonGraphicSpec === undefined
+        ? null
+        : validateProductAnnouncementSpec(selectedJsonGraphicSpec),
+    [selectedJsonGraphicSpec]
+  );
   const selGraphicLabel =
     selGraphic?.type === "json-render" ? "Announcement graphic" : "Graphic";
   const presetOf = (z: ZoomItem) =>
@@ -1400,6 +1427,8 @@ export function App({
         })),
     [project.assets, sr]
   );
+  const configCloseLabel =
+    mobileRightPanel === "config" ? "Close config" : "Hide config";
 
   const configPanel = (
     <div className="flex min-h-0 flex-1 overflow-y-auto bg-background">
@@ -1409,11 +1438,17 @@ export function App({
             Config
           </div>
           <Button
-            aria-label="Hide config"
+            aria-label={configCloseLabel}
             className="size-8 text-muted-foreground"
-            onClick={() => setConfigOpen(false)}
+            onClick={() => {
+              if (mobileRightPanel === "config") {
+                setMobileRightPanel(null);
+                return;
+              }
+              setConfigOpen(false);
+            }}
             size="icon-sm"
-            title="Hide config"
+            title={configCloseLabel}
             variant="ghost"
           >
             <PanelRight />
@@ -1974,20 +2009,7 @@ export function App({
           activeSlug={project.slug}
           assets={project.assets.map(withAssetKind)}
           mediaVersion={project.mediaVersion}
-          onAssetsUpdated={(update) => {
-            setProject((p) => ({
-              ...p,
-              assets: update.assets,
-              ...(update.broll === undefined ? {} : { broll: update.broll }),
-              ...(update.stills === undefined ? {} : { stills: update.stills }),
-            }));
-            const nextBroll = update.assets.find(
-              (a) => (a.kind ?? "broll") === "broll"
-            );
-            if (nextBroll && !update.assets.some((a) => a.id === chosenAsset)) {
-              setChosenAsset(nextBroll.id);
-            }
-          }}
+          onAssetsUpdated={applyAssetUpdate}
           onCloseSettings={() => setSettingsOpen(false)}
           onOpenSettings={() => setSettingsOpen(true)}
           onSelectSettingsSection={setSettingsSection}
@@ -2095,7 +2117,34 @@ export function App({
                           {colorScheme === "dark" ? <Sun /> : <Moon />}
                         </Button>
                         <Button
+                          aria-label="Open chat"
+                          className="xl:hidden"
+                          onClick={() => setMobileRightPanel("chat")}
+                          size="icon-sm"
+                          title="Open chat"
+                          variant={
+                            mobileRightPanel === "chat" ? "secondary" : "ghost"
+                          }
+                        >
+                          <MessageSquare />
+                        </Button>
+                        <Button
+                          aria-label="Open config"
+                          className="xl:hidden"
+                          onClick={() => setMobileRightPanel("config")}
+                          size="icon-sm"
+                          title="Open config"
+                          variant={
+                            mobileRightPanel === "config"
+                              ? "secondary"
+                              : "ghost"
+                          }
+                        >
+                          <PanelRight />
+                        </Button>
+                        <Button
                           aria-label="Toggle config"
+                          className="hidden xl:inline-flex"
                           onClick={() => setConfigOpen((open) => !open)}
                           size="icon-sm"
                           title="Toggle config"
@@ -2394,27 +2443,7 @@ export function App({
                       width={visibleChatWidth}
                     />
                     <AgentChatPanel
-                      onAssetsUpdated={(update) => {
-                        setProject((p) => ({
-                          ...p,
-                          assets: update.assets,
-                          ...(update.broll === undefined
-                            ? {}
-                            : { broll: update.broll }),
-                          ...(update.stills === undefined
-                            ? {}
-                            : { stills: update.stills }),
-                        }));
-                        const nextBroll = update.assets.find(
-                          (a) => (a.kind ?? "broll") === "broll"
-                        );
-                        if (
-                          nextBroll &&
-                          !update.assets.some((a) => a.id === chosenAsset)
-                        ) {
-                          setChosenAsset(nextBroll.id);
-                        }
-                      }}
+                      onAssetsUpdated={applyAssetUpdate}
                       showSidebarTrigger={false}
                       slug={project.slug}
                     />
@@ -2427,6 +2456,36 @@ export function App({
                       {configPanel}
                     </aside>
                   ) : null}
+                  {mobileRightPanel === null ? null : (
+                    <div className="fixed inset-0 z-50 xl:hidden">
+                      <button
+                        aria-label="Close panel"
+                        className="absolute inset-0 bg-black/10"
+                        onClick={() => setMobileRightPanel(null)}
+                        type="button"
+                      />
+                      <section
+                        aria-label={
+                          mobileRightPanel === "chat" ? "Chat" : "Config"
+                        }
+                        aria-modal="true"
+                        className="absolute inset-x-0 bottom-0 flex h-[88vh] max-h-[88vh] flex-col overflow-hidden rounded-t-xl border-border border-t bg-background text-foreground shadow-lg"
+                        role="dialog"
+                      >
+                        <div className="flex min-h-0 flex-1 overflow-hidden">
+                          {mobileRightPanel === "chat" ? (
+                            <AgentChatPanel
+                              onAssetsUpdated={applyAssetUpdate}
+                              onClose={() => setMobileRightPanel(null)}
+                              showSidebarTrigger={false}
+                              slug={project.slug}
+                            />
+                          ) : null}
+                          {mobileRightPanel === "config" ? configPanel : null}
+                        </div>
+                      </section>
+                    </div>
+                  )}
                 </>
               )}
             </SidebarProvider>

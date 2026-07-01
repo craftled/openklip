@@ -13,6 +13,7 @@ import {
 import {
   chooseAssetInput,
   chooseSourceInput,
+  graphicWindowDurationSamples,
   planBrollForRanges,
   planGraphicWindow,
 } from "../src/exporter.ts";
@@ -167,6 +168,22 @@ test("planGraphicWindow shifts the window earlier when an earlier range is delet
   });
 
   assert.deepEqual(win, { outStart: 1.5, outEnd: 2.5 });
+});
+
+test("graphicWindowDurationSamples uses clipped output duration", () => {
+  const win = planGraphicWindow({
+    startSample: Math.round(0.5 * SAMPLE_RATE),
+    endSample: Math.round(4.5 * SAMPLE_RATE),
+    sampleRate: SAMPLE_RATE,
+    ranges: [
+      { startSec: 0, endSec: 1 },
+      { startSec: 4, endSec: 5 },
+    ],
+  });
+
+  assert.ok(win);
+  assert.deepEqual(win, { outStart: 0.5, outEnd: 1.5 });
+  assert.equal(graphicWindowDurationSamples(win, SAMPLE_RATE), SAMPLE_RATE);
 });
 
 // ── FEATURE 1: notes are metadata only and NEVER reach ffmpeg ────────────────

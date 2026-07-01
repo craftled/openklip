@@ -10,6 +10,7 @@ type ToggleGroupValue = string | readonly string[];
 
 const ToggleGroupContext = React.createContext<
   VariantProps<typeof toggleVariants> & {
+    disabled?: boolean;
     orientation?: "horizontal" | "vertical";
     onItemPressed?: (value: string, pressed: boolean) => void;
     selectedValues: readonly string[];
@@ -91,7 +92,8 @@ function ToggleGroup({
   return (
     <ToggleGroupContext.Provider
       value={{
-        onItemPressed: disabled ? undefined : onItemPressed,
+        disabled,
+        onItemPressed,
         orientation,
         selectedValues,
         size,
@@ -139,8 +141,8 @@ function ToggleGroupItem({
   ...props
 }: TogglePrimitive.Props & VariantProps<typeof toggleVariants>) {
   const context = React.useContext(ToggleGroupContext);
-  const isGroupedItem =
-    context.onItemPressed !== undefined && typeof value === "string";
+  const isGroupedItem = typeof value === "string";
+  const itemDisabled = disabled || context.disabled;
 
   return (
     <TogglePrimitive
@@ -156,10 +158,10 @@ function ToggleGroupItem({
       data-slot="toggle-group-item"
       data-spacing={context.spacing}
       data-variant={context.variant || variant}
-      disabled={disabled}
+      disabled={itemDisabled}
       onPressedChange={(nextPressed, details) => {
         onPressedChange?.(nextPressed, details);
-        if (details.isCanceled || !isGroupedItem) {
+        if (details.isCanceled || itemDisabled || !isGroupedItem) {
           return;
         }
         context.onItemPressed?.(value, nextPressed);

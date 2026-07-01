@@ -6,6 +6,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { ProjectSchema, SAMPLE_RATE } from "../src/edl.ts";
 import {
   PRODUCT_ANNOUNCEMENT_CATALOG,
+  PRODUCT_ANNOUNCEMENT_LIMITS,
   sampleProductAnnouncementSpec,
   validateProductAnnouncementSpec,
 } from "../src/product-announcement.ts";
@@ -53,6 +54,77 @@ test("product announcement spec validates selected component props", () => {
   const invalidPropsResult = validateProductAnnouncementSpec(invalidProps);
   assert.equal(invalidPropsResult.success, false);
   assert.match(invalidPropsResult.issues.join("\n"), /language/);
+
+  const invalidAccent = structuredClone(sampleProductAnnouncementSpec);
+  invalidAccent.elements.scene.props = {
+    ...invalidAccent.elements.scene.props,
+    accent: "url(https://example.com/pixel)",
+  };
+  const invalidAccentResult = validateProductAnnouncementSpec(invalidAccent);
+  assert.equal(invalidAccentResult.success, false);
+  assert.match(invalidAccentResult.issues.join("\n"), /accent/);
+});
+
+test("product announcement spec rejects unsafe graph shapes", () => {
+  const wrongRoot = structuredClone(sampleProductAnnouncementSpec);
+  wrongRoot.root = "hero";
+  const wrongRootResult = validateProductAnnouncementSpec(wrongRoot);
+  assert.equal(wrongRootResult.success, false);
+  assert.match(wrongRootResult.issues.join("\n"), /AnnouncementScene/);
+
+  const cyclic = structuredClone(sampleProductAnnouncementSpec);
+  cyclic.elements.scene.children = ["scene"];
+  const cyclicResult = validateProductAnnouncementSpec(cyclic);
+  assert.equal(cyclicResult.success, false);
+  assert.match(cyclicResult.issues.join("\n"), /cyclic child graph/);
+
+  const orphaned = structuredClone(sampleProductAnnouncementSpec);
+  orphaned.elements.ghost = {
+    children: [],
+    props: {
+      code: "openklip export",
+      language: "bash",
+    },
+    type: "CodeSnippet",
+    visible: true,
+  };
+  const orphanedResult = validateProductAnnouncementSpec(orphaned);
+  assert.equal(orphanedResult.success, false);
+  assert.match(orphanedResult.issues.join("\n"), /orphaned element/);
+
+  const tooLarge = structuredClone(sampleProductAnnouncementSpec);
+  for (let i = 0; i < 40; i++) {
+    tooLarge.elements[`extra${i}`] = {
+      children: [],
+      props: {
+        code: "openklip export",
+        language: "bash",
+      },
+      type: "CodeSnippet",
+      visible: true,
+    };
+  }
+  const tooLargeResult = validateProductAnnouncementSpec(tooLarge);
+  assert.equal(tooLargeResult.success, false);
+  assert.match(tooLargeResult.issues.join("\n"), /40 or fewer elements/);
+
+  const tooLongText = structuredClone(sampleProductAnnouncementSpec);
+  tooLongText.elements.hero.props = {
+    ...tooLongText.elements.hero.props,
+    headline: "x".repeat(PRODUCT_ANNOUNCEMENT_LIMITS.textChars + 1),
+  };
+  const tooLongResult = validateProductAnnouncementSpec(tooLongText);
+  assert.equal(tooLongResult.success, false);
+  assert.match(tooLongResult.issues.join("\n"), /headline/);
+
+  const tooLargeBytes = structuredClone(sampleProductAnnouncementSpec);
+  tooLargeBytes.elements.hero.props = {
+    ...tooLargeBytes.elements.hero.props,
+    headline: "x".repeat(PRODUCT_ANNOUNCEMENT_LIMITS.specBytes),
+  };
+  const tooLargeBytesResult = validateProductAnnouncementSpec(tooLargeBytes);
+  assert.equal(tooLargeBytesResult.success, false);
+  assert.match(tooLargeBytesResult.issues.join("\n"), /too large|headline/);
 });
 
 test("product announcement static render is native markup without script output", async () => {
@@ -94,6 +166,14 @@ test("json-graphic-add mutates project only after catalog and spec validation", 
   assert.equal(item.catalog, PRODUCT_ANNOUNCEMENT_CATALOG);
   assert.equal(project.graphics?.length, 1);
 
+  const nextItem = runAction("json-graphic-add", project, {
+    catalog: PRODUCT_ANNOUNCEMENT_CATALOG,
+    fromSec: 4,
+    toSec: 5,
+    spec: sampleProductAnnouncementSpec,
+  }) as { id: string };
+  assert.notEqual(nextItem.id, item.id);
+
   const badCatalog = makeProject({ slug: "bad-catalog" });
   assert.throws(() =>
     runAction("json-graphic-add", badCatalog, {
@@ -119,6 +199,73 @@ test("json-graphic-add mutates project only after catalog and spec validation", 
   assert.equal(badSpec.graphics?.length ?? 0, 0);
 });
 
+test("json-graphic-set patches a json-render graphic and rejects invalid specs", () => {
+  const project = makeProject({ slug: "set-json" });
+  const item = runAction("json-graphic-add", project, {
+    catalog: PRODUCT_ANNOUNCEMENT_CATALOG,
+    fromSec: 1,
+    toSec: 4,
+    spec: sampleProductAnnouncementSpec,
+  }) as { id: string };
+
+  const nextSpec = structuredClone(sampleProductAnnouncementSpec);
+  nextSpec.elements.hero.props = {
+    ...nextSpec.elements.hero.props,
+    headline: "Validated graphics now patch cleanly",
+  };
+  const patched = runAction("json-graphic-set", project, {
+    id: item.id,
+    fromSec: 2,
+    toSec: 6,
+    spec: nextSpec,
+    track: "zoom",
+  }) as {
+    endSample: number;
+    spec?: typeof sampleProductAnnouncementSpec;
+    startSample: number;
+    track: string;
+  };
+
+  assert.equal(patched.startSample, SAMPLE_RATE * 2);
+  assert.equal(patched.endSample, SAMPLE_RATE * 6);
+  assert.equal(patched.track, "zoom");
+  assert.equal(
+    patched.spec?.elements.hero.props.headline,
+    "Validated graphics now patch cleanly"
+  );
+
+  const before = structuredClone(project.graphics?.[0]);
+  const invalidSpec = structuredClone(sampleProductAnnouncementSpec);
+  invalidSpec.elements.hero.type = "MagicDemoWidget";
+  assert.throws(() =>
+    runAction("json-graphic-set", project, {
+      id: item.id,
+      spec: invalidSpec,
+    })
+  );
+  assert.deepEqual(project.graphics?.[0], before);
+
+  const templateProject = makeProject({
+    slug: "template-graphic",
+    graphics: [
+      {
+        id: "g-template",
+        template: "lower-third",
+        params: {},
+        startSample: 0,
+        endSample: SAMPLE_RATE,
+        track: "title",
+      },
+    ],
+  });
+  assert.throws(() =>
+    runAction("json-graphic-set", templateProject, {
+      id: "g-template",
+      spec: sampleProductAnnouncementSpec,
+    })
+  );
+});
+
 test("legacy template graphics still parse without json-render fields", () => {
   const parsed = ProjectSchema.parse({
     ...makeProject({ slug: "legacy-graphic" }),
@@ -137,6 +284,25 @@ test("legacy template graphics still parse without json-render fields", () => {
   assert.equal(parsed.graphics[0].type, undefined);
   assert.equal(parsed.graphics[0].template, "lower-third");
   assert.deepEqual(parsed.graphics[0].params, { title: "OpenKlip" });
+});
+
+test("json-render graphics require catalog and spec in project JSON", () => {
+  assert.throws(() =>
+    ProjectSchema.parse({
+      ...makeProject({ slug: "broken-json-graphic" }),
+      graphics: [
+        {
+          id: "g-json",
+          type: "json-render",
+          template: PRODUCT_ANNOUNCEMENT_CATALOG,
+          params: {},
+          startSample: 0,
+          endSample: SAMPLE_RATE,
+          track: "title",
+        },
+      ],
+    })
+  );
 });
 
 test("preview overlays branch to the json-render renderer", () => {
@@ -193,5 +359,85 @@ test("CLI json-graphic-add reads a spec file and mutates project graphics", asyn
     assert.equal(data.graphics.length, 1);
     assert.equal(data.graphics[0].type, "json-render");
     assert.equal(data.graphics[0].catalog, PRODUCT_ANNOUNCEMENT_CATALOG);
+  });
+});
+
+test("CLI json-graphic-add rejects invalid input without mutating graphics", async () => {
+  await withTempProjectsRoot(async ({ root, slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const validSpecPath = join(root, "valid-announcement-spec.json");
+    const malformedSpecPath = join(root, "malformed-announcement-spec.json");
+    const invalidSpecPath = join(root, "invalid-announcement-spec.json");
+    writeFileSync(validSpecPath, JSON.stringify(sampleProductAnnouncementSpec));
+    writeFileSync(malformedSpecPath, "{not json");
+
+    const invalidSpec = structuredClone(sampleProductAnnouncementSpec);
+    invalidSpec.elements.hero.type = "MagicDemoWidget";
+    writeFileSync(invalidSpecPath, JSON.stringify(invalidSpec));
+
+    const missingFile = await runCli([
+      "json-graphic-add",
+      slug,
+      PRODUCT_ANNOUNCEMENT_CATALOG,
+      "1",
+      "4",
+    ]);
+    assert.notEqual(missingFile.code, 0);
+    assert.match(missingFile.out, /--spec-file is required/);
+
+    const unknownCatalog = await runCli([
+      "json-graphic-add",
+      slug,
+      "other-catalog",
+      "1",
+      "4",
+      "--spec-file",
+      validSpecPath,
+    ]);
+    assert.notEqual(unknownCatalog.code, 0);
+    assert.match(unknownCatalog.out, /unknown json-render catalog/);
+
+    const malformedJson = await runCli([
+      "json-graphic-add",
+      slug,
+      PRODUCT_ANNOUNCEMENT_CATALOG,
+      "1",
+      "4",
+      "--spec-file",
+      malformedSpecPath,
+    ]);
+    assert.notEqual(malformedJson.code, 0);
+    assert.match(malformedJson.out, /could not read --spec-file/);
+
+    const invalidComponent = await runCli([
+      "json-graphic-add",
+      slug,
+      PRODUCT_ANNOUNCEMENT_CATALOG,
+      "1",
+      "4",
+      "--spec-file",
+      invalidSpecPath,
+    ]);
+    assert.notEqual(invalidComponent.code, 0);
+    assert.match(invalidComponent.out, /invalid product announcement spec/);
+
+    const invalidTiming = await runCli([
+      "json-graphic-add",
+      slug,
+      PRODUCT_ANNOUNCEMENT_CATALOG,
+      "4",
+      "1",
+      "--spec-file",
+      validSpecPath,
+    ]);
+    assert.notEqual(invalidTiming.code, 0);
+    assert.match(invalidTiming.out, /span is empty/);
+
+    const overlays = await runCli(["overlays", slug, "--json"]);
+    assert.equal(overlays.code, 0);
+    const data = JSON.parse(overlays.out.trim()) as {
+      graphics?: Array<unknown>;
+    };
+    assert.equal(data.graphics?.length ?? 0, 0);
   });
 });

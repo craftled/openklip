@@ -14,6 +14,7 @@ import {
   AttachmentTitle,
 } from "@/components/ui/attachment";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
+import { Button } from "@/components/ui/button";
 import {
   Empty,
   EmptyDescription,
@@ -61,6 +62,7 @@ interface ChatTrailStats {
 
 interface AgentChatPanelProps {
   onAssetsUpdated: (update: AssetBinUpdate) => void;
+  onClose?: () => void;
   showSidebarTrigger?: boolean;
   slug: string;
 }
@@ -304,6 +306,7 @@ function AgentChatTrail({
 
 export function AgentChatPanel({
   onAssetsUpdated,
+  onClose,
   showSidebarTrigger = true,
   slug,
 }: AgentChatPanelProps) {
@@ -339,6 +342,18 @@ export function AgentChatPanel({
                 {activeThread.title}
               </span>
             )}
+            {onClose ? (
+              <Button
+                aria-label="Close chat"
+                className="size-8 text-muted-foreground"
+                onClick={onClose}
+                size="icon-sm"
+                title="Close chat"
+                variant="ghost"
+              >
+                <XIcon />
+              </Button>
+            ) : null}
             {showSidebarTrigger ? (
               <SidebarTrigger aria-label="Toggle chat" side="right" />
             ) : null}

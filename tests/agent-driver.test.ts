@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   buildChatPrompt,
+  buildClaudeEditArgs,
   buildEditPrompt,
   buildFillerPrompt,
   extractModelText,
@@ -203,6 +204,16 @@ test("buildArgs use the hardened structured-output flags per agent", () => {
   ]);
   // Grok's stdout is already clean JSON in plain mode.
   assert.deepEqual(resolveAgent("grok-build").buildArgs("P", {}), ["-p", "P"]);
+});
+
+test("buildClaudeEditArgs allows every OpenKlip MCP tool by wildcard", () => {
+  const args = buildClaudeEditArgs("do the edit", {
+    agent: "claude-opus-4-8",
+    cfgPath: "/tmp/openklip-mcp-test.json",
+  });
+  const allowIndex = args.indexOf("--allowedTools");
+  assert.notEqual(allowIndex, -1);
+  assert.equal(args[allowIndex + 1], "mcp__openklip__*");
 });
 
 test("only Claude advertises a --model flag", () => {

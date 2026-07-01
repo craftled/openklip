@@ -31,6 +31,40 @@ test("buildSkillCatalog merges workflow and template skills", () => {
   );
 });
 
+test("buildSkillCatalog includes bundled product announcement skill by default", () => {
+  const catalog = buildSkillCatalog([]);
+  const skill = catalog.find((s) => s.id === "template:product-announcement");
+  assert.ok(skill);
+  assert.equal(skill.kind, "template");
+  assert.equal(skill.templateId, "product-announcement");
+  assert.match(skill.invokeText, /json-graphic-add/);
+});
+
+test("buildSkillCatalog does not duplicate default template skills", () => {
+  const catalog = buildSkillCatalog([
+    {
+      id: "product-announcement",
+      label: "Product announcement",
+      description: "Short technical launch video.",
+    },
+  ]);
+  assert.equal(
+    catalog.filter((s) => s.id === "template:product-announcement").length,
+    1
+  );
+});
+
+test("buildSkillCatalog pins product announcement before workflows", () => {
+  const catalog = buildSkillCatalog([]);
+  const productIndex = catalog.findIndex(
+    (s) => s.id === "template:product-announcement"
+  );
+  const fillerIndex = catalog.findIndex((s) => s.id === "filler");
+  assert.notEqual(productIndex, -1);
+  assert.notEqual(fillerIndex, -1);
+  assert.ok(productIndex < fillerIndex);
+});
+
 test("product announcement template skill tells Claude to use json tools", () => {
   const catalog = buildSkillCatalog([
     {

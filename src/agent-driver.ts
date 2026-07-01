@@ -490,6 +490,27 @@ export interface AgentEditRun {
   text: string;
 }
 
+export function buildClaudeEditArgs(
+  prompt: string,
+  opts: { agent: string; cfgPath: string }
+): string[] {
+  const spec = resolveAgent(opts.agent);
+  return [
+    "-p",
+    prompt,
+    "--output-format",
+    "json",
+    "--mcp-config",
+    opts.cfgPath,
+    "--strict-mcp-config",
+    "--allowedTools",
+    "mcp__openklip__*",
+    "--permission-mode",
+    "acceptEdits",
+    ...(spec.usesModelFlag ? ["--model", opts.agent] : []),
+  ];
+}
+
 // Tool-editing chat path (Claude): run headless with the openklip MCP server
 // loaded so the model actually CALLS the edit tools against the project instead
 // of describing CLI commands. Reuses the same stdio server the CLI and Cursor
@@ -530,20 +551,7 @@ export async function runClaudeEdit(
       },
     })
   );
-  const args = [
-    "-p",
-    prompt,
-    "--output-format",
-    "json",
-    "--mcp-config",
-    cfgPath,
-    "--strict-mcp-config",
-    "--allowedTools",
-    "mcp__openklip",
-    "--permission-mode",
-    "acceptEdits",
-    ...(spec.usesModelFlag ? ["--model", opts.agent] : []),
-  ];
+  const args = buildClaudeEditArgs(prompt, { agent: opts.agent, cfgPath });
   const proc = Bun.spawn([cli, ...args], {
     stdin: "ignore",
     stdout: "pipe",

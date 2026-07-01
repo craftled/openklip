@@ -11,18 +11,58 @@ export const PRODUCT_ANNOUNCEMENT_CATALOG = "product-announcement" as const;
 export const PRODUCT_ANNOUNCEMENT_WIDTH = 1920;
 export const PRODUCT_ANNOUNCEMENT_HEIGHT = 1080;
 export const PRODUCT_ANNOUNCEMENT_FPS = 30;
+export const PRODUCT_ANNOUNCEMENT_LIMITS = {
+  codeChars: 240,
+  elementIdChars: 64,
+  elements: 40,
+  featureChars: 96,
+  specBytes: 12_000,
+  textChars: 180,
+  childrenPerElement: 12,
+} as const;
+
+const HexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+const AnnouncementTextSchema = z
+  .string()
+  .min(1)
+  .max(PRODUCT_ANNOUNCEMENT_LIMITS.textChars);
+const AnnouncementFeatureSchema = z
+  .string()
+  .min(1)
+  .max(PRODUCT_ANNOUNCEMENT_LIMITS.featureChars);
+const AnnouncementCodeSchema = z
+  .string()
+  .min(1)
+  .max(PRODUCT_ANNOUNCEMENT_LIMITS.codeChars);
 
 const JsonRenderElementSchema = z.object({
-  type: z.string(),
+  type: z.string().min(1).max(PRODUCT_ANNOUNCEMENT_LIMITS.elementIdChars),
   props: z.record(z.string(), z.unknown()).default({}),
-  children: z.array(z.string()).default([]),
+  children: z
+    .array(z.string().min(1).max(PRODUCT_ANNOUNCEMENT_LIMITS.elementIdChars))
+    .max(PRODUCT_ANNOUNCEMENT_LIMITS.childrenPerElement)
+    .default([]),
   visible: VisibilityConditionSchema.default(true),
 });
 
-export const ProductAnnouncementSpecSchema = z.object({
-  root: z.string().min(1),
-  elements: z.record(z.string(), JsonRenderElementSchema),
-});
+export const ProductAnnouncementSpecSchema = z
+  .object({
+    root: z.string().min(1).max(PRODUCT_ANNOUNCEMENT_LIMITS.elementIdChars),
+    elements: z.record(
+      z.string().min(1).max(PRODUCT_ANNOUNCEMENT_LIMITS.elementIdChars),
+      JsonRenderElementSchema
+    ),
+  })
+  .superRefine((spec, ctx) => {
+    const elementCount = Object.keys(spec.elements).length;
+    if (elementCount > PRODUCT_ANNOUNCEMENT_LIMITS.elements) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["elements"],
+        message: `must include ${PRODUCT_ANNOUNCEMENT_LIMITS.elements} or fewer elements`,
+      });
+    }
+  });
 
 export type ProductAnnouncementSpec = z.infer<
   typeof ProductAnnouncementSpecSchema
@@ -40,8 +80,9 @@ export const productAnnouncementCatalog = defineCatalog(schema, {
     AnnouncementScene: {
       description: "Full-frame product announcement composition.",
       props: z.object({
-        product: z.string().min(1),
-        claim: z.string().min(1),
+        accent: HexColorSchema,
+        product: AnnouncementTextSchema,
+        claim: AnnouncementTextSchema,
         mood: z.enum(["technical", "launch", "proof"]),
       }),
       slots: ["default"],
@@ -49,30 +90,29 @@ export const productAnnouncementCatalog = defineCatalog(schema, {
     CodeSnippet: {
       description: "Short technical proof snippet for abstract launches.",
       props: z.object({
-        code: z.string().min(1).max(160),
+        code: AnnouncementCodeSchema,
         language: z.enum(["bash", "ts", "json"]),
       }),
     },
     FeatureStack: {
       description: "Three compact product capability bullets.",
       props: z.object({
-        items: z.array(z.string().min(1)).length(3),
+        items: z.array(AnnouncementFeatureSchema).length(3),
       }),
     },
     HeroStatement: {
       description: "Main claim for the product announcement.",
       props: z.object({
-        accent: z.string().min(1),
-        eyebrow: z.string().min(1),
-        headline: z.string().min(1),
+        eyebrow: AnnouncementTextSchema,
+        headline: AnnouncementTextSchema,
       }),
     },
     ProofPoint: {
       description: "Small quantified proof point.",
       props: z.object({
-        label: z.string().min(1),
-        note: z.string().min(1),
-        value: z.string().min(1),
+        label: AnnouncementTextSchema,
+        note: AnnouncementTextSchema,
+        value: AnnouncementTextSchema,
       }),
     },
   },
@@ -89,9 +129,77 @@ function issuePath(path: PropertyKey[]): string {
   return path.length > 0 ? path.map(String).join(".") : "props";
 }
 
+function specByteLength(rawSpec: unknown): number | null {
+  try {
+    return Buffer.byteLength(JSON.stringify(rawSpec), "utf8");
+  } catch {
+    return null;
+  }
+}
+
+function validateProductAnnouncementGraph(
+  spec: ProductAnnouncementSpec
+): string[] {
+  const issues: string[] = [];
+  const reachable = new Set<string>();
+  const visiting = new Set<string>();
+  const root = spec.elements[spec.root];
+  if (!root) {
+    return [`root: unknown element ${spec.root}`];
+  }
+
+  const visit = (elementKey: string, path: string[]): void => {
+    if (visiting.has(elementKey)) {
+      issues.push(`${[...path, elementKey].join(" -> ")}: cyclic child graph`);
+      return;
+    }
+    if (reachable.has(elementKey)) {
+      return;
+    }
+    const element = spec.elements[elementKey];
+    if (!element) {
+      const parent = path.at(-1) ?? "root";
+      issues.push(`${parent}: unknown child ${elementKey}`);
+      return;
+    }
+    visiting.add(elementKey);
+    for (const childKey of element.children) {
+      visit(childKey, [...path, elementKey]);
+    }
+    visiting.delete(elementKey);
+    reachable.add(elementKey);
+  };
+
+  visit(spec.root, []);
+  for (const elementKey of Object.keys(spec.elements)) {
+    if (!reachable.has(elementKey)) {
+      issues.push(
+        `${elementKey}: orphaned element is not reachable from root ${spec.root}`
+      );
+    }
+  }
+  return issues;
+}
+
 export function validateProductAnnouncementSpec(
   rawSpec: unknown
 ): ProductAnnouncementValidation {
+  const byteLength = specByteLength(rawSpec);
+  if (byteLength === null) {
+    return {
+      issues: ["Spec must be JSON-serializable"],
+      success: false,
+    };
+  }
+  if (byteLength > PRODUCT_ANNOUNCEMENT_LIMITS.specBytes) {
+    return {
+      issues: [
+        `Spec is too large: ${byteLength} bytes exceeds ${PRODUCT_ANNOUNCEMENT_LIMITS.specBytes}`,
+      ],
+      success: false,
+    };
+  }
+
   const parsed = ProductAnnouncementSpecSchema.safeParse(rawSpec);
   if (!parsed.success) {
     return {
@@ -113,8 +221,23 @@ export function validateProductAnnouncementSpec(
   }
 
   const normalized = ProductAnnouncementSpecSchema.parse(structure.data);
+  if (normalized.elements[normalized.root]?.type !== "AnnouncementScene") {
+    return {
+      issues: ["root: product announcement root must be AnnouncementScene"],
+      success: false,
+    };
+  }
+
+  const graphIssues = validateProductAnnouncementGraph(normalized);
+  if (graphIssues.length > 0) {
+    return {
+      issues: graphIssues,
+      success: false,
+    };
+  }
+
   const graph = validateSpec(normalized as Spec, { checkOrphans: true });
-  if (!graph.valid) {
+  if (!(graph.valid && graph.issues.length === 0)) {
     return {
       issues: graph.issues.map((issue) => issue.message),
       success: false,
@@ -227,6 +350,7 @@ export function buildProductAnnouncementSpec(
       scene: {
         type: "AnnouncementScene",
         props: {
+          accent: input.accent ?? "#f0b429",
           product: input.product ?? "OpenKlip",
           claim:
             input.claim ??
@@ -239,7 +363,6 @@ export function buildProductAnnouncementSpec(
       hero: {
         type: "HeroStatement",
         props: {
-          accent: input.accent ?? "#f0b429",
           eyebrow: input.eyebrow ?? "Product update",
           headline:
             input.headline ?? "JSON specs become export-ready motion graphics",
