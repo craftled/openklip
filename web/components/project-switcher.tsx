@@ -290,11 +290,6 @@ export function ProjectSwitcher({
               </DropdownMenuGroup>
             </DropdownMenuContent>
           </DropdownMenu>
-          <ProjectInlineFolderAction
-            className="absolute top-1/2 right-7 z-10 -translate-y-1/2 opacity-100"
-            revealGroup="project"
-            slug={active.slug}
-          />
         </SidebarMenuItem>
       </SidebarMenu>
     </>
