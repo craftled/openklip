@@ -31,6 +31,7 @@ import {
   SAMPLE_RATE,
   sec,
   sourceToOutputSec,
+  type Title,
   totalDurationSec,
 } from "./edl.ts";
 import {
@@ -921,8 +922,14 @@ export async function exportCut(
   const textGraphicItems: TitleItem[] = textGraphics
     .map((x): TitleItem => {
       const pos = x.params.position;
-      const position: "lower" | "center" | "hero" =
-        pos === "center" || pos === "hero" ? pos : "lower";
+      const position: Title["position"] =
+        pos === "center" ||
+        pos === "hero" ||
+        pos === "quote" ||
+        pos === "divider" ||
+        pos === "callout"
+          ? pos
+          : "lower";
       return {
         text: String(x.params.text ?? x.params.title ?? ""),
         startSec: x.outStart,

@@ -159,7 +159,7 @@ Add `--note "<why>"` to any `cut` or overlay-add to record the rationale on the 
 | `openklip music-add <slug> <assetId> <fromSec> <toSec>` | Place a registered **music** asset as a background bed. `--gain 0.3` (0–2), `--fade-in <sec>` / `--fade-out <sec>` (0–10), `--src-in <sec>`, `--mode loop\|trim`, `--note "<why>"`. |
 | `openklip music-set <slug> <musicId>` | Patch a music placement: same flags plus `--asset`. |
 | `openklip music-rm <slug> <musicId>` | Remove a music placement. |
-| `openklip title-add <slug> <fromSec> <toSec> <text>` | Burn a title card. `--position lower\|center\|hero` (default lower). Use `\n` for two lines. |
+| `openklip title-add <slug> <fromSec> <toSec> <text>` | Burn a title card. `--position lower\|center\|hero\|quote\|divider\|callout` (default lower). Use `\n` for two lines (hero/quote attribution). |
 | `openklip title-add-phrase <slug> "spoken" "title text"` | Place a title at the first spoken phrase match (min 2s span). |
 | `openklip title-set <slug> <titleId>` | Patch title: `--text`, `--position`, `--from`, `--to`. |
 | `openklip title-rm <slug> <titleId>` | Remove a title card. |

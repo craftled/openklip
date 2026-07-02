@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.20.0.0 - 2026-07-03
+
+The richer title styles release: three new editorial title positions beyond lower, center, and hero.
+
+### Added
+- **Title style presets** (Milestone 5.2): `position` on title cards now accepts `quote` (centered italic quote + optional attribution line), `divider` (centered section label wrapped as `- LABEL -`), and `callout` (compact top-left label). ASS export adds matching styles in `buildTitlesAss`; preview renders them in `PreviewOverlays`. CLI/MCP/registry/GUI position picker parity.
+
+### Changed
+- **Version**: bumped OpenKlip to `0.20.0.0`.
+
 ## 0.19.0.0 - 2026-07-03
 
 The b-roll split-screen release: a third display mode places the speaker on the left and b-roll on the right.

@@ -4,7 +4,18 @@
 // brace-stripping escape, and a color->&HBBGGRR& colour helper.
 
 import { colorToHex } from "./color.ts";
-import { type Motion, MotionSchema } from "./edl.ts";
+import { type Motion, MotionSchema, type Title } from "./edl.ts";
+
+export type TitlePosition = Title["position"];
+
+export const TITLE_POSITION_IDS = [
+  "lower",
+  "center",
+  "hero",
+  "quote",
+  "divider",
+  "callout",
+] as const satisfies readonly TitlePosition[];
 
 // Resolve the speed-scaled entrance timing from the motion config. Pure, so the
 // "make it snappier" math is unit tested. Higher speed → shorter durations.
@@ -22,7 +33,7 @@ export function resolveTitleMotion(motion: Motion): {
 // The ASS override tags for a title's entrance, driven by the motion config.
 // Lower thirds slide up into place over the fade-in window; hero/center fade.
 export function titleMotionTags(
-  kind: "center" | "hero" | "lower",
+  kind: TitlePosition,
   motion: Motion,
   geom: { baseY: number; cx: number; slidePx: number }
 ): string {
@@ -30,8 +41,11 @@ export function titleMotionTags(
   if (kind === "hero") {
     return `{\\an5\\fad(${heroFadeMs},${heroFadeMs})}`;
   }
-  if (kind === "center") {
+  if (kind === "center" || kind === "quote" || kind === "divider") {
     return `{\\an5\\fad(${fadeMs},${fadeMs})}`;
+  }
+  if (kind === "callout") {
+    return `{\\an7\\fad(${fadeMs},${fadeMs})}`;
   }
   return `{\\an2\\fad(${fadeMs},${fadeMs})\\move(${geom.cx},${geom.baseY + geom.slidePx},${geom.cx},${geom.baseY},0,${fadeMs})}`;
 }
@@ -39,7 +53,7 @@ export function titleMotionTags(
 export interface TitleItem {
   endSec: number;
   id?: string;
-  position?: "lower" | "center" | "hero";
+  position?: TitlePosition;
   startSec: number;
   text: string;
 }
@@ -53,6 +67,14 @@ export function parseHeroLines(text: string): {
     headline: parts[0]?.trim() ?? "",
     subtitle: parts.slice(1).join("\n").trim(),
   };
+}
+
+export function formatDividerLabel(text: string): string {
+  const core = text.trim().toUpperCase();
+  if (core.length === 0) {
+    return "";
+  }
+  return `- ${core} -`;
 }
 
 const WHITE = "&H00FFFFFF&";
@@ -99,16 +121,18 @@ export function buildTitlesAss(
   items: TitleItem[],
   opts: TitleAssOptions
 ): string {
-  // Two style sizes: lower-thirds read smaller, centered cards are the hero.
   const lowerFont = Math.max(20, Math.round(opts.height * 0.05));
   const centerFont = Math.max(28, Math.round(opts.height * 0.07));
   const heroHeadFont = Math.max(40, Math.round(opts.height * 0.075));
   const heroSubFont = Math.max(18, Math.round(opts.height * 0.028));
+  const quoteFont = Math.max(26, Math.round(opts.height * 0.055));
+  const quoteAttrFont = Math.max(16, Math.round(opts.height * 0.028));
+  const dividerFont = Math.max(18, Math.round(opts.height * 0.032));
+  const calloutFont = Math.max(16, Math.round(opts.height * 0.028));
   const marginV = Math.round(opts.height * 0.08);
+  const calloutMarginV = Math.round(opts.height * 0.12);
   const accent = toAssColor(opts.accent ?? DEFAULT_TITLE_ACCENT);
 
-  // BorderStyle 3 + a semi-transparent dark BackColour paints an opaque-ish box
-  // behind the glyphs so titles read on any footage. Bold white text, Arial.
   const header = [
     "[Script Info]",
     "ScriptType: v4.00+",
@@ -119,13 +143,13 @@ export function buildTitlesAss(
     "",
     "[V4+ Styles]",
     "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-    // Lower: bottom-center (Alignment 2 / \an2), generous MarginV lifts it into the lower third.
     `Style: TitleLower,Arial,${lowerFont},${WHITE},${accent},&H00000000&,&HA0000000&,1,0,0,0,100,100,0,0,3,0,0,2,120,120,${marginV},1`,
-    // Center: middle-center (Alignment 5 / \an5), no special margin.
     `Style: TitleCenter,Arial,${centerFont},${WHITE},${accent},&H00000000&,&HA0000000&,1,0,0,0,100,100,0,0,3,0,0,5,120,120,0,1`,
-    // Hero: serif headline + subtitle, light shadow, no box.
     `Style: TitleHeroHead,Georgia,${heroHeadFont},${WHITE},${WHITE},&H00000000&,&H80000000&,1,0,0,0,100,100,0,0,1,0,2,5,120,120,0,1`,
     `Style: TitleHeroSub,Georgia,${heroSubFont},${WHITE},${WHITE},&H00000000&,&H80000000&,0,0,0,0,100,100,0,0,1,0,2,5,120,120,0,1`,
+    `Style: TitleQuote,Georgia,${quoteFont},${WHITE},${accent},&H00000000&,&HA0000000&,0,1,0,0,100,100,0,0,3,0,0,5,120,120,0,1`,
+    `Style: TitleDivider,Arial,${dividerFont},${WHITE},${accent},&H00000000&,&HA0000000&,0,0,0,0,100,100,0,0,3,0,0,5,120,120,0,1`,
+    `Style: TitleCallout,Arial,${calloutFont},${WHITE},${accent},&H00000000&,&HA0000000&,1,0,0,0,100,100,0,0,3,0,0,7,80,80,${calloutMarginV},1`,
     "",
     "[Events]",
     "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
@@ -133,28 +157,27 @@ export function buildTitlesAss(
 
   const motion = opts.motion ?? MotionSchema.parse(undefined);
   const slidePx = Math.max(16, Math.round(opts.height * motion.slideFrac));
-  // Lower titles anchor at bottom-center; the slide-up baseline is MarginV above the floor.
   const baseY = opts.height - marginV;
   const cx = Math.round(opts.width / 2);
   const geom = { baseY, cx, slidePx };
 
   const events: string[] = [];
   for (const item of items) {
-    const text = assEscape((item.text ?? "").trim());
-    if (text.length === 0) {
-      continue; // skip empty / whitespace-only
+    const rawText = (item.text ?? "").trim();
+    if (rawText.length === 0) {
+      continue;
     }
 
     const start = item.startSec;
     const end = Math.max(item.endSec, start + 0.05);
-    const isHero = item.position === "hero";
-    const isCenter = item.position === "center";
+    const position = item.position ?? "lower";
 
     let override: string;
     let style: string;
     let payload: string;
-    if (isHero) {
-      const { headline, subtitle } = parseHeroLines(item.text ?? "");
+
+    if (position === "hero") {
+      const { headline, subtitle } = parseHeroLines(rawText);
       if (!headline) {
         continue;
       }
@@ -169,13 +192,53 @@ export function buildTitlesAss(
       );
       continue;
     }
-    payload = text;
-    if (isCenter) {
-      // Centered hero card: fade only, no slide. \an5 = middle-center.
+
+    if (position === "quote") {
+      const { headline, subtitle } = parseHeroLines(rawText);
+      if (!headline) {
+        continue;
+      }
+      style = "TitleQuote";
+      override = `${titleMotionTags("quote", motion, geom)}\\i1`;
+      payload = assEscape(headline);
+      if (subtitle) {
+        payload += `{\\r}\\N{\\fs${quoteAttrFont}\\i0}${assEscape(subtitle)}`;
+      }
+      events.push(
+        `Dialogue: 0,${assTime(start)},${assTime(end)},${style},,0,0,0,,${override}${payload}`
+      );
+      continue;
+    }
+
+    if (position === "divider") {
+      const label = formatDividerLabel(rawText);
+      if (label.length === 0) {
+        continue;
+      }
+      style = "TitleDivider";
+      override = titleMotionTags("divider", motion, geom);
+      payload = assEscape(label);
+      events.push(
+        `Dialogue: 0,${assTime(start)},${assTime(end)},${style},,0,0,0,,${override}${payload}`
+      );
+      continue;
+    }
+
+    if (position === "callout") {
+      style = "TitleCallout";
+      override = titleMotionTags("callout", motion, geom);
+      payload = assEscape(rawText);
+      events.push(
+        `Dialogue: 0,${assTime(start)},${assTime(end)},${style},,0,0,0,,${override}${payload}`
+      );
+      continue;
+    }
+
+    payload = assEscape(rawText);
+    if (position === "center") {
       style = "TitleCenter";
       override = titleMotionTags("center", motion, geom);
     } else {
-      // Lower third: fade + a short upward slide into place. \an2 = bottom-center.
       style = "TitleLower";
       override = titleMotionTags("lower", motion, geom);
     }
