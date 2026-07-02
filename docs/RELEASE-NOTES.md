@@ -2,7 +2,24 @@
 
 Use these bodies when publishing releases. Each section matches a tag in `CHANGELOG.md` without duplicating the full changelog. **Known gaps:** always link to [TODO.md](../TODO.md#known-limitations); do not duplicate the list here.
 
-Publishing status checked on 2026-07-02: GitHub releases are published through `v0.10.0.1`; `v0.11.0.0`, `v0.12.0.0`, `v0.13.0.0`, and `v0.14.0.0` are prepared below for publication in order.
+Publishing status checked on 2026-07-02: GitHub releases are published through `v0.10.0.1`. `v0.11.0.0`, `v0.12.0.0`, `v0.13.0.0`, and `v0.14.0.0` were still unpublished as of this morning and are being published today (2026-07-02) from the prepared bodies below, in order. `v0.14.1.0` is prepared below for publication after them.
+
+---
+
+## v0.14.1.0
+
+**Trust completion: the transcript editor stops resurrecting cut words, and a new `revise-draft` playbook edits or reverts an existing draft.**
+
+### Highlights
+- **Transcript reconcile fix**: the contentEditable transcript editor no longer risks restoring a cut word on a stray edit. A word only comes back through an explicit action (timeline toggle, search restore, cleanup, revert); typing its text back into the transcript no longer restores it.
+- **`revise-draft` playbook**: a new skill (`templates/revise-draft/skill.md`, auto-listed alongside `make-draft`) lets an agent apply targeted edits or a whole-task revert to an existing draft, with safety rails around `--force` and re-export.
+- Current codebase verification: 1131 tests.
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations) for the current list. `make-short` (vertical reframe) is still not implemented; agents still have no dedicated tool to query past action or task history (GUI History panel only).
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#01410---2026-07-02)
 
 ---
 

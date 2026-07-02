@@ -329,6 +329,7 @@ Goal: an agent can pursue a video outcome in a visible loop until it produces a 
   - [ ] Export new draft.
   - [ ] Summarize what changed.
   - Verification: user can ask for a specific revision and see exact edits.
+  - Note 2026-07-02: `templates/revise-draft/skill.md` exists (auto-listed in the skills catalog alongside `make-draft`) and instructs each phase above (`project_overlays`/`transcript_grep` reads, targeted edits vs. whole-task `revert`, conditional re-export, a `task_complete` summary of what changed). `tests/templates.test.ts` pins that the file is listed and contains the expected keywords. Left unticked: no live run on a real project has exercised a revision request end to end yet, so the item's own verification line (user asks for a revision, sees exact edits) has not been demonstrated.
 
 ### 2.3 Agent checkpoints and recovery
 

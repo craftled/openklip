@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.14.1.0 - 2026-07-02
+
+A trust-completion patch: the transcript editor no longer risks resurrecting cut words on a stray edit, and a new `revise-draft` playbook lets an agent make targeted edits or a whole-task revert to an existing draft.
+
+### Fixed
+- **Transcript reconcile no longer resurrects cut words**: `reconcileTranscriptText` (`web/lib/transcript-edit.ts`) now marks a word deleted only when its token is absent from the edited text; a match or replace op preserves the word's existing `deleted` flag instead of clearing it. Restoring a cut word stays an explicit action (timeline toggle, search restore, cleanup, revert): typing a deleted word's text back into the transcript no longer restores it. Inserted text anchors only to non-deleted words (forward to the next kept match, or backward to the nearest preceding kept word when none follows), and a blur that extracts token-identical text no longer triggers a redundant `edit-words` save.
+
+### Added
+- **`revise-draft` playbook**: `templates/revise-draft/skill.md` (auto-listed in the skills slash catalog alongside `make-draft`) interprets a revision request against an existing draft: targeted edits (title, zoom, b-roll, music, caption changes) or a whole-task revert via `openklip revert`, with honest safety rails (never `--force` unprompted, re-read status after a revert, re-export after changes that affect the rendered output). Covered by `tests/templates.test.ts` alongside `make-draft`.
+
+### Changed
+- **Version**: bumped OpenKlip to `0.14.1.0`.
+
 ## 0.14.0.0 - 2026-07-02
 
 The task-level undo/revert release: OpenKlip now logs every user-facing edit and can roll a project back to any of them. Previously-unlogged paths (asset registration and deletion, template/brand CLI commands, multi-take assembly, brief saves) now write to the same action history as everything else, every logged mutation keeps a pre-mutation snapshot on disk, and a new `revert` capability restores a project to an earlier revision, an agent task's starting point, or the last edit, from the CLI, MCP, or the History panel.
