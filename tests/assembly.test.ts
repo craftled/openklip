@@ -96,6 +96,15 @@ test("assembleFromSelection concats two seeded takes into a real source (smoke)"
       "ffmpeg(proxyB)"
     );
 
+    // R4: seed a STALE previous-recording PCM + analysis cache; a successful
+    // assembly must replace the PCM and drop the cache or snap/cleanup would
+    // silently analyze the wrong audio.
+    mkdirSync(p.working, { recursive: true });
+    await Bun.write(p.audioRaw, "stale-pcm-from-previous-recording");
+    const staleAnalysisPath = join(p.working, "audio-analysis.json");
+    await Bun.write(staleAnalysisPath, JSON.stringify({ version: 1 }));
+    const stalePcmSize = (await Bun.file(p.audioRaw).arrayBuffer()).byteLength;
+
     // Remove the placeholder project.json so the ingest guard allows assembly.
     await Bun.write(p.project, "");
     const result = await assembleFromSelection(
@@ -127,5 +136,19 @@ test("assembleFromSelection concats two seeded takes into a real source (smoke)"
     // The takes survive the assembly (parked alongside the new source).
     const takes = await listTakes(slug);
     assert.equal(takes.length, 2);
+
+    // R4: the stale PCM was regenerated from the ASSEMBLED source (4s of
+    // 16kHz f32 mono is ~256KB, nothing like the seeded stale bytes) and the
+    // stale derived cache is gone.
+    assert.ok(existsSync(p.audioRaw), "audio16k.f32 missing after assembly");
+    const freshPcmSize = (await Bun.file(p.audioRaw).arrayBuffer()).byteLength;
+    assert.ok(
+      freshPcmSize > stalePcmSize * 100,
+      `expected a regenerated PCM, got ${freshPcmSize}B (stale was ${stalePcmSize}B)`
+    );
+    assert.ok(
+      !existsSync(staleAnalysisPath),
+      "stale audio-analysis.json should be removed by assembly"
+    );
   });
 });

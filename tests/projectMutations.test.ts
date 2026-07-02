@@ -33,6 +33,50 @@ test("applyProjectEdits persists transcript word text corrections", () => {
   assert.equal(project.words[0].deleted, false);
 });
 
+// F8: the GUI's bulk edit-words path must preserve originalText the same way
+// setWordText (src/actions.ts, the CLI/agent parity surface) already does.
+test("applyProjectEdits records originalText the first time a word's text changes", () => {
+  const project = makeProject();
+  assert.equal(project.words[0].text, "Hello");
+  applyProjectEdits(project, {
+    words: [{ id: "w0", deleted: false, text: "Howdy" }],
+  });
+  assert.equal(project.words[0].text, "Howdy");
+  assert.equal(project.words[0].originalText, "Hello");
+});
+
+test("applyProjectEdits never overwrites an already-set originalText on a later correction", () => {
+  const project = makeProject();
+  applyProjectEdits(project, {
+    words: [{ id: "w0", deleted: false, text: "Howdy" }],
+  });
+  applyProjectEdits(project, {
+    words: [{ id: "w0", deleted: false, text: "Hey there" }],
+  });
+  assert.equal(project.words[0].text, "Hey there");
+  assert.equal(project.words[0].originalText, "Hello");
+});
+
+test("applyProjectEdits does not set originalText when the text is unchanged", () => {
+  const project = makeProject();
+  applyProjectEdits(project, {
+    words: [{ id: "w0", deleted: false, text: "Hello" }],
+  });
+  assert.equal(project.words[0].text, "Hello");
+  assert.equal(project.words[0].originalText, undefined);
+});
+
+// C2: the GUI bulk edit path shares setWordText's whitespace normalization,
+// so an embedded newline cannot ride into project.json and break the
+// one-line ASS Dialogue entries the caption burn writes.
+test("applyProjectEdits collapses embedded newlines/tabs in word text to single spaces", () => {
+  const project = makeProject();
+  applyProjectEdits(project, {
+    words: [{ id: "w0", deleted: false, text: "line1\nline2" }],
+  });
+  assert.equal(project.words[0].text, "line1 line2");
+});
+
 test("applyProjectEdits re-anchors overlays when its words cut deletes the phrase", () => {
   const project = makeProject();
   // Anchor a title onto the second word ("world"); stored span already correct.

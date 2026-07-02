@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { survivingRanges } from "@engine/edl";
+import { effectiveRanges } from "@engine/edl";
 import { EXPORT_COMPRESSIONS, exportCut } from "@engine/exporter";
 import { assertValidSlug, projectPaths } from "@engine/paths";
 import { loadProject } from "@engine/projectStore";
@@ -58,10 +58,19 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     );
   }
 
-  // 4. Guard against rendering an empty cut before invoking ffmpeg.
+  // 4. Guard against rendering an empty cut before invoking ffmpeg. F2: reads
+  // effectiveRanges (dead-air subtraction + snap), not the raw survivingRanges
+  // - dead-air subtraction alone can empty an otherwise-nonempty cut, and this
+  // guard must agree with what exportCut itself is about to compute or it
+  // passes here and throws a 500 there instead of a clean 400. No silences
+  // are loaded for this check: VAD snap only shifts existing boundaries
+  // inward, never outward (see snapRanges/snapBoundary's no-inversion
+  // invariant in src/audio-analysis-core.ts), so it never empties ranges
+  // dead-air subtraction alone would have kept - omitting silences here
+  // cannot produce a false pass.
   try {
     const project = await loadProject(slug);
-    if (survivingRanges(project).length === 0) {
+    if (effectiveRanges(project).length === 0) {
       return Response.json(
         { error: "nothing to export (all words deleted)" },
         { status: 400 }

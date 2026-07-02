@@ -16,10 +16,12 @@ import {
   removeTitle,
   removeZoom,
   restoreAll,
+  setAudio,
   setCaptionMaxWords,
   setCaptions,
   setLook,
   setPadMs,
+  setWordText,
   summarize,
   updateBroll,
   updateMusic,
@@ -365,6 +367,64 @@ test("setPadMs clamps to 0-500", () => {
   assert.equal(p.padMs, 0);
 });
 
+// ── MILESTONE 4.2: export audio quality (setAudio primitive) ────────────────
+
+test("setAudio clamps every bound", () => {
+  const p = makeProject();
+  setAudio(p, {
+    ducking: { amountDb: 999, attackMs: -5, releaseMs: 99_999 },
+    loudness: { targetLufs: 999 },
+    voiceHighpass: { hz: 999 },
+  });
+  assert.equal(p.audio.ducking.amountDb, 30);
+  assert.equal(p.audio.ducking.attackMs, 1);
+  assert.equal(p.audio.ducking.releaseMs, 2000);
+  assert.equal(p.audio.loudness.targetLufs, -10);
+  assert.equal(p.audio.voiceHighpass.hz, 200);
+
+  setAudio(p, {
+    ducking: { amountDb: -50, attackMs: 0, releaseMs: 0 },
+    loudness: { targetLufs: -50 },
+    voiceHighpass: { hz: 0 },
+  });
+  assert.equal(p.audio.ducking.amountDb, 1);
+  assert.equal(p.audio.ducking.attackMs, 1);
+  assert.equal(p.audio.ducking.releaseMs, 20);
+  assert.equal(p.audio.loudness.targetLufs, -30);
+  assert.equal(p.audio.voiceHighpass.hz, 40);
+});
+
+test("setAudio merges partially: only the passed keys change within a subobject", () => {
+  const p = makeProject();
+  setAudio(p, { ducking: { enabled: true, amountDb: 18 } });
+  assert.equal(p.audio.ducking.enabled, true);
+  assert.equal(p.audio.ducking.amountDb, 18);
+  // Untouched sibling keys in the SAME subobject keep their defaults.
+  assert.equal(p.audio.ducking.attackMs, 25);
+  assert.equal(p.audio.ducking.releaseMs, 250);
+
+  setAudio(p, { ducking: { attackMs: 60 } });
+  assert.equal(p.audio.ducking.attackMs, 60);
+  // A later partial patch does not clobber earlier fields.
+  assert.equal(p.audio.ducking.enabled, true);
+  assert.equal(p.audio.ducking.amountDb, 18);
+});
+
+test("setAudio leaves untouched subobjects intact", () => {
+  const p = makeProject();
+  setAudio(p, { loudness: { enabled: true, targetLufs: -14 } });
+  assert.equal(p.audio.loudness.enabled, true);
+  assert.equal(p.audio.loudness.targetLufs, -14);
+  // ducking and voiceHighpass were never patched: still at schema defaults.
+  assert.deepEqual(p.audio.ducking, {
+    enabled: false,
+    amountDb: 12,
+    attackMs: 25,
+    releaseMs: 250,
+  });
+  assert.deepEqual(p.audio.voiceHighpass, { enabled: false, hz: 80 });
+});
+
 test("setLook toggles vignette", () => {
   const p = makeProject();
   setLook(p, { vignette: true });
@@ -512,6 +572,69 @@ test("cutWords records a per-word note and clears it on empty string", () => {
   assert.equal(w?.note, "stumble");
   cutWords(p, ["w1"], true, "");
   assert.equal(w?.note, undefined);
+});
+
+// ── D4: setWordText (agent/CLI word-text correction parity) ─────────────────
+
+test("setWordText updates the word text and trims surrounding whitespace", () => {
+  const p = makeProject();
+  const w = setWordText(p, "w0", "  Howdy  ");
+  assert.equal(w.text, "Howdy");
+  assert.equal(p.words.find((x) => x.id === "w0")?.text, "Howdy");
+});
+
+test("setWordText rejects empty text (including whitespace-only)", () => {
+  const p = makeProject();
+  assert.throws(() => setWordText(p, "w0", "   "), /empty/i);
+});
+
+test("setWordText rejects text longer than 200 characters", () => {
+  const p = makeProject();
+  const tooLong = "x".repeat(201);
+  assert.throws(() => setWordText(p, "w0", tooLong), /200/);
+});
+
+test("setWordText accepts text at exactly the 200 character limit", () => {
+  const p = makeProject();
+  const atLimit = "x".repeat(200);
+  const w = setWordText(p, "w0", atLimit);
+  assert.equal(w.text.length, 200);
+});
+
+test("setWordText throws a clear error when the word id is missing", () => {
+  const p = makeProject();
+  assert.throws(() => setWordText(p, "nope", "Hi"), /nope/);
+});
+
+test("setWordText sets originalText once on first correction and never overwrites it", () => {
+  const p = makeProject();
+  const first = setWordText(p, "w0", "Hola");
+  assert.equal(first.originalText, "Hello");
+
+  const second = setWordText(p, "w0", "Bonjour");
+  assert.equal(second.originalText, "Hello");
+  assert.equal(second.text, "Bonjour");
+  assert.equal(p.words.find((x) => x.id === "w0")?.originalText, "Hello");
+});
+
+test("setWordText does not set originalText when the correction is a no-op (same text)", () => {
+  const p = makeProject();
+  const w = setWordText(p, "w0", "Hello");
+  assert.equal(w.text, "Hello");
+  assert.equal(w.originalText, undefined);
+});
+
+// C2: embedded control whitespace must not survive into project.json - an
+// embedded newline would later break the one-line ASS Dialogue entries the
+// caption burn writes (assEscape does not strip newlines).
+test("setWordText collapses embedded newlines/tabs to single spaces", () => {
+  const p = makeProject();
+  const w = setWordText(p, "w0", "line1\nline2");
+  assert.equal(w.text, "line1 line2");
+  assert.equal(p.words.find((x) => x.id === "w0")?.text, "line1 line2");
+
+  const tabbed = setWordText(p, "w0", "a\t\tb\r\nc");
+  assert.equal(tabbed.text, "a b c");
 });
 
 // ── MILESTONE 4.1: music placement primitives ────────────────────────────────
@@ -739,4 +862,29 @@ test("summarize counts words, cuts, ranges, broll, music, and kept duration", ()
   assert.equal(s.brollCount, 1);
   assert.equal(s.musicCount, 1);
   assert.ok(Math.abs(s.keptDurationSec - 4) < 1e-6);
+});
+
+test("summarize stays sync but reflects dead-air subtraction via effectiveRanges", () => {
+  const p = makeProject();
+  p.cuts = {
+    snap: { enabled: false, mode: "off", maxShiftMs: 120, crossfadeMs: 24 },
+    deadAir: [
+      { id: "d1", startSample: SAMPLE_RATE, endSample: 2 * SAMPLE_RATE },
+    ],
+  };
+  const s = summarize(p);
+  // The 6s contiguous kept run splits around the 1s dead-air span.
+  assert.equal(s.cuts, 2);
+  assert.ok(Math.abs(s.keptDurationSec - 5) < 1e-6);
+});
+
+test("summarize accepts optional silences and applies VAD snap when enabled", () => {
+  const p = makeProject();
+  p.cuts = {
+    snap: { enabled: true, mode: "vad", maxShiftMs: 120, crossfadeMs: 24 },
+    deadAir: [],
+  };
+  const withoutSilences = summarize(p);
+  const withSilences = summarize(p, [{ startSec: 5.9, endSec: 6.3 }]);
+  assert.ok(withSilences.keptDurationSec < withoutSilences.keptDurationSec);
 });

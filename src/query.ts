@@ -1,12 +1,13 @@
 import { summarize } from "./actions.ts";
+import type { SilenceSpan } from "./audio-analysis-core.ts";
 import {
   type CutSnap,
   CutsSchema,
+  effectiveRanges,
   type Filter,
   type PhraseAnchor,
   type Project,
   samplesToSec,
-  survivingRanges,
 } from "./edl.ts";
 import { findPhraseRuns, type PhraseRun } from "./phrase-match.ts";
 import { validateProductAnnouncementSpec } from "./product-announcement.ts";
@@ -211,10 +212,16 @@ export function wordSpan(
   return { token, words };
 }
 
+// Stays sync (many callers, including the CLI's non-analysis paths, have no
+// silence data): `silences` is optional and, when supplied, lets
+// effectiveRanges() apply VAD snap on top of the always-on dead-air
+// subtraction, so CLI/agent output matches export truth exactly when the
+// caller has loaded working/audio-analysis.json.
 export function listRanges(
-  project: Project
+  project: Project,
+  silences?: SilenceSpan[]
 ): Array<{ endSec: number; startSec: number }> {
-  return survivingRanges(project);
+  return effectiveRanges(project, silences);
 }
 
 export function listOverlays(project: Project): OverlayViews {
@@ -300,8 +307,11 @@ export function listOverlays(project: Project): OverlayViews {
   };
 }
 
-export function projectStatus(project: Project): ProjectStatusJson {
-  const s = summarize(project);
+export function projectStatus(
+  project: Project,
+  silences?: SilenceSpan[]
+): ProjectStatusJson {
+  const s = summarize(project, silences);
   const cuts = CutsSchema.parse(project.cuts ?? {});
   return {
     slug: project.slug,
@@ -312,7 +322,7 @@ export function projectStatus(project: Project): ProjectStatusJson {
       deleted: s.deleted,
     },
     keptDurationSec: s.keptDurationSec,
-    ranges: listRanges(project),
+    ranges: listRanges(project, silences),
     padMs: project.padMs ?? 50,
     captions: {
       enabled: project.captions.enabled,

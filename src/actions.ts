@@ -6,11 +6,14 @@
 import { randomUUID } from "node:crypto";
 import { isNeutralColor } from "./color-adjust.ts";
 import {
+  type Audio,
+  AudioSchema,
   type Broll,
   type ColorAdjust,
   ColorAdjustSchema,
   type CutSnap,
   CutSnapSchema,
+  type DeadAirSpan,
   type Filter,
   type Graphic,
   type Motion,
@@ -75,6 +78,52 @@ export function cutWords(
     }
   }
   return project;
+}
+
+const WORD_TEXT_MAX_LENGTH = 200;
+
+// C2: collapse embedded whitespace controls (\r, \n, \t and any run of
+// whitespace) to single spaces and trim. Transcript words are single-line by
+// construction, and an embedded newline would otherwise survive into
+// project.json and then break the ONE-LINE ASS Dialogue entries the caption
+// burn writes (assEscape does not strip newlines). Shared by setWordText
+// below (agent/CLI word-text) and the GUI bulk edit path in
+// src/projectMutations.ts so neither surface can smuggle a control char in.
+export function normalizeWordText(text: string): string {
+  return text.replace(/\s+/g, " ").trim();
+}
+
+// Correct one word's transcript text (the agent/CLI parity surface for the
+// GUI's bulk "edit-words" path, see app/actions.ts). Normalizes embedded
+// whitespace (see normalizeWordText), rejects empty or overlong (>200 char)
+// text, and throws if the word id doesn't exist. Records the PRE-correction
+// text once in originalText the first time a word's text actually changes;
+// later corrections update `text` but never touch an already-set
+// originalText, so the original Whisper output stays recoverable through any
+// number of edits.
+export function setWordText(
+  project: Project,
+  id: string,
+  text: string
+): { id: string; originalText?: string; text: string } {
+  const trimmed = normalizeWordText(text);
+  if (trimmed.length === 0) {
+    throw new Error("word text cannot be empty");
+  }
+  if (trimmed.length > WORD_TEXT_MAX_LENGTH) {
+    throw new Error(
+      `word text is too long (${trimmed.length} chars, max ${WORD_TEXT_MAX_LENGTH})`
+    );
+  }
+  const word = project.words.find((w) => w.id === id);
+  if (!word) {
+    throw new Error(`unknown word id "${id}"`);
+  }
+  if (trimmed !== word.text && word.originalText === undefined) {
+    word.originalText = word.text;
+  }
+  word.text = trimmed;
+  return { id: word.id, text: word.text, originalText: word.originalText };
 }
 
 // Find the first contiguous run of words whose concatenated normalized text
@@ -1058,6 +1107,128 @@ export function setCutSnap(project: Project, input: Partial<CutSnap>): Project {
   return project;
 }
 
+// Sliver floor for an INCOMING dead-air span before it is ever registered.
+// Distinct from MIN_DEAD_AIR_SLIVER_SEC in audio-analysis-core.ts, which
+// floors a REMAINDER kept after subtracting dead air from a range; the two
+// thresholds happen to share a value today but govern different ends of the
+// same pipeline, so they are not merged into one constant.
+const MIN_DEAD_AIR_SPAN_SEC = 0.05;
+// F4: two spans within this of each other coalesce into one entry (addDeadAir
+// below) instead of being registered as separate, possibly-overlapping spans.
+const DEAD_AIR_ADJACENT_SEC = 0.01;
+// F4: silently drop overflow beyond this many registered spans, keeping the
+// earliest (by source time) - a runaway "apply all safe" (or an agent loop)
+// must not grow cuts.deadAir without bound.
+const MAX_DEAD_AIR_SPANS = 200;
+
+// Register dead-air spans (source time) to drop from otherwise-kept ranges :
+// see CutsSchema.deadAir and subtractDeadAir in audio-analysis-core.ts, which
+// applies them on top of survivingRanges at preview/export. Each span is
+// validated (finite, toSec > fromSec), clamped to [0, project duration], and
+// dropped as a sliver under 0.05s after clamping; spans that end up touching
+// or overlapping (within THIS call) are merged before ids are assigned.
+export function addDeadAir(
+  project: Project,
+  spans: { fromSec: number; toSec: number }[]
+): DeadAirSpan[] {
+  if (!Array.isArray(spans) || spans.length === 0) {
+    throw new Error("dead-air spans must be a non-empty array");
+  }
+  const durationSec = project.durationSamples / SAMPLE_RATE;
+  const normalized: { startSample: number; endSample: number }[] = [];
+  for (const { fromSec, toSec } of spans) {
+    if (!(Number.isFinite(fromSec) && Number.isFinite(toSec))) {
+      throw new Error("dead-air span timing values must be finite numbers");
+    }
+    if (toSec <= fromSec) {
+      throw new Error(
+        `dead-air span is empty: toSec (${toSec}) must be greater than fromSec (${fromSec})`
+      );
+    }
+    const clampedFrom = Math.min(Math.max(fromSec, 0), durationSec);
+    const clampedTo = Math.min(Math.max(toSec, 0), durationSec);
+    if (clampedTo - clampedFrom < MIN_DEAD_AIR_SPAN_SEC) {
+      continue;
+    }
+    normalized.push({
+      startSample: Math.round(clampedFrom * SAMPLE_RATE),
+      endSample: Math.round(clampedTo * SAMPLE_RATE),
+    });
+  }
+
+  normalized.sort((a, b) => a.startSample - b.startSample);
+  const merged: { startSample: number; endSample: number }[] = [];
+  for (const span of normalized) {
+    const last = merged.at(-1);
+    if (last && span.startSample <= last.endSample) {
+      last.endSample = Math.max(last.endSample, span.endSample);
+    } else {
+      merged.push({ ...span });
+    }
+  }
+
+  // F4(b) idempotency: coalesce each incoming span into an EXISTING
+  // (already-applied) span it overlaps or sits within DEAD_AIR_ADJACENT_SEC
+  // of, extending that entry's bounds, instead of blindly appending a new,
+  // possibly-overlapping entry. Re-running "apply all safe" with the same or
+  // adjacent candidates then grows nothing.
+  const existing = project.cuts?.deadAir ?? [];
+  const existingIds = new Set(existing.map((d) => d.id));
+  const adjacentSamples = Math.round(DEAD_AIR_ADJACENT_SEC * SAMPLE_RATE);
+  const nextSpans: DeadAirSpan[] = existing.map((d) => ({ ...d }));
+  const touched: DeadAirSpan[] = [];
+  let seq = 0;
+
+  for (const span of merged) {
+    const hit = nextSpans.find(
+      (c) =>
+        span.startSample <= c.endSample + adjacentSamples &&
+        c.startSample <= span.endSample + adjacentSamples
+    );
+    if (hit) {
+      hit.startSample = Math.min(hit.startSample, span.startSample);
+      hit.endSample = Math.max(hit.endSample, span.endSample);
+      touched.push(hit);
+      continue;
+    }
+    let id: string;
+    do {
+      seq += 1;
+      id = `da${Date.now()}${seq}`;
+    } while (existingIds.has(id));
+    existingIds.add(id);
+    const item: DeadAirSpan = { id, ...span };
+    nextSpans.push(item);
+    touched.push(item);
+  }
+
+  // 200-span cap: keep the earliest (by source time), silently drop overflow.
+  nextSpans.sort((a, b) => a.startSample - b.startSample);
+  const capped = nextSpans.slice(0, MAX_DEAD_AIR_SPANS);
+  const cappedIds = new Set(capped.map((d) => d.id));
+
+  project.cuts = { ...project.cuts, deadAir: capped };
+  // Dedupe: a single incoming span can coalesce into the same existing entry
+  // as an earlier span in this call (both `touched`); a caller reconciling
+  // optimistic ids only needs each affected span once.
+  const seenIds = new Set<string>();
+  return touched.filter((t) => {
+    if (!cappedIds.has(t.id) || seenIds.has(t.id)) {
+      return false;
+    }
+    seenIds.add(t.id);
+    return true;
+  });
+}
+
+// Remove a registered dead-air span by id. Returns whether one was removed.
+export function removeDeadAir(project: Project, id: string): boolean {
+  const existing = project.cuts?.deadAir ?? [];
+  const next = existing.filter((d) => d.id !== id);
+  project.cuts = { ...project.cuts, deadAir: next };
+  return next.length < existing.length;
+}
+
 // Apply picture look flags and filters.
 export function setLook(
   project: Project,
@@ -1107,6 +1278,70 @@ function mergeColor<T extends { color?: ColorAdjust }>(
 // Patch the global animation feel. Only the provided knobs change.
 export function setMotion(project: Project, input: Partial<Motion>): Project {
   project.motion = { ...project.motion, ...input };
+  return project;
+}
+
+function clampNum(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+// Patch export audio quality settings: ducking, loudness normalization, and
+// voice highpass. Merges ONE LEVEL DEEP like setMotion (only the provided
+// subobject keys change; an omitted subobject is left entirely untouched),
+// but unlike setMotion every numeric field is clamped to its AudioSchema
+// bound here on write, so a caller cannot smuggle an out-of-range value past
+// the shape-only registry schema (the stricter convention setCutSnap
+// established: bounds live in the primitive, not the registry schema).
+export function setAudio(
+  project: Project,
+  input: {
+    ducking?: Partial<Audio["ducking"]>;
+    loudness?: Partial<Audio["loudness"]>;
+    voiceHighpass?: Partial<Audio["voiceHighpass"]>;
+  }
+): Project {
+  const current = AudioSchema.parse(project.audio ?? {});
+  const ducking = input.ducking
+    ? {
+        enabled: input.ducking.enabled ?? current.ducking.enabled,
+        amountDb: clampNum(
+          input.ducking.amountDb ?? current.ducking.amountDb,
+          1,
+          30
+        ),
+        attackMs: clampNum(
+          input.ducking.attackMs ?? current.ducking.attackMs,
+          1,
+          500
+        ),
+        releaseMs: clampNum(
+          input.ducking.releaseMs ?? current.ducking.releaseMs,
+          20,
+          2000
+        ),
+      }
+    : current.ducking;
+  const loudness = input.loudness
+    ? {
+        enabled: input.loudness.enabled ?? current.loudness.enabled,
+        targetLufs: clampNum(
+          input.loudness.targetLufs ?? current.loudness.targetLufs,
+          -30,
+          -10
+        ),
+      }
+    : current.loudness;
+  const voiceHighpass = input.voiceHighpass
+    ? {
+        enabled: input.voiceHighpass.enabled ?? current.voiceHighpass.enabled,
+        hz: clampNum(
+          input.voiceHighpass.hz ?? current.voiceHighpass.hz,
+          40,
+          200
+        ),
+      }
+    : current.voiceHighpass;
+  project.audio = { ducking, loudness, voiceHighpass };
   return project;
 }
 

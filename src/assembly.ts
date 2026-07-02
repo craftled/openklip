@@ -253,6 +253,21 @@ export async function assembleFromSelection(
     "ffmpeg(assemble-proxy)"
   );
 
+  // R4: the assembly replaces source/proxy/project.json, so the ingest-time
+  // analysis inputs MUST follow. Left alone, the PREVIOUS recording's
+  // working/audio16k.f32 keeps a valid mtime and working/audio-analysis.json
+  // stays cache-fresh against it, so snap and dead-air cleanup would silently
+  // analyze the WRONG audio. Regenerate the PCM from the assembled source; if
+  // extraction fails, drop the stale PCM instead - no analysis (the honest
+  // degraded path: loadAudioAnalysis throws, cleanup goes filler-only) beats
+  // analysis of the wrong recording. The derived cache is stale either way.
+  try {
+    await extractAudio(sourceOut, p.audioRaw);
+  } catch {
+    await rm(p.audioRaw, { force: true });
+  }
+  await rm(join(p.working, "audio-analysis.json"), { force: true });
+
   const project: Project = ProjectSchema.parse({
     version: 1,
     slug,

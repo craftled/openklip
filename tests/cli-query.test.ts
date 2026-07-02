@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
+import { statSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { addMusic, addTitle } from "../src/actions.ts";
-import { runOverlays } from "../src/cli-query.ts";
+import { runOverlays, runRanges, runStatusJson } from "../src/cli-query.ts";
 import { SAMPLE_RATE } from "../src/edl.ts";
+import { projectPaths } from "../src/paths.ts";
 import {
   makeProject,
   withTempProjectsRoot,
@@ -118,6 +120,165 @@ test("CLI ranges --json lists kept segments", async () => {
     const data = JSON.parse(r.out.trim());
     assert.equal(data.ranges.length, 1);
     assert.ok(data.ranges[0].startSec >= 1);
+  });
+});
+
+test("CLI ranges --json reflects dead-air subtraction (matches export truth)", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    const p = makeProject({ slug, padMs: 0 });
+    p.cuts = {
+      snap: { enabled: false, mode: "off", maxShiftMs: 120, crossfadeMs: 24 },
+      deadAir: [
+        { id: "d1", startSample: SAMPLE_RATE / 2, endSample: SAMPLE_RATE },
+      ],
+    };
+    writeFixtureProject(slug, p);
+
+    const r = await runCli(["ranges", slug, "--json"]);
+    assert.equal(r.code, 0);
+    const data = JSON.parse(r.out.trim());
+    assert.equal(data.ranges.length, 2);
+    assert.equal(data.ranges[0].endSec, 0.5);
+    assert.equal(data.ranges[1].startSec, 1);
+  });
+});
+
+test("CLI status --json ranges reflect dead-air subtraction", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    const p = makeProject({ slug, padMs: 0 });
+    p.cuts = {
+      snap: { enabled: false, mode: "off", maxShiftMs: 120, crossfadeMs: 24 },
+      deadAir: [
+        { id: "d1", startSample: SAMPLE_RATE / 2, endSample: SAMPLE_RATE },
+      ],
+    };
+    writeFixtureProject(slug, p);
+
+    const r = await runCli(["status", slug, "--json"]);
+    assert.equal(r.code, 0);
+    const data = JSON.parse(r.out.trim());
+    assert.equal(data.ranges.length, 2);
+  });
+});
+
+test("CLI ranges --json applies VAD snap end-to-end via a cached audio-analysis.json", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    const p = makeProject({ slug, padMs: 0 });
+    p.cuts = {
+      snap: { enabled: true, mode: "vad", maxShiftMs: 120, crossfadeMs: 24 },
+      deadAir: [],
+    };
+    writeFixtureProject(slug, p);
+
+    const paths = projectPaths(slug);
+    // 16kHz mono f32 silence; content doesn't matter, only that the file
+    // exists so loadAudioAnalysis() doesn't throw and the cache below is
+    // accepted (mtime match).
+    await Bun.write(
+      paths.audioRaw,
+      new Float32Array(1600).buffer as ArrayBuffer
+    );
+    const sourceMtimeMs = statSync(paths.audioRaw).mtimeMs;
+    // F13: loadAudioAnalysis now validates the cache shape (AudioAnalysisSchema)
+    // before trusting it, so this fixture must be a complete AudioAnalysis
+    // object (version/sampleRate/windowMs/thresholdDb/minSilenceMs), not just
+    // the sourceMtimeMs + silences this test actually exercises.
+    await Bun.write(
+      `${paths.working}/audio-analysis.json`,
+      JSON.stringify({
+        version: 1,
+        sampleRate: 16_000,
+        windowMs: 20,
+        thresholdDb: -38,
+        minSilenceMs: 300,
+        sourceMtimeMs,
+        silences: [{ startSec: 1.9, endSec: 2.3 }],
+      })
+    );
+
+    const r = await runCli(["ranges", slug, "--json"]);
+    assert.equal(r.code, 0);
+    const data = JSON.parse(r.out.trim());
+    assert.equal(data.ranges.at(-1)?.endSec, 1.9);
+  });
+});
+
+test("CLI cleanup --apply-safe chunks more than 50 dead-air spans", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    const wordCount = 52;
+    const wordDurationSec = 0.2;
+    const gapSec = 1.5;
+    const stepSec = wordDurationSec + gapSec;
+    const words = Array.from({ length: wordCount }, (_, i) => {
+      const startSec = i * stepSec;
+      return {
+        id: `w${i}`,
+        text: `word${i}`,
+        startSample: Math.round(startSec * SAMPLE_RATE),
+        endSample: Math.round((startSec + wordDurationSec) * SAMPLE_RATE),
+        deleted: false,
+      };
+    });
+    const silences = Array.from({ length: wordCount - 1 }, (_, i) => ({
+      startSec: i * stepSec + wordDurationSec,
+      endSec: (i + 1) * stepSec,
+    }));
+    const durationSamples = Math.round(
+      ((wordCount - 1) * stepSec + wordDurationSec) * SAMPLE_RATE
+    );
+    const p = makeProject({ slug, durationSamples, padMs: 0, words });
+    writeFixtureProject(slug, p);
+
+    const paths = projectPaths(slug);
+    await Bun.write(
+      paths.audioRaw,
+      new Float32Array(1600).buffer as ArrayBuffer
+    );
+    const sourceMtimeMs = statSync(paths.audioRaw).mtimeMs;
+    await Bun.write(
+      `${paths.working}/audio-analysis.json`,
+      JSON.stringify({
+        version: 1,
+        sampleRate: 16_000,
+        windowMs: 20,
+        thresholdDb: -38,
+        minSilenceMs: 300,
+        sourceMtimeMs,
+        silences,
+      })
+    );
+
+    const r = await runCli(["cleanup", slug, "--apply-safe"]);
+    assert.equal(r.code, 0, r.out);
+    assert.match(r.out, /registered 51 dead-air span\(s\)/);
+
+    const saved = JSON.parse(await Bun.file(paths.project).text());
+    assert.equal(saved.cuts.deadAir.length, 51);
+  });
+});
+
+test("CLI word-text corrects a word and preserves the original as originalText", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+
+    const r = await runCli(["word-text", slug, "w0", "Hi", "there"]);
+    assert.equal(r.code, 0);
+    assert.match(r.out, /word w0: "Hi there"/);
+
+    const paths = projectPaths(slug);
+    const saved = JSON.parse(await Bun.file(paths.project).text());
+    const w0 = saved.words.find((w: { id: string }) => w.id === "w0");
+    assert.equal(w0.text, "Hi there");
+    assert.equal(w0.originalText, "Hello");
+  });
+});
+
+test("CLI word-text rejects an unknown word id with a non-zero exit", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const r = await runCli(["word-text", slug, "nope", "hi"]);
+    assert.notEqual(r.code, 0);
+    assert.match(r.out, /nope/);
   });
 });
 
@@ -271,4 +432,35 @@ test("runOverlays human output lists music placements", () => {
   const out = runOverlays(p, { json: false });
   assert.match(out, /music \(1\):/);
   assert.match(out, /asset bed {2}1\.000s-4\.000s {2}gain 0\.4 {2}loop: score/);
+});
+
+// ── D2: runRanges/runStatusJson thread optional silences through to snap ────
+
+test("runRanges applies VAD snap when silences are passed and snap is enabled", () => {
+  const p = makeProject({ padMs: 0 });
+  p.cuts = {
+    snap: { enabled: true, mode: "vad", maxShiftMs: 120, crossfadeMs: 24 },
+    deadAir: [],
+  };
+  const withoutSilences = JSON.parse(runRanges(p, { json: true }));
+  const withSilences = JSON.parse(
+    runRanges(p, { json: true, silences: [{ startSec: 1.9, endSec: 2.3 }] })
+  );
+  const last = (r: { ranges: Array<{ endSec: number }> }) =>
+    r.ranges.at(-1)?.endSec;
+  assert.equal(last(withoutSilences), 2);
+  assert.equal(last(withSilences), 1.9);
+});
+
+test("runStatusJson applies VAD snap when silences are passed and snap is enabled", () => {
+  const p = makeProject({ padMs: 0 });
+  p.cuts = {
+    snap: { enabled: true, mode: "vad", maxShiftMs: 120, crossfadeMs: 24 },
+    deadAir: [],
+  };
+  const withoutSilences = JSON.parse(runStatusJson(p));
+  const withSilences = JSON.parse(
+    runStatusJson(p, [{ startSec: 1.9, endSec: 2.3 }])
+  );
+  assert.ok(withSilences.keptDurationSec < withoutSilences.keptDurationSec);
 });

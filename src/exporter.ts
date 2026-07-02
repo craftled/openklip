@@ -1,25 +1,27 @@
 import { existsSync } from "node:fs";
 import { mkdir, rename, unlink } from "node:fs/promises";
 import { isAbsolute, join } from "node:path";
+import { loadAudioAnalysis } from "./audio-analysis.ts";
 import {
   buildAss,
-  type CaptionWord,
   captionPlacementForSpan,
   groupCaptions,
+  keptWordsInOutputTime,
   type TitleSpan,
 } from "./captions.ts";
 import { colorAdjustFilter } from "./color-adjust.ts";
 import {
   type Asset,
+  type Audio,
   type Broll,
+  type CutSnap,
+  effectiveRanges,
   type MusicPlacement,
-  type Project,
   ProjectSchema,
   type Range,
   SAMPLE_RATE,
   sec,
   sourceToOutputSec,
-  survivingRanges,
   totalDurationSec,
 } from "./edl.ts";
 import { FFMPEG, probe, run } from "./ffmpeg.ts";
@@ -158,31 +160,10 @@ export function chooseAssetInput(
   );
 }
 
-function keptWordsInOutputTime(
-  project: Project,
-  ranges: Range[]
-): CaptionWord[] {
-  const sr = project.sampleRate;
-  const out: CaptionWord[] = [];
-  for (const w of project.words) {
-    if (w.deleted) {
-      continue;
-    }
-    const ws = w.startSample / sr;
-    const we = w.endSample / sr;
-    let cum = 0;
-    for (const r of ranges) {
-      if (ws >= r.startSec - 1e-6 && ws <= r.endSec + 1e-6) {
-        const s = cum + Math.max(0, ws - r.startSec);
-        const e = cum + Math.max(0, Math.min(we, r.endSec) - r.startSec);
-        out.push({ text: w.text, startSec: s, endSec: Math.max(e, s + 0.05) });
-        break;
-      }
-      cum += r.endSec - r.startSec;
-    }
-  }
-  return out;
-}
+// keptWordsInOutputTime now lives in src/captions.ts (R1): one shared
+// implementation with src/compiledTimeline.ts, matching words to ranges by
+// OVERLAP so snap/dead-air boundary shifts cannot drop a playing word's
+// caption.
 
 function escapeAssPath(p: string): string {
   return p.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
@@ -374,24 +355,284 @@ export function buildMusicFilterParts(
   return { filterParts, inputArgs, mixInputLabels };
 }
 
-// The audio side of the filtergraph. CRITICAL invariant: with zero music the
-// single returned line is byte-identical to the historical voice-only chain
-// (tests pin this), so projects without music export exactly as before. With
-// music, the voice chain is renamed [avoice] and mixed with every [mN] using
-// duration=first (the voice defines the cut length) and normalize=0 (amix must
-// not duck the voice by 1/n).
+// ── Seam declick / crossfade (Milestone 4.2 D2) ─────────────────────────────
+
+export interface SeamedVoiceOpts {
+  /** cuts.snap.crossfadeMs (0-100ms schema range). */
+  crossfadeMs: number;
+  /** audio.voiceHighpass.hz, present only when the highpass is enabled. */
+  highpassHz?: number;
+}
+
+export interface SeamedVoiceResult {
+  filterParts: string[];
+  /** The label the LAST filter part writes to; callers rename/consume it. */
+  outLabel: string;
+}
+
+// Declick the seams a plain `aselect` butt-joins hard: each surviving range
+// becomes its own `atrim` segment off [0:a], chained pairwise through
+// `acrossfade`. Every INTERNAL edge (not the very first start or very last
+// end) borrows crossfadeMs/2 of already-deleted source material on each side,
+// so the crossfade "spends" material that would otherwise be discarded rather
+// than eating into a kept range.
+//
+// Duration invariant (MUST hold, smoke-tested within 20ms in exporter.test.ts):
+// acrossfade always shortens its two inputs' combined duration by exactly its
+// `d`. Each seam's total extension (half borrowed by the trailing segment +
+// half borrowed by the leading segment) is built to equal that seam's `d`
+// exactly, so every acrossfade's shortening is offset by the extension that
+// fed it and the chained total duration equals the plain aselect duration to
+// the sample, regardless of how many seams clamp short.
+//
+// Clamping: a seam's available "gap" is the deleted span between the two
+// ranges it joins, and its `d` must also fit inside BOTH adjacent segments.
+// `d = min(crossfadeMs/1000, gap, leftRangeLen, rightRangeLen)`, split
+// evenly, so the borrowed material never crosses into the ranges either side
+// of the gap (acrossfade `d` varies per seam as a result - this is expected).
+// R3 (ffmpeg-verified): the range-length clamps matter because acrossfade
+// with an INPUT shorter than `d` exits 0 but produces EMPTY or truncated
+// audio (a silent voice track or dropped audio + A/V desync), and snapRanges
+// can legitimately shrink an edge range below crossfadeMs/2. Raw range length
+// is a safe lower bound for both inputs: a segment's duration is its range
+// length plus borrowed extensions (>= range length), and the accumulated left
+// chain never gets shorter than its most recent segment (each crossfade
+// yields a + b - d >= max(a, b) when d <= min(a, b)).
+//
+// Zero-gap / sub-4ms fallback: when two ranges are effectively adjacent
+// (gap ~ 0), or the clamped `d` would fall under 4ms (too short for a useful
+// crossfade), there is no material worth borrowing, so extending either side
+// would eat into a kept range for no audible benefit. Falls back to a
+// duration-preserving butt join instead: an 8ms qsin fade-out on the trailing
+// segment's own tail, an 8ms qsin fade-in on the leading segment's own head
+// (fades only reshape existing samples, they never add or remove any), then a
+// hard `concat`. No material is borrowed, so duration is preserved by
+// construction.
+const MIN_CROSSFADE_SEC = 0.004;
+
+export function buildSeamedVoiceParts(
+  ranges: Range[],
+  opts: SeamedVoiceOpts
+): SeamedVoiceResult {
+  const hp = opts.highpassHz;
+  const prefix = hp && hp > 0 ? `highpass=f=${hp},` : "";
+  const BUTT_FADE_SEC = 0.008;
+
+  if (ranges.length === 0) {
+    return { filterParts: [], outLabel: "" };
+  }
+
+  const seamCount = ranges.length - 1;
+  const seams = Array.from({ length: seamCount }, (_, i) => {
+    const gap = Math.max(0, ranges[i + 1].startSec - ranges[i].endSec);
+    const leftLen = ranges[i].endSec - ranges[i].startSec;
+    const rightLen = ranges[i + 1].endSec - ranges[i + 1].startSec;
+    const clamped = Math.min(
+      Math.max(0, opts.crossfadeMs) / 1000,
+      gap,
+      leftLen,
+      rightLen
+    );
+    // Under 4ms: route this seam through the butt-join branch (d === 0)
+    // rather than an acrossfade too short to declick anything.
+    const d = clamped < MIN_CROSSFADE_SEC ? 0 : clamped;
+    return { d, ext: d / 2 };
+  });
+
+  const filterParts: string[] = [];
+  const segLabels: string[] = [];
+  const segDurations: number[] = [];
+  ranges.forEach((r, i) => {
+    const extBefore = i === 0 ? 0 : seams[i - 1].ext;
+    const extAfter = i === seamCount ? 0 : seams[i].ext;
+    const start = r.startSec - extBefore;
+    const end = r.endSec + extAfter;
+    const label = `av${i}`;
+    filterParts.push(
+      `[0:a]${prefix}atrim=start=${sec(start)}:end=${sec(end)},asetpts=PTS-STARTPTS[${label}]`
+    );
+    segLabels.push(label);
+    segDurations.push(end - start);
+  });
+
+  let accLabel = segLabels[0];
+  let accDuration = segDurations[0];
+  for (let i = 0; i < seamCount; i++) {
+    const seam = seams[i];
+    const nextLabel = segLabels[i + 1];
+    const nextDuration = segDurations[i + 1];
+    const outLabel = `avseam${i}`;
+    if (seam.d > 0) {
+      filterParts.push(
+        `[${accLabel}][${nextLabel}]acrossfade=d=${sec(seam.d)}:c1=qsin:c2=qsin[${outLabel}]`
+      );
+      accDuration = accDuration + nextDuration - seam.d;
+    } else {
+      const leftFadeDur = Math.min(BUTT_FADE_SEC, accDuration);
+      const rightFadeDur = Math.min(BUTT_FADE_SEC, nextDuration);
+      const leftFaded = `${accLabel}fo`;
+      const rightFaded = `${nextLabel}fi`;
+      filterParts.push(
+        `[${accLabel}]afade=t=out:st=${sec(Math.max(0, accDuration - leftFadeDur))}:d=${sec(leftFadeDur)}:curve=qsin[${leftFaded}]`
+      );
+      filterParts.push(
+        `[${nextLabel}]afade=t=in:st=0.000000:d=${sec(rightFadeDur)}:curve=qsin[${rightFaded}]`
+      );
+      filterParts.push(
+        `[${leftFaded}][${rightFaded}]concat=n=2:v=0:a=1[${outLabel}]`
+      );
+      accDuration += nextDuration;
+    }
+    accLabel = outLabel;
+  }
+
+  return { filterParts, outLabel: accLabel };
+}
+
+// Whether buildAudioParts should route the voice through buildSeamedVoiceParts
+// instead of the plain aselect line. A single surviving range has no seam to
+// declick, and a zero crossfade is an explicit opt-out.
+export function shouldUseSeamedVoice(
+  ranges: Range[],
+  snap: CutSnap | undefined
+): boolean {
+  return Boolean(snap?.enabled && snap.crossfadeMs > 0 && ranges.length > 1);
+}
+
+// amountDb (1-30, AudioSchema bound) -> sidechaincompress ratio. Determinism
+// over psychoacoustic precision: three bands roughly bracket light/medium/
+// heavy ducking so the mapping is a fixed, pinned lookup rather than a
+// continuous formula that would drift if the constants ever moved. threshold
+// is held constant (a fixed low level so the compressor engages on ordinary
+// voice, not just loud peaks); amountDb only steers ratio.
+const DUCK_THRESHOLD = "0.02";
+function duckRatioFor(amountDb: number): number {
+  if (amountDb <= 6) {
+    return 4;
+  }
+  if (amountDb <= 12) {
+    return 8;
+  }
+  return 20;
+}
+
+export interface AudioFilterOpts {
+  /** project.audio; ducking/loudness/highpass all default to off/absent. */
+  audio?: Audio;
+  /** Surviving ranges; required to consider the seam-declick path. */
+  ranges?: Range[];
+  /** project.cuts.snap; the seam path only engages when this is enabled. */
+  snap?: CutSnap;
+}
+
+// The audio side of the filtergraph. CRITICAL invariant: with zero music AND
+// every audio setting at its default (disabled), the returned lines are
+// byte-identical to the historical voice-only / voice+amix chains (tests pin
+// this), so an export with no audio-quality opt-in renders exactly as before.
+//
+// Stage order: voice (aselect or seamed-crossfade) -> optional music mix
+// (plain amix, or sidechain ducking then amix when ducking is enabled and
+// music is present) -> optional loudnorm as the FINAL stage before [aout].
 export function buildAudioParts(
   selectExpr: string,
-  music: MusicFilterGraph
+  music: MusicFilterGraph,
+  opts: AudioFilterOpts = {}
 ): string[] {
-  if (music.mixInputLabels.length === 0) {
-    return [`[0:a]aselect='${selectExpr}',asetpts=N/SR/TB[aout]`];
+  const ranges = opts.ranges ?? [];
+  const snap = opts.snap;
+  const audio = opts.audio;
+  const hasMusic = music.mixInputLabels.length > 0;
+  const ducking = Boolean(audio?.ducking?.enabled) && hasMusic;
+  const loudness = Boolean(audio?.loudness?.enabled);
+  const useSeams = shouldUseSeamedVoice(ranges, snap);
+
+  const parts: string[] = [];
+  // isTerminalVoice: nothing downstream of the voice stage runs, so it can
+  // write directly to [aout] and stay byte-identical to the historical
+  // zero-music, zero-settings line (both the zero-music and with-music pins
+  // depend on this exact label choice; see the byte-parity tests).
+  const isTerminalVoice = !(hasMusic || loudness);
+  const voiceLabel = isTerminalVoice ? "aout" : "avoice";
+
+  if (useSeams) {
+    // Seam highpass is threaded through buildSeamedVoiceParts's own option
+    // (applied before each atrim, ahead of the crossfades).
+    const seam = buildSeamedVoiceParts(ranges, {
+      crossfadeMs: (snap as CutSnap).crossfadeMs,
+      highpassHz: audio?.voiceHighpass?.enabled
+        ? audio.voiceHighpass.hz
+        : undefined,
+    });
+    parts.push(...seam.filterParts, `[${seam.outLabel}]anull[${voiceLabel}]`);
+  } else {
+    // F7: the plain aselect voice path (cuts.snap off, or a single surviving
+    // range) previously ignored voiceHighpass entirely - only the seam path
+    // above honored it, so enabling the highpass with snap off was a no-op.
+    // Appended right after asetpts, same as the seam path applies it right
+    // before its own atrim. Disabled (the default) emits no suffix, so this
+    // is byte-identical to the historical line the zero-settings pins expect.
+    const highpassHz = audio?.voiceHighpass?.enabled
+      ? audio.voiceHighpass.hz
+      : undefined;
+    const highpassSuffix =
+      highpassHz && highpassHz > 0 ? `,highpass=f=${highpassHz}` : "";
+    parts.push(
+      `[0:a]aselect='${selectExpr}',asetpts=N/SR/TB${highpassSuffix}[${voiceLabel}]`
+    );
   }
-  return [
-    `[0:a]aselect='${selectExpr}',asetpts=N/SR/TB[avoice]`,
-    ...music.filterParts,
-    `[avoice]${music.mixInputLabels.map((l) => `[${l}]`).join("")}amix=inputs=${1 + music.mixInputLabels.length}:duration=first:normalize=0[aout]`,
-  ];
+
+  if (hasMusic) {
+    parts.push(...music.filterParts);
+  }
+
+  let mixedLabel = voiceLabel;
+  if (hasMusic && ducking) {
+    const mmixLabel =
+      music.mixInputLabels.length === 1 ? music.mixInputLabels[0] : "mmix";
+    if (music.mixInputLabels.length > 1) {
+      parts.push(
+        `${music.mixInputLabels.map((l) => `[${l}]`).join("")}amix=inputs=${music.mixInputLabels.length}:duration=first:normalize=0[mmix]`
+      );
+    }
+    // hasMusic && ducking guarantees voiceLabel is "avoice" (isTerminalVoice
+    // is false whenever hasMusic is true), so this is the same label - spelled
+    // via the variable for clarity that the split source is THE voice stage.
+    parts.push(`[${voiceLabel}]asplit=2[avmain][avsc]`);
+    const duck = (audio as Audio).ducking;
+    const ratio = duckRatioFor(duck.amountDb);
+    parts.push(
+      `[${mmixLabel}][avsc]sidechaincompress=threshold=${DUCK_THRESHOLD}:ratio=${ratio}:attack=${duck.attackMs}:release=${duck.releaseMs}:makeup=1[mduck]`
+    );
+    const finalLabel = loudness ? "apreln" : "aout";
+    parts.push(
+      `[avmain][mduck]amix=inputs=2:duration=first:normalize=0[${finalLabel}]`
+    );
+    mixedLabel = finalLabel;
+  } else if (hasMusic) {
+    const finalLabel = loudness ? "apreln" : "aout";
+    parts.push(
+      `[${voiceLabel}]${music.mixInputLabels.map((l) => `[${l}]`).join("")}amix=inputs=${1 + music.mixInputLabels.length}:duration=first:normalize=0[${finalLabel}]`
+    );
+    mixedLabel = finalLabel;
+  }
+
+  if (loudness) {
+    const targetLufs = (audio as Audio).loudness.targetLufs;
+    // R2 (ffmpeg-verified): single-pass loudnorm internally upsamples and
+    // OUTPUTS 192 kHz; the aac encoder then clamps that to 96 kHz, so every
+    // loudness-enabled export would silently ship 96 kHz audio instead of the
+    // project's 48 kHz. Constrain the rate back to the project grid
+    // immediately after the loudnorm stage (this one line serves both the
+    // voice-only and post-amix paths; mixedLabel is whichever fed it).
+    // aformat (not a bare `aresample=48000`, which trips a channel-layout
+    // negotiation error after loudnorm on the bundled ffmpeg-static build)
+    // lets ffmpeg insert the correctly-negotiated resampler itself.
+    parts.push(
+      `[${mixedLabel}]loudnorm=I=${targetLufs}:TP=-1.5:LRA=11,aformat=sample_rates=${SAMPLE_RATE}[aout]`
+    );
+  }
+
+  return parts;
 }
 
 export async function exportCut(
@@ -412,6 +653,13 @@ export async function exportCut(
   height: number;
   fps: number;
   compression: ExportCompression;
+  audio: {
+    seams: boolean;
+    ducking: boolean;
+    loudness: boolean;
+    /** Whether VAD-snapped ranges (cuts.snap) actually shaped this export. */
+    snapped: boolean;
+  };
 }> {
   const p = projectPaths(slug);
   await mkdir(p.working, { recursive: true });
@@ -419,7 +667,24 @@ export async function exportCut(
   const project = ProjectSchema.parse(
     JSON.parse(await Bun.file(p.project).text())
   );
-  const ranges = survivingRanges(project);
+  const wantsSnap =
+    project.cuts?.snap?.enabled && project.cuts.snap.mode === "vad";
+  // A failed/missing analysis must never fail the export: fall back to
+  // undefined (effectiveRanges treats that as "snap is a no-op") and report
+  // the honest outcome via `snapped` below.
+  const silences = wantsSnap
+    ? await loadAudioAnalysis(slug)
+        .then((a) => a.silences)
+        .catch(() => undefined)
+    : undefined;
+  const ranges = effectiveRanges(project, silences);
+  // F10: matches effectiveRanges' own snap gate (project.cuts.snap.enabled &&
+  // mode "vad" && silences && silences.length > 0), so `snapped` cannot
+  // report true for an analysis that loaded but found nothing to snap onto
+  // (an empty silences array is honest "snap did not shape this export").
+  const snapped = Boolean(
+    wantsSnap && silences !== undefined && silences.length > 0
+  );
   if (ranges.length === 0) {
     throw new Error("nothing to export (all words deleted)");
   }
@@ -834,9 +1099,20 @@ export async function exportCut(
     vlabel = "vgfx";
   }
   parts.push(`[${vlabel}]null[vout]`);
-  // Zero music emits the historical voice-only [aout] line byte-identically;
-  // otherwise the voice becomes [avoice] and is amixed with every music bed.
-  parts.push(...buildAudioParts(selectExpr, musicGraph));
+  // Zero music AND every audio setting at its default emits the historical
+  // voice-only [aout] line byte-identically; otherwise the voice may route
+  // through seam-declick, ducking, and/or loudnorm before landing on [aout].
+  const audioSeams = shouldUseSeamedVoice(ranges, project.cuts.snap);
+  const audioDucking =
+    Boolean(project.audio.ducking.enabled) && musicWindows.length > 0;
+  const audioLoudness = Boolean(project.audio.loudness.enabled);
+  parts.push(
+    ...buildAudioParts(selectExpr, musicGraph, {
+      ranges,
+      snap: project.cuts.snap,
+      audio: project.audio,
+    })
+  );
 
   const inputs = [
     "-i",
@@ -917,5 +1193,11 @@ export async function exportCut(
     height: outH,
     fps: outFps,
     compression: opts.compression ?? "social",
+    audio: {
+      seams: audioSeams,
+      ducking: audioDucking,
+      loudness: audioLoudness,
+      snapped,
+    },
   };
 }

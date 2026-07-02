@@ -97,9 +97,13 @@ const EXPECTED = [
   "captions-max",
   "pad",
   "cuts-snap",
+  "dead-air-add",
+  "dead-air-rm",
+  "audio",
   "look-vignette",
   "reorder",
   "reanchor",
+  "word-text",
 ];
 
 test("registry covers every documented mutation by name", () => {
@@ -302,6 +306,48 @@ test("cuts-snap: stores VAD snap settings in project JSON", () => {
     crossfadeMs: 32,
   });
   assert.deepEqual(p.cuts.snap, r.snap);
+});
+
+test("audio: stores export audio quality settings, clamped, in project JSON", () => {
+  const p = makeProject();
+  const r = runAction("audio", p, {
+    ducking: { enabled: true, amountDb: 999 },
+    loudness: { enabled: true, targetLufs: -14 },
+  }) as { audio: Project["audio"] };
+  assert.deepEqual(r.audio, {
+    ducking: { enabled: true, amountDb: 30, attackMs: 25, releaseMs: 250 },
+    loudness: { enabled: true, targetLufs: -14 },
+    voiceHighpass: { enabled: false, hz: 80 },
+  });
+  assert.deepEqual(p.audio, r.audio);
+});
+
+test("word-text: corrects a word's text and round-trips originalText", () => {
+  const p = makeProject();
+  const first = runAction("word-text", p, { id: "w0", text: "Word Zero" }) as {
+    id: string;
+    text: string;
+    originalText?: string;
+  };
+  assert.equal(first.text, "Word Zero");
+  assert.equal(first.originalText, "word0");
+  assert.equal(p.words[0].text, "Word Zero");
+
+  const second = runAction("word-text", p, {
+    id: "w0",
+    text: "Word Zero!!",
+  }) as { id: string; text: string; originalText?: string };
+  assert.equal(second.originalText, "word0");
+});
+
+test("word-text: rejects empty text (primitive owns the bound)", () => {
+  const p = makeProject();
+  assert.throws(() => runAction("word-text", p, { id: "w0", text: "   " }));
+});
+
+test("word-text: rejects an unknown word id", () => {
+  const p = makeProject();
+  assert.throws(() => runAction("word-text", p, { id: "nope", text: "hi" }));
 });
 
 test("reorder: restacks within a track", () => {

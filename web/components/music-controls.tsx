@@ -1,9 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import {
+  CommitNumberInput,
+  firstSliderValue,
+  THIN_SLIDER,
+} from "@/components/slider-primitives";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -44,67 +48,6 @@ export interface MusicPlacementPatch {
   gain?: number;
   mode?: "trim" | "loop";
   toSec?: number;
-}
-
-function firstSliderValue(value: number | readonly number[]): number {
-  return typeof value === "number" ? value : value[0];
-}
-
-function clampNumber(raw: string, min: number, max: number): number | null {
-  const n = Number(raw);
-  if (!Number.isFinite(n)) {
-    return null;
-  }
-  return Math.max(min, Math.min(max, n));
-}
-
-const THIN_SLIDER =
-  "[&_[data-slot=slider-track]]:h-1 [&_[data-slot=slider-thumb]]:size-3 [&_[data-slot=slider-range]]:bg-foreground/35";
-
-// Number input that keeps keystrokes local and persists only on blur or Enter
-// (the filter-controls onValueChange/onValueCommitted split, applied to typed
-// input). Persisting per keystroke would enqueue one save + history entry per
-// character.
-function CommitNumberInput({
-  max,
-  min,
-  onCommit,
-  step,
-  value,
-}: {
-  max?: number;
-  min: number;
-  onCommit: (n: number) => void;
-  step: number;
-  value: number;
-}) {
-  const [draft, setDraft] = useState<string | null>(null);
-  const commit = () => {
-    if (draft === null) {
-      return;
-    }
-    const n = clampNumber(draft, min, max ?? Number.MAX_SAFE_INTEGER);
-    setDraft(null);
-    if (n !== null && n !== value) {
-      onCommit(n);
-    }
-  };
-  return (
-    <Input
-      max={max}
-      min={min}
-      onBlur={commit}
-      onChange={(e) => setDraft(e.target.value)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") {
-          commit();
-        }
-      }}
-      step={step}
-      type="number"
-      value={draft ?? value}
-    />
-  );
 }
 
 // One placement's editor. Slider drags update local state only and persist on

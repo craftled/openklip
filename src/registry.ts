@@ -9,6 +9,7 @@
 import { z } from "zod";
 import {
   addBroll,
+  addDeadAir,
   addGraphic,
   addJsonGraphic,
   addMusic,
@@ -19,6 +20,7 @@ import {
   cutByText,
   cutWords,
   removeBroll,
+  removeDeadAir,
   removeGraphic,
   removeMusic,
   removeStill,
@@ -28,12 +30,14 @@ import {
   reorderTitle,
   reorderZoom,
   restoreAll,
+  setAudio,
   setCaptionMaxWords,
   setCaptions,
   setCutSnap,
   setLook,
   setMotion,
   setPadMs,
+  setWordText,
   updateBroll,
   updateGraphic,
   updateJsonGraphic,
@@ -147,6 +151,17 @@ export const actions: ActionDef[] = [
       const reanchored = reanchorProject(p);
       return { ok: true, reanchored };
     },
+  }),
+  defineAction({
+    name: "word-text",
+    summary:
+      "Correct one word's transcript text (agent/CLI parity surface; the GUI's bulk edits use its own edit-words path).",
+    surfaces: ["cli", "gui", "mcp"],
+    schema: z.object({
+      id: z.string(),
+      text: z.string(),
+    }),
+    run: (p, i) => setWordText(p, i.id, i.text),
   }),
   defineAction({
     name: "broll-add",
@@ -459,6 +474,29 @@ export const actions: ActionDef[] = [
     },
   }),
   defineAction({
+    name: "dead-air-add",
+    summary:
+      "Register dead-air spans (source time) to drop from otherwise-kept ranges.",
+    surfaces: ["cli", "gui", "mcp"],
+    schema: z.object({
+      spans: z
+        .array(z.object({ fromSec: sec, toSec: sec }))
+        .min(1)
+        .max(50),
+    }),
+    run: (p, i) => addDeadAir(p, i.spans),
+  }),
+  defineAction({
+    name: "dead-air-rm",
+    summary: "Remove a registered dead-air span by id.",
+    // No GUI affordance yet (the cleanup panel only ADDS spans; a per-span
+    // remove/undo row is a TODO), so the gui surface stays off until one
+    // exists rather than advertising a caller-less surface.
+    surfaces: ["cli", "mcp"],
+    schema: z.object({ id: z.string() }),
+    run: (p, i) => ({ removed: removeDeadAir(p, i.id) }),
+  }),
+  defineAction({
     name: "look-vignette",
     summary: "Toggle the vignette look flag.",
     surfaces: ["cli", "gui", "mcp"],
@@ -524,6 +562,38 @@ export const actions: ActionDef[] = [
     run: (p, i) => {
       setMotion(p, i);
       return { motion: p.motion };
+    },
+  }),
+  defineAction({
+    name: "audio",
+    summary:
+      "Set export audio quality: sidechain ducking under music, loudness normalization, and voice highpass. Bounds are enforced in setAudio, not here (cuts-snap precedent) - schema is shape-only.",
+    surfaces: ["cli", "gui", "mcp"],
+    schema: z.object({
+      ducking: z
+        .object({
+          enabled: z.boolean().optional(),
+          amountDb: z.number().optional(),
+          attackMs: z.number().optional(),
+          releaseMs: z.number().optional(),
+        })
+        .optional(),
+      loudness: z
+        .object({
+          enabled: z.boolean().optional(),
+          targetLufs: z.number().optional(),
+        })
+        .optional(),
+      voiceHighpass: z
+        .object({
+          enabled: z.boolean().optional(),
+          hz: z.number().optional(),
+        })
+        .optional(),
+    }),
+    run: (p, i) => {
+      setAudio(p, i);
+      return { audio: p.audio };
     },
   }),
   defineAction({

@@ -1,5 +1,10 @@
 import { z } from "zod";
 import {
+  type SilenceSpan,
+  snapRanges,
+  subtractDeadAir,
+} from "./audio-analysis-core.ts";
+import {
   ProductAnnouncementCatalogSchema,
   ProductAnnouncementSpecSchema,
 } from "./product-announcement.ts";
@@ -16,6 +21,13 @@ export const WordSchema = z.object({
   deleted: z.boolean().default(false),
   /** F1: why this word was cut/kept; metadata only, never reaches ffmpeg. */
   note: z.string().optional(),
+  /**
+   * The transcript text this word had BEFORE its first agent/CLI correction
+   * (see setWordText in actions.ts). Set once and never overwritten, so the
+   * original Whisper output stays recoverable even after edits. Absent for
+   * words that have never been corrected.
+   */
+  originalText: z.string().optional(),
 });
 export type Word = z.infer<typeof WordSchema>;
 
@@ -339,9 +351,23 @@ export const CutSnapSchema = z
   });
 export type CutSnap = z.infer<typeof CutSnapSchema>;
 
+// A source-time span (48 kHz sample grid, like Word) manually or agent
+// registered to drop from an otherwise-kept range: a natural pause or leftover
+// dead air INSIDE a surviving stretch, as opposed to `deleted` words which
+// remove the word's own span. Applied by effectiveRanges (export/preview) on
+// top of survivingRanges: see subtractDeadAir in audio-analysis-core.ts.
+export const DeadAirSpanSchema = z.object({
+  id: z.string(),
+  startSample: z.number().int().nonnegative(),
+  endSample: z.number().int().nonnegative(),
+});
+export type DeadAirSpan = z.infer<typeof DeadAirSpanSchema>;
+
 export const CutsSchema = z
   .object({
     snap: CutSnapSchema,
+    /** Source-time spans removed from kept ranges; applied by effectiveRanges. */
+    deadAir: z.array(DeadAirSpanSchema).default([]),
   })
   .default({
     snap: {
@@ -350,8 +376,49 @@ export const CutsSchema = z
       maxShiftMs: 120,
       crossfadeMs: 24,
     },
+    deadAir: [],
   });
 export type Cuts = z.infer<typeof CutsSchema>;
+
+// Export audio quality settings stored in project.json (Descript-match
+// Milestone 4.2). Mirrors the MotionSchema shape: one settings object with a
+// whole-object default so legacy project.json files parse unchanged. Bounds
+// live here (like Motion/CutSnap) because this is the persisted, load-bearing
+// document shape; the setAudio primitive re-clamps on write so callers cannot
+// smuggle an out-of-range value past the schema via a partial merge.
+export const AudioSchema = z
+  .object({
+    /** Sidechain-duck the music bed under the voice at export. */
+    ducking: z
+      .object({
+        enabled: z.boolean().default(false),
+        /** Target attenuation of the bed while the voice is present, in dB. */
+        amountDb: z.number().min(1).max(30).default(12),
+        attackMs: z.number().min(1).max(500).default(25),
+        releaseMs: z.number().min(20).max(2000).default(250),
+      })
+      .default({ enabled: false, amountDb: 12, attackMs: 25, releaseMs: 250 }),
+    /** Single-pass loudnorm to a target integrated loudness. */
+    loudness: z
+      .object({
+        enabled: z.boolean().default(false),
+        targetLufs: z.number().min(-30).max(-10).default(-16),
+      })
+      .default({ enabled: false, targetLufs: -16 }),
+    /** Rumble-cut highpass applied to seam-crossfaded voice segments. */
+    voiceHighpass: z
+      .object({
+        enabled: z.boolean().default(false),
+        hz: z.number().min(40).max(200).default(80),
+      })
+      .default({ enabled: false, hz: 80 }),
+  })
+  .default({
+    ducking: { enabled: false, amountDb: 12, attackMs: 25, releaseMs: 250 },
+    loudness: { enabled: false, targetLufs: -16 },
+    voiceHighpass: { enabled: false, hz: 80 },
+  });
+export type Audio = z.infer<typeof AudioSchema>;
 
 export const ProjectSchema = z.object({
   version: z.literal(1),
@@ -400,6 +467,8 @@ export const ProjectSchema = z.object({
   assembly: AssemblyProvenanceSchema.optional(),
   /** Global animation feel for overlay entrances. */
   motion: MotionSchema,
+  /** Export audio quality: ducking, loudness normalization, voice highpass. */
+  audio: AudioSchema,
   /** Monotonic edit revision bumped by logged mutations (absent = 0). */
   revision: z.number().int().nonnegative().optional(),
 });
@@ -458,6 +527,37 @@ export function survivingRanges(project: Project): Range[] {
     }
   }
   return merged.filter((r) => r.endSec - r.startSec > 0.01);
+}
+
+// The single shared range pipeline every consumer (exporter, query/CLI,
+// compiledTimeline, and the web client) should read from. Layers on top of
+// survivingRanges() in a fixed order:
+//   1. dead-air subtraction (cuts.deadAir): ALWAYS applied when non-empty,
+//      regardless of the snap setting, since a dead-air span is an explicit
+//      "remove this" edit, not a VAD suggestion.
+//   2. VAD snap (cuts.snap): only applied when snap.enabled, snap.mode is
+//      "vad", AND the caller supplied `silences`. Dead-air runs first so
+//      snap candidates are matched against the post-subtraction boundaries
+//      (e.g. a boundary created by splitting a range around dead air can
+//      itself snap onto a nearby silence).
+// Callers that have no silence data (sync call sites, or surfaces that
+// haven't loaded working/audio-analysis.json) simply omit `silences`; snap
+// becomes a no-op and dead-air subtraction still applies, so CLI/GUI/export
+// truth never diverges on dead-air, only on how tightly boundaries snap.
+export function effectiveRanges(
+  project: Project,
+  silences?: SilenceSpan[]
+): Range[] {
+  let ranges = survivingRanges(project);
+  const deadAir = project.cuts?.deadAir ?? [];
+  if (deadAir.length > 0) {
+    ranges = subtractDeadAir(ranges, deadAir, project.sampleRate);
+  }
+  const snap = project.cuts?.snap;
+  if (snap?.enabled && snap.mode === "vad" && silences && silences.length > 0) {
+    ranges = snapRanges(ranges, silences, snap.maxShiftMs / 1000);
+  }
+  return ranges;
 }
 
 export function totalDurationSec(ranges: Range[]): number {

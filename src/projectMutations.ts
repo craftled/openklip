@@ -1,4 +1,4 @@
-import { setCutSnap } from "./actions.ts";
+import { normalizeWordText, setCutSnap } from "./actions.ts";
 import { isNeutralColor } from "./color-adjust.ts";
 import {
   type Broll,
@@ -39,7 +39,18 @@ export function applyProjectEdits(
       if (patch) {
         w.deleted = Boolean(patch.deleted);
         if (typeof patch?.text === "string" && patch.text.trim()) {
-          w.text = patch.text.trim();
+          // F8: mirror setWordText's (src/actions.ts) originalText
+          // preservation - record the PRE-correction text once, the first
+          // time this word's text actually changes, so the GUI's bulk
+          // edit-words path doesn't bypass the same recoverability the
+          // CLI/agent word-text correction surface already gives every word.
+          // C2: normalizeWordText (not a bare trim) so an embedded newline
+          // can't ride into project.json and break one-line ASS Dialogues.
+          const trimmed = normalizeWordText(patch.text);
+          if (trimmed !== w.text && w.originalText === undefined) {
+            w.originalText = w.text;
+          }
+          w.text = trimmed;
         }
       }
     }

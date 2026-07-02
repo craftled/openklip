@@ -1,12 +1,19 @@
 "use client";
 
+import type { SilenceSpan } from "@engine/audio-analysis-core";
+import type { CleanupCandidate } from "@engine/cleanup";
+import { partitionSafeCandidates } from "@engine/cleanup";
 import type {
+  Audio,
   ColorAdjust,
+  CutSnap,
   Project as EngineProject,
   Filter,
 } from "@engine/edl";
+import { AudioSchema, CutSnapSchema, effectiveRanges } from "@engine/edl";
 import { FILTER_OPTIONS, filterLabel } from "@engine/filter";
 import { validateProductAnnouncementSpec } from "@engine/product-announcement";
+import { useRouter } from "next/navigation";
 import {
   type ComponentType,
   type CSSProperties,
@@ -23,6 +30,7 @@ import { AgentChatProvider } from "@/components/agent-chat-context";
 import { AgentChatPanel } from "@/components/agent-chat-panel";
 import { AgentSidebar } from "@/components/agent-sidebar";
 import { withAssetKind } from "@/components/asset-bin";
+import { AudioControls, type AudioPatch } from "@/components/audio-controls";
 import { BriefEditor } from "@/components/brief-editor";
 import {
   CHAT_WIDTH_DEFAULT,
@@ -30,6 +38,10 @@ import {
   readStoredChatWidth,
 } from "@/components/chat-resize-handle";
 import { CinemaPlayer } from "@/components/cinema-player";
+import {
+  buildCleanupCandidates,
+  CleanupPanel,
+} from "@/components/cleanup-panel";
 import { ColorTempPad } from "@/components/color-temp-pad";
 import {
   EditTimeline,
@@ -116,6 +128,7 @@ import {
   toastSaveError,
 } from "@/lib/app-toast";
 import type { AssetBinUpdate } from "@/lib/asset-bin-update";
+import { type DeadAirItem, reconcileDeadAirItems } from "@/lib/dead-air-state";
 import {
   APP_ICON_CLASS,
   Captions,
@@ -228,9 +241,17 @@ interface StillItem {
 }
 interface Project {
   assets: Asset[];
+  audio?: Audio;
   brief?: string | null;
   broll: BrollItem[];
   captions?: { enabled: boolean; maxWords?: number };
+  // cuts.deadAir/cuts.snap: registered by the Cleanup/Audio config sections
+  // (dead-air-add/cuts-snap registry actions). Optional so this local Project
+  // type keeps parsing project.json shapes saved before either existed.
+  cuts?: {
+    deadAir?: DeadAirItem[];
+    snap?: CutSnap;
+  };
   dirPath: string;
   durationSamples: number;
   fps: number;
@@ -242,6 +263,10 @@ interface Project {
   music?: MusicPlacementView[];
   padMs: number;
   sampleRate: number;
+  // Rides on the project object from a separate editor-page-data change
+  // (VAD silence spans for dead-air detection); absent/undefined/null all
+  // degrade the Cleanup section to filler-only via buildCleanupCandidates.
+  silences?: SilenceSpan[] | null;
   slug: string;
   source: string;
   stills?: StillItem[];
@@ -265,53 +290,42 @@ const SLIDER =
   "[&_[data-slot=slider-track]]:h-1 [&_[data-slot=slider-thumb]]:size-3 [&_[data-slot=slider-range]]:bg-foreground/35";
 const CONFIG_SIDEBAR_WIDTH = 288;
 const CHAT_WIDTH_WITH_CONFIG = 360;
+// F12: mirrors the dead-air-add action's server-side span cap (src/registry.ts).
+const DEAD_AIR_ADD_BATCH_SIZE = 50;
+
+// M4: read straight off AudioSchema/CutSnapSchema's own `.default()` (src/edl.ts)
+// instead of hand-copied literals that can drift from the schema, so the
+// Audio config section has something to render/merge against on a
+// project.json saved before either field existed.
+const DEFAULT_AUDIO: Audio = AudioSchema.parse(undefined);
+const DEFAULT_CUT_SNAP: CutSnap = CutSnapSchema.parse(undefined);
+
+// One-level-deep merge matching setAudio's server-side merge (src/actions.ts):
+// only the subobjects present in patch change, an omitted subobject is left
+// untouched. Values are re-clamped server-side regardless of what the
+// slider/number-input bounds already enforce client-side.
+function mergeAudioPatch(current: Audio | undefined, patch: AudioPatch): Audio {
+  const base = current ?? DEFAULT_AUDIO;
+  return {
+    ducking: patch.ducking
+      ? { ...base.ducking, ...patch.ducking }
+      : base.ducking,
+    loudness: patch.loudness
+      ? { ...base.loudness, ...patch.loudness }
+      : base.loudness,
+    voiceHighpass: patch.voiceHighpass
+      ? { ...base.voiceHighpass, ...patch.voiceHighpass }
+      : base.voiceHighpass,
+  };
+}
 
 function firstSliderValue(value: number | readonly number[]): number {
   return typeof value === "number" ? value : value[0];
 }
 
-function survivingRanges(project: Project): Range[] {
-  const pad = (project.padMs ?? 50) / 1000;
-  const dur = project.durationSamples / project.sampleRate;
-  const raw: Array<{ start: number; end: number }> = [];
-  let cur: { start: number; end: number } | null = null;
-  for (const w of project.words) {
-    if (w.deleted) {
-      if (cur) {
-        raw.push(cur);
-        cur = null;
-      }
-      continue;
-    }
-    const s = w.startSample / project.sampleRate;
-    const e = w.endSample / project.sampleRate;
-    if (cur) {
-      cur.end = Math.max(cur.end, e);
-    } else {
-      cur = { start: s, end: e };
-    }
-  }
-  if (cur) {
-    raw.push(cur);
-  }
-  const padded: Range[] = raw.map((r, index) => ({
-    startSec: Math.max(index === 0 ? 0 : r.start, r.start - pad),
-    endSec: Math.min(
-      index === raw.length - 1 ? dur || r.end + pad : r.end,
-      r.end + pad
-    ),
-  }));
-  const merged: Range[] = [];
-  for (const r of padded) {
-    const last = merged[merged.length - 1];
-    if (last && r.startSec <= last.endSec) {
-      last.endSec = Math.max(last.endSec, r.endSec);
-    } else {
-      merged.push({ ...r });
-    }
-  }
-  return merged.filter((r) => r.endSec - r.startSec > 0.01);
-}
+// Kept-range math itself now lives in one place (src/edl.ts effectiveRanges),
+// shared with the server (exporter/query/CLI) so preview and export truth
+// cannot drift; see the two effectiveRanges(project, ...) call sites below.
 
 function outputPos(ranges: Range[], curSec: number): number {
   let cum = 0;
@@ -388,6 +402,7 @@ export function App({
   initialProject: Project;
   projects: ProjectListing[];
 }) {
+  const router = useRouter();
   const [project, setProject] = useState<Project>(initialProject);
   const [playing, setPlaying] = useState(false);
   const [curSample, setCurSample] = useState(0);
@@ -494,13 +509,30 @@ export function App({
   const saveErrorRef = useRef<string | null>(null);
   projectRef.current = project;
 
+  // F5: ranges feeds both the render path below and the CutScheduler's 60Hz
+  // getRanges tick right after. rangesRef mirrors this memo so the scheduler
+  // reads a cheap ref instead of recomputing effectiveRanges on every
+  // requestAnimationFrame. Assigned during render (like projectRef.current
+  // above), so it is already current by the time any effect runs, including
+  // the first-mount CutScheduler construction below - no stale first frame.
+  const ranges = useMemo(
+    () =>
+      project
+        ? effectiveRanges(
+            project as unknown as EngineProject,
+            project.silences ?? undefined
+          )
+        : [],
+    [project]
+  );
+  const rangesRef = useRef(ranges);
+  rangesRef.current = ranges;
+
   useEffect(() => {
     if (!(videoRef.current && project) || schedRef.current) {
       return;
     }
-    const sched = new CutScheduler(videoRef.current, () =>
-      survivingRanges(projectRef.current as Project)
-    );
+    const sched = new CutScheduler(videoRef.current, () => rangesRef.current);
     sched.onTick = (sourceSec) => {
       const lr = loopRef.current;
       if (lr && videoRef.current && sourceSec >= lr.outSec - 0.03) {
@@ -514,10 +546,6 @@ export function App({
     schedRef.current = sched;
   }, [project]);
 
-  const ranges = useMemo(
-    () => (project ? survivingRanges(project) : []),
-    [project]
-  );
   const projectHover = useMemo(
     () => buildProjectHoverContext(project, project.dirPath),
     [project]
@@ -595,6 +623,34 @@ export function App({
   );
   const activeMusic = project?.music?.find(
     (m) => curSample >= m.startSample && curSample < m.endSample
+  );
+  // Filler + dead-air candidates for the Cleanup config section. Degrades to
+  // filler-only (with a warning) until project.silences is populated by the
+  // editor-page-data change that loads audio analysis for this page. Cast
+  // like reanchorProject above: this file's local Project is a narrower UI
+  // shape than the engine's, missing fields (version, proxy, ...) the pure
+  // engine helpers don't read. F6: deps are narrowed to what
+  // buildCleanupCandidates/cleanupReport actually read (words, cuts,
+  // silences, and the overlay arrays it checks for proximity warnings) so an
+  // unrelated project.json field (look, motion, assets, ...) doesn't force a
+  // recompute on every edit.
+  const cleanupReportView = useMemo(
+    () =>
+      buildCleanupCandidates(
+        project as unknown as EngineProject,
+        project.silences
+      ),
+    [
+      project.slug,
+      project.words,
+      project.cuts,
+      project.silences,
+      project.broll,
+      project.titles,
+      project.zooms,
+      project.stills,
+      project.graphics,
+    ]
   );
 
   useEffect(() => {
@@ -1056,6 +1112,176 @@ export function App({
     setProject({ ...project, music });
     enqueueSave(() => runGuiAction(project.slug, "music-rm", { id }));
   };
+
+  // Cleanup section: a filler candidate optimistically deletes its wordIds
+  // (reanchoredWordUpdate, the same optimistic mirror cutSearchMatches uses)
+  // and persists through the cut action; a dead-air candidate optimistically
+  // appends a placeholder to cuts.deadAir and persists through dead-air-add,
+  // reconciling the placeholder with the server-assigned id on success (the
+  // music-add precedent).
+  const applyCleanupCandidate = (candidate: CleanupCandidate) => {
+    if (candidate.kind === "filler") {
+      setProject((prev) =>
+        reanchoredWordUpdate(prev, new Set(candidate.wordIds), true)
+      );
+      enqueueSave(() =>
+        runGuiAction(project.slug, "cut", {
+          ids: candidate.wordIds,
+          deleted: true,
+          note: candidate.reason,
+        })
+      );
+      return;
+    }
+    const optimisticId = `da${Date.now()}`;
+    setProject((prev) => ({
+      ...prev,
+      cuts: {
+        ...prev.cuts,
+        deadAir: [
+          ...(prev.cuts?.deadAir ?? []),
+          {
+            id: optimisticId,
+            startSample: Math.round(candidate.startSec * prev.sampleRate),
+            endSample: Math.round(candidate.endSec * prev.sampleRate),
+          },
+        ],
+      },
+    }));
+    enqueueSave(async () => {
+      const r = await runGuiAction(project.slug, "dead-air-add", {
+        spans: [{ fromSec: candidate.startSec, toSec: candidate.endSec }],
+      });
+      if (r.ok) {
+        const created = r.data.result as DeadAirItem[];
+        setProject((prev) => ({
+          ...prev,
+          cuts: {
+            ...prev.cuts,
+            deadAir: reconcileDeadAirItems(
+              prev.cuts?.deadAir ?? [],
+              created,
+              (id) => id === optimisticId
+            ),
+          },
+        }));
+      }
+      return r;
+    });
+  };
+
+  // "Apply all safe" batches every safe candidate into at most two saves (and
+  // two history entries) instead of one per candidate: one cut call carrying
+  // every safe filler's wordIds, one (possibly chunked, see F12 below)
+  // dead-air-add call carrying every safe dead-air candidate's span.
+  // partitionSafeCandidates (M2) is the same split src/cli.ts's
+  // `cleanup --apply-safe` uses.
+  const applyAllSafeCleanup = () => {
+    const { fillerIds, deadAirSpans } = partitionSafeCandidates(
+      cleanupReportView.candidates
+    );
+    if (fillerIds.length === 0 && deadAirSpans.length === 0) {
+      return;
+    }
+    if (fillerIds.length > 0) {
+      setProject((prev) =>
+        reanchoredWordUpdate(prev, new Set(fillerIds), true)
+      );
+      enqueueSave(() =>
+        runGuiAction(project.slug, "cut", {
+          ids: fillerIds,
+          deleted: true,
+          note: "cleanup: apply all safe",
+        })
+      );
+    }
+    if (deadAirSpans.length > 0) {
+      const optimisticId = `da${Date.now()}`;
+      setProject((prev) => ({
+        ...prev,
+        cuts: {
+          ...prev.cuts,
+          deadAir: [
+            ...(prev.cuts?.deadAir ?? []),
+            ...deadAirSpans.map((span, index) => ({
+              id: `${optimisticId}-${index}`,
+              startSample: Math.round(span.fromSec * project.sampleRate),
+              endSample: Math.round(span.toSec * project.sampleRate),
+            })),
+          ],
+        },
+      }));
+      // F12: dead-air-add caps at 50 spans per call (src/registry.ts). A
+      // safe batch over that limit chunks into sequential calls instead of
+      // zod-failing the whole request after the optimistic update above.
+      enqueueSave(async () => {
+        const created: DeadAirItem[] = [];
+        for (let i = 0; i < deadAirSpans.length; i += DEAD_AIR_ADD_BATCH_SIZE) {
+          const batch = deadAirSpans.slice(i, i + DEAD_AIR_ADD_BATCH_SIZE);
+          const r = await runGuiAction(project.slug, "dead-air-add", {
+            spans: batch,
+          });
+          if (!r.ok) {
+            // An earlier batch in this loop may already be applied
+            // server-side; router.refresh() re-delivers project-data from
+            // the server (the same affordance F3's patchSnap uses) so
+            // optimistic client state, including the placeholder above,
+            // cannot diverge from it silently. enqueueSave's own failure
+            // path (below) still surfaces the error toast.
+            router.refresh();
+            return r;
+          }
+          created.push(...(r.data.result as DeadAirItem[]));
+        }
+        setProject((prev) => ({
+          ...prev,
+          cuts: {
+            ...prev.cuts,
+            deadAir: reconcileDeadAirItems(
+              prev.cuts?.deadAir ?? [],
+              created,
+              (id) => id.startsWith(optimisticId)
+            ),
+          },
+        }));
+        return { ok: true } as const;
+      });
+    }
+  };
+
+  // Audio section: ducking/loudness/highpass patch through the audio action
+  // (setAudio re-clamps bounds server-side); snap patches through the
+  // existing cuts-snap action.
+  const patchAudio = (patch: AudioPatch) => {
+    setProject((prev) => ({
+      ...prev,
+      audio: mergeAudioPatch(prev.audio, patch),
+    }));
+    enqueueSave(() => runGuiAction(project.slug, "audio", patch));
+  };
+  const patchSnap = (patch: Partial<CutSnap>) => {
+    setProject((prev) => ({
+      ...prev,
+      cuts: {
+        ...prev.cuts,
+        snap: { ...(prev.cuts?.snap ?? DEFAULT_CUT_SNAP), ...patch },
+      },
+    }));
+    // F3: enabling snap needs project.silences, which only the server
+    // component's project-data load populates (see app/lib/project-data.ts);
+    // without a refresh here the preview stays unsnapped until a full page
+    // reload even though export already snaps. Scoped to enabled/mode
+    // changes only, so a maxShiftMs/crossfadeMs tweak (which needs no new
+    // data) doesn't pay for a round trip.
+    enqueueSave(async () => {
+      const r = await runGuiAction(project.slug, "cuts-snap", patch);
+      if (r.ok && (patch.enabled !== undefined || patch.mode !== undefined)) {
+        router.refresh();
+      }
+      return r;
+    });
+  };
+
   const onClipTiming = useCallback(
     (
       kind: TimelineClipKind,
@@ -2381,6 +2607,14 @@ export function App({
                 slug={project.slug}
               />
             </Section>
+            <Section title="Cleanup">
+              <CleanupPanel
+                applying={pendingSaves > 0}
+                onApply={applyCleanupCandidate}
+                onApplyAllSafe={applyAllSafeCleanup}
+                report={cleanupReportView}
+              />
+            </Section>
             <Section title="Music">
               <MusicSectionControls
                 assetName={assetName}
@@ -2396,6 +2630,15 @@ export function App({
                 onRemove={removeMusicPlacement}
                 placements={project.music ?? []}
                 sampleRate={sr}
+              />
+            </Section>
+            <Section title="Audio">
+              <AudioControls
+                applying={pendingSaves > 0}
+                audio={project.audio ?? DEFAULT_AUDIO}
+                onPatchAudio={patchAudio}
+                onPatchSnap={patchSnap}
+                snap={project.cuts?.snap ?? DEFAULT_CUT_SNAP}
               />
             </Section>
             <Section title="History">
