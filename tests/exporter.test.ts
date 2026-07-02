@@ -365,15 +365,15 @@ test("resolveOutputFps honors a requested rate", () => {
   assert.equal(resolveOutputFps(29.97, 60), 60);
 });
 
-test("fpsFilterFor passes the source through and honors explicit requests", () => {
+test("fpsFilterFor always pins the resolved output rate", () => {
   assert.equal(fpsFilterFor(30, 24), ",fps=24");
-  // An explicit request matching the source exactly is a no-op.
-  assert.equal(fpsFilterFor(30, 30), "");
-  // No request: source passthrough, even on fractional rates.
-  assert.equal(fpsFilterFor(29.97, undefined), "");
-  // Decided behavior: an explicit number is a retime order (the export dialog
-  // offers "Source" separately), so requesting 30 on a 29.97 source emits the
-  // filter and the file really is 30fps, matching what exportCut reports.
+  assert.equal(fpsFilterFor(30, 30), ",fps=30");
+  // Source passthrough is still pinned explicitly: frame-rate metadata does
+  // not reliably survive the select filter on every ffmpeg build (the Linux
+  // ffmpeg-static falls back to 25 fps), so the resolved rate is always
+  // written into the chain instead of trusting FRAME_RATE propagation.
+  assert.equal(fpsFilterFor(29.97, undefined), ",fps=30");
+  // An explicit number on a fractional source is a true retime order.
   assert.equal(fpsFilterFor(29.97, 30), ",fps=30");
 });
 
