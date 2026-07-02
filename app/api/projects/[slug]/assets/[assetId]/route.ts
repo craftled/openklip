@@ -1,6 +1,5 @@
 import { deleteAsset } from "@engine/assets";
 import { assertValidSlug } from "@engine/paths";
-import { withProjectLock } from "@engine/project-lock";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,9 +22,10 @@ export async function DELETE(_req: Request, { params }: RouteParams) {
   }
 
   try {
-    const project = await withProjectLock(slug, () =>
-      deleteAsset(slug, assetId)
-    );
+    // deleteAsset locks internally (via mutateProject): wrapping it in
+    // another withProjectLock here would deadlock the per-slug promise
+    // queue on the nested lock (see src/project-lock.ts).
+    const project = await deleteAsset(slug, assetId, "human");
     return Response.json({
       assets: project.assets,
       broll: project.broll,

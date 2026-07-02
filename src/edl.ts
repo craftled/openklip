@@ -420,58 +420,63 @@ export const AudioSchema = z
   });
 export type Audio = z.infer<typeof AudioSchema>;
 
-export const ProjectSchema = z.object({
-  version: z.literal(1),
-  slug: z.string(),
-  source: z.string(),
-  proxy: z.string(),
-  sampleRate: z.literal(SAMPLE_RATE),
-  fps: z.number().positive(),
-  width: z.number().int().positive(),
-  height: z.number().int().positive(),
-  durationSamples: z.number().int().nonnegative(),
-  padMs: z.number().nonnegative().default(50),
-  captions: z
-    .object({
-      enabled: z.boolean().default(true),
-      maxWords: z.number().int().positive().default(6),
-    })
-    .default({ enabled: true, maxWords: 6 }),
-  assets: z.array(AssetSchema).default([]),
-  broll: z.array(BrollSchema).default([]),
-  look: z
-    .object({
-      vignette: z.boolean().default(false),
-      /** Built-in filter applied to the whole picture. */
-      filter: FilterSchema,
-      /** Named .cube LUT in luts/ applied before the filter (absent = none). */
-      lut: z.string().optional(),
-      /** Continuous color knobs on top of the filter (absent = neutral). */
-      color: ColorAdjustSchema.optional(),
-    })
-    .default({ vignette: false, filter: "none" }),
-  zooms: z.array(ZoomSchema).default([]),
-  titles: z.array(TitleSchema).default([]),
-  stills: z.array(StillSchema).default([]),
-  graphics: z.array(GraphicSchema).default([]),
-  /** Background music placements mixed under the voice at export. */
-  music: z.array(MusicPlacementSchema).default([]),
-  words: z.array(WordSchema),
-  /** Cut-quality settings. Analysis caches live under working/, not here. */
-  cuts: CutsSchema,
-  /** Edit template id (templates/<id>/skill.md). */
-  template: z.string().optional(),
-  /** Subagent visual scene log of the main video (absent until analyzed). */
-  sceneLog: SceneLogSchema.optional(),
-  /** F3: provenance of a multi-take assembly (absent for single-source projects). */
-  assembly: AssemblyProvenanceSchema.optional(),
-  /** Global animation feel for overlay entrances. */
-  motion: MotionSchema,
-  /** Export audio quality: ducking, loudness normalization, voice highpass. */
-  audio: AudioSchema,
-  /** Monotonic edit revision bumped by logged mutations (absent = 0). */
-  revision: z.number().int().nonnegative().optional(),
-});
+export const ProjectSchema = z
+  .object({
+    version: z.literal(1),
+    slug: z.string(),
+    source: z.string(),
+    proxy: z.string(),
+    sampleRate: z.literal(SAMPLE_RATE),
+    fps: z.number().positive(),
+    width: z.number().int().positive(),
+    height: z.number().int().positive(),
+    durationSamples: z.number().int().nonnegative(),
+    padMs: z.number().nonnegative().default(50),
+    captions: z
+      .object({
+        enabled: z.boolean().default(true),
+        maxWords: z.number().int().positive().default(6),
+      })
+      .default({ enabled: true, maxWords: 6 }),
+    assets: z.array(AssetSchema).default([]),
+    broll: z.array(BrollSchema).default([]),
+    look: z
+      .object({
+        vignette: z.boolean().default(false),
+        /** Built-in filter applied to the whole picture. */
+        filter: FilterSchema,
+        /** Named .cube LUT in luts/ applied before the filter (absent = none). */
+        lut: z.string().optional(),
+        /** Continuous color knobs on top of the filter (absent = neutral). */
+        color: ColorAdjustSchema.optional(),
+      })
+      .default({ vignette: false, filter: "none" }),
+    zooms: z.array(ZoomSchema).default([]),
+    titles: z.array(TitleSchema).default([]),
+    stills: z.array(StillSchema).default([]),
+    graphics: z.array(GraphicSchema).default([]),
+    /** Background music placements mixed under the voice at export. */
+    music: z.array(MusicPlacementSchema).default([]),
+    words: z.array(WordSchema),
+    /** Cut-quality settings. Analysis caches live under working/, not here. */
+    cuts: CutsSchema,
+    /** Edit template id (templates/<id>/skill.md). */
+    template: z.string().optional(),
+    /** Subagent visual scene log of the main video (absent until analyzed). */
+    sceneLog: SceneLogSchema.optional(),
+    /** F3: provenance of a multi-take assembly (absent for single-source projects). */
+    assembly: AssemblyProvenanceSchema.optional(),
+    /** Global animation feel for overlay entrances. */
+    motion: MotionSchema,
+    /** Export audio quality: ducking, loudness normalization, voice highpass. */
+    audio: AudioSchema,
+    /** Monotonic edit revision bumped by logged mutations (absent = 0). */
+    revision: z.number().int().nonnegative().optional(),
+  })
+  // Forward-compat: keep unknown top-level keys instead of the zod default
+  // (silently strip). Without this, a build that predates a new field
+  // re-saving an existing project.json would silently drop that field.
+  .passthrough();
 export type Project = z.infer<typeof ProjectSchema>;
 
 export interface Range {

@@ -1,7 +1,7 @@
 // Project-file access shared by the Next route handlers (and usable from the
 // CLI). Pure Node fs (no Bun globals) so it runs under Next on Bun or Node.
 import { existsSync, readdirSync, statSync } from "node:fs";
-import { readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   type Actor,
@@ -80,6 +80,74 @@ export interface MutateMeta {
   /** Defaults to OPENKLIP_ACTOR when set, else "human". */
   actor?: Actor;
   input?: unknown;
+  /** Spawned agent task this mutation ran under, when any (OPENKLIP_TASK_ID). */
+  taskId?: string;
+}
+
+// One pre-mutation project.json snapshot per logged revision, named after the
+// revision it captures (rev-<revisionBefore>.json). src/revert.ts reads these
+// back to restore an earlier state; see the writer in mutateProject below.
+const SNAPSHOT_NAME_PATTERN = /^rev-(\d+)\.json$/;
+
+/** Revision number encoded in a history snapshot filename, or undefined for
+ * anything else in the directory (stray files, tmp leftovers). */
+export function snapshotRevisionFromFilename(name: string): number | undefined {
+  const match = SNAPSHOT_NAME_PATTERN.exec(name);
+  return match ? Number(match[1]) : undefined;
+}
+
+/** Revisions that currently have a snapshot on disk, ascending. Sync (like
+ * listProjects/latestProject above) so route handlers and the revert engine
+ * can call it without an extra await. */
+export function listHistorySnapshotRevisions(slug: string): number[] {
+  const dir = projectPaths(slug).historyDir;
+  if (!existsSync(dir)) {
+    return [];
+  }
+  return readdirSync(dir)
+    .map(snapshotRevisionFromFilename)
+    .filter((r): r is number => r !== undefined)
+    .sort((a, b) => a - b);
+}
+
+export const MAX_HISTORY_SNAPSHOTS = 100;
+
+/** Drop all but the newest `keep` snapshots by revision number. Exported so
+ * the cap can be exercised directly in tests without writing 100+ files. */
+export async function pruneHistorySnapshots(
+  slug: string,
+  keep: number = MAX_HISTORY_SNAPSHOTS
+): Promise<void> {
+  const dir = projectPaths(slug).historyDir;
+  if (!existsSync(dir)) {
+    return;
+  }
+  const named = readdirSync(dir)
+    .map((name) => ({ name, revision: snapshotRevisionFromFilename(name) }))
+    .filter(
+      (e): e is { name: string; revision: number } => e.revision !== undefined
+    )
+    .sort((a, b) => b.revision - a.revision);
+  const stale = named.slice(keep);
+  await Promise.all(
+    stale.map((e) => unlink(join(dir, e.name)).catch(() => undefined))
+  );
+}
+
+// Atomic tmp+rename write, matching src/chats.ts and src/audio-analysis.ts:
+// a crash mid-write leaves the old snapshot (or none) instead of a truncated
+// rev-<n>.json that revert would fail to parse.
+async function writeHistorySnapshot(
+  slug: string,
+  revisionBefore: number,
+  json: string
+): Promise<void> {
+  const dir = projectPaths(slug).historyDir;
+  await mkdir(dir, { recursive: true });
+  const target = join(dir, `rev-${revisionBefore}.json`);
+  const tmp = `${target}.tmp-${process.pid}`;
+  await writeFile(tmp, json);
+  await rename(tmp, target);
 }
 
 // Load → mutate → save inside the per-slug project lock, so concurrent server
@@ -96,6 +164,10 @@ export function mutateProject<T>(
   return withProjectLock(slug, async () => {
     const project = await loadProject(slug);
     const revisionBefore = project.revision ?? 0;
+    // Snapshot the pre-mutation state as a string NOW, before fn mutates
+    // `project` in place below: stringifying after fn ran would capture the
+    // POST-mutation state instead (fn mutates the same object, not a copy).
+    const preMutationJson = meta ? JSON.stringify(project, null, 2) : undefined;
     const result = await fn(project);
     if (meta) {
       project.revision = revisionBefore + 1;
@@ -111,11 +183,26 @@ export function mutateProject<T>(
           result: summarizeForLog(result),
           revisionBefore,
           revisionAfter: revisionBefore + 1,
+          taskId: meta.taskId,
         });
       } catch (err) {
         // History is best-effort: a log write failure must never fail an edit
         // that already saved.
         console.error(`action log append failed for ${slug}:`, err);
+      }
+      if (preMutationJson !== undefined) {
+        try {
+          await writeHistorySnapshot(slug, revisionBefore, preMutationJson);
+          await pruneHistorySnapshots(slug);
+        } catch (err) {
+          // Same best-effort contract as the log append above: a snapshot
+          // failure (disk full, permissions) must never fail an edit that
+          // already saved.
+          console.warn(
+            `history snapshot write failed for ${slug} rev ${revisionBefore}:`,
+            err
+          );
+        }
       }
     }
     return result;

@@ -55,9 +55,11 @@ export function projectDir(slug: string): string {
 // Layered project layout. `project.json` (the edit) stays at the project root;
 // user originals live in assets/; everything derived lives under working/
 // (proxy, transcript, audio, frames, asset proxies) and rendered output under
-// output/. Three working/ files are NOT derived and must never be
+// output/. Four working/ paths are NOT derived and must never be
 // regenerated: chats.json (agent threads), actions.jsonl (append-only action
-// history), and tasks.json (agent task-progress store).
+// history), tasks.json (agent task-progress store), and history/ (per-revision
+// pre-mutation project.json snapshots, written by mutateProject and read by
+// src/revert.ts; user-edit-class like actions.jsonl, not a rebuildable cache).
 // Proxy paths in project.json are relative to dir
 // (e.g. "working/assets/b1.mp4"); user sources use "assets/track.mp3".
 export function projectPaths(slug: string) {
@@ -85,6 +87,8 @@ export function projectPaths(slug: string) {
     tasks: join(working, "tasks.json"),
     /** Append-only action history: one JSON entry per line. */
     actionsLog: join(working, "actions.jsonl"),
+    /** Pre-mutation project.json snapshots, one per logged revision (rev-<n>.json). */
+    historyDir: join(working, "history"),
     out: join(output, "out.mp4"),
     /** Multi-take ingest parking lot: takes/<id>/ (F3). */
     takes: join(dir, "takes"),

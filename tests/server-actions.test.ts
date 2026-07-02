@@ -4,6 +4,7 @@ import {
   exportProject,
   loadBriefAction,
   revealProjectFolder,
+  revertProjectAction,
   runGuiAction,
   saveBrief,
   saveBroll,
@@ -413,6 +414,20 @@ test("saveBrief with empty text clears the brief", async () => {
   });
 });
 
+test("saveBrief server action logs a brief-set entry with actor human that does not move the revision", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const saved = await saveBrief(slug, "Tone: playful.");
+    assert.equal(saved.ok, true);
+
+    const entries = await readActionLog(slug);
+    assert.equal(entries.length, 1);
+    assert.equal(entries[0].action, "brief-set");
+    assert.equal(entries[0].actor, "human");
+    assert.equal(entries[0].revisionBefore, entries[0].revisionAfter);
+  });
+});
+
 test("loadBriefAction on a project with no brief.md returns ok with brief null", async () => {
   await withTempProjectsRoot(async ({ slug }) => {
     writeFixtureProject(slug, makeProject({ slug }));
@@ -435,6 +450,63 @@ test("revealProjectFolder rejects missing project", async () => {
     assert.equal(result.ok, false);
     if (!result.ok) {
       assert.match(result.error, /project not found/);
+    }
+  });
+});
+
+// ── revertProjectAction: server action wrapping src/revert.ts, actor human ──
+
+test("revertProjectAction restores an earlier revision and records actor human", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    await saveProjectEdits(slug, { padMs: 10 });
+    await saveProjectEdits(slug, { padMs: 20 });
+
+    const result = await revertProjectAction(slug, { to: 0 });
+    assert.equal(result.ok, true);
+    if (result.ok) {
+      assert.equal(result.data.restoredTo, 0);
+      assert.equal(result.data.revision, 3);
+    }
+
+    const loaded = await loadProject(slug);
+    assert.equal(loaded.padMs, 50);
+
+    const entries = await readActionLog(slug);
+    assert.equal(entries[0].action, "revert");
+    assert.equal(entries[0].actor, "human");
+  });
+});
+
+// G1: the History panel's own state lives entirely in the browser (App's
+// useState<Project>), so a GUI revert must hand the freshly restored project
+// back to the caller instead of leaving it to infer state from {revision,
+// restoredTo} alone; see web/components/history-panel.tsx's onReverted prop
+// and web/app.tsx's reseed handler.
+test("revertProjectAction returns the freshly loaded restored project alongside revision/restoredTo", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    await saveProjectEdits(slug, { padMs: 10 });
+
+    const result = await revertProjectAction(slug, { to: 0 });
+    assert.equal(result.ok, true);
+    if (result.ok) {
+      assert.equal(result.data.project.slug, slug);
+      assert.equal(result.data.project.padMs, 50);
+      const loaded = await loadProject(slug);
+      assert.deepEqual(result.data.project, loaded);
+    }
+  });
+});
+
+test("revertProjectAction returns ok:false with a clear message when nothing to revert", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    await saveProjectEdits(slug, { padMs: 10 });
+    const result = await revertProjectAction(slug, { to: 1 });
+    assert.equal(result.ok, false);
+    if (!result.ok) {
+      assert.match(result.error, /nothing to revert/i);
     }
   });
 });

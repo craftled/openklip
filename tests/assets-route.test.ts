@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { GET, POST } from "../app/api/projects/[slug]/assets/route.ts";
 import { POST as SYNC_POST } from "../app/api/projects/[slug]/assets/sync/route.ts";
+import { readActionLog } from "../src/action-log.ts";
 import { FFMPEG } from "../src/ffmpeg.ts";
 import {
   brollClipFor,
@@ -64,6 +65,15 @@ test("POST /api/projects/:slug/assets registers music and returns JSON", async (
     assert.equal(res.status, 200);
     assert.equal(data.asset?.kind, "music");
     assert.ok(Array.isArray(data.assets) && data.assets.length === 1);
+
+    // registerAssetBytes now owns its own locking via mutateProject (the
+    // route no longer wraps it in withProjectLock, which would deadlock);
+    // the upload must still be a logged, revision-bumping mutation.
+    const entries = await readActionLog(slug);
+    assert.equal(entries.length, 1);
+    assert.equal(entries[0].action, "asset-add");
+    assert.equal(entries[0].actor, "human");
+    assert.equal(entries[0].revisionAfter, 1);
   });
 });
 

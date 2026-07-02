@@ -4,8 +4,19 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { ActionLogEntry } from "../src/action-log.ts";
 import {
   actorBadgeClass,
+  canRevertEntry,
+  canRevertGroup,
+  crossesAssembleBoundary,
+  groupHasBriefSet,
+  groupHistoryEntries,
+  groupTouchesTruncationBoundary,
+  HISTORY_PAGE_LIMIT,
   HistoryList,
+  historyEntryKey,
+  newestAssembleIndex,
   parseHistoryEntries,
+  parseSnapshotRevisions,
+  revertErrorNeedsForce,
   revisionSpanLabel,
 } from "../web/components/history-panel.tsx";
 
@@ -74,4 +85,436 @@ test("parseHistoryEntries keeps well-formed rows and drops the rest", () => {
   assert.equal(parsed.length, 1);
   assert.equal(parsed[0].action, "cut");
   assert.deepEqual(parseHistoryEntries("not-an-array"), []);
+});
+
+// ── revert affordances: snapshotRevisions, grouping, force-guard ───────────
+
+test("parseSnapshotRevisions keeps only numbers from an untrusted payload", () => {
+  assert.deepEqual(parseSnapshotRevisions([0, 1, "2", null, 3]), [0, 1, 3]);
+  assert.deepEqual(parseSnapshotRevisions("not-an-array"), []);
+  assert.deepEqual(parseSnapshotRevisions(undefined), []);
+});
+
+test("canRevertEntry requires the entry to bump revision AND have a snapshot for revisionBefore", () => {
+  assert.equal(canRevertEntry(older, [0]), true);
+  assert.equal(canRevertEntry(older, [1]), false); // no snapshot for rev 0
+  assert.equal(canRevertEntry(older, []), false);
+  const briefSet: ActionLogEntry = {
+    at: 500,
+    action: "brief-set",
+    actor: "human",
+    revisionBefore: 1,
+    revisionAfter: 1,
+  };
+  assert.equal(canRevertEntry(briefSet, [1]), false); // never bumped revision
+});
+
+test("historyEntryKey is stable for equal entries and distinguishes different ones", () => {
+  assert.equal(historyEntryKey(older), historyEntryKey({ ...older }));
+  assert.notEqual(historyEntryKey(older), historyEntryKey(newer));
+});
+
+test("groupHistoryEntries groups consecutive entries sharing a taskId, leaves the rest singleton", () => {
+  const taskA1: ActionLogEntry = {
+    at: 10,
+    action: "cut",
+    actor: "agent",
+    revisionBefore: 2,
+    revisionAfter: 3,
+    taskId: "task-1",
+  };
+  const taskA2: ActionLogEntry = {
+    at: 20,
+    action: "cut",
+    actor: "agent",
+    revisionBefore: 1,
+    revisionAfter: 2,
+    taskId: "task-1",
+  };
+  const human: ActionLogEntry = {
+    at: 30,
+    action: "pad",
+    actor: "human",
+    revisionBefore: 0,
+    revisionAfter: 1,
+  };
+  // groupHistoryEntries only looks at array order + taskId, not `at`/revision
+  // fields: this array order is what the API returns (newest first).
+  const groups = groupHistoryEntries([taskA1, taskA2, human]);
+  assert.equal(groups.length, 2);
+  assert.equal(groups[0].taskId, "task-1");
+  assert.equal(groups[0].entries.length, 2);
+  assert.equal(groups[1].taskId, undefined);
+  assert.equal(groups[1].entries.length, 1);
+});
+
+test("groupHistoryEntries does not merge non-consecutive entries that happen to share a taskId", () => {
+  const a: ActionLogEntry = {
+    at: 10,
+    action: "cut",
+    actor: "agent",
+    revisionBefore: 2,
+    revisionAfter: 3,
+    taskId: "task-1",
+  };
+  const interloper: ActionLogEntry = {
+    at: 20,
+    action: "pad",
+    actor: "human",
+    revisionBefore: 1,
+    revisionAfter: 2,
+  };
+  const b: ActionLogEntry = {
+    at: 30,
+    action: "cut",
+    actor: "agent",
+    revisionBefore: 0,
+    revisionAfter: 1,
+    taskId: "task-1",
+  };
+  const groups = groupHistoryEntries([a, interloper, b]);
+  assert.equal(groups.length, 3);
+});
+
+test("groupHistoryEntries never merges entries with no taskId into one group", () => {
+  const groups = groupHistoryEntries([older, newer]);
+  assert.equal(groups.length, 2);
+});
+
+test("revertErrorNeedsForce detects the force-guard message from src/revert.ts", () => {
+  assert.equal(
+    revertErrorNeedsForce(
+      'reverting task "x" would also discard "cut" (rev 0 -> 1) from actor "human"; pass force to revert anyway'
+    ),
+    true
+  );
+  assert.equal(
+    revertErrorNeedsForce("nothing to revert, already at revision 0"),
+    false
+  );
+  assert.equal(revertErrorNeedsForce("no snapshot for revision 5"), false);
+});
+
+test("HistoryList renders an enabled revert affordance for a revertible entry", () => {
+  const html = renderToStaticMarkup(
+    <HistoryList entries={[older]} snapshotRevisions={[0]} />
+  );
+  assert.match(html, /Revert to before this/);
+  assert.doesNotMatch(html, /disabled=""/);
+});
+
+test("HistoryList disables the revert affordance when no snapshot exists for the entry", () => {
+  const html = renderToStaticMarkup(
+    <HistoryList entries={[older]} snapshotRevisions={[]} />
+  );
+  assert.match(html, /No snapshot to revert to/);
+  assert.match(html, /disabled=""/);
+});
+
+test("HistoryList without snapshotRevisions renders no revert controls (backward compatible)", () => {
+  const html = renderToStaticMarkup(<HistoryList entries={[older]} />);
+  assert.doesNotMatch(html, /Revert/);
+});
+
+test("HistoryList renders one 'Revert task' affordance for a multi-entry task group", () => {
+  const taskA1: ActionLogEntry = {
+    at: 10,
+    action: "cut",
+    actor: "agent",
+    revisionBefore: 2,
+    revisionAfter: 3,
+    taskId: "task-1",
+  };
+  const taskA2: ActionLogEntry = {
+    at: 20,
+    action: "cut",
+    actor: "agent",
+    revisionBefore: 1,
+    revisionAfter: 2,
+    taskId: "task-1",
+  };
+  const html = renderToStaticMarkup(
+    <HistoryList entries={[taskA1, taskA2]} snapshotRevisions={[1, 2]} />
+  );
+  assert.match(html, /Revert task/);
+});
+
+// canRevertGroup must gate on the group's EARLIEST entry's revisionBefore
+// (the revision revertProject's {task} target actually restores to), not the
+// newest one. A snapshotRevisions array containing both revisions (as used
+// above) can't tell the two implementations apart, so probe each revision in
+// isolation.
+
+test("canRevertGroup is disabled when only the NEWEST entry's revisionBefore has a snapshot", () => {
+  const taskA1: ActionLogEntry = {
+    at: 10,
+    action: "cut",
+    actor: "agent",
+    revisionBefore: 2,
+    revisionAfter: 3,
+    taskId: "task-1",
+  };
+  const taskA2: ActionLogEntry = {
+    at: 20,
+    action: "cut",
+    actor: "agent",
+    revisionBefore: 1,
+    revisionAfter: 2,
+    taskId: "task-1",
+  };
+  const group = groupHistoryEntries([taskA1, taskA2])[0];
+  // Only the newest entry's revisionBefore (2) has a snapshot; the earliest
+  // entry's revisionBefore (1), which is what actually gets restored, does
+  // not.
+  assert.equal(canRevertGroup(group, [2]), false);
+
+  const html = renderToStaticMarkup(
+    <HistoryList entries={[taskA1, taskA2]} snapshotRevisions={[2]} />
+  );
+  assert.doesNotMatch(html, /Revert task/);
+});
+
+test("canRevertGroup is enabled when only the EARLIEST entry's revisionBefore has a snapshot", () => {
+  const taskA1: ActionLogEntry = {
+    at: 10,
+    action: "cut",
+    actor: "agent",
+    revisionBefore: 2,
+    revisionAfter: 3,
+    taskId: "task-1",
+  };
+  const taskA2: ActionLogEntry = {
+    at: 20,
+    action: "cut",
+    actor: "agent",
+    revisionBefore: 1,
+    revisionAfter: 2,
+    taskId: "task-1",
+  };
+  const group = groupHistoryEntries([taskA1, taskA2])[0];
+  assert.equal(canRevertGroup(group, [1]), true);
+
+  const html = renderToStaticMarkup(
+    <HistoryList entries={[taskA1, taskA2]} snapshotRevisions={[1]} />
+  );
+  assert.match(html, /Revert task/);
+});
+
+// ── G2: revert can't cross an "assemble" (multi-take) boundary ─────────────
+
+test("newestAssembleIndex finds the first (newest) assemble entry, or -1", () => {
+  const assemble: ActionLogEntry = {
+    at: 500,
+    action: "assemble",
+    actor: "agent",
+    revisionBefore: 1,
+    revisionAfter: 2,
+  };
+  assert.equal(newestAssembleIndex([newer, assemble, older]), 1);
+  assert.equal(newestAssembleIndex([newer, older]), -1);
+  assert.equal(newestAssembleIndex([]), -1);
+});
+
+test("crossesAssembleBoundary blocks the assemble entry itself and everything older, not newer entries", () => {
+  const assemble: ActionLogEntry = {
+    at: 500,
+    action: "assemble",
+    actor: "agent",
+    revisionBefore: 1,
+    revisionAfter: 2,
+  };
+  const entries = [newer, assemble, older];
+  assert.equal(crossesAssembleBoundary(entries, newer), false);
+  assert.equal(crossesAssembleBoundary(entries, assemble), true);
+  assert.equal(crossesAssembleBoundary(entries, older), true);
+  // No assemble entry anywhere: never blocks.
+  assert.equal(crossesAssembleBoundary([newer, older], older), false);
+});
+
+test("HistoryList disables per-entry revert at/older than the newest assemble entry with a hint, leaves newer entries enabled", () => {
+  const assemble: ActionLogEntry = {
+    at: 500,
+    action: "assemble",
+    actor: "agent",
+    revisionBefore: 1,
+    revisionAfter: 2,
+  };
+  const entries = [newer, assemble, older];
+  const html = renderToStaticMarkup(
+    <HistoryList entries={entries} snapshotRevisions={[0, 1, 2]} />
+  );
+  assert.match(html, /crosses a multi-take assembly/i);
+  // newer (rev 1 -> 2) sits above the assemble entry: still revertible.
+  // older (rev 0 -> 1) and the assemble entry itself sit at/below it: blocked.
+  // (Match the space-prefixed attribute, not "data-disabled=\"\"", which
+  // also renders on a disabled Button and would double-count otherwise.)
+  const disabledCount = (html.match(/ disabled=""/g) ?? []).length;
+  assert.equal(disabledCount, 2);
+});
+
+test("HistoryList with no assemble entries in view is unaffected (all revertible entries stay enabled)", () => {
+  const html = renderToStaticMarkup(
+    <HistoryList entries={[newer, older]} snapshotRevisions={[0, 1]} />
+  );
+  assert.doesNotMatch(html, /crosses a multi-take assembly/i);
+  assert.doesNotMatch(html, /disabled=""/);
+});
+
+// ── G3: task-group revert doesn't restore brief.md, so the confirm copy
+// must caveat groups that include a brief-set entry ───────────────────────
+
+test("groupHasBriefSet is true only when a brief-set entry is in the group", () => {
+  const taskCut: ActionLogEntry = {
+    at: 10,
+    action: "cut",
+    actor: "agent",
+    revisionBefore: 1,
+    revisionAfter: 2,
+    taskId: "task-1",
+  };
+  const taskBrief: ActionLogEntry = {
+    at: 20,
+    action: "brief-set",
+    actor: "agent",
+    revisionBefore: 1,
+    revisionAfter: 1,
+    taskId: "task-1",
+  };
+  const withBrief = groupHistoryEntries([taskBrief, taskCut])[0];
+  assert.equal(groupHasBriefSet(withBrief), true);
+  const withoutBrief = groupHistoryEntries([taskCut])[0];
+  assert.equal(groupHasBriefSet(withoutBrief), false);
+});
+
+test("HistoryList's task-revert confirm copy caveats groups that include a brief-set entry", () => {
+  const taskCut: ActionLogEntry = {
+    at: 10,
+    action: "cut",
+    actor: "agent",
+    revisionBefore: 1,
+    revisionAfter: 2,
+    taskId: "task-1",
+  };
+  const taskBrief: ActionLogEntry = {
+    at: 20,
+    action: "brief-set",
+    actor: "agent",
+    revisionBefore: 1,
+    revisionAfter: 1,
+    taskId: "task-1",
+  };
+  const entries = [taskBrief, taskCut];
+  const group = groupHistoryEntries(entries)[0];
+  const groupKey = `task:${group.taskId}:${historyEntryKey(group.entries[0])}`;
+  const html = renderToStaticMarkup(
+    <HistoryList
+      confirmingKey={groupKey}
+      entries={entries}
+      snapshotRevisions={[1]}
+    />
+  );
+  assert.match(html, /brief changes are not restored/i);
+});
+
+test("HistoryList's task-revert confirm copy has no caveat for a group without a brief-set entry", () => {
+  const taskCut1: ActionLogEntry = {
+    at: 10,
+    action: "cut",
+    actor: "agent",
+    revisionBefore: 1,
+    revisionAfter: 2,
+    taskId: "task-1",
+  };
+  const taskCut2: ActionLogEntry = {
+    at: 20,
+    action: "cut",
+    actor: "agent",
+    revisionBefore: 0,
+    revisionAfter: 1,
+    taskId: "task-1",
+  };
+  const entries = [taskCut1, taskCut2];
+  const group = groupHistoryEntries(entries)[0];
+  const groupKey = `task:${group.taskId}:${historyEntryKey(group.entries[0])}`;
+  const html = renderToStaticMarkup(
+    <HistoryList
+      confirmingKey={groupKey}
+      entries={entries}
+      snapshotRevisions={[0]}
+    />
+  );
+  assert.doesNotMatch(html, /brief changes are not restored/i);
+});
+
+// ── G4: canRevertGroup is only as trustworthy as the (possibly truncated)
+// 200-entry view the panel is showing ───────────────────────────────────────
+
+function makeChainEntries(count: number): ActionLogEntry[] {
+  // Newest first, as the API returns them: revisionAfter counts DOWN from
+  // count to 1 so entries[i] has revisionBefore = count - i - 1.
+  return Array.from({ length: count }, (_, i) => ({
+    at: 1000 - i,
+    action: "cut",
+    actor: "agent" as const,
+    revisionBefore: count - i - 1,
+    revisionAfter: count - i,
+    taskId: "task-1",
+  }));
+}
+
+test("groupTouchesTruncationBoundary is false when the view is under the page limit", () => {
+  const entries = makeChainEntries(5);
+  const group = groupHistoryEntries(entries)[0];
+  assert.equal(
+    groupTouchesTruncationBoundary(group, entries, HISTORY_PAGE_LIMIT),
+    false
+  );
+});
+
+test("groupTouchesTruncationBoundary is true when the view is exactly the page limit and the group reaches the oldest visible entry", () => {
+  const entries = makeChainEntries(HISTORY_PAGE_LIMIT);
+  const group = groupHistoryEntries(entries)[0];
+  assert.equal(group.entries.length, HISTORY_PAGE_LIMIT);
+  assert.equal(
+    groupTouchesTruncationBoundary(group, entries, HISTORY_PAGE_LIMIT),
+    true
+  );
+});
+
+test("groupTouchesTruncationBoundary is false when the group ends before the oldest visible entry", () => {
+  const taskEntries = makeChainEntries(3); // task-1, revisionBefore 2,1,0
+  const filler: ActionLogEntry = {
+    at: 1,
+    action: "look-vignette",
+    actor: "human",
+    revisionBefore: -1,
+    revisionAfter: 0,
+  };
+  const entries = [
+    ...taskEntries,
+    ...Array.from({ length: HISTORY_PAGE_LIMIT - 4 }, (_, i) => ({
+      at: -i,
+      action: "look-vignette",
+      actor: "human" as const,
+      revisionBefore: -2 - i,
+      revisionAfter: -1 - i,
+    })),
+    filler,
+  ];
+  assert.equal(entries.length, HISTORY_PAGE_LIMIT);
+  const group = groupHistoryEntries(entries)[0];
+  assert.equal(group.taskId, "task-1");
+  assert.equal(
+    groupTouchesTruncationBoundary(group, entries, HISTORY_PAGE_LIMIT),
+    false
+  );
+});
+
+test("HistoryList disables a task revert with a 'history truncated' hint when the group reaches the oldest visible entry of a full-limit view", () => {
+  const entries = makeChainEntries(HISTORY_PAGE_LIMIT);
+  const snapshotRevisions = entries.map((e) => e.revisionBefore);
+  const html = renderToStaticMarkup(
+    <HistoryList entries={entries} snapshotRevisions={snapshotRevisions} />
+  );
+  assert.match(html, /history truncated/i);
 });

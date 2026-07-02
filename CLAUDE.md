@@ -14,9 +14,9 @@ See `AGENTS.md` for the full OpenKlip edit loop, CLI commands, MCP tools, and gu
 
 ## Current release memory
 
-- Code truth checked on 2026-07-02: `VERSION` and `package.json` are `0.13.0.0`; `bun test` has 1017 tests.
+- Code truth checked on 2026-07-02: `VERSION` and `package.json` are `0.14.0.0`; `bun test` has 1117 tests.
 - Release docs: `CHANGELOG.md` is authoritative history, `docs/RELEASE-NOTES.md` holds GitHub release bodies, and `TODO.md#known-limitations` is the single current gaps list.
-- Published GitHub releases were checked on 2026-07-02 and stopped at `v0.10.0.1`; drafts exist for `v0.11.0.0`, `v0.12.0.0`, and `v0.13.0.0`.
+- Published GitHub releases were checked on 2026-07-02 and stopped at `v0.10.0.1`; drafts exist for `v0.11.0.0`, `v0.12.0.0`, `v0.13.0.0`, and `v0.14.0.0`.
 
 ## Subagent fleet (cost routing)
 

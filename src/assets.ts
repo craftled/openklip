@@ -8,6 +8,7 @@ import {
   resolve,
   sep,
 } from "node:path";
+import type { Actor } from "./action-log.ts";
 import { removeAsset } from "./actions.ts";
 import {
   type Asset,
@@ -18,6 +19,7 @@ import {
 } from "./edl.ts";
 import { FFMPEG, probe, probeAudio, run } from "./ffmpeg.ts";
 import { assetProxyRelative, projectPaths, slugify } from "./paths.ts";
+import { mutateProject } from "./projectStore.ts";
 import { cwdPath } from "./repo-paths.ts";
 
 const IMAGE_EXT = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif"]);
@@ -62,11 +64,6 @@ async function loadProject(slug: string) {
     throw new Error(`project not found: ${slug}`);
   }
   return ProjectSchema.parse(JSON.parse(await Bun.file(p.project).text()));
-}
-
-async function saveProject(slug: string, project: Project): Promise<void> {
-  const p = projectPaths(slug);
-  await Bun.write(p.project, JSON.stringify(project, null, 2));
 }
 
 async function buildVideoProxy(
@@ -191,7 +188,8 @@ async function buildStillProxy(
 export async function registerAsset(
   slug: string,
   fileArg: string,
-  kind?: AssetKind
+  kind?: AssetKind,
+  actor?: Actor
 ): Promise<Asset> {
   const src = isAbsolute(fileArg) ? fileArg : cwdPath(fileArg);
   if (!existsSync(src)) {
@@ -229,8 +227,21 @@ export async function registerAsset(
     proxy: built.proxy,
     durationSamples: built.durationSamples,
   };
-  project.assets = [...project.assets.filter((a) => a.id !== id), asset];
-  await saveProject(slug, project);
+  // The write goes through mutateProject (locked, logged): it reloads the
+  // project fresh inside the per-slug lock, so a registration racing another
+  // mutation can't lose an update, and the registration itself is a logged,
+  // revision-bumping action-history entry.
+  await mutateProject(
+    slug,
+    (p) => {
+      p.assets = [...p.assets.filter((a) => a.id !== id), asset];
+    },
+    {
+      action: "asset-add",
+      actor,
+      input: { id: asset.id, name: asset.name, kind: asset.kind },
+    }
+  );
   console.log(`[asset] registered "${id}" (${asset.name}, ${resolvedKind})`);
   return asset;
 }
@@ -240,7 +251,8 @@ export async function registerAssetBytes(
   slug: string,
   filename: string,
   data: Uint8Array,
-  kind?: AssetKind
+  kind?: AssetKind,
+  actor?: Actor
 ): Promise<Asset> {
   const safeName =
     basename(filename).replace(/[^a-zA-Z0-9._-]/g, "_") || "upload";
@@ -260,7 +272,7 @@ export async function registerAssetBytes(
   }
 
   await writeFile(stored, data);
-  return await registerAsset(slug, stored, kind);
+  return await registerAsset(slug, stored, kind, actor);
 }
 
 export function listAssetsByKind(assets: Asset[]): Record<AssetKind, Asset[]> {
@@ -298,17 +310,30 @@ async function safeUnlinkInProject(
 /** Remove an asset from the bin, prune overlays, and delete project-local files. */
 export async function deleteAsset(
   slug: string,
-  assetId: string
+  assetId: string,
+  actor?: Actor
 ): Promise<Project> {
-  const project = await loadProject(slug);
-  const asset = project.assets.find((a) => a.id === assetId);
+  const existing = await loadProject(slug);
+  const asset = existing.assets.find((a) => a.id === assetId);
   if (!asset) {
     throw new Error(`unknown asset "${assetId}"`);
   }
-  if (!removeAsset(project, assetId)) {
-    throw new Error(`unknown asset "${assetId}"`);
-  }
-  await saveProject(slug, project);
+  // Routed through mutateProject (locked, logged): it reloads the project
+  // fresh inside the per-slug lock (so a concurrent edit can't lose an
+  // update) and gives asset removal a logged, revision-bumping
+  // action-history entry, like asset-add already has.
+  let mutated: Project | undefined;
+  await mutateProject(
+    slug,
+    (p) => {
+      mutated = p;
+      if (!removeAsset(p, assetId)) {
+        throw new Error(`unknown asset "${assetId}"`);
+      }
+    },
+    { action: "asset-rm", actor, input: { id: asset.id, name: asset.name } }
+  );
+  const project = mutated as Project;
   await safeUnlinkInProject(slug, asset.proxy);
   if (asset.src) {
     await safeUnlinkInProject(slug, asset.src);

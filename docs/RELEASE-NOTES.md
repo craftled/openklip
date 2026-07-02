@@ -2,7 +2,26 @@
 
 Use these bodies when publishing releases. Each section matches a tag in `CHANGELOG.md` without duplicating the full changelog. **Known gaps:** always link to [TODO.md](../TODO.md#known-limitations); do not duplicate the list here.
 
-Publishing status checked on 2026-07-02: GitHub releases are published through `v0.10.0.1`; `v0.11.0.0`, `v0.12.0.0`, and `v0.13.0.0` are prepared below for publication in order.
+Publishing status checked on 2026-07-02: GitHub releases are published through `v0.10.0.1`; `v0.11.0.0`, `v0.12.0.0`, `v0.13.0.0`, and `v0.14.0.0` are prepared below for publication in order.
+
+---
+
+## v0.14.0.0
+
+**Task-level undo/revert: full action history coverage, pre-mutation snapshots, and a revert command on CLI, MCP, and the GUI History panel.**
+
+### Highlights
+- **Full history coverage**: action history now logs every user-facing mutation, not just registry actions: asset registration and deletion, `openklip template set`, `openklip brand` / `ingest --brand`, and multi-take `assemble` (which now writes through the same locked, logged path instead of a raw file write, so it no longer resets the revision counter). Background folder-sync prune logs under a new `system` actor. Brief saves from CLI, GUI, and MCP share one best-effort log entry.
+- **Pre-mutation snapshots**: every logged mutation now keeps the project state from just before the change in `working/history/`, pruned to the newest 100 revisions.
+- **Revert**: `openklip revert <slug> (--to <rev> | --task <id> | --last) [--force]`, the MCP `revert` tool, and a GUI History panel revert action restore `project.json` to an earlier snapshot as a normal logged mutation, so the revision counter stays monotonic and a revert is itself revertible. Guards refuse a revert that would silently discard another task's work (without `--force`) or cross a multi-take assembly boundary.
+- **Forward-compatible schema**: `ProjectSchema` is now `.passthrough()`, so unknown top-level keys survive a load/save round-trip instead of being dropped by an older build.
+- Current codebase verification: 1117 tests.
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations) for the current list. Revert restores `project.json` only, not export artifacts, `brief.md`, chats, tasks, or asset files.
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#01400---2026-07-02)
 
 ---
 

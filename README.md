@@ -69,7 +69,7 @@ Agent sidebar chats use `working/chats.json`, not `localStorage` (color scheme a
 
 ## What works today
 
-Verified against the current codebase (`VERSION` / `package.json` `0.13.0.0`, 1017 tests):
+Verified against the current codebase (`VERSION` / `package.json` `0.14.0.0`, 1117 tests):
 
 - **Ingest**: video → local transcript + preview proxy + `project.json` (`openklip ingest`; refuses re-ingest unless `--force`)
 - **Transcript editing**: click words to toggle `deleted`; `openklip cut` / `cut --text` / `restore` on CLI
@@ -96,14 +96,15 @@ Verified against the current codebase (`VERSION` / `package.json` `0.13.0.0`, 10
 - **Written rationale**: `--note "<why>"` on any `cut` or overlay records why a pick was made; metadata only, never reaches ffmpeg, surfaces in `overlays` / transcript / MCP (`--note ""` clears it)
 - **Phrase-anchored cues**: phrase-placed overlays remember the spoken phrase and re-resolve onto the current kept words after a re-cut (`openklip reanchor`); a deleted phrase flags `stale` and keeps the last good span
 - **Multi-take assembly**: `openklip take-add` / `takes` / `assemble` splice the best take per line into one single-source `project.json` the cut/overlay/export engine edits unchanged
-- **Action history**: append-only per-project log (`working/actions.jsonl`) records every registry mutation with actor (human / agent / cli / mcp), input/result summaries, timestamp, and revision before/after; History section in the Config panel; `GET /api/projects/<slug>/history`
+- **Action history**: append-only per-project log (`working/actions.jsonl`) records every user-facing mutation (registry actions, asset add/remove, template/brand, multi-take assemble, brief saves) with actor (human / agent / cli / mcp / system), input/result summaries, timestamp, and revision before/after; History section in the Config panel; `GET /api/projects/<slug>/history`
+- **Revert (undo)**: every logged mutation keeps a pre-mutation snapshot in `working/history/` (newest 100 revisions); `openklip revert <slug> (--to <rev> | --task <id> | --last) [--force]`, the MCP `revert` tool, and per-entry/per-task "Revert" buttons in the History panel restore `project.json` to an earlier state as a normal, itself-revertible mutation. Restores `project.json` only, not `brief.md`, chats, tasks, asset files, or derived media; see [TODO.md](./TODO.md#known-limitations) for the details
 - **Project brief**: `brief.md` at the project root holds audience, goal, tone, must-use assets, avoid list, target length, and export formats; agents read it on every chat/edit prompt (2000-char bounded); GUI Brief section in the Config panel; `openklip brief <slug> [--set <text...> | --file <path>]` and MCP `brief_get` / `brief_set`
 - **Agent tasks with live progress**: every tool-calling chat edit gets a visible task (`working/tasks.json`); the chat panel's task progress card polls every 2 seconds while running and shows each step plus a cancel button that kills the underlying agent process; the agent signals completion explicitly (`task_step` / `task_complete` MCP tools) instead of relying on heuristics
 - **Make-a-draft playbook**: `templates/make-draft/skill.md` turns one prompt into a full first draft: reads the brief and assets, cuts filler, adds titles/captions, places b-roll or stills, adds a music bed if available, exports, and verifies itself
 - **Browser project creation**: upload a video in the New Project dialog or drop one onto the empty workspace; format-validated on client and server, source persisted into the project folder, explicit overwrite confirm on name collisions, ingest progress overlay, editor opens on completion
 - **Workspace**: macOS folder picker on empty landing; inline project create; projects root persisted in `.openklip/projects-root`
 - **CLI**: full edit surface; `openklip actions --json` mutations manifest; `openklip tools --json` full agent tool list
-- **MCP server**: `openklip mcp` (stdio) exposes 67 tools with CLI/GUI parity; `.cursor/mcp.json` wired for Cursor
+- **MCP server**: `openklip mcp` (stdio) exposes 68 tools with CLI/GUI parity; `.cursor/mcp.json` wired for Cursor
 - **Edit templates**: `templates/<id>/skill.md` playbooks; `openklip template set`; brand presets at ingest (`openklip brand`)
 - **Agent selector**: drive filler cuts via Claude Code, Codex, Cursor, or Grok subscription CLIs
 - **Design system**: default shadcn/ui tokens with Base UI primitives (`app/globals.css`, `components.json`); light/dark via `.dark` class; icons via `web/lib/icon.tsx`

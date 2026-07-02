@@ -2,12 +2,7 @@
 // commands in one manifest. CLI (`openklip tools`), MCP (stdio server), and docs
 // all read from here so surfaces stay in sync with the GUI's project.json edits.
 import { z } from "zod";
-import {
-  type Actor,
-  actorFromEnv,
-  appendActionLog,
-  summarizeForLog,
-} from "./action-log.ts";
+import { type Actor, actorFromEnv } from "./action-log.ts";
 import {
   type AgentTaskOutcome,
   completeAgentTask,
@@ -17,6 +12,7 @@ import { assembleFromSelection, listTakes, loadTake } from "./assembly.ts";
 import { loadAudioAnalysis } from "./audio-analysis.ts";
 import type { SilenceSpan } from "./audio-analysis-core.ts";
 import { loadBrief, saveBrief } from "./brief.ts";
+import { logBriefSet } from "./brief-log.ts";
 import { cleanupReport, fillerOnlyCleanupReport } from "./cleanup.ts";
 import { type Project, samplesToSec } from "./edl.ts";
 import { EXPORT_COMPRESSIONS, exportCut } from "./exporter.ts";
@@ -38,6 +34,7 @@ import {
   runAction,
   type Surface,
 } from "./registry.ts";
+import { type RevertTarget, revertProject } from "./revert.ts";
 import {
   applyProjectTemplate,
   listTemplates,
@@ -77,6 +74,15 @@ function zodShapeFromSchema(schema: z.ZodType): Record<string, z.ZodType> {
 // server so its edits attribute to the agent instead.
 function toolActor(): Actor {
   return actorFromEnv() ?? "mcp";
+}
+
+// Threads OPENKLIP_TASK_ID (set by the agent-task spawner, see
+// activeTaskIdFromEnv below) onto logged mutations so history entries link
+// back to the task that produced them. Undefined for direct MCP/CLI calls
+// that aren't running as part of a spawned task.
+function toolTaskId(): string | undefined {
+  const id = process.env.OPENKLIP_TASK_ID?.trim();
+  return id ? id : undefined;
 }
 
 function scopedProjectSlug(): string | undefined {
@@ -157,7 +163,12 @@ function mutationTool(action: ActionDef): AgentToolDef {
       return mutateProject(
         projectSlug,
         (project) => runAction(action.name, project, actionInput),
-        { action: action.name, actor: toolActor(), input: actionInput }
+        {
+          action: action.name,
+          actor: toolActor(),
+          input: actionInput,
+          taskId: toolTaskId(),
+        }
       );
     },
   };
@@ -428,22 +439,8 @@ const queryTools: AgentToolDef[] = [
     // is not part of the EDL), hence revisionBefore === revisionAfter.
     run: async ({ slug: projectSlug, text }) => {
       await saveBrief(projectSlug, text);
-      const chars = text.trim().length;
-      try {
-        const project = await loadProject(projectSlug);
-        const revision = project.revision ?? 0;
-        await appendActionLog(projectSlug, {
-          at: Date.now(),
-          action: "brief-set",
-          actor: toolActor(),
-          input: summarizeForLog({ chars }),
-          revisionBefore: revision,
-          revisionAfter: revision,
-        });
-      } catch {
-        // Best-effort: a history-log failure must not fail the brief write.
-      }
-      return { saved: true, chars };
+      await logBriefSet(projectSlug, toolActor(), text, toolTaskId());
+      return { saved: true, chars: text.trim().length };
     },
   }),
   defineQueryTool({
@@ -549,6 +546,7 @@ const queryTools: AgentToolDef[] = [
           action: "title-add-phrase",
           actor: toolActor(),
           input: { spokenPhrase, text, position, note },
+          taskId: toolTaskId(),
         }
       ),
   }),
@@ -583,6 +581,7 @@ const queryTools: AgentToolDef[] = [
           action: "zoom-add-phrase",
           actor: toolActor(),
           input: { spokenPhrase, scale, rampSec, note },
+          taskId: toolTaskId(),
         }
       ),
   }),
@@ -615,6 +614,7 @@ const queryTools: AgentToolDef[] = [
           action: "broll-add-phrase",
           actor: toolActor(),
           input: { assetId, spokenPhrase, note },
+          taskId: toolTaskId(),
         }
       ),
   }),
@@ -711,14 +711,61 @@ const queryTools: AgentToolDef[] = [
       assembleFromSelection(
         projectSlug,
         { segments, ...(padMs === undefined ? {} : { padMs }) },
-        { force }
+        { force, actor: toolActor() }
       ),
   }),
 ];
 
+// revert is a manual AgentToolDef (not built with defineQueryTool/mutationTool)
+// for two reasons: it is NOT a registry action (registry actions are pure
+// in-memory Project -> Project transforms; revert reads a snapshot file off
+// disk before it can mutate anything, see src/revert.ts), and its "exactly
+// one of to/task/last" constraint needs a zod .refine(), which would turn the
+// schema into a ZodEffects that zodShapeFromSchema can't read fields off of.
+// So the refined schema drives validation in run() while the plain base
+// schema's shape (revertBaseShape) is what MCP's inputSchema actually sees.
+const revertBaseShape = {
+  slug,
+  to: z.number().int().nonnegative().optional(),
+  task: z.string().min(1).optional(),
+  last: z.boolean().optional(),
+  force: z.boolean().optional(),
+};
+const revertSchema = z
+  .object(revertBaseShape)
+  .refine(
+    (v) =>
+      [v.to !== undefined, v.task !== undefined, v.last === true].filter(
+        Boolean
+      ).length === 1,
+    { message: 'revert requires exactly one of "to", "task", or "last"' }
+  );
+
+const revertTool: AgentToolDef = {
+  name: "revert",
+  summary:
+    "Revert a project to an earlier logged revision: --to a revision, --task an agent task's changes, or --last the most recent edit.",
+  surfaces: ["mcp", "cli"],
+  schema: revertSchema,
+  zodShape: revertBaseShape,
+  run: (raw) => {
+    const { slug: projectSlug, to, task, force } = revertSchema.parse(raw);
+    const target: RevertTarget =
+      to === undefined
+        ? task === undefined
+          ? { last: true }
+          : { task, force }
+        : { to };
+    return revertProject(projectSlug, target, {
+      actor: toolActor(),
+      taskId: toolTaskId(),
+    });
+  },
+};
+
 const mutationTools = actions.map(mutationTool);
 
-const allTools: AgentToolDef[] = [...queryTools, ...mutationTools];
+const allTools: AgentToolDef[] = [...queryTools, revertTool, ...mutationTools];
 
 const byName = new Map(allTools.map((t) => [t.name, t]));
 

@@ -28,6 +28,8 @@ import {
   projectDeleteFailedToast,
   projectIngestLoadingMessage,
   revealFailedToast,
+  revertFailedToast,
+  revertSucceededToast,
   saveFailedToast,
   workspacePickerToasts,
   workspacePickFailedToast,
@@ -314,5 +316,21 @@ test("chatAssetUploadSuccessToast adds bin hint", () => {
     kind: "success",
     title: "2 assets added",
     description: "Available in the asset bin.",
+  });
+});
+
+test("revertSucceededToast formats the restored and new revisions", () => {
+  assert.deepEqual(revertSucceededToast({ revision: 3, restoredTo: 0 }), {
+    kind: "success",
+    title: "Reverted",
+    description: "Restored revision 0 (now revision 3)",
+  });
+});
+
+test("revertFailedToast", () => {
+  assert.deepEqual(revertFailedToast("nothing to revert"), {
+    kind: "error",
+    title: "Could not revert",
+    description: "nothing to revert",
   });
 });

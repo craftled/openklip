@@ -111,6 +111,25 @@ export function assetRemoveFailedToast(error: string): ToastPayload {
   };
 }
 
+export function revertSucceededToast(outcome: {
+  restoredTo: number;
+  revision: number;
+}): ToastPayload {
+  return {
+    kind: "success",
+    title: "Reverted",
+    description: `Restored revision ${outcome.restoredTo} (now revision ${outcome.revision})`,
+  };
+}
+
+export function revertFailedToast(error: string): ToastPayload {
+  return {
+    kind: "error",
+    title: "Could not revert",
+    description: error,
+  };
+}
+
 export function countNewAssetIds(
   knownIds: ReadonlySet<string>,
   assets: ReadonlyArray<AssetIdRef>
