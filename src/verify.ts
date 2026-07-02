@@ -8,10 +8,11 @@
 // The diff + verdict are pure and unit tested; only the audio extract and the
 // transcribe spawn touch the world.
 import { existsSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { FFMPEG, run } from "./ffmpeg.ts";
 import { projectPaths } from "./paths.ts";
 import { loadProject } from "./projectStore.ts";
+import { transcribeScriptPath } from "./script-paths.ts";
 
 // Conservative disfluency set: tokens that are almost never real content, so a
 // survivor is a real defect. "like" is deliberately excluded (a real word).
@@ -144,7 +145,7 @@ async function transcribeToWords(
   outJsonAbs: string
 ): Promise<string[]> {
   const proc = Bun.spawn(
-    ["node", resolve(import.meta.dir, "transcribe.mjs"), audioAbs, outJsonAbs],
+    ["node", transcribeScriptPath(), audioAbs, outJsonAbs],
     { stdout: "pipe", stderr: "pipe" }
   );
   if ((await proc.exited) !== 0) {

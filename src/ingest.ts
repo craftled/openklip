@@ -1,12 +1,13 @@
 import { existsSync } from "node:fs";
 import { mkdir, rm } from "node:fs/promises";
-import { isAbsolute, resolve } from "node:path";
+import { isAbsolute } from "node:path";
 import { type Project, ProjectSchema, SAMPLE_RATE, type Word } from "./edl.ts";
 import { FFMPEG, probe, run } from "./ffmpeg.ts";
 import { assertProjectCanBeIngested } from "./ingest-guard.ts";
 import type { IngestPhase, IngestProgress } from "./ingest-types.ts";
 import { projectPaths, slugFromVideo } from "./paths.ts";
 import { cwdPath } from "./repo-paths.ts";
+import { transcribeScriptPath } from "./script-paths.ts";
 import { defaultTemplateId } from "./templates.ts";
 
 export type { IngestPhase, IngestProgress } from "./ingest-types.ts";
@@ -107,10 +108,10 @@ export async function transcribeToWords(
   audioRaw: string,
   rawJson: string
 ): Promise<Word[]> {
-  const proc = Bun.spawn(
-    ["node", resolve(import.meta.dir, "transcribe.mjs"), audioRaw, rawJson],
-    { stdout: "inherit", stderr: "inherit" }
-  );
+  const proc = Bun.spawn(["node", transcribeScriptPath(), audioRaw, rawJson], {
+    stdout: "inherit",
+    stderr: "inherit",
+  });
   if ((await proc.exited) !== 0) {
     throw new Error("transcription step failed");
   }
