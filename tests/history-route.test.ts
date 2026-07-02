@@ -11,6 +11,7 @@ import {
 
 interface HistoryResponse {
   entries: ActionLogEntry[];
+  maxHistorySnapshots: number;
   snapshotRevisions: number[];
 }
 
@@ -68,6 +69,16 @@ test("GET /api/projects/:slug/history returns empty entries with no log", async 
 });
 
 // ── snapshotRevisions: which revisions have a working/history/ snapshot ────
+
+test("GET /api/projects/:slug/history includes maxHistorySnapshots from projectStore", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const res = await get(slug);
+    assert.equal(res.status, 200);
+    const data = (await res.json()) as HistoryResponse;
+    assert.equal(data.maxHistorySnapshots, 100);
+  });
+});
 
 test("GET /api/projects/:slug/history includes snapshotRevisions for logged mutations", async () => {
   await withTempProjectsRoot(async ({ slug }) => {

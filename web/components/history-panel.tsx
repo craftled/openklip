@@ -52,6 +52,14 @@ export function parseSnapshotRevisions(value: unknown): number[] {
   return value.filter((v): v is number => typeof v === "number");
 }
 
+/** Positive snapshot cap from the history route, or undefined when absent. */
+export function parseMaxHistorySnapshots(value: unknown): number | undefined {
+  return typeof value === "number" && value > 0 ? value : undefined;
+}
+
+/** Confirm-state key for the header "Undo last edit" affordance. */
+export const LAST_REVERT_KEY = "last-revert";
+
 /** Stable identity for one log entry (no id field on ActionLogEntry itself). */
 export function historyEntryKey(
   entry: Pick<ActionLogEntry, "action" | "at" | "revisionAfter">
@@ -191,10 +199,34 @@ export function groupTouchesTruncationBoundary(
 
 // resolveRevertTarget's task guard (src/revert.ts) throws a message ending
 // "...; pass force to revert anyway" when a later, unrelated edit would also
-// be discarded. Matching on "force" lets the panel offer a second
-// confirmation instead of just failing the revert silently.
+// be discarded. Match that exact phrase so unrelated errors that happen to
+// mention "force" do not escalate to a second confirm.
+const REVERT_FORCE_PHRASE = "pass force to revert anyway";
+
 export function revertErrorNeedsForce(message: string): boolean {
-  return /force/i.test(message);
+  return message.includes(REVERT_FORCE_PHRASE);
+}
+
+/** Newest revision-bumping entry that still has a snapshot, or undefined. */
+export function newestRevertibleEntry(
+  entries: ActionLogEntry[],
+  snapshotRevisions: readonly number[]
+): ActionLogEntry | undefined {
+  return entries.find((entry) => canRevertEntry(entry, snapshotRevisions));
+}
+
+/** True when the GUI can offer "Undo last edit" ({ last: true }), matching
+ * resolveRevertTarget's {last:true} plus the same assemble-boundary guard as
+ * per-entry revert. */
+export function canRevertLast(
+  entries: ActionLogEntry[],
+  snapshotRevisions: readonly number[]
+): boolean {
+  const entry = newestRevertibleEntry(entries, snapshotRevisions);
+  if (!entry) {
+    return false;
+  }
+  return !crossesAssembleBoundary(entries, entry);
 }
 
 interface RevertControls {
@@ -519,6 +551,9 @@ export function HistoryPanel({
   const router = useRouter();
   const [entries, setEntries] = useState<ActionLogEntry[]>([]);
   const [snapshotRevisions, setSnapshotRevisions] = useState<number[]>([]);
+  const [maxHistorySnapshots, setMaxHistorySnapshots] = useState<
+    number | undefined
+  >();
   const [loading, setLoading] = useState(false);
   const [confirmingKey, setConfirmingKey] = useState<string | null>(null);
   const [forceConfirmKey, setForceConfirmKey] = useState<string | null>(null);
@@ -536,10 +571,14 @@ export function HistoryPanel({
       }
       const data = (await res.json()) as {
         entries?: unknown;
+        maxHistorySnapshots?: unknown;
         snapshotRevisions?: unknown;
       };
       setEntries(parseHistoryEntries(data.entries));
       setSnapshotRevisions(parseSnapshotRevisions(data.snapshotRevisions));
+      setMaxHistorySnapshots(
+        parseMaxHistorySnapshots(data.maxHistorySnapshots)
+      );
     } catch {
       // Network hiccup: keep the last list rather than erroring the panel.
     } finally {
@@ -609,6 +648,16 @@ export function HistoryPanel({
     []
   );
 
+  const onRequestLastRevert = useCallback(() => {
+    setConfirmingKey(LAST_REVERT_KEY);
+    setForceConfirmKey(null);
+    setPendingTarget({ last: true });
+  }, []);
+
+  const undoLastEnabled = canRevertLast(entries, snapshotRevisions);
+  const undoLastConfirming = confirmingKey === LAST_REVERT_KEY;
+  const undoLastReverting = revertingKey === LAST_REVERT_KEY;
+
   const onConfirmRevert = useCallback(
     (key: string) => {
       if (pendingTarget) {
@@ -629,21 +678,66 @@ export function HistoryPanel({
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <span className="text-muted-foreground text-xs">
           {entries.length} action{entries.length === 1 ? "" : "s"}
         </span>
-        <Button
-          aria-label="Refresh history"
-          className="size-6 text-muted-foreground"
-          disabled={loading}
-          onClick={() => void refresh()}
-          size="icon-sm"
-          title="Refresh history"
-          variant="ghost"
-        >
-          <RotateCcw />
-        </Button>
+        <span className="flex shrink-0 items-center gap-1">
+          {undoLastConfirming ? (
+            <>
+              <span className="text-[11px] text-muted-foreground">
+                Undo last edit?
+              </span>
+              <Button
+                className="h-5 rounded-sm px-1.5 text-[11px] text-destructive hover:bg-destructive/10"
+                disabled={undoLastReverting}
+                onClick={() => onConfirmRevert(LAST_REVERT_KEY)}
+                size="sm"
+                type="button"
+                variant="ghost"
+              >
+                Confirm
+              </Button>
+              <Button
+                className="h-5 rounded-sm px-1.5 text-[11px] text-muted-foreground"
+                disabled={undoLastReverting}
+                onClick={cancelRevert}
+                size="sm"
+                type="button"
+                variant="ghost"
+              >
+                Cancel
+              </Button>
+            </>
+          ) : (
+            <Button
+              className="h-6 rounded-sm px-2 text-[11px] text-muted-foreground hover:text-destructive"
+              disabled={!undoLastEnabled || undoLastReverting || loading}
+              onClick={onRequestLastRevert}
+              size="sm"
+              title={
+                undoLastEnabled
+                  ? "Undo the most recent logged edit"
+                  : "No snapshot to undo"
+              }
+              type="button"
+              variant="ghost"
+            >
+              Undo last
+            </Button>
+          )}
+          <Button
+            aria-label="Refresh history"
+            className="size-6 text-muted-foreground"
+            disabled={loading}
+            onClick={() => void refresh()}
+            size="icon-sm"
+            title="Refresh history"
+            variant="ghost"
+          >
+            <RotateCcw />
+          </Button>
+        </span>
       </div>
       <HistoryList
         confirmingKey={confirmingKey}
@@ -657,6 +751,11 @@ export function HistoryPanel({
         revertingKey={revertingKey}
         snapshotRevisions={snapshotRevisions}
       />
+      {entries.length > 0 && maxHistorySnapshots !== undefined ? (
+        <p className="text-[11px] text-muted-foreground">
+          Revert is available for the newest {maxHistorySnapshots} logged edits.
+        </p>
+      ) : null}
     </div>
   );
 }

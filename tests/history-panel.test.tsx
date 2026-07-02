@@ -6,6 +6,7 @@ import {
   actorBadgeClass,
   canRevertEntry,
   canRevertGroup,
+  canRevertLast,
   crossesAssembleBoundary,
   groupHasBriefSet,
   groupHistoryEntries,
@@ -14,7 +15,9 @@ import {
   HistoryList,
   historyEntryKey,
   newestAssembleIndex,
+  newestRevertibleEntry,
   parseHistoryEntries,
+  parseMaxHistorySnapshots,
   parseSnapshotRevisions,
   revertErrorNeedsForce,
   revisionSpanLabel,
@@ -193,6 +196,51 @@ test("revertErrorNeedsForce detects the force-guard message from src/revert.ts",
     false
   );
   assert.equal(revertErrorNeedsForce("no snapshot for revision 5"), false);
+  assert.equal(
+    revertErrorNeedsForce(
+      "action history is inconsistent with project revision (project at 4, log tail at 2); use --to <revision> explicitly"
+    ),
+    false
+  );
+});
+
+test("parseMaxHistorySnapshots accepts a positive number and rejects the rest", () => {
+  assert.equal(parseMaxHistorySnapshots(100), 100);
+  assert.equal(parseMaxHistorySnapshots(0), undefined);
+  assert.equal(parseMaxHistorySnapshots("100"), undefined);
+});
+
+test("newestRevertibleEntry and canRevertLast mirror {last:true} eligibility", () => {
+  const briefOnly: ActionLogEntry = {
+    at: 3000,
+    action: "brief-set",
+    actor: "human",
+    revisionBefore: 2,
+    revisionAfter: 2,
+  };
+  assert.deepEqual(
+    newestRevertibleEntry([newer, briefOnly, older], [0, 1]),
+    newer
+  );
+  assert.equal(canRevertLast([newer, older], [0, 1]), true);
+  assert.equal(canRevertLast([newer, older], []), false);
+  assert.equal(
+    canRevertLast(
+      [
+        {
+          at: 4000,
+          action: "assemble",
+          actor: "human",
+          revisionBefore: 2,
+          revisionAfter: 3,
+        },
+        newer,
+        older,
+      ],
+      [0, 1, 2]
+    ),
+    false
+  );
 });
 
 test("HistoryList renders an enabled revert affordance for a revertible entry", () => {
