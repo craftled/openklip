@@ -2,7 +2,24 @@
 
 Use these bodies when publishing releases. Each section matches a tag in `CHANGELOG.md` without duplicating the full changelog. **Known gaps:** always link to [TODO.md](../TODO.md#known-limitations); do not duplicate the list here.
 
-Publishing status checked on 2026-07-02: GitHub releases are published through `v0.14.1.0`. `v0.15.0.0` is prepared below for publication next.
+Publishing status checked on 2026-07-03 (`gh release list`): GitHub releases are published through `v0.15.0.0`. `v0.16.0.0` is prepared below for publication next.
+
+---
+
+## v0.16.0.0
+
+**Export platform presets: one named pick (YouTube, YouTube 4K, X, LinkedIn) sets compression, frame rate, resolution ceiling, and loudness target together, on CLI, API, MCP, and the GUI export dialog.**
+
+### Highlights
+- **Export platform presets**: `youtube` (1080p, -14 LUFS), `youtube-4k` (2160p, -14 LUFS), `x` (1080p/30fps, -14 LUFS), and `linkedin` (1080p/30fps, -14 LUFS), defined once in `src/export-platforms.ts`. A preset fills in defaults only: any compression/fps/maxHeight/loudness value passed explicitly still wins, and `maxHeight` never upscales past the source. `openklip export --platform <id>` (plus a new `--loudness <lufs>` override), the export API route, the `exportProject` server action, and the MCP `export` tool all share the same resolution logic; a Platform picker in the GUI export dialog sets the visible controls to match.
+- **Export dialog resolution fix**: the dialog's "4K" control could previously submit the source height instead of the intended output ceiling; the displayed dimensions, size/time estimate, and the actual export now always agree.
+- Current codebase verification: 1243 tests.
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations) for the current list. Platform presets are landscape-only (no vertical/9:16 destinations yet); a platform's fps is a hard pin, not a cap, so retiming footage shot at a different frame rate can duplicate frames; loudness normalization stays single-pass (lands near, not exactly at, the target).
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#01600---2026-07-03)
 
 ---
 

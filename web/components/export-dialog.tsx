@@ -1,16 +1,23 @@
 "use client";
 
+import {
+  type ExportPlatformId,
+  exportPlatform,
+} from "@engine/export-platforms";
 import type { ExportCompression } from "@engine/exporter";
 import { type ReactElement, type ReactNode, useMemo, useState } from "react";
 import {
   COMPRESSION_COPY,
   type ExportDestination,
   ExportOptionsForm,
+  type ExportPlatformSelection,
   type ExportResolution,
+  platformFormValues,
 } from "@/components/export-options-form";
 
 export type {
   ExportDestination,
+  ExportPlatformSelection,
   ExportResolution,
 } from "@/components/export-options-form";
 
@@ -35,6 +42,8 @@ export interface ExportDialogOptions {
   /** "source" keeps the source frame rate; a number requests that rate. */
   frameRate: number | "source";
   maxHeight?: number;
+  /** undefined when Manual is selected; otherwise the active preset id. */
+  platform?: ExportPlatformId;
   resolution: ExportResolution;
 }
 
@@ -49,14 +58,19 @@ interface ExportDialogProps {
   sourceWidth: number;
 }
 
-function outputDimensions(
-  resolution: ExportResolution,
+/**
+ * Dimensions for a resolved maxHeight (undefined means source-native): the
+ * one shared cap-and-scale math so displayed dims, estimates, and the
+ * submitted export request can never independently disagree about what a
+ * given maxHeight actually renders. Never upscales past the source.
+ */
+export function outputDimensionsForMaxHeight(
+  maxHeight: number | undefined,
   sourceWidth: number,
   sourceHeight: number
 ): { width: number; height: number } {
-  const cap =
-    resolution === "720" ? 720 : resolution === "1080" ? 1080 : sourceHeight;
-  const height = Math.min(sourceHeight, cap);
+  const height =
+    maxHeight === undefined ? sourceHeight : Math.min(sourceHeight, maxHeight);
   const width = Math.round((sourceWidth * height) / sourceHeight / 2) * 2;
   return { width, height };
 }
@@ -71,6 +85,33 @@ function maxHeightForResolution(
     return 1080;
   }
   return;
+}
+
+/**
+ * The one true maxHeight for the dialog's current platform + source
+ * combination. The "4k" resolution bucket is ambiguous on its own: for
+ * Manual it means source-native (no cap, undefined); for an active platform
+ * whose own ceiling maps to that bucket (only youtube-4k today, 2160) it
+ * means that platform's REAL numeric ceiling, capped at source so it never
+ * claims an upscale. An explicit 720/1080 pick always wins regardless of
+ * platform (the module-level explicit-wins convention), since that is an
+ * independent user choice made after the platform filled the controls.
+ * Every displayed number (dims, estimates) and the submitted maxHeight must
+ * derive from this single value so the dialog can never show one thing and
+ * export another.
+ */
+export function effectiveMaxHeight(
+  platform: ExportPlatformSelection,
+  resolution: ExportResolution,
+  sourceHeight: number
+): number | undefined {
+  if (resolution !== "4k") {
+    return maxHeightForResolution(resolution);
+  }
+  if (platform === "manual") {
+    return;
+  }
+  return Math.min(sourceHeight, exportPlatform(platform).maxHeight);
 }
 
 function formatBytes(bytes: number): string {
@@ -109,11 +150,40 @@ export function ExportDialog({
   const [compression, setCompression] = useState<ExportCompression>("social");
   // "source" or a stringified frame rate; mapped to number | "source" on export.
   const [frameRate, setFrameRate] = useState<string>("source");
+  const [platform, setPlatform] = useState<ExportPlatformSelection>("manual");
   const destination: ExportDestination = "file";
 
+  // Picking a platform chip sets the compression/fps/resolution controls to
+  // the preset's defaults; the controls stay independently editable after
+  // that (explicit-wins at export time makes double-specifying safe), so
+  // there is never a submitted value the visible controls do not also show.
+  // The resolution control's "4k" bucket is the one exception that needs a
+  // second, platform-aware lookup (effectiveMaxHeight): Manual+4k means
+  // source-native, but an active platform whose ceiling maps to that same
+  // bucket (youtube-4k, 2160) means its real numeric cap, not "whatever the
+  // source is." effectiveMaxHeight resolves that ambiguity once so dims,
+  // estimates, and the submitted maxHeight all agree with what actually
+  // renders.
+  const handlePlatformChange = (value: ExportPlatformSelection) => {
+    setPlatform(value);
+    if (value === "manual") {
+      return;
+    }
+    const values = platformFormValues(exportPlatform(value));
+    setCompression(values.compression);
+    setFrameRate(values.fpsValue);
+    setResolution(values.resolution);
+  };
+
+  const activeMaxHeight = useMemo(
+    () => effectiveMaxHeight(platform, resolution, sourceHeight),
+    [platform, resolution, sourceHeight]
+  );
+
   const dims = useMemo(
-    () => outputDimensions(resolution, sourceWidth, sourceHeight),
-    [resolution, sourceHeight, sourceWidth]
+    () =>
+      outputDimensionsForMaxHeight(activeMaxHeight, sourceWidth, sourceHeight),
+    [activeMaxHeight, sourceHeight, sourceWidth]
   );
 
   const compressionMeta = COMPRESSION_COPY[compression];
@@ -131,7 +201,8 @@ export function ExportDialog({
       compression,
       destination,
       frameRate: frameRate === "source" ? "source" : Number(frameRate),
-      maxHeight: maxHeightForResolution(resolution),
+      maxHeight: activeMaxHeight,
+      platform: platform === "manual" ? undefined : platform,
       resolution,
     });
   };
@@ -158,7 +229,9 @@ export function ExportDialog({
           frameRate={frameRate}
           onCompressionChange={setCompression}
           onFrameRateChange={setFrameRate}
+          onPlatformChange={handlePlatformChange}
           onResolutionChange={setResolution}
+          platform={platform}
           resolution={resolution}
           sourceFps={sourceFps}
         />

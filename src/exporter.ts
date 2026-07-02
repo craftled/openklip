@@ -25,6 +25,10 @@ import {
   sourceToOutputSec,
   totalDurationSec,
 } from "./edl.ts";
+import {
+  type ExportPlatformId,
+  resolvePlatformOptions,
+} from "./export-platforms.ts";
 import { FFMPEG, probe, run } from "./ffmpeg.ts";
 import { filterChain } from "./filter.ts";
 import { renderGraphicOverlay } from "./graphic-render.ts";
@@ -62,7 +66,21 @@ export type ExportCompression = (typeof EXPORT_COMPRESSIONS)[number];
 export interface ExportOptions {
   compression?: ExportCompression; // libx264 preset/CRF bundle; default "social"
   fps?: number; // output frame rate; default = rounded source rate
+  /**
+   * Export-invocation-only loudness normalization target (LUFS, -30..-10).
+   * Applies loudnorm at this target for THIS export regardless of the
+   * project's saved audio.loudness setting; never mutates the project.
+   * Bounds are enforced by each surface (CLI/route/action/MCP), matching
+   * how fps/maxHeight bounds are enforced today.
+   */
+  loudnessTargetLufs?: number;
   maxHeight?: number; // e.g. 1080 -> downscale output (and speed up filtering/encode)
+  /**
+   * Destination preset (see export-platforms.ts) that fills any of the
+   * fields above left unset by the caller. Explicit fields always win over
+   * the platform's defaults; resolved once at the top of exportCut.
+   */
+  platform?: ExportPlatformId;
 }
 
 // libx264 args per compression preset. Pure so tests pin the mapping; CRF must
@@ -116,6 +134,19 @@ export function parseExportFpsFlag(raw: string): number {
     throw new Error("--fps must be an integer between 1 and 120");
   }
   return fps;
+}
+
+// Parse the CLI `--loudness` flag value against the same -30..-10 LUFS bounds
+// enforced by setAudio (actions.ts's clampNum(-30, -10)) and the AudioSchema
+// (edl.ts's z.number().min(-30).max(-10)). Lives here rather than cli.ts for
+// the same reason as parseExportFpsFlag: cli.ts runs its command switch at
+// module scope and cannot be imported by tests.
+export function parseExportLoudnessFlag(raw: string): number {
+  const lufs = Number(raw);
+  if (!(Number.isFinite(lufs) && lufs >= -30 && lufs <= -10)) {
+    throw new Error("--loudness must be a number between -30 and -10");
+  }
+  return lufs;
 }
 
 export interface InputChoice {
@@ -520,6 +551,13 @@ function duckRatioFor(amountDb: number): number {
 export interface AudioFilterOpts {
   /** project.audio; ducking/loudness/highpass all default to off/absent. */
   audio?: Audio;
+  /**
+   * Export-invocation-only loudness override (explicit option or a platform
+   * preset's targetLufs). When set, loudnorm runs at this target for this
+   * export regardless of audio?.loudness?.enabled, and never mutates the
+   * project. Undefined leaves audio?.loudness exactly as before.
+   */
+  loudnessTargetLufs?: number;
   /** Surviving ranges; required to consider the seam-declick path. */
   ranges?: Range[];
   /** project.cuts.snap; the seam path only engages when this is enabled. */
@@ -544,7 +582,9 @@ export function buildAudioParts(
   const audio = opts.audio;
   const hasMusic = music.mixInputLabels.length > 0;
   const ducking = Boolean(audio?.ducking?.enabled) && hasMusic;
-  const loudness = Boolean(audio?.loudness?.enabled);
+  const loudnessOverride = opts.loudnessTargetLufs;
+  const loudness =
+    loudnessOverride !== undefined || Boolean(audio?.loudness?.enabled);
   const useSeams = shouldUseSeamedVoice(ranges, snap);
 
   const parts: string[] = [];
@@ -618,7 +658,7 @@ export function buildAudioParts(
   }
 
   if (loudness) {
-    const targetLufs = (audio as Audio).loudness.targetLufs;
+    const targetLufs = loudnessOverride ?? (audio as Audio).loudness.targetLufs;
     // R2 (ffmpeg-verified): single-pass loudnorm internally upsamples and
     // OUTPUTS 192 kHz; the aac encoder then clamps that to 96 kHz, so every
     // loudness-enabled export would silently ship 96 kHz audio instead of the
@@ -654,6 +694,12 @@ export async function exportCut(
   height: number;
   fps: number;
   compression: ExportCompression;
+  /** Present only when a platform preset was used to resolve this export. */
+  platform?: ExportPlatformId;
+  /** The effective loudness target when normalization applied this export
+   * (project.audio.loudness.enabled, an explicit loudnessTargetLufs, or a
+   * platform preset's targetLufs); undefined when no normalization ran. */
+  loudnessTargetLufs?: number;
   audio: {
     seams: boolean;
     ducking: boolean;
@@ -662,6 +708,10 @@ export async function exportCut(
     snapped: boolean;
   };
 }> {
+  // ONE resolution point: a platform preset only fills gaps left unset by
+  // the caller, so every surface (CLI/route/action/MCP) gets platform
+  // support just by passing opts.platform through to exportCut.
+  const resolved = resolvePlatformOptions(opts.platform, opts);
   const p = projectPaths(slug);
   await mkdir(p.working, { recursive: true });
   await mkdir(p.output, { recursive: true });
@@ -702,8 +752,8 @@ export async function exportCut(
 
   // output resolution
   const outH =
-    opts.maxHeight && opts.maxHeight < sourceMeta.height
-      ? opts.maxHeight
+    resolved.maxHeight && resolved.maxHeight < sourceMeta.height
+      ? resolved.maxHeight
       : sourceMeta.height;
   const outW =
     outH === sourceMeta.height
@@ -737,7 +787,7 @@ export async function exportCut(
   // becomes one extra looped-image input after the b-roll inputs.
   // outFps is the ONE resolved output rate; stills, rich graphics, zoompan, and
   // the base-chain retime below must all read it.
-  const outFps = resolveOutputFps(sourceMeta.fps, opts.fps);
+  const outFps = resolveOutputFps(sourceMeta.fps, resolved.fps);
   const stillPlans = (project.stills ?? [])
     .map((s) => {
       const asset = assetById.get(s.assetId);
@@ -985,7 +1035,7 @@ export async function exportCut(
   const parts: string[] = [];
   // Retime right after setpts (before scale/overlays) so every downstream
   // enable window stays expressed in output seconds at outFps.
-  let base = `[0:v]select='${selectExpr}',setpts=N/FRAME_RATE/TB${fpsFilterFor(sourceMeta.fps, opts.fps)}`;
+  let base = `[0:v]select='${selectExpr}',setpts=N/FRAME_RATE/TB${fpsFilterFor(sourceMeta.fps, resolved.fps)}`;
   if (outH !== sourceMeta.height) {
     base += `,scale=${outW}:${outH}`;
   }
@@ -1107,12 +1157,20 @@ export async function exportCut(
   const audioSeams = shouldUseSeamedVoice(ranges, project.cuts.snap);
   const audioDucking =
     Boolean(project.audio.ducking.enabled) && musicWindows.length > 0;
-  const audioLoudness = Boolean(project.audio.loudness.enabled);
+  // The effective target for THIS export: an explicit/platform override
+  // wins over the project's saved audio.loudness, which never gets touched.
+  const effectiveLoudnessTarget =
+    resolved.loudnessTargetLufs ??
+    (project.audio.loudness.enabled
+      ? project.audio.loudness.targetLufs
+      : undefined);
+  const audioLoudness = effectiveLoudnessTarget !== undefined;
   parts.push(
     ...buildAudioParts(selectExpr, musicGraph, {
       ranges,
       snap: project.cuts.snap,
       audio: project.audio,
+      loudnessTargetLufs: resolved.loudnessTargetLufs,
     })
   );
 
@@ -1157,7 +1215,7 @@ export async function exportCut(
         "[aout]",
         "-c:v",
         "libx264",
-        ...encoderArgsFor(opts.compression),
+        ...encoderArgsFor(resolved.compression),
         "-pix_fmt",
         "yuv420p",
         "-c:a",
@@ -1194,7 +1252,9 @@ export async function exportCut(
     vignette,
     height: outH,
     fps: outFps,
-    compression: opts.compression ?? "social",
+    compression: resolved.compression ?? "social",
+    platform: resolved.platform,
+    loudnessTargetLufs: effectiveLoudnessTarget,
     audio: {
       seams: audioSeams,
       ducking: audioDucking,

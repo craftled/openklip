@@ -37,6 +37,7 @@ import {
   graphicWindowDurationSamples,
   type MusicFilterGraph,
   parseExportFpsFlag,
+  parseExportLoudnessFlag,
   planBrollForRanges,
   planGraphicWindow,
   planMusicWindows,
@@ -427,6 +428,19 @@ test("parseExportFpsFlag accepts integers 1-120 and rejects the rest", () => {
     assert.throws(
       () => parseExportFpsFlag(raw),
       /--fps must be an integer between 1 and 120/,
+      raw
+    );
+  }
+});
+
+test("parseExportLoudnessFlag accepts -30..-10 and rejects the rest", () => {
+  assert.equal(parseExportLoudnessFlag("-18"), -18);
+  assert.equal(parseExportLoudnessFlag("-30"), -30);
+  assert.equal(parseExportLoudnessFlag("-10"), -10);
+  for (const raw of ["-5", "-31", "0", "not-a-number"]) {
+    assert.throws(
+      () => parseExportLoudnessFlag(raw),
+      /--loudness must be a number between -30 and -10/,
       raw
     );
   }
@@ -1004,6 +1018,62 @@ test("buildAudioParts: voiceHighpass reaches the plain aselect voice path (snap 
 });
 
 test("buildAudioParts: voiceHighpass disabled leaves the plain aselect path byte-identical", () => {
+  const expr = "between(t,0.000000,6.000000)";
+  const zeroMusic: MusicFilterGraph = {
+    filterParts: [],
+    inputArgs: [],
+    mixInputLabels: [],
+  };
+  assert.deepEqual(buildAudioParts(expr, zeroMusic, { audio: DEFAULT_AUDIO }), [
+    `[0:a]aselect='${expr}',asetpts=N/SR/TB[aout]`,
+  ]);
+});
+
+// ── Export platform presets: per-invocation loudnessTargetLufs override ────
+// (project.audio.loudness is never mutated; the override only shapes THIS
+// export's filtergraph). Matrix: project loudness {off, on} x override
+// {unset, set}. off/unset and on/unset are already pinned above by the
+// existing loudness tests; these two cover the override-set column.
+
+test("buildAudioParts: loudnessTargetLufs override applies loudnorm even when project loudness is disabled", () => {
+  const expr = "between(t,0.000000,6.000000)";
+  const zeroMusic: MusicFilterGraph = {
+    filterParts: [],
+    inputArgs: [],
+    mixInputLabels: [],
+  };
+  const parts = buildAudioParts(expr, zeroMusic, {
+    audio: DEFAULT_AUDIO,
+    loudnessTargetLufs: -14,
+  });
+  assert.deepEqual(parts, [
+    `[0:a]aselect='${expr}',asetpts=N/SR/TB[avoice]`,
+    "[avoice]loudnorm=I=-14:TP=-1.5:LRA=11,aformat=sample_rates=48000[aout]",
+  ]);
+});
+
+test("buildAudioParts: loudnessTargetLufs override replaces the project's own target when project loudness is enabled", () => {
+  const expr = "between(t,0.000000,6.000000)";
+  const zeroMusic: MusicFilterGraph = {
+    filterParts: [],
+    inputArgs: [],
+    mixInputLabels: [],
+  };
+  const audio: Audio = {
+    ...DEFAULT_AUDIO,
+    loudness: { enabled: true, targetLufs: -16 },
+  };
+  const parts = buildAudioParts(expr, zeroMusic, {
+    audio,
+    loudnessTargetLufs: -20,
+  });
+  assert.deepEqual(parts, [
+    `[0:a]aselect='${expr}',asetpts=N/SR/TB[avoice]`,
+    "[avoice]loudnorm=I=-20:TP=-1.5:LRA=11,aformat=sample_rates=48000[aout]",
+  ]);
+});
+
+test("buildAudioParts: no loudnessTargetLufs override and project loudness disabled stays byte-identical", () => {
   const expr = "between(t,0.000000,6.000000)";
   const zeroMusic: MusicFilterGraph = {
     filterParts: [],
@@ -1880,5 +1950,229 @@ test("exportCut: loudness normalization on succeeds with one audio stream (smoke
     // R2: without the rate constraint after loudnorm, loudnorm's internal
     // 192kHz output gets clamped by aac to 96kHz; the export must stay 48k.
     assert.equal(probed.audioSampleRate, "48000");
+  });
+});
+
+// ── Export platform presets: one resolution point at the top of exportCut ──
+
+function platformSmokeProject(slug: string, src: string) {
+  return makeProject({
+    slug,
+    source: src,
+    fps: 30,
+    width: 320,
+    height: 240,
+    durationSamples: 2 * SAMPLE_RATE,
+    captions: { enabled: false, maxWords: 6, style: "boxed" },
+    words: [
+      {
+        id: "w0",
+        text: "Hello",
+        startSample: 0,
+        endSample: SAMPLE_RATE,
+        deleted: false,
+      },
+      {
+        id: "w1",
+        text: "world",
+        startSample: SAMPLE_RATE,
+        endSample: 2 * SAMPLE_RATE,
+        deleted: false,
+      },
+    ],
+  });
+}
+
+async function makePlatformSmokeSource(src: string) {
+  await run(
+    FFMPEG,
+    [
+      "-y",
+      "-f",
+      "lavfi",
+      "-i",
+      "testsrc=duration=2:size=320x240:rate=30",
+      "-f",
+      "lavfi",
+      "-i",
+      "sine=frequency=440:duration=2",
+      "-c:v",
+      "libx264",
+      "-pix_fmt",
+      "yuv420p",
+      "-c:a",
+      "aac",
+      "-shortest",
+      src,
+    ],
+    "ffmpeg(platform-smoke-clip)"
+  );
+}
+
+test("exportCut resolves a platform preset (x: web/30fps/1080) and reports it in the summary (smoke)", {
+  skip: FFMPEG_OK ? false : "ffmpeg binary unavailable",
+}, async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    const p = projectPaths(slug);
+    const src = join(p.dir, "source.mp4");
+    await makePlatformSmokeSource(src);
+    writeFixtureProject(slug, platformSmokeProject(slug, src));
+
+    const result = await exportCut(slug, { platform: "x" });
+    assert.equal(result.platform, "x");
+    assert.equal(result.compression, "web");
+    assert.equal(result.fps, 30);
+    assert.equal(result.height, 240); // source is already below the 1080 ceiling
+    assert.equal(result.loudnessTargetLufs, -14);
+    assert.equal(result.audio.loudness, true);
+    assert.equal((await probe(p.out)).fps, 30);
+  });
+});
+
+test("exportCut: an explicit option wins over the platform default for that one field only", {
+  skip: FFMPEG_OK ? false : "ffmpeg binary unavailable",
+}, async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    const p = projectPaths(slug);
+    const src = join(p.dir, "source.mp4");
+    await makePlatformSmokeSource(src);
+    writeFixtureProject(slug, platformSmokeProject(slug, src));
+
+    // youtube pins compression=social, fps=source, targetLufs=-14; only fps
+    // is overridden explicitly here, so compression/loudness still come from
+    // the platform.
+    const result = await exportCut(slug, { platform: "youtube", fps: 24 });
+    assert.equal(result.platform, "youtube");
+    assert.equal(result.fps, 24);
+    assert.equal(result.compression, "social");
+    assert.equal(result.loudnessTargetLufs, -14);
+    assert.equal((await probe(p.out)).fps, 24);
+  });
+});
+
+test("exportCut: explicit loudnessTargetLufs works with no platform selected (smoke)", {
+  skip: FFMPEG_OK ? false : "ffmpeg binary unavailable",
+}, async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    const p = projectPaths(slug);
+    const src = join(p.dir, "source.mp4");
+    await makePlatformSmokeSource(src);
+    writeFixtureProject(slug, platformSmokeProject(slug, src));
+
+    const result = await exportCut(slug, { loudnessTargetLufs: -18 });
+    assert.equal(result.platform, undefined);
+    assert.equal(result.loudnessTargetLufs, -18);
+    assert.equal(result.audio.loudness, true);
+    const probed = await probeOut(p.out);
+    assert.equal(probed.audioSampleRate, "48000");
+  });
+});
+
+test("exportCut: no platform and no loudnessTargetLufs leaves the summary exactly as before (smoke)", {
+  skip: FFMPEG_OK ? false : "ffmpeg binary unavailable",
+}, async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    const p = projectPaths(slug);
+    const src = join(p.dir, "source.mp4");
+    await makePlatformSmokeSource(src);
+    writeFixtureProject(slug, platformSmokeProject(slug, src));
+
+    const result = await exportCut(slug, {});
+    assert.equal(result.platform, undefined);
+    assert.equal(result.loudnessTargetLufs, undefined);
+    assert.equal(result.audio.loudness, false);
+  });
+});
+
+// ── CLI: --platform flag (product-announcement.test.tsx runCli pattern) ────
+
+const CLI = join(import.meta.dir, "../src/cli.ts");
+
+async function runCli(args: string[]): Promise<{ code: number; out: string }> {
+  const proc = Bun.spawn(["bun", "run", CLI, ...args], {
+    stdout: "pipe",
+    stderr: "pipe",
+    env: { ...process.env },
+  });
+  const [stdout, stderr, code] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+    proc.exited,
+  ]);
+  return { code, out: stdout + stderr };
+}
+
+test("CLI export --platform bogus errors and lists the known platform ids", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const result = await runCli(["export", slug, "--platform", "bogus"]);
+    assert.notEqual(result.code, 0);
+    assert.match(result.out, /youtube, youtube-4k, x, linkedin/);
+  });
+});
+
+test("CLI export --platform youtube reaches the encoder and is reflected in the printed summary (smoke)", {
+  skip: FFMPEG_OK ? false : "ffmpeg binary unavailable",
+}, async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    const p = projectPaths(slug);
+    const src = join(p.dir, "source.mp4");
+    await makePlatformSmokeSource(src);
+    writeFixtureProject(slug, platformSmokeProject(slug, src));
+
+    const result = await runCli(["export", slug, "--platform", "youtube"]);
+    assert.equal(result.code, 0, result.out);
+    assert.match(result.out, /platform youtube/);
+    assert.match(result.out, /social/);
+  });
+});
+
+test("CLI export --platform youtube --loudness -18 reports -18 LUFS, winning over the youtube preset's -14 default (smoke)", {
+  skip: FFMPEG_OK ? false : "ffmpeg binary unavailable",
+}, async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    const p = projectPaths(slug);
+    const src = join(p.dir, "source.mp4");
+    await makePlatformSmokeSource(src);
+    writeFixtureProject(slug, platformSmokeProject(slug, src));
+
+    const result = await runCli([
+      "export",
+      slug,
+      "--platform",
+      "youtube",
+      "--loudness",
+      "-18",
+    ]);
+    assert.equal(result.code, 0, result.out);
+    assert.match(result.out, /platform youtube/);
+    assert.match(result.out, /-18 LUFS/);
+    assert.doesNotMatch(result.out, /-14 LUFS/);
+  });
+});
+
+test("CLI export --loudness -5 (out of -30..-10 range) errors and states the valid range", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const result = await runCli(["export", slug, "--loudness", "-5"]);
+    assert.notEqual(result.code, 0);
+    assert.match(result.out, /--loudness must be a number between -30 and -10/);
+  });
+});
+
+test("CLI export --platform with no following value errors and lists the known platform ids", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const result = await runCli(["export", slug, "--platform"]);
+    assert.notEqual(result.code, 0);
+    assert.match(result.out, /youtube, youtube-4k, x, linkedin/);
+  });
+});
+
+test("CLI export --loudness with no following value errors", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const result = await runCli(["export", slug, "--loudness"]);
+    assert.notEqual(result.code, 0);
   });
 });

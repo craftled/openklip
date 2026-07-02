@@ -45,10 +45,16 @@ import {
   type Zoom,
 } from "./edl.ts";
 import {
+  EXPORT_PLATFORM_IDS,
+  type ExportPlatformId,
+  isExportPlatformId,
+} from "./export-platforms.ts";
+import {
   EXPORT_COMPRESSIONS,
   type ExportCompression,
   exportCut,
   parseExportFpsFlag,
+  parseExportLoudnessFlag,
 } from "./exporter.ts";
 import { FFMPEG, FFPROBE } from "./ffmpeg.ts";
 import { FILTER_NAMES, isFilter } from "./filter.ts";
@@ -223,6 +229,7 @@ Review & export
                                        --height <px>  max output height (e.g. 1080)
                                        --fps <n>      output frame rate, integer 1-120 (default: source)
                                        --compression <preset>  studio|social|web|web-low
+                                       --platform <id>  destination preset (youtube|youtube-4k|x|linkedin); fills gaps only, explicit flags win
   openklip revert <slug> --to <rev>  restore an earlier logged revision
   openklip revert <slug> --task <id> revert every change made by one agent task
   openklip revert <slug> --last      undo the most recent logged edit
@@ -1892,7 +1899,7 @@ try {
     case "export": {
       if (!rest[0]) {
         throw new Error(
-          "usage: openklip export <slug> [--height <px>] [--fps <n>] [--compression <preset>]"
+          "usage: openklip export <slug> [--height <px>] [--fps <n>] [--compression <preset>] [--platform <id>] [--loudness <lufs>]"
         );
       }
       const heightIdx = rest.indexOf("--height");
@@ -1921,9 +1928,43 @@ try {
         }
         compression = compressionRaw as ExportCompression;
       }
-      const r = await exportCut(rest[0], { compression, fps, maxHeight });
+      // Guard against a trailing flag with no value: `flagValue` would
+      // otherwise silently return undefined and export would proceed with no
+      // preset applied.
+      let platform: ExportPlatformId | undefined;
+      if (rest.includes("--platform")) {
+        const platformRaw = flagValue(rest, "--platform");
+        if (platformRaw === undefined || !isExportPlatformId(platformRaw)) {
+          throw new Error(
+            `unknown export platform "${platformRaw ?? ""}" (expected one of: ${EXPORT_PLATFORM_IDS.join(", ")})`
+          );
+        }
+        platform = platformRaw;
+      }
+      let loudnessTargetLufs: number | undefined;
+      if (rest.includes("--loudness")) {
+        const loudnessRaw = flagValue(rest, "--loudness");
+        if (loudnessRaw === undefined) {
+          throw new Error(
+            "--loudness requires a value (a number between -30 and -10)"
+          );
+        }
+        loudnessTargetLufs = parseExportLoudnessFlag(loudnessRaw);
+      }
+      const r = await exportCut(rest[0], {
+        compression,
+        fps,
+        loudnessTargetLufs,
+        maxHeight,
+        platform,
+      });
+      const platformNote = r.platform ? `, platform ${r.platform}` : "";
+      const loudnessNote =
+        r.loudnessTargetLufs === undefined
+          ? ""
+          : `, loudness ${r.loudnessTargetLufs} LUFS`;
       console.log(
-        `exported ${r.ranges} ranges, ${r.durationSec.toFixed(1)}s (${r.height}p, ${r.fps}fps, ${r.compression}, music ${r.music}) -> ${r.out}`
+        `exported ${r.ranges} ranges, ${r.durationSec.toFixed(1)}s (${r.height}p, ${r.fps}fps, ${r.compression}${platformNote}${loudnessNote}, music ${r.music}) -> ${r.out}`
       );
       break;
     }

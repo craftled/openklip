@@ -4,6 +4,11 @@ import { existsSync } from "node:fs";
 import { loadBrief, saveBrief as saveBriefFile } from "@engine/brief";
 import { logBriefSet } from "@engine/brief-log";
 import type { ColorAdjust, Cuts, Filter, Motion, Project } from "@engine/edl";
+import {
+  EXPORT_PLATFORM_IDS,
+  type ExportPlatformId,
+  isExportPlatformId,
+} from "@engine/export-platforms";
 import type { ExportCompression } from "@engine/exporter";
 import { projectPaths } from "@engine/paths";
 import {
@@ -232,7 +237,9 @@ export async function exportProject(
   options?: {
     compression?: ExportCompression;
     fps?: number;
+    loudnessTargetLufs?: number;
     maxHeight?: number;
+    platform?: ExportPlatformId;
   }
 ): Promise<
   ActionResult<{
@@ -249,7 +256,8 @@ export async function exportProject(
     // Server actions are network-reachable: enforce the same bounds the HTTP
     // route and MCP tool do before any export work, instead of trusting the
     // caller (an unchecked fps would land verbatim in the filtergraph).
-    const { compression, fps, maxHeight } = options ?? {};
+    const { compression, fps, loudnessTargetLufs, maxHeight, platform } =
+      options ?? {};
     if (
       fps !== undefined &&
       !(Number.isInteger(fps) && fps >= 1 && fps <= 120)
@@ -270,7 +278,28 @@ export async function exportProject(
     ) {
       throw new Error("maxHeight must be an integer between 1 and 4320");
     }
-    const result = await exportCut(slug, { compression, fps, maxHeight });
+    if (platform !== undefined && !isExportPlatformId(platform)) {
+      throw new Error(
+        `unknown export platform "${platform}" (expected one of: ${EXPORT_PLATFORM_IDS.join(", ")})`
+      );
+    }
+    if (
+      loudnessTargetLufs !== undefined &&
+      !(
+        Number.isFinite(loudnessTargetLufs) &&
+        loudnessTargetLufs >= -30 &&
+        loudnessTargetLufs <= -10
+      )
+    ) {
+      throw new Error("loudnessTargetLufs must be between -30 and -10");
+    }
+    const result = await exportCut(slug, {
+      compression,
+      fps,
+      loudnessTargetLufs,
+      maxHeight,
+      platform,
+    });
     return { ok: true, data: result };
   } catch (e) {
     return fail(e);

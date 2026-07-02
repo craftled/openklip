@@ -69,7 +69,7 @@ Agent sidebar chats use `working/chats.json`, not `localStorage` (color scheme a
 
 ## What works today
 
-Verified against the current codebase (`VERSION` / `package.json` `0.15.0.0`, 1187 tests):
+Verified against the current codebase (`VERSION` / `package.json` `0.16.0.0`, 1243 tests):
 
 - **Ingest**: video → local transcript + preview proxy + `project.json` (`openklip ingest`; refuses re-ingest unless `--force`)
 - **Transcript editing**: click words to toggle `deleted`; `openklip cut` / `cut --text` / `restore` on CLI
@@ -85,6 +85,7 @@ Verified against the current codebase (`VERSION` / `package.json` `0.15.0.0`, 11
 - **Assets**: register b-roll, music, stills; sidebar asset bin with upload + `assets/` folder sync; upload from chat `+`
 - **Overlays**: b-roll cover, Ken Burns stills, push-in zooms, title cards (lower / center / hero), vignette; phrase helpers (`*-add-phrase`) on CLI
 - **Export**: ffmpeg composes kept ranges + overlays + captions; GUI export dialog picks max height (720p / 1080p / 4K), compression preset (studio / social / web / web-low), and output frame rate (source / 24 / 25 / 30 / 48 / 60) with a live size/time estimate; same settings on CLI (`--height`, `--fps`, `--compression`), MCP, and the export API
+- **Export platform presets**: a Platform picker (GUI export dialog) and `--platform <id>` (CLI, `youtube` / `youtube-4k` / `x` / `linkedin`) set compression, frame rate, a source-capped resolution ceiling, and a loudness target together; any control changed after picking a platform still wins, and `--loudness <lufs>` overrides just the loudness target for that export without touching the saved project setting. Landscape-only for now; no vertical/9:16 presets yet
 - **Music placement**: place a registered music asset under the edit with gain, fades, source in-point, and trim/loop mode (`openklip music-add` / `music-set` / `music-rm`); Config panel Music section, placed-music timeline track, preview bed with a mute toggle, mixed into the export by ffmpeg
 - **Cleanup review**: deterministic filler-word detection (isolated disfluencies auto-safe; ambiguous words and phrases flagged review) plus dead-air detection from real audio analysis, with per-candidate risk and an "apply all safe" batch action; Cleanup section in the Config panel, `openklip cleanup <slug> [--json] [--apply-safe]`, MCP `cleanup_report`
 - **VAD snap + seam crossfades**: cut boundaries optionally snap onto detected silence (`cuts.snap`) and export joins the resulting seams with equal-power crossfades that reuse a few ms of removed audio to avoid clicks; wired through the exporter, preview scheduler, and every CLI/MCP range/status query so they all agree; Config panel Audio section, GUI/MCP `cuts-snap` action
@@ -144,6 +145,7 @@ openklip transcript grep <slug> "phrase"
 openklip cut <slug> --text "phrase to remove"
 openklip music-add <slug> <assetId> 0 20 --gain 0.3
 openklip export <slug> --compression web --fps 30
+openklip export <slug> --platform youtube-4k --loudness -13
 ```
 
 In Cursor, enable the bundled MCP server (`.cursor/mcp.json`) and call the same tools without shelling out. Tool manifest: `openklip tools --json --surface mcp`.

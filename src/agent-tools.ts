@@ -17,6 +17,7 @@ import { loadBrief, saveBrief } from "./brief.ts";
 import { logBriefSet } from "./brief-log.ts";
 import { cleanupReport, fillerOnlyCleanupReport } from "./cleanup.ts";
 import { type Project, samplesToSec } from "./edl.ts";
+import { EXPORT_PLATFORM_IDS } from "./export-platforms.ts";
 import { EXPORT_COMPRESSIONS, exportCut } from "./exporter.ts";
 import { listGraphics } from "./graphics.ts";
 import { listLuts } from "./lut.ts";
@@ -710,9 +711,36 @@ const queryTools: AgentToolDef[] = [
         .max(120)
         .optional()
         .describe("Output frame rate; default = source rate"),
+      platform: z
+        .enum(EXPORT_PLATFORM_IDS)
+        .optional()
+        .describe(
+          "Destination preset (youtube, youtube-4k, x, linkedin); fills any of compression/fps/maxHeight/loudnessTargetLufs left unset above, explicit fields always win"
+        ),
+      loudnessTargetLufs: z
+        .number()
+        .min(-30)
+        .max(-10)
+        .optional()
+        .describe(
+          "Loudness normalization target (LUFS) for this export only; overrides project.audio.loudness without mutating the project"
+        ),
     }),
-    run: async ({ slug: projectSlug, maxHeight, compression, fps }) =>
-      exportCut(projectSlug, { compression, fps, maxHeight }),
+    run: async ({
+      slug: projectSlug,
+      maxHeight,
+      compression,
+      fps,
+      platform,
+      loudnessTargetLufs,
+    }) =>
+      exportCut(projectSlug, {
+        compression,
+        fps,
+        loudnessTargetLufs,
+        maxHeight,
+        platform,
+      }),
   }),
   defineQueryTool({
     name: "verify",
