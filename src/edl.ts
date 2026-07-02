@@ -110,14 +110,19 @@ export const AssetSchema = z.object({
 });
 export type Asset = z.infer<typeof AssetSchema>;
 
-// A b-roll clip covering a span of the talking-head SOURCE timeline. "cover"
-// swaps the video to the b-roll while the talker's audio continues.
+// A b-roll clip covering a span of the talking-head SOURCE timeline.
+// display "cover" swaps the full frame to the b-roll while talker audio
+// continues; "pip" keeps the speaker visible and insets b-roll bottom-right.
+export const BrollDisplaySchema = z.enum(["cover", "pip"]);
+export type BrollDisplay = z.infer<typeof BrollDisplaySchema>;
+
 export const BrollSchema = z.object({
   id: z.string(),
   assetId: z.string(),
   startSample: z.number().int().nonnegative(),
   endSample: z.number().int().nonnegative(),
   srcInSample: z.number().int().nonnegative().default(0),
+  display: BrollDisplaySchema.default("cover"),
   note: z.string().optional(),
   anchor: PhraseAnchorSchema.optional(),
 });

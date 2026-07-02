@@ -49,7 +49,12 @@ import {
 } from "./actions.ts";
 import { CAPTION_STYLE_IDS } from "./caption-styles.ts";
 import { NEUTRAL_COLOR } from "./color-adjust.ts";
-import { FilterSchema, PhraseAnchorSchema, type Project } from "./edl.ts";
+import {
+  BrollDisplaySchema,
+  FilterSchema,
+  PhraseAnchorSchema,
+  type Project,
+} from "./edl.ts";
 import {
   PRODUCT_ANNOUNCEMENT_CATALOG,
   ProductAnnouncementCatalogSchema,
@@ -171,6 +176,7 @@ export const actions: ActionDef[] = [
     surfaces: ["cli", "gui", "mcp"],
     schema: z.object({
       assetId: z.string(),
+      display: BrollDisplaySchema.optional(),
       fromSec: sec,
       toSec: sec,
       srcInSec: sec.optional(),
@@ -181,11 +187,13 @@ export const actions: ActionDef[] = [
   }),
   defineAction({
     name: "broll-set",
-    summary: "Patch a b-roll clip (asset, span, source in-point).",
+    summary:
+      "Patch a b-roll clip (asset, span, source in-point, display mode).",
     surfaces: ["cli", "gui", "mcp"],
     schema: z.object({
       id: z.string(),
       assetId: z.string().optional(),
+      display: BrollDisplaySchema.optional(),
       fromSec: sec.optional(),
       toSec: sec.optional(),
       srcInSec: sec.optional(),

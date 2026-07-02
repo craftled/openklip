@@ -17,6 +17,7 @@ import type { SilenceSpan } from "./audio-analysis-core.ts";
 import { applyBrand, loadBrand } from "./brands.ts";
 import { loadBrief, saveBrief } from "./brief.ts";
 import { logBriefSet } from "./brief-log.ts";
+import { BROLL_DISPLAY_IDS } from "./broll-display.ts";
 import { isCaptionStyleId, listCaptionStyles } from "./caption-styles.ts";
 import {
   cleanupReport,
@@ -35,6 +36,7 @@ import { colorAdjustSummary } from "./color-adjust.ts";
 import { runDoctor } from "./doctor.ts";
 import {
   type Broll,
+  type BrollDisplay,
   type Graphic,
   type MusicPlacement,
   type Project,
@@ -136,7 +138,9 @@ Transcript edits
 Overlays
   openklip broll-add <slug> <assetId> <fromSec> <toSec>
                                      cover a source-time span with a registered asset
-  openklip broll-set <slug> <brollId>  patch b-roll (--asset --from --to --src-in)
+                                       --display cover|pip  (default cover)
+  openklip broll-set <slug> <brollId>  patch b-roll (--asset --from --to --src-in
+                                       --display cover|pip)
   openklip broll-rm <slug> <brollId> remove a b-roll clip
   openklip music-add <slug> <assetId> <fromSec> <toSec>
                                      place background music under the voice
@@ -353,6 +357,20 @@ function flagValue(args: string[], flag: string): string | undefined {
     return;
   }
   return args[idx + 1];
+}
+
+function parseBrollDisplayFlag(
+  raw: string | undefined
+): BrollDisplay | undefined {
+  if (raw === undefined) {
+    return;
+  }
+  if (raw === "cover" || raw === "pip") {
+    return raw;
+  }
+  throw new Error(
+    `unknown b-roll display "${raw}" (expected one of: ${BROLL_DISPLAY_IDS.join(", ")})`
+  );
 }
 
 function flagNumber(args: string[], flag: string): number | undefined {
@@ -822,22 +840,26 @@ try {
     case "broll-add": {
       if (!(rest[0] && rest[1] && rest[2] && rest[3])) {
         throw new Error(
-          "usage: openklip broll-add <slug> <assetId> <fromSec> <toSec>"
+          "usage: openklip broll-add <slug> <assetId> <fromSec> <toSec> [--display cover|pip]"
         );
       }
       const slug = rest[0];
+      const args = rest.slice(4);
       const fromSec = Number(rest[2]);
       const toSec = Number(rest[3]);
       if (!(Number.isFinite(fromSec) && Number.isFinite(toSec))) {
         throw new Error("fromSec and toSec must be numbers (seconds)");
       }
+      const display = parseBrollDisplayFlag(flagValue(args, "--display"));
       const { result: item } = await runLoggedAction<Broll>(slug, "broll-add", {
         assetId: rest[1],
         fromSec,
         toSec,
+        ...(display === undefined ? {} : { display }),
       });
+      const modeNote = item.display === "pip" ? ", pip inset" : "";
       console.log(
-        `added b-roll ${item.id} (asset "${item.assetId}", ${fromSec}s-${toSec}s)`
+        `added b-roll ${item.id} (asset "${item.assetId}", ${fromSec}s-${toSec}s${modeNote})`
       );
       break;
     }
@@ -860,17 +882,19 @@ try {
     case "broll-set": {
       if (!(rest[0] && rest[1])) {
         throw new Error(
-          "usage: openklip broll-set <slug> <brollId> [--asset id] [--from N] [--to N] [--src-in N]"
+          "usage: openklip broll-set <slug> <brollId> [--asset id] [--from N] [--to N] [--src-in N] [--display cover|pip]"
         );
       }
       const slug = rest[0];
       const args = rest.slice(2);
+      const display = parseBrollDisplayFlag(flagValue(args, "--display"));
       const { result: item } = await runLoggedAction<Broll>(slug, "broll-set", {
         id: rest[1],
         assetId: flagValue(args, "--asset"),
         fromSec: flagNumber(args, "--from"),
         toSec: flagNumber(args, "--to"),
         srcInSec: flagNumber(args, "--src-in"),
+        ...(display === undefined ? {} : { display }),
       });
       console.log(
         `updated b-roll ${item.id} (asset "${item.assetId}", ${secSpan(item.startSample, item.endSample)})`

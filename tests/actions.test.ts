@@ -516,6 +516,26 @@ function withStillAsset(p: Project): Project {
   return p;
 }
 
+test("addBroll stores display pip and defaults to cover", () => {
+  const p = makeProject();
+  const pip = addBroll(p, {
+    assetId: "broll-1",
+    fromSec: 1,
+    toSec: 2,
+    display: "pip",
+  });
+  assert.equal(pip.display, "pip");
+  const cover = addBroll(p, { assetId: "broll-1", fromSec: 3, toSec: 4 });
+  assert.equal(cover.display, "cover");
+});
+
+test("updateBroll patches display", () => {
+  const p = makeProject();
+  const item = addBroll(p, { assetId: "broll-1", fromSec: 1, toSec: 2 });
+  updateBroll(p, item.id, { display: "pip" });
+  assert.equal(p.broll[0]?.display, "pip");
+});
+
 test("addBroll stores an optional note and omits it when absent", () => {
   const p = makeProject();
   const noted = addBroll(p, {

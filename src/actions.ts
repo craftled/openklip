@@ -178,6 +178,7 @@ export function addBroll(
   project: Project,
   input: {
     assetId: string;
+    display?: Broll["display"];
     fromSec: number;
     toSec: number;
     srcInSec?: number;
@@ -185,7 +186,15 @@ export function addBroll(
     anchor?: PhraseAnchor;
   }
 ): Broll {
-  const { assetId, fromSec, toSec, srcInSec = 0, note, anchor } = input;
+  const {
+    assetId,
+    display,
+    fromSec,
+    toSec,
+    srcInSec = 0,
+    note,
+    anchor,
+  } = input;
   if (![fromSec, toSec, srcInSec].every(Number.isFinite)) {
     throw new Error("b-roll timing values must be finite numbers");
   }
@@ -229,6 +238,7 @@ export function addBroll(
     startSample: Math.round(fromSec * SAMPLE_RATE),
     endSample: Math.round(endSec * SAMPLE_RATE),
     srcInSample: Math.round(srcInSec * SAMPLE_RATE),
+    display: display ?? "cover",
     ...(note === undefined ? {} : { note }),
     ...(anchor === undefined ? {} : { anchor }),
   };
@@ -270,6 +280,7 @@ export function updateBroll(
   id: string,
   patch: {
     assetId?: string;
+    display?: Broll["display"];
     fromSec?: number;
     toSec?: number;
     srcInSec?: number;
@@ -322,6 +333,9 @@ export function updateBroll(
   item.startSample = Math.round(fromSec * SAMPLE_RATE);
   item.endSample = Math.round(endSec * SAMPLE_RATE);
   item.srcInSample = Math.round(srcInSec * SAMPLE_RATE);
+  if (patch.display !== undefined) {
+    item.display = patch.display;
+  }
   patchNote(item, patch.note);
   return item;
 }

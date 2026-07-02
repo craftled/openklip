@@ -152,9 +152,9 @@ Add `--note "<why>"` to any `cut` or overlay-add to record the rationale on the 
 | --- | --- |
 | `openklip broll <slug> <file>` | Register a b-roll clip (builds preview proxy, returns asset id). |
 | `openklip asset-add <slug> <file> [--kind broll\|music\|still]` | Register any asset kind (builds a proxy for video/audio, returns the asset id). `openklip broll` is the `--kind broll` shortcut; register a **still** here before `still-add`. |
-| `openklip broll-add <slug> <assetId> <fromSec> <toSec>` | Cover a source-time span with a registered asset. |
+| `openklip broll-add <slug> <assetId> <fromSec> <toSec>` | Cover a source-time span with a registered asset. `--display cover\|pip` (default `cover`; `pip` keeps the speaker visible with an inset). |
 | `openklip broll-add-phrase <slug> <assetId> "spoken phrase"` | Cover the span of the first spoken phrase match. |
-| `openklip broll-set <slug> <brollId>` | Patch b-roll: `--asset`, `--from`, `--to`, `--src-in` (seconds). |
+| `openklip broll-set <slug> <brollId>` | Patch b-roll: `--asset`, `--from`, `--to`, `--src-in` (seconds), `--display cover\|pip`. |
 | `openklip broll-rm <slug> <brollId>` | Remove a b-roll clip. |
 | `openklip music-add <slug> <assetId> <fromSec> <toSec>` | Place a registered **music** asset as a background bed. `--gain 0.3` (0–2), `--fade-in <sec>` / `--fade-out <sec>` (0–10), `--src-in <sec>`, `--mode loop\|trim`, `--note "<why>"`. |
 | `openklip music-set <slug> <musicId>` | Patch a music placement: same flags plus `--asset`. |

@@ -144,6 +144,7 @@ import {
   Moon,
   PanelLeft,
   PanelRight,
+  Scan,
   Sparkles,
   Sun,
   Trash2,
@@ -214,6 +215,7 @@ interface Asset {
 }
 interface BrollItem {
   assetId: string;
+  display?: "cover" | "pip";
   endSample: number;
   id: string;
   srcInSample: number;
@@ -652,6 +654,14 @@ export function App({
   const activeBroll = project?.broll?.find(
     (b) => curSample >= b.startSample && curSample < b.endSample
   );
+  const activeCoverBroll =
+    activeBroll && (activeBroll.display ?? "cover") !== "pip"
+      ? activeBroll
+      : undefined;
+  const activePipBroll =
+    activeBroll && (activeBroll.display ?? "cover") === "pip"
+      ? activeBroll
+      : undefined;
   const zoomWindows = useMemo<ZoomWindow[]>(
     () =>
       project
@@ -666,7 +676,7 @@ export function App({
         : [],
     [project, ranges, sr]
   );
-  const zoomScale = activeBroll ? 1 : zoomFactorAtSec(outPos, zoomWindows);
+  const zoomScale = activeCoverBroll ? 1 : zoomFactorAtSec(outPos, zoomWindows);
   const assetName = (id: string) =>
     project?.assets.find((a) => a.id === id)?.name ?? id;
   const brollAssets = useMemo(
@@ -718,18 +728,20 @@ export function App({
     if (!v) {
       return;
     }
-    if (!activeBroll) {
+    const brollForPreview = activeCoverBroll ?? activePipBroll;
+    if (!brollForPreview) {
       if (!v.paused) {
         v.pause();
       }
       return;
     }
-    const url = `/media/asset/${activeBroll.assetId}?v=${projectRef.current?.mediaVersion ?? 0}`;
+    const url = `/media/asset/${brollForPreview.assetId}?v=${projectRef.current?.mediaVersion ?? 0}`;
     if (v.getAttribute("src") !== url) {
       v.src = url;
     }
     const want =
-      activeBroll.srcInSample / sr + (curSample - activeBroll.startSample) / sr;
+      brollForPreview.srcInSample / sr +
+      (curSample - brollForPreview.startSample) / sr;
     if (Number.isFinite(want) && Math.abs(v.currentTime - want) > 0.25) {
       v.currentTime = Math.max(0, want);
     }
@@ -741,7 +753,7 @@ export function App({
     if (!(playing || v.paused)) {
       v.pause();
     }
-  }, [activeBroll, curSample, playing, sr]);
+  }, [activeCoverBroll, activePipBroll, curSample, playing, sr]);
 
   // Music bed under the voice (brollRef sibling pattern): a hidden <audio>
   // follows the active placement. Its desired position is CONTINUOUS on the
@@ -966,6 +978,7 @@ export function App({
         startSample: project.words[a].startSample,
         endSample: project.words[b].endSample,
         srcInSample: 0,
+        display: "cover" as const,
       },
     ];
     setProject({ ...project, broll });
@@ -1953,6 +1966,11 @@ export function App({
         ? [
             { icon: Film, label: "Source", value: assetName(selBroll.assetId) },
             {
+              icon: Scan,
+              label: "Display",
+              value: (selBroll.display ?? "cover") === "pip" ? "PiP" : "Cover",
+            },
+            {
               icon: Clock3,
               label: "Starts",
               value: fmt(selBroll.startSample / sr),
@@ -2349,53 +2367,77 @@ export function App({
               )}
 
               {selBroll && brollAssets.length > 0 && (
-                <Section title="Source">
-                  <Select
-                    onValueChange={(v) =>
-                      v &&
-                      updateBroll(selBroll.id, {
-                        assetId: v,
-                      })
-                    }
-                    value={selBroll.assetId}
-                  >
-                    <SelectTrigger className="w-full" size="sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {brollAssets.map((a) => (
-                          <SelectItem key={a.id} value={a.id}>
-                            {a.name}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                  {(project.broll ?? []).length > 1 && (
-                    <div className="mt-3">
-                      <span className="text-muted-foreground text-xs">
-                        Paint order : drag to restack
-                      </span>
-                      <div className="mt-1.5">
-                        <OverlaySortable
-                          onReorder={reorderBrollOrder}
-                          onSelect={(id) =>
-                            setSelected({
-                              kind: "broll",
-                              id,
-                            })
-                          }
-                          rows={(project.broll ?? []).map((b) => ({
-                            id: b.id,
-                            label: assetName(b.assetId),
-                          }))}
-                          selectedId={selected?.id}
-                        />
+                <>
+                  <Section title="Display">
+                    <ToggleGroup
+                      className="w-full"
+                      onValueChange={(value) => {
+                        const mode = firstToggleValue(value);
+                        if (mode === "cover" || mode === "pip") {
+                          updateBroll(selBroll.id, { display: mode });
+                        }
+                      }}
+                      size="sm"
+                      spacing={0}
+                      value={[selBroll.display ?? "cover"]}
+                      variant="outline"
+                    >
+                      <ToggleGroupItem className="flex-1" value="cover">
+                        Cover
+                      </ToggleGroupItem>
+                      <ToggleGroupItem className="flex-1" value="pip">
+                        PiP
+                      </ToggleGroupItem>
+                    </ToggleGroup>
+                  </Section>
+                  <Section title="Source">
+                    <Select
+                      onValueChange={(v) =>
+                        v &&
+                        updateBroll(selBroll.id, {
+                          assetId: v,
+                        })
+                      }
+                      value={selBroll.assetId}
+                    >
+                      <SelectTrigger className="w-full" size="sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          {brollAssets.map((a) => (
+                            <SelectItem key={a.id} value={a.id}>
+                              {a.name}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                    {(project.broll ?? []).length > 1 && (
+                      <div className="mt-3">
+                        <span className="text-muted-foreground text-xs">
+                          Paint order : drag to restack
+                        </span>
+                        <div className="mt-1.5">
+                          <OverlaySortable
+                            onReorder={reorderBrollOrder}
+                            onSelect={(id) =>
+                              setSelected({
+                                kind: "broll",
+                                id,
+                              })
+                            }
+                            rows={(project.broll ?? []).map((b) => ({
+                              id: b.id,
+                              label: assetName(b.assetId),
+                            }))}
+                            selectedId={selected?.id}
+                          />
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </Section>
+                    )}
+                  </Section>
+                </>
               )}
 
               {selStill && stillAssets.length > 0 && (
@@ -3018,8 +3060,12 @@ export function App({
                             />
                             <video
                               className={cn(
-                                "absolute inset-0 z-[1] h-full w-full bg-black object-cover",
-                                activeBroll ? "block" : "hidden"
+                                "absolute z-[1] bg-black object-cover",
+                                activeCoverBroll
+                                  ? "inset-0 block h-full w-full"
+                                  : activePipBroll
+                                    ? "right-2 bottom-2 block aspect-video w-[28%] rounded-md border border-white/25 shadow-lg"
+                                    : "hidden"
                               )}
                               muted
                               playsInline

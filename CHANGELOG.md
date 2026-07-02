@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.17.0.0 - 2026-07-03
+
+The b-roll PiP release: a placed b-roll clip can keep the speaker on screen instead of always swapping the full frame.
+
+### Added
+- **B-roll display modes** (Milestone 5.2): each b-roll placement gets a `display` field: `cover` (default, full-frame swap) or `pip` (bottom-right inset at ~28% frame width, speaker stays visible). Shared helpers in `src/broll-display.ts` drive preview and export: cover scales/crops to the output frame; pip scales to an inset box with transparent pad and composites with `overlay=W-w-M:H-h-M`. Legacy projects without `display` parse as `cover`. Surfaces: CLI `openklip broll-add` / `broll-set --display cover|pip`, registry `broll-add` / `broll-set`, MCP tools, `listOverlays` / `project_overlays`, and a Cover/PiP toggle in the GUI inspector with matching preview (push-in zoom still applies under cover b-roll only).
+
+### Changed
+- **Version**: bumped OpenKlip to `0.17.0.0`.
+
 ## 0.16.0.0 - 2026-07-03
 
 The export platform presets release: exporting for a destination is now one pick instead of four separate flags to remember.
