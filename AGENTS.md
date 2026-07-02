@@ -306,7 +306,7 @@ The agent and the GUI share the same `projects/` directory.
 
 ## No em dashes
 
-Do **not** use the em dash character (`—`, U+2014) anywhere in this project.
+Do **not** use the em dash character (U+2014) anywhere in this project.
 
 This applies to:
 
@@ -451,6 +451,6 @@ Biome's linter will catch most issues automatically. Focus your attention on:
 4. **Edge cases** - Handle boundary conditions and error states
 5. **User experience** - Accessibility, performance, and usability considerations
 6. **Documentation** - Add comments for complex logic, but prefer self-documenting code
-7. **No em dashes** - Do not use `—` in docs, UI copy, or release notes
+7. **No em dashes** - Do not use U+2014 in docs, UI copy, or release notes
 
 Run `bun x ultracite fix` before committing to ensure compliance.

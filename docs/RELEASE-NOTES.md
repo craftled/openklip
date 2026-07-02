@@ -2,6 +2,71 @@
 
 Use these bodies when publishing releases. Each section matches a tag in `CHANGELOG.md` without duplicating the full changelog. **Known gaps:** always link to [TODO.md](../TODO.md#known-limitations); do not duplicate the list here.
 
+Publishing status checked on 2026-07-02: GitHub releases are published through `v0.10.0.1`; `v0.11.0.0`, `v0.12.0.0`, and `v0.13.0.0` are prepared below for publication in order.
+
+---
+
+## v0.13.0.0
+
+**Cut and sound quality: cleanup review, silence-snapped cuts, seam crossfades, and export audio polish.**
+
+### Highlights
+- **Cleanup review**: filler and dead-air candidates are now generated from deterministic transcript rules plus real audio analysis, with safe/review risk levels, overlay-collision warnings, and estimated time saved. Apply one row or all safe rows from the Config panel, `openklip cleanup <slug> --apply-safe`, or agent tools.
+- **Audio analysis engine**: ingest-time PCM drives cached silence detection (`working/audio-analysis.json`), validated on read and invalidated when source mtime or analysis options change.
+- **VAD snap + seam crossfades**: `cuts.snap` is live across preview scheduling, export, status/ranges/overlays, and agent tools. Exports can join snapped cut seams with duration-preserving equal-power crossfades that clamp safely on short ranges.
+- **Export audio quality**: projects can sidechain-duck music under speech, apply single-pass loudness normalization, and highpass the voice track. These are export-only by design; preview audio stays unprocessed.
+- **Dead-air spans**: explicit source-time spans can be removed from otherwise kept ranges via `dead-air-add` and `dead-air-rm`, with coalescing, caps, and action-history logging.
+- **Transcript correction parity**: `openklip word-text` and the `word-text` action let CLI/MCP/UI paths correct one word without touching timing, while preserving the original text on first edit.
+- **Caption and assembly fixes**: captions now match kept output by overlap so snapped/dead-air-shifted boundaries do not drop live words; multi-take assembly regenerates analysis audio so VAD and cleanup read the assembled source.
+- Current codebase verification: 1017 tests.
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations) for the current list.
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#01300---2026-07-02)
+
+---
+
+## v0.12.0.0
+
+**Done-for-you agent drafts: project briefs, visible agent tasks, and the make-a-draft playbook.**
+
+### Highlights
+- **Project brief**: every project can carry a `brief.md` with audience, goal, tone, must-use assets, avoid list, target length, and export guidance. The GUI, CLI, MCP tools, and agent prompts all read the same bounded brief.
+- **Agent task model**: tool-calling chat edits create persisted tasks in `working/tasks.json`, including status, steps, notes, timestamps, and chat linkage. The chat panel shows live progress and survives reload.
+- **Task progress tools**: spawned agents report with `task_step` and `task_complete`, scoped through `OPENKLIP_TASK_ID` so a run can only update its own task.
+- **Cancellable runs**: cancel terminates the spawned agent process group and marks the task honestly instead of leaving the UI hanging.
+- **Make-a-draft playbook**: `templates/make-draft/skill.md` turns one prompt into a full first draft flow: read status/brief/transcript/assets, cut filler, add titles/captions, place b-roll or stills, optionally add music, export, and verify.
+- **Safer task and export storage**: task writes are lock-protected and self-heal corrupt JSON with a backup; exports write to a temporary file before moving into `output/out.mp4`.
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations) for the current list.
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#01200---2026-07-02)
+
+---
+
+## v0.11.0.0
+
+**Alpha gate: a capable local editor with browser project creation, transcript search, music placement, export settings, and action history.**
+
+### Highlights
+- **Browser project creation**: upload or drag-drop a video into an empty workspace or New Project dialog; the source is copied into the project folder, ingest progress is visible, and replacing an existing slug requires confirmation.
+- **Transcript search and batch cuts**: the UI gained phrase search with kept/cut scopes, click-to-seek matches, select-as-span, Cut first / Cut all, Restore / Restore all, optional notes, and parity with `openklip transcript grep`.
+- **Music placement**: music assets can be placed with gain, fades, source offset, and trim/loop mode. Preview plays a synced bed with a mute toggle, and export mixes it through ffmpeg without restarting at cuts.
+- **Real export settings**: compression presets and frame rate settings now affect rendered output through the GUI dialog, CLI flags, export API, and MCP export tool.
+- **Action history**: registry and GUI mutations append to `working/actions.jsonl` with action, actor, summaries, timestamp, and revision before/after; the Config panel exposes the history.
+- **Engine path and upload fixes**: browser-started ingest/verify/doctor/rich-graphic export resolve helper scripts from the repo root, and uploaded sources persist inside the project folder for full-quality export.
+- **Output FPS hotfix**: the v0.11 line also includes the follow-up fix that pins export output frame rate in the filter chain, repairing main CI.
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations) for the current list.
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#01100---2026-07-02)
+
 ---
 
 ## v0.10.0.1

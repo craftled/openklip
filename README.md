@@ -69,7 +69,7 @@ Agent sidebar chats use `working/chats.json`, not `localStorage` (color scheme a
 
 ## What works today
 
-Verified against the current codebase (1014 tests; main is ahead of the last release, v0.10.0.1, and includes an unreleased done-for-you agent draft beta):
+Verified against the current codebase (`VERSION` / `package.json` `0.13.0.0`, 1017 tests):
 
 - **Ingest**: video → local transcript + preview proxy + `project.json` (`openklip ingest`; refuses re-ingest unless `--force`)
 - **Transcript editing**: click words to toggle `deleted`; `openklip cut` / `cut --text` / `restore` on CLI

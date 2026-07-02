@@ -127,12 +127,12 @@ Legend: Full means the surface can achieve the same outcome. Partial means the s
 | Workspace folder picker | Full on macOS | Partial via env/config file | Missing | Full: `/api/workspace` | Acceptable local app gap for now. |
 | Project status | Full | Full: `status --json` | Full: `project_status` | Partial through page data, no public status route | Good agent parity except HTTP query route. |
 | Transcript list | Full: transcript panel | Full: `transcript` | Full: `transcript_list` | Partial through page data | Good CLI/MCP parity. |
-| Transcript grep/span/phrase | Missing UI phrase search | Full | Full | Missing public route | Biggest near-term Descript gap. |
+| Transcript grep/span/phrase | Full: transcript search | Full | Full | Missing public route | Good UI/CLI/MCP parity; weak HTTP parity. |
 | Word cut and restore | Full: word click and batch save | Full: `cut`, `restore` | Full: `cut`, `restore-all` | Full via server actions | Good parity for word ids. |
 | Phrase cut | Full: transcript search with batch cuts | Full: `cut --text` | Full: `cut-text` | Missing public route | UI shipped 2026-07-02. |
 | Restore all | Full through actions where exposed | Full | Full | Full via registry server action | Good parity. |
-| Transcript text correction | Partial: server action accepts `text` | Missing dedicated CLI | Missing dedicated MCP | Partial through `saveProjectEdits` | Needs explicit action and query behavior. |
-| Cut snap settings | Full config path exists | Full registry action | Full registry tool | Full via registry server action | VAD implementation still incomplete. |
+| Transcript text correction | Full: editor word edits | Full: `word-text` | Full: `word-text` | Full through server action / registry path | Good parity. |
+| Cut snap settings | Full: Config Audio controls | Partial: registry action is surfaced, no dedicated hand-facing command | Full: `cuts-snap` | Full via registry server action | VAD snap and export crossfades shipped; CLI affordance remains weak. |
 | Captions on/off and max words | Full | Full | Full | Full via registry server action | Good parity. |
 | Caption style presets | Missing | Missing | Missing | Missing | Product gap. |
 | Pad around cuts | Full | Full | Full | Full via server action | Good parity. |
@@ -174,7 +174,7 @@ Legend: Full means the surface can achieve the same outcome. Partial means the s
 | Transcript words | Ingest only | UI, CLI, MCP | Cut/restore full parity, text correction partial | Not intentionally deletable | Add explicit transcript correction action. |
 | B-roll asset | UI/API upload, CLI register | UI, CLI, MCP | Asset card via analyze only, metadata edit missing | UI/API only | Add CLI/MCP delete and asset-card edit if needed. |
 | Still asset | UI/API upload, CLI register | UI, CLI, MCP | Asset card via analyze only, metadata edit missing | UI/API only | Same asset CRUD gap. |
-| Music asset | UI/API upload, CLI register | UI, CLI, MCP | Placement via `music-add`/`music-set`/`music-rm` | UI/API only | Music timeline model shipped 2026-07-02; ducking and loudness normalization pending. |
+| Music asset | UI/API upload, CLI register | UI, CLI, MCP | Placement via `music-add`/`music-set`/`music-rm` | UI/API only | Music placement, export mix, ducking, loudness, and voice highpass shipped; timeline drag-trim remains open. |
 | Titles | UI, CLI, MCP | UI, CLI, MCP | UI, CLI, MCP | UI, CLI, MCP | Good parity. Needs richer styles. |
 | Zooms | UI, CLI, MCP | UI, CLI, MCP | UI, CLI, MCP | UI, CLI, MCP | Good parity. Needs target point/crop variants. |
 | B-roll overlays | UI, CLI, MCP | UI, CLI, MCP | UI, CLI, MCP | UI, CLI, MCP | Needs PiP/audio modes. |
@@ -185,7 +185,7 @@ Legend: Full means the surface can achieve the same outcome. Partial means the s
 | Takes | CLI/MCP add and assemble | CLI/MCP | Assemble creates new source | File-level only | Missing UI take browser and API routes. |
 | Exports | UI, CLI, MCP, API | File output, status, verify | Re-export overwrites | Manual file delete only | Needs presets, settings, history. |
 | Agent chats | UI/API | UI/API | UI/API rename/archive/append | UI/API | Not exposed to CLI/MCP as context or task log. |
-| Brief/context | Missing | Missing | Missing | Missing | Needed for done-for-you agent workflows. |
+| Brief/context | UI, CLI, MCP | UI, CLI, MCP | CLI/MCP/UI save paths | File delete clears manually | `brief.md` shipped; GUI/CLI brief saves are not history-logged yet. |
 | Action history | Append-only log on every registry mutation | History route + Config panel section | Not applicable (append-only) | Not applicable (append-only) | No filters or undo; non-registry CLI mutations do not log yet. |
 
 ### 0.3 Baseline audit conclusion
@@ -194,17 +194,16 @@ The current architecture is strong where it uses the registry: cuts by id, capti
 
 The biggest blockers to a capable agent-first editor are:
 
-1. UI phrase search and phrase cuts are missing even though CLI/MCP already support them.
-2. Music exists as an asset kind but not as a first-class placed timeline track.
-3. Agent task progress, completion, checkpoints, and action history are missing.
-4. Project briefs and style recipes are missing, so agents lack persistent creative context.
-5. Multi-take assembly is powerful but CLI/MCP-only.
-6. Export settings beyond height are not wired.
-7. Process safety is in-process only, so CLI plus server concurrent writes can race.
+1. Cross-surface parity holes remain: project create/delete, asset delete/register, inbox scan, analysis triggers, chat context, and task logs are not all available on UI, CLI, MCP, and HTTP.
+2. Manual correction gaps remain: b-roll PiP/audio modes, music timeline drag-trim, richer title/caption styles, and visual export transitions.
+3. Agent recovery gaps remain: resumable checkpoints, task-level revert, undo, and history filters.
+4. Context gaps remain: style recipes, brand-kit ingestion, and script/document ingestion beyond the free-form project brief.
+5. Shorts and reframing are still missing.
+6. Process safety is in-process only, so CLI plus server concurrent writes can race.
 
-2026-07-02 update: blockers 1 (UI phrase search/cuts) and 6 (export settings) are resolved; blocker 2 is partially resolved (music placement, preview bed, and export mix shipped; ducking and loudness remain); blocker 3 is partially resolved (append-only action history with UI visibility shipped; task checkpoints remain). Blocker 3's task-state gap (agent task model, visible progress, explicit completion) and blocker 4 (project briefs) are resolved as of 2026-07-02.
+2026-07-02 update: UI phrase search/cuts, export settings, music placement, project briefs, append-only action history, visible agent task progress, VAD snap, seam crossfades, cleanup review, ducking, loudness, and voice highpass are resolved. Remaining gaps are now about deeper parity, recovery, richer audio/overlay controls, shorts, and process safety.
 
-Recommended next code task: **UI phrase search and phrase cuts**. It closes a visible Descript-level gap, reuses existing phrase-match and registry primitives, and is smaller than music, task state, or reframing.
+Recommended next code task: **B-roll PiP and richer overlay controls**. The first-draft loop now exists; improving visual correction primitives gives agents more expressive choices while keeping human review inspectable.
 
 ## Milestone 1: Frictionless project intake
 
@@ -1067,17 +1066,12 @@ These tracks can run in parallel as long as each PR keeps `project.json` migrati
 
 1. Baseline audit.
 2. Browser project creation from raw media.
-3. UI phrase search and phrase cuts.
-4. Music placement and export.
-5. Agent task model with visible progress.
-6. Done-for-you `make-draft` workflow prompt.
-7. Filler and dead-air candidate review.
-8. B-roll PiP and richer overlay controls.
-9. Vertical preset and manual crop.
-10. Export settings and verification dashboard.
-11. Action history and task-level revert.
-12. OS-level locking and HTTP parity.
-13. Editorial motion language recipes.
+3. B-roll PiP and richer overlay controls.
+4. Vertical preset and manual crop.
+5. Export verification dashboard.
+6. Task checkpoints and task-level revert.
+7. OS-level locking and HTTP parity.
+8. Editorial motion language recipes.
 
 This order makes the product feel more capable every few steps while keeping agent-native architecture intact.
 
