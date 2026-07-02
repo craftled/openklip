@@ -10,6 +10,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
+import { buildBrollOverlayFilters } from "../src/broll-display.ts";
 import {
   type Asset,
   type Audio,
@@ -140,6 +141,41 @@ test("chooseAssetInput names the asset kind when source and proxy are missing", 
       /missing music asset "bed"/
     );
   });
+});
+
+test("buildBrollOverlayFilters uses pip overlay coordinates when display is pip", () => {
+  const parts = buildBrollOverlayFilters({
+    display: "pip",
+    inputIndex: 2,
+    outW: 1920,
+    outH: 1080,
+    outStart: 1,
+    outEnd: 4,
+    srcInSec: 0,
+    lastLabel: "v0",
+  });
+  assert.equal(parts.length, 2);
+  assert.match(parts[0] ?? "", /pad=538:302/);
+  assert.match(parts[1] ?? "", /overlay=W-w-38:H-h-38/);
+});
+
+test("buildBrollOverlayFilters keeps full-frame cover overlay by default", () => {
+  const parts = buildBrollOverlayFilters({
+    display: "cover",
+    inputIndex: 2,
+    outW: 1280,
+    outH: 720,
+    outStart: 0,
+    outEnd: 2,
+    srcInSec: 0,
+    lastLabel: "vz",
+  });
+  assert.match(
+    parts[0] ?? "",
+    /scale=1280:720:force_original_aspect_ratio=increase/
+  );
+  assert.match(parts[1] ?? "", /overlay=eof_action=pass/);
+  assert.doesNotMatch(parts[1] ?? "", /overlay=W-w-/);
 });
 
 test("planBrollForRanges splits a b-roll cover across deleted gaps", () => {

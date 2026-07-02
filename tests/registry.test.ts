@@ -510,6 +510,18 @@ test("actionTable renders a markdown row for each action", () => {
 
 // ── FEATURE 1: written rationale (note) through the registry ─────────────────
 
+test("broll-add: carries display pip onto the overlay", () => {
+  const p = makeProject();
+  const item = runAction("broll-add", p, {
+    assetId: "broll-1",
+    fromSec: 0,
+    toSec: 2,
+    display: "pip",
+  }) as { display: string };
+  assert.equal(item.display, "pip");
+  assert.equal(p.broll[0]?.display, "pip");
+});
+
 test("broll-add: carries an optional note onto the overlay", () => {
   const p = makeProject();
   runAction("broll-add", p, {

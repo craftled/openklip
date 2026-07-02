@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { mkdir, rename, unlink } from "node:fs/promises";
 import { isAbsolute, join } from "node:path";
 import { loadAudioAnalysis } from "./audio-analysis.ts";
+import { buildBrollOverlayFilters } from "./broll-display.ts";
 import { captionStyle } from "./caption-styles.ts";
 import {
   buildAss,
@@ -15,6 +16,7 @@ import {
   type Asset,
   type Audio,
   type Broll,
+  type BrollDisplay,
   type CutSnap,
   effectiveRanges,
   type MusicPlacement,
@@ -202,6 +204,7 @@ function escapeAssPath(p: string): string {
 }
 
 export interface BrollPlan {
+  display: BrollDisplay;
   inputIndex: number;
   outEnd: number;
   outStart: number;
@@ -228,6 +231,7 @@ export function planBrollForRanges(input: {
       continue;
     }
     plans.push({
+      display: input.broll.display ?? "cover",
       inputIndex: input.firstInputIndex + plans.length,
       outStart: sourceToOutputSec(segmentStart, input.ranges),
       outEnd: sourceToOutputSec(segmentEnd, input.ranges),
@@ -1058,12 +1062,17 @@ export async function exportCut(
   }
 
   for (const pl of plans) {
-    parts.push(
-      `[${pl.inputIndex}:v]trim=start=${sec(pl.srcInSec)}:duration=${sec(pl.outEnd - pl.outStart)},setpts=PTS-STARTPTS+${sec(pl.outStart)}/TB,scale=${outW}:${outH}:force_original_aspect_ratio=increase,crop=${outW}:${outH},setsar=1[bv${pl.inputIndex}]`
-    );
-    parts.push(
-      `[${last}][bv${pl.inputIndex}]overlay=eof_action=pass:enable='between(t,${sec(pl.outStart)},${sec(pl.outEnd)})'[ov${pl.inputIndex}]`
-    );
+    const [scalePart, overlayPart] = buildBrollOverlayFilters({
+      display: pl.display,
+      inputIndex: pl.inputIndex,
+      lastLabel: last,
+      outEnd: pl.outEnd,
+      outH,
+      outStart: pl.outStart,
+      outW,
+      srcInSec: pl.srcInSec,
+    });
+    parts.push(scalePart, overlayPart);
     last = `ov${pl.inputIndex}`;
   }
 
