@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.12.0.0 - 2026-07-02
+
+The Beta gate release: done-for-you agent drafts. Write a short brief for a project and every agent request follows it; watch the agent work step by step in a live task panel with a cancel button that actually stops the run; and turn one prompt into a finished draft with the make-a-draft playbook: cuts, captions, a title, b-roll or stills, a music bed, an export, and a self-check, all in one go.
+
+### Added
+- **Project brief**: a per-project `brief.md` (audience, goal, tone, must-use assets, avoid list, target length, export formats as free-form guidance) editable in the Config panel, via `openklip brief <slug> [--set | --file]`, and via MCP `brief_get` / `brief_set`; agents receive it in every chat and edit prompt, bounded and marked as user-editable configuration. Agent writes to the brief are recorded in the action history.
+- **Agent tasks with live progress**: every tool-editing chat run is a persistent task (`working/tasks.json`) with the request, status, per-step progress the agent reports as it works, and an explicit completion signal (completed, partial with remaining work, or blocked with a question); the chat panel shows recent tasks live while a run is active, survives page reload, and its cancel button kills the running agent's whole process tree; a run that dies or times out is finalized honestly instead of hanging.
+- **Make-a-draft playbook**: a `make-draft` entry in the skills slash menu walks the agent from brief and transcript straight through cuts, captions, a title, b-roll or stills, an optional music bed, export, and verify; the edit-run budget was raised to 15 minutes so a full draft with verification completes.
+
+### Changed
+- **Agent runs are cancellable and attributable**: cancel now terminates the spawned agent CLI and its ffmpeg/whisper children (process-group kill), a deliberate cancel reads as "Cancelled" in the chat instead of an error, and each run's MCP session is scoped to its own task id so concurrent runs cannot cross-report.
+- **Version**: bumped OpenKlip to `0.12.0.0`.
+
+### Fixed
+- **Task store integrity**: task updates are cross-process safe (an in-flight step report can no longer resurrect a task you just cancelled), a corrupt `tasks.json` self-heals with a backup instead of wedging the panel, per-task steps are capped, and all agent-supplied task fields are clamped at the store layer.
+- **Cancel safety**: cancelling a task now verifies the task belongs to the project before killing anything, so a cancel request can never terminate another project's run.
+- **Export integrity**: exports write to a temporary file and move into place on success, so two exports racing (for example a manual export during an agent draft) can no longer corrupt `output/out.mp4`.
+- **Brief saves are serialized** per project like every other project file, and the brief editor gained proper guidance text and save-state labels.
+- **Task panel efficiency**: the progress panel polls on its intended 2-second cadence (a dependency bug made it poll as fast as the network allowed), hides itself when there is nothing to show, and caps its height so long step lists cannot push the composer off screen.
+
 ## 0.11.0.0 - 2026-07-02
 
 The Alpha gate release: OpenKlip is now a capable local editor end to end. You can create a project from the browser by uploading or dropping a video, search the transcript and batch-cut phrases without touching the CLI, lay a music bed under the voice track that plays in preview and mixes into the export, pick real compression and frame-rate settings in the export dialog, and see every edit any surface made in a per-project action history.
