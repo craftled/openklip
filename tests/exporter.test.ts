@@ -10,6 +10,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
+import { buildBrollAudioFilterGraph } from "../src/broll-audio.ts";
 import { buildBrollOverlayFilters } from "../src/broll-display.ts";
 import {
   type Asset,
@@ -176,6 +177,30 @@ test("buildBrollOverlayFilters keeps full-frame cover overlay by default", () =>
   );
   assert.match(parts[1] ?? "", /overlay=eof_action=pass/);
   assert.doesNotMatch(parts[1] ?? "", /overlay=W-w-/);
+});
+
+test("buildAudioParts mixes b-roll audio with voice when audioMode is mix", () => {
+  const expr = "between(t,0.000000,6.000000)";
+  const zeroMusic: MusicFilterGraph = {
+    filterParts: [],
+    inputArgs: [],
+    mixInputLabels: [],
+  };
+  const brollAudio = buildBrollAudioFilterGraph([
+    {
+      audioMode: "mix",
+      inputIndex: 1,
+      outEnd: 4,
+      outStart: 1,
+      srcInSec: 0,
+    },
+  ]);
+  const parts = buildAudioParts(expr, zeroMusic, { brollAudio });
+  assert.equal(parts[0], `[0:a]aselect='${expr}',asetpts=N/SR/TB[avoice]`);
+  assert.match(parts[1] ?? "", /\[1:a\]aresample=/);
+  assert.deepEqual(parts.slice(-1), [
+    "[avoice][ba1]amix=inputs=2:duration=first:normalize=0[aout]",
+  ]);
 });
 
 test("planBrollForRanges splits a b-roll cover across deleted gaps", () => {

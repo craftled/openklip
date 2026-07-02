@@ -178,6 +178,7 @@ export function addBroll(
   project: Project,
   input: {
     assetId: string;
+    audioMode?: Broll["audioMode"];
     display?: Broll["display"];
     fromSec: number;
     toSec: number;
@@ -188,6 +189,7 @@ export function addBroll(
 ): Broll {
   const {
     assetId,
+    audioMode,
     display,
     fromSec,
     toSec,
@@ -239,6 +241,7 @@ export function addBroll(
     endSample: Math.round(endSec * SAMPLE_RATE),
     srcInSample: Math.round(srcInSec * SAMPLE_RATE),
     display: display ?? "cover",
+    audioMode: audioMode ?? "silent",
     ...(note === undefined ? {} : { note }),
     ...(anchor === undefined ? {} : { anchor }),
   };
@@ -280,6 +283,7 @@ export function updateBroll(
   id: string,
   patch: {
     assetId?: string;
+    audioMode?: Broll["audioMode"];
     display?: Broll["display"];
     fromSec?: number;
     toSec?: number;
@@ -335,6 +339,9 @@ export function updateBroll(
   item.srcInSample = Math.round(srcInSec * SAMPLE_RATE);
   if (patch.display !== undefined) {
     item.display = patch.display;
+  }
+  if (patch.audioMode !== undefined) {
+    item.audioMode = patch.audioMode;
   }
   patchNote(item, patch.note);
   return item;

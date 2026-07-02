@@ -50,6 +50,7 @@ import {
 import { CAPTION_STYLE_IDS } from "./caption-styles.ts";
 import { NEUTRAL_COLOR } from "./color-adjust.ts";
 import {
+  BrollAudioModeSchema,
   BrollDisplaySchema,
   FilterSchema,
   PhraseAnchorSchema,
@@ -176,6 +177,7 @@ export const actions: ActionDef[] = [
     surfaces: ["cli", "gui", "mcp"],
     schema: z.object({
       assetId: z.string(),
+      audioMode: BrollAudioModeSchema.optional(),
       display: BrollDisplaySchema.optional(),
       fromSec: sec,
       toSec: sec,
@@ -188,11 +190,12 @@ export const actions: ActionDef[] = [
   defineAction({
     name: "broll-set",
     summary:
-      "Patch a b-roll clip (asset, span, source in-point, display mode).",
+      "Patch a b-roll clip (asset, span, source in-point, display, audio mode).",
     surfaces: ["cli", "gui", "mcp"],
     schema: z.object({
       id: z.string(),
       assetId: z.string().optional(),
+      audioMode: BrollAudioModeSchema.optional(),
       display: BrollDisplaySchema.optional(),
       fromSec: sec.optional(),
       toSec: sec.optional(),

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.18.0.0 - 2026-07-03
+
+The b-roll audio modes release: a placed b-roll clip can mix its soundtrack with the voice at export, not only swap the picture.
+
+### Added
+- **B-roll audio modes** (Milestone 5.2): each b-roll placement gets an `audioMode` field: `silent` (default, voice only), `broll` (b-roll audio only during the span), `mix` (mix with voice), `duck-voice` (duck voice under b-roll), `duck-broll` (duck b-roll under voice). Shared helpers in `src/broll-audio.ts` trim and delay b-roll audio from the same `-i` inputs as the video overlays, then mix through `buildAudioParts`. Surfaces: CLI `openklip broll-add` / `broll-set --audio-mode`, registry / MCP, `listOverlays`, and an Audio picker in the GUI b-roll inspector. Preview audio stays voice-only for now.
+
+### Changed
+- **Version**: bumped OpenKlip to `0.18.0.0`.
+
 ## 0.17.0.0 - 2026-07-03
 
 The b-roll PiP release: a placed b-roll clip can keep the speaker on screen instead of always swapping the full frame.

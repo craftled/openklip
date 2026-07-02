@@ -47,6 +47,7 @@ export interface OverlayViews {
   broll: Array<{
     anchor: PhraseAnchor | null;
     assetId: string;
+    audioMode: "broll" | "duck-broll" | "duck-voice" | "mix" | "silent";
     display: "cover" | "pip";
     fromSec: number;
     id: string;
@@ -232,6 +233,7 @@ export function listOverlays(project: Project): OverlayViews {
     broll: project.broll.map((b) => ({
       id: b.id,
       assetId: b.assetId,
+      audioMode: b.audioMode ?? "silent",
       display: b.display ?? "cover",
       fromSec: sec(b.startSample),
       toSec: sec(b.endSample),

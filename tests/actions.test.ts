@@ -536,6 +536,26 @@ test("updateBroll patches display", () => {
   assert.equal(p.broll[0]?.display, "pip");
 });
 
+test("addBroll stores audioMode and defaults to silent", () => {
+  const p = makeProject();
+  const mixed = addBroll(p, {
+    assetId: "broll-1",
+    fromSec: 1,
+    toSec: 2,
+    audioMode: "mix",
+  });
+  assert.equal(mixed.audioMode, "mix");
+  const plain = addBroll(p, { assetId: "broll-1", fromSec: 3, toSec: 4 });
+  assert.equal(plain.audioMode, "silent");
+});
+
+test("updateBroll patches audioMode", () => {
+  const p = makeProject();
+  const item = addBroll(p, { assetId: "broll-1", fromSec: 1, toSec: 2 });
+  updateBroll(p, item.id, { audioMode: "duck-broll" });
+  assert.equal(p.broll[0]?.audioMode, "duck-broll");
+});
+
 test("addBroll stores an optional note and omits it when absent", () => {
   const p = makeProject();
   const noted = addBroll(p, {

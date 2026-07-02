@@ -17,6 +17,7 @@ import type { SilenceSpan } from "./audio-analysis-core.ts";
 import { applyBrand, loadBrand } from "./brands.ts";
 import { loadBrief, saveBrief } from "./brief.ts";
 import { logBriefSet } from "./brief-log.ts";
+import { BROLL_AUDIO_MODE_IDS } from "./broll-audio.ts";
 import { BROLL_DISPLAY_IDS } from "./broll-display.ts";
 import { isCaptionStyleId, listCaptionStyles } from "./caption-styles.ts";
 import {
@@ -139,8 +140,9 @@ Overlays
   openklip broll-add <slug> <assetId> <fromSec> <toSec>
                                      cover a source-time span with a registered asset
                                        --display cover|pip  (default cover)
+                                       --audio-mode silent|broll|mix|duck-voice|duck-broll
   openklip broll-set <slug> <brollId>  patch b-roll (--asset --from --to --src-in
-                                       --display cover|pip)
+                                       --display cover|pip --audio-mode ...)
   openklip broll-rm <slug> <brollId> remove a b-roll clip
   openklip music-add <slug> <assetId> <fromSec> <toSec>
                                      place background music under the voice
@@ -370,6 +372,20 @@ function parseBrollDisplayFlag(
   }
   throw new Error(
     `unknown b-roll display "${raw}" (expected one of: ${BROLL_DISPLAY_IDS.join(", ")})`
+  );
+}
+
+function parseBrollAudioModeFlag(
+  raw: string | undefined
+): Broll["audioMode"] | undefined {
+  if (raw === undefined) {
+    return;
+  }
+  if ((BROLL_AUDIO_MODE_IDS as readonly string[]).includes(raw)) {
+    return raw as Broll["audioMode"];
+  }
+  throw new Error(
+    `unknown b-roll audio mode "${raw}" (expected one of: ${BROLL_AUDIO_MODE_IDS.join(", ")})`
   );
 }
 
@@ -840,7 +856,7 @@ try {
     case "broll-add": {
       if (!(rest[0] && rest[1] && rest[2] && rest[3])) {
         throw new Error(
-          "usage: openklip broll-add <slug> <assetId> <fromSec> <toSec> [--display cover|pip]"
+          "usage: openklip broll-add <slug> <assetId> <fromSec> <toSec> [--display cover|pip] [--audio-mode silent|broll|mix|duck-voice|duck-broll]"
         );
       }
       const slug = rest[0];
@@ -851,15 +867,23 @@ try {
         throw new Error("fromSec and toSec must be numbers (seconds)");
       }
       const display = parseBrollDisplayFlag(flagValue(args, "--display"));
+      const audioMode = parseBrollAudioModeFlag(
+        flagValue(args, "--audio-mode")
+      );
       const { result: item } = await runLoggedAction<Broll>(slug, "broll-add", {
         assetId: rest[1],
         fromSec,
         toSec,
         ...(display === undefined ? {} : { display }),
+        ...(audioMode === undefined ? {} : { audioMode }),
       });
       const modeNote = item.display === "pip" ? ", pip inset" : "";
+      const audioNote =
+        item.audioMode && item.audioMode !== "silent"
+          ? `, audio ${item.audioMode}`
+          : "";
       console.log(
-        `added b-roll ${item.id} (asset "${item.assetId}", ${fromSec}s-${toSec}s${modeNote})`
+        `added b-roll ${item.id} (asset "${item.assetId}", ${fromSec}s-${toSec}s${modeNote}${audioNote})`
       );
       break;
     }
@@ -882,12 +906,15 @@ try {
     case "broll-set": {
       if (!(rest[0] && rest[1])) {
         throw new Error(
-          "usage: openklip broll-set <slug> <brollId> [--asset id] [--from N] [--to N] [--src-in N] [--display cover|pip]"
+          "usage: openklip broll-set <slug> <brollId> [--asset id] [--from N] [--to N] [--src-in N] [--display cover|pip] [--audio-mode silent|broll|mix|duck-voice|duck-broll]"
         );
       }
       const slug = rest[0];
       const args = rest.slice(2);
       const display = parseBrollDisplayFlag(flagValue(args, "--display"));
+      const audioMode = parseBrollAudioModeFlag(
+        flagValue(args, "--audio-mode")
+      );
       const { result: item } = await runLoggedAction<Broll>(slug, "broll-set", {
         id: rest[1],
         assetId: flagValue(args, "--asset"),
@@ -895,6 +922,7 @@ try {
         toSec: flagNumber(args, "--to"),
         srcInSec: flagNumber(args, "--src-in"),
         ...(display === undefined ? {} : { display }),
+        ...(audioMode === undefined ? {} : { audioMode }),
       });
       console.log(
         `updated b-roll ${item.id} (asset "${item.assetId}", ${secSpan(item.startSample, item.endSample)})`
