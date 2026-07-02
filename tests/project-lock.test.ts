@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { withChatsLock, withProjectLock } from "../src/project-lock.ts";
+import {
+  withBriefLock,
+  withChatsLock,
+  withProjectLock,
+  withTasksLock,
+} from "../src/project-lock.ts";
 
 const delay = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -51,6 +56,76 @@ test("withProjectLock and withChatsLock are independent (chats stay responsive d
   });
   await Promise.all([project, chats]);
   // The chats call must not wait for the project call: both starts appear
+  // before either end.
+  assert.ok(log[0]?.endsWith("start"));
+  assert.ok(log[1]?.endsWith("start"));
+});
+
+test("withBriefLock serializes overlapping calls for the same slug", async () => {
+  const log: string[] = [];
+  const slow = (id: string) =>
+    withBriefLock("proj", async () => {
+      log.push(`start${id}`);
+      await delay(10);
+      log.push(`end${id}`);
+    });
+  await Promise.all([slow("A"), slow("B")]);
+  assert.ok(
+    log.join(",") === "startA,endA,startB,endB" ||
+      log.join(",") === "startB,endB,startA,endA",
+    `expected serialized order, got ${log.join(",")}`
+  );
+});
+
+test("withTasksLock serializes overlapping calls for the same slug", async () => {
+  const log: string[] = [];
+  const slow = (id: string) =>
+    withTasksLock("proj", async () => {
+      log.push(`start${id}`);
+      await delay(10);
+      log.push(`end${id}`);
+    });
+  await Promise.all([slow("A"), slow("B")]);
+  assert.ok(
+    log.join(",") === "startA,endA,startB,endB" ||
+      log.join(",") === "startB,endB,startA,endA",
+    `expected serialized order, got ${log.join(",")}`
+  );
+});
+
+test("withProjectLock and withBriefLock are independent (brief edits stay responsive during a project mutation)", async () => {
+  const log: string[] = [];
+  const project = withProjectLock("proj", async () => {
+    log.push("p-start");
+    await delay(15);
+    log.push("p-end");
+  });
+  const brief = withBriefLock("proj", async () => {
+    log.push("b-start");
+    await delay(5);
+    log.push("b-end");
+  });
+  await Promise.all([project, brief]);
+  // The brief call must not wait for the project call: both starts appear
+  // before either end.
+  assert.ok(log[0]?.endsWith("start"));
+  assert.ok(log[1]?.endsWith("start"));
+});
+
+test("withProjectLock and withTasksLock are independent (task writes stay responsive during a project mutation)", async () => {
+  const log: string[] = [];
+  const project = withProjectLock("proj", async () => {
+    log.push("p-start");
+    await delay(15);
+    log.push("p-end");
+  });
+  const tasks = withTasksLock("proj", async () => {
+    log.push("t-start");
+    await delay(5);
+    log.push("t-end");
+  });
+  await Promise.all([project, tasks]);
+  // The tasks call must not wait for the project call: both starts appear
   // before either end.
   assert.ok(log[0]?.endsWith("start"));
   assert.ok(log[1]?.endsWith("start"));

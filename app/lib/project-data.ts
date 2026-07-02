@@ -1,5 +1,6 @@
 import { statSync } from "node:fs";
 import { syncAssetsFromFolder } from "@engine/asset-scanner";
+import { loadBrief } from "@engine/brief";
 import { formatDisplayPath } from "@engine/display-path";
 import { projectPaths } from "@engine/paths";
 import { loadProject, resolveSlug } from "@engine/projectStore";
@@ -15,9 +16,12 @@ export async function loadEditorProject(slugParam?: string | null) {
   const project = await loadProject(slug);
   const paths = projectPaths(slug);
   const mediaVersion = Math.round(statSync(paths.proxy).mtimeMs);
+  // Best-effort: a missing/corrupt brief.md must not break the editor load.
+  const brief = await loadBrief(slug).catch(() => undefined);
   return {
     ...project,
     dirPath: formatDisplayPath(paths.dir),
     mediaVersion,
+    brief: brief ?? null,
   };
 }

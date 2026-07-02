@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { mkdir } from "node:fs/promises";
+import { mkdir, rename, unlink } from "node:fs/promises";
 import { isAbsolute, join } from "node:path";
 import {
   buildAss,
@@ -860,32 +860,47 @@ export async function exportCut(
     // never shifts; buildMusicFilterParts numbered them from firstInputIndex.
     ...musicGraph.inputArgs,
   ];
-  await run(
-    FFMPEG,
-    [
-      "-y",
-      ...inputs,
-      "-filter_complex",
-      parts.join(";"),
-      "-map",
-      "[vout]",
-      "-map",
-      "[aout]",
-      "-c:v",
-      "libx264",
-      ...encoderArgsFor(opts.compression),
-      "-pix_fmt",
-      "yuv420p",
-      "-c:a",
-      "aac",
-      "-b:a",
-      "192k",
-      "-movflags",
-      "+faststart",
-      p.out,
-    ],
-    "ffmpeg(export)"
-  );
+  // Render to a unique tmp sibling, then rename over out.mp4 on success:
+  // ffmpeg writing p.out in place means a GUI export racing an agent export
+  // corrupts the file both are writing. The tmp name KEEPS the .mp4
+  // extension so ffmpeg still infers the mp4 container from it.
+  const tmpOut = join(p.output, `.out-tmp-${process.pid}-${Date.now()}.mp4`);
+  try {
+    await run(
+      FFMPEG,
+      [
+        "-y",
+        ...inputs,
+        "-filter_complex",
+        parts.join(";"),
+        "-map",
+        "[vout]",
+        "-map",
+        "[aout]",
+        "-c:v",
+        "libx264",
+        ...encoderArgsFor(opts.compression),
+        "-pix_fmt",
+        "yuv420p",
+        "-c:a",
+        "aac",
+        "-b:a",
+        "192k",
+        "-movflags",
+        "+faststart",
+        tmpOut,
+      ],
+      "ffmpeg(export)"
+    );
+    await rename(tmpOut, p.out);
+  } catch (e) {
+    try {
+      await unlink(tmpOut);
+    } catch {
+      // Best-effort: ffmpeg may have failed before creating the tmp file.
+    }
+    throw e;
+  }
 
   return {
     out: p.out,

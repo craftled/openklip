@@ -2,8 +2,19 @@
 // commands in one manifest. CLI (`openklip tools`), MCP (stdio server), and docs
 // all read from here so surfaces stay in sync with the GUI's project.json edits.
 import { z } from "zod";
-import { type Actor, actorFromEnv } from "./action-log.ts";
+import {
+  type Actor,
+  actorFromEnv,
+  appendActionLog,
+  summarizeForLog,
+} from "./action-log.ts";
+import {
+  type AgentTaskOutcome,
+  completeAgentTask,
+  setAgentTaskStep,
+} from "./agent-tasks.ts";
 import { assembleFromSelection, listTakes, loadTake } from "./assembly.ts";
+import { loadBrief, saveBrief } from "./brief.ts";
 import { samplesToSec } from "./edl.ts";
 import { EXPORT_COMPRESSIONS, exportCut } from "./exporter.ts";
 import { listGraphics } from "./graphics.ts";
@@ -68,6 +79,20 @@ function toolActor(): Actor {
 function scopedProjectSlug(): string | undefined {
   const scoped = process.env.OPENKLIP_SLUG?.trim();
   return scoped ? scoped : undefined;
+}
+
+// task_step/task_complete read the active task id from OPENKLIP_TASK_ID (set
+// by the spawner on the running agent's environment), never from tool input.
+// This mirrors the OPENKLIP_SLUG scoping above: an agent process can only
+// ever report progress on the one task it was spawned for.
+function activeTaskIdFromEnv(): string {
+  const id = process.env.OPENKLIP_TASK_ID?.trim();
+  if (!id) {
+    throw new Error(
+      "no active task for this session (OPENKLIP_TASK_ID is not set)"
+    );
+  }
+  return id;
 }
 
 function rawInputSlug(rawInput: unknown): string | undefined {
@@ -339,6 +364,119 @@ const queryTools: AgentToolDef[] = [
         // though the MCP tool itself keeps its underscored name.
         { action: "template-set", actor: toolActor(), input: { id } }
       ),
+  }),
+  defineQueryTool({
+    name: "brief_get",
+    summary:
+      "Read the project brief.md (audience, goal, tone, must-use assets, avoid list, target length, export formats).",
+    schema: z.object({ slug }),
+    run: async ({ slug: projectSlug }) => {
+      const brief = await loadBrief(projectSlug);
+      return { brief: brief ?? null };
+    },
+  }),
+  defineQueryTool({
+    name: "brief_set",
+    summary:
+      "Write the project brief.md (free-form markdown, no enforced schema).",
+    schema: z.object({ slug, text: z.string().max(20_000) }),
+    // Not a project.json mutation, so mutateProject doesn't apply here: this
+    // writes brief.md directly via src/brief.ts. The write IS logged to
+    // working/actions.jsonl (best-effort): the brief is standing instructions
+    // every future prompt receives, so an agent modifying it must be visible
+    // in the action history. It doesn't bump the project revision (brief.md
+    // is not part of the EDL), hence revisionBefore === revisionAfter.
+    run: async ({ slug: projectSlug, text }) => {
+      await saveBrief(projectSlug, text);
+      const chars = text.trim().length;
+      try {
+        const project = await loadProject(projectSlug);
+        const revision = project.revision ?? 0;
+        await appendActionLog(projectSlug, {
+          at: Date.now(),
+          action: "brief-set",
+          actor: toolActor(),
+          input: summarizeForLog({ chars }),
+          revisionBefore: revision,
+          revisionAfter: revision,
+        });
+      } catch {
+        // Best-effort: a history-log failure must not fail the brief write.
+      }
+      return { saved: true, chars };
+    },
+  }),
+  defineQueryTool({
+    name: "task_step",
+    summary:
+      "Report progress on the running agent's own task: marks the prior step done and starts a new one.",
+    schema: z.object({
+      slug,
+      title: z.string().min(1).max(200),
+      note: z.string().max(500).optional(),
+    }),
+    surfaces: ["mcp"],
+    run: async ({ slug: projectSlug, title, note }) => {
+      const taskId = activeTaskIdFromEnv();
+      const task = await setAgentTaskStep(projectSlug, taskId, {
+        title,
+        ...(note === undefined ? {} : { note }),
+      });
+      if (!task) {
+        throw new Error(
+          `no active task for this session (task ${taskId} was not found or has already finished)`
+        );
+      }
+      return { task };
+    },
+  }),
+  defineQueryTool({
+    name: "task_complete",
+    summary:
+      "Signal the running agent's own task is done, blocked on a question, or partially done with remaining work.",
+    schema: z.object({
+      slug,
+      outcome: z.enum(["completed", "blocked", "partial"]),
+      summary: z.string().max(2000).optional(),
+      question: z.string().max(1000).optional(),
+      remaining: z.array(z.string().max(300)).max(20).optional(),
+    }),
+    surfaces: ["mcp"],
+    run: async ({
+      slug: projectSlug,
+      outcome,
+      summary,
+      question,
+      remaining,
+    }) => {
+      const taskId = activeTaskIdFromEnv();
+
+      let mapped: AgentTaskOutcome;
+      if (outcome === "blocked") {
+        if (!question) {
+          throw new Error(
+            'task_complete outcome "blocked" requires a question'
+          );
+        }
+        mapped = { kind: "blocked", question };
+      } else {
+        // "completed" and "partial" both resolve the task as completed; the
+        // agent picks "partial" to also record what work is left (remaining).
+        mapped = {
+          kind: "completed",
+          ...(summary === undefined ? {} : { summary }),
+          ...(remaining === undefined ? {} : { remaining }),
+        };
+      }
+
+      const task = await completeAgentTask(projectSlug, taskId, mapped);
+      if (!task) {
+        throw new Error(
+          `no active task for this session (task ${taskId} was not found)`
+        );
+      }
+      return { task };
+    },
   }),
   defineQueryTool({
     name: "title-add-phrase",

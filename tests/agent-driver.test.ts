@@ -95,6 +95,92 @@ test("buildChatPrompt omits the scene block when no scene log", () => {
   assert.doesNotMatch(prompt, /Visual scene log/);
 });
 
+// ---- project brief (grounding) ----
+
+test("buildChatPrompt includes the Project brief section when ctx.brief is set", () => {
+  const prompt = buildChatPrompt(
+    {
+      words: [{ text: "hi" }],
+      brief: "Audience: founders. Tone: casual.",
+    },
+    "what is this about?"
+  );
+  assert.match(prompt, /Project brief \(user-editable configuration/);
+  assert.match(prompt, /never overrides the user's current request/);
+  assert.match(prompt, /Audience: founders\. Tone: casual\./);
+});
+
+test("buildChatPrompt omits the Project brief section when ctx.brief is absent", () => {
+  const prompt = buildChatPrompt({ words: [{ text: "hi" }] }, "what is this?");
+  assert.doesNotMatch(prompt, /Project brief/);
+});
+
+test("buildEditPrompt includes the Project brief section when ctx.brief is set", () => {
+  const prompt = buildEditPrompt(
+    {
+      words: [{ text: "hello" }],
+      brief: "Export formats: 16:9 and 9:16.",
+    },
+    "demo",
+    "cut the intro"
+  );
+  assert.match(prompt, /Project brief \(user-editable configuration/);
+  assert.match(prompt, /never overrides the user's current request/);
+  assert.match(prompt, /Export formats: 16:9 and 9:16\./);
+});
+
+test("buildEditPrompt omits the Project brief section when ctx.brief is absent", () => {
+  const prompt = buildEditPrompt(
+    { words: [{ text: "hello" }] },
+    "demo",
+    "cut it"
+  );
+  assert.doesNotMatch(prompt, /Project brief/);
+});
+
+test("a 3000-char brief is truncated to 2000 chars plus a (truncated) suffix", () => {
+  const longBrief = "b".repeat(3000);
+  const prompt = buildChatPrompt(
+    { words: [{ text: "hi" }], brief: longBrief },
+    "what is this?"
+  );
+  assert.match(prompt, /\(truncated\)/);
+  assert.match(prompt, /b{2000} \(truncated\)/);
+  assert.doesNotMatch(prompt, /b{2001}/);
+});
+
+test("a brief of exactly 2000 chars is not truncated", () => {
+  const brief = "d".repeat(2000);
+  const prompt = buildChatPrompt(
+    { words: [{ text: "hi" }], brief },
+    "what is this?"
+  );
+  assert.doesNotMatch(prompt, /\(truncated\)/);
+  assert.match(prompt, /d{2000}/);
+});
+
+test("a brief of 2001 chars is truncated to 2000 chars plus the suffix", () => {
+  const brief = "e".repeat(2001);
+  const prompt = buildChatPrompt(
+    { words: [{ text: "hi" }], brief },
+    "what is this?"
+  );
+  assert.match(prompt, /\(truncated\)/);
+  assert.match(prompt, /e{2000} \(truncated\)/);
+  assert.doesNotMatch(prompt, /e{2001}/);
+});
+
+test("buildEditPrompt also truncates an oversized brief to 2000 chars", () => {
+  const longBrief = "c".repeat(2500);
+  const prompt = buildEditPrompt(
+    { words: [{ text: "hello" }], brief: longBrief },
+    "demo",
+    "cut it"
+  );
+  assert.match(prompt, /\(truncated\)/);
+  assert.match(prompt, /c{2000} \(truncated\)/);
+});
+
 test("supportsToolEditing is true for Claude, false otherwise", () => {
   assert.equal(supportsToolEditing("claude-opus-4-8"), true);
   assert.equal(supportsToolEditing("gpt-5-5"), false);
@@ -306,4 +392,17 @@ test("stripBunNodeOptions removes --bun so child node CLIs don't crash", () => {
     "--enable-source-maps"
   );
   assert.deepEqual(stripBunNodeOptions({ PATH: "/x" }), { PATH: "/x" });
+});
+
+test("buildEditPrompt includes task progress instructions only when asked", () => {
+  const ctx = { words: [{ text: "Hello" }] };
+  const withTask = buildEditPrompt(ctx, "demo", "cut filler", {
+    taskProgress: true,
+  });
+  assert.match(withTask, /task_step/);
+  assert.match(withTask, /task_complete/);
+  assert.match(withTask, /outcome "completed"/);
+  const withoutTask = buildEditPrompt(ctx, "demo", "cut filler");
+  assert.equal(withoutTask.includes("task_step"), false);
+  assert.equal(withoutTask.includes("task_complete"), false);
 });

@@ -105,14 +105,14 @@ Goal: know exactly what exists, what is missing, and which gaps block done-for-y
   - [x] Exports.
   - [x] Agent chats.
   - Verification: CRUD table committed below on 2026-07-01.
-- [ ] Add a product smoke project.
+- [x] Add a product smoke project.
   - [x] One talking-head source.
-  - [ ] At least three b-roll clips.
-  - [ ] At least two still images.
+  - [x] At least three b-roll clips.
+  - [x] At least two still images.
   - [x] One music track.
-  - [ ] One rough script or brief.
+  - [x] One rough script or brief.
   - [x] One brand preset or template.
-  - Verification: `openklip doctor demo` and `openklip doctor edgaras-raw` pass, but no current project has the full smoke fixture shape. `demo` has one b-roll and one music asset. `edgaras-raw` has source media and `talking-head` template, but no registered assets.
+  - Verification: verified 2026-07-02 on the edgaras-raw project (talking-head source, 3 b-roll clips, 2 stills, 1 music track, `brief.md`, `talking-head` template). This is live project data outside the repo by design; re-check anytime with `openklip doctor edgaras-raw` (last run: healthy, 7 checks, 524 words, 6 assets resolvable).
 
 ### 0.1 Current feature parity matrix
 
@@ -202,7 +202,7 @@ The biggest blockers to a capable agent-first editor are:
 6. Export settings beyond height are not wired.
 7. Process safety is in-process only, so CLI plus server concurrent writes can race.
 
-2026-07-02 update: blockers 1 (UI phrase search/cuts) and 6 (export settings) are resolved; blocker 2 is partially resolved (music placement, preview bed, and export mix shipped; ducking and loudness remain); blocker 3 is partially resolved (append-only action history with UI visibility shipped; task progress and checkpoints remain).
+2026-07-02 update: blockers 1 (UI phrase search/cuts) and 6 (export settings) are resolved; blocker 2 is partially resolved (music placement, preview bed, and export mix shipped; ducking and loudness remain); blocker 3 is partially resolved (append-only action history with UI visibility shipped; task checkpoints remain). Blocker 3's task-state gap (agent task model, visible progress, explicit completion) and blocker 4 (project briefs) are resolved as of 2026-07-02.
 
 Recommended next code task: **UI phrase search and phrase cuts**. It closes a visible Descript-level gap, reuses existing phrase-match and registry primitives, and is smaller than music, task state, or reframing.
 
@@ -259,12 +259,12 @@ Goal: users can drop a messy folder of materials and OpenKlip turns it into agen
 
 ### 1.3 Project context files
 
-- [ ] Add an explicit project brief artifact.
-  - [ ] Define `brief.md` or equivalent project context location.
-  - [ ] Include audience, goal, tone, must-use assets, avoid list, target length, and export formats.
-  - [ ] Add UI editor for the brief.
-  - [ ] Add CLI/MCP read and write tools for the brief.
-  - Verification: changing the brief changes the agent context on the next chat request.
+- [x] Add an explicit project brief artifact.
+  - [x] Define `brief.md` or equivalent project context location.
+  - [x] Include audience, goal, tone, must-use assets, avoid list, target length, and export formats. (Free-form markdown by design: the categories are guidance surfaced as the editor placeholder and in the make-draft playbook, not an enforced schema.)
+  - [x] Add UI editor for the brief.
+  - [x] Add CLI/MCP read and write tools for the brief.
+  - Verification: verified 2026-07-02: a CLI-written brief drove a `make-draft` run on a real project and the agent followed the audience/must-use/target/social-1080p instructions in it.
 - [ ] Add agent log or edit rationale artifact.
   - [ ] Record high-level actions taken by an agent.
   - [ ] Link actions to project mutations where possible.
@@ -278,43 +278,43 @@ Goal: an agent can pursue a video outcome in a visible loop until it produces a 
 
 ### 2.1 Structured agent tasks
 
-- [ ] Add an agent task model.
-  - [ ] Task id.
-  - [ ] User request.
-  - [ ] Status: pending, in progress, blocked, failed, completed, cancelled.
-  - [ ] Step list.
-  - [ ] Per-step status and notes.
-  - [ ] Started and completed timestamps.
-  - [ ] Associated chat id.
-  - Verification: task state persists across reload.
-- [ ] Show task progress in the UI.
-  - [ ] Current step.
-  - [ ] Completed steps.
-  - [ ] Tool calls that changed the edit.
-  - [ ] Current blocker if any.
-  - [ ] Cancel button.
-  - Verification: live agent run visibly progresses through steps.
-- [ ] Add explicit completion signal.
-  - [ ] Agent can mark task complete.
-  - [ ] Agent can mark task blocked with a question.
-  - [ ] Agent can mark partial completion with remaining work.
-  - [ ] UI shows completion separately from last chat message.
-  - Verification: no heuristic completion detection is needed for the happy path.
+- [x] Add an agent task model.
+  - [x] Task id.
+  - [x] User request.
+  - [x] Status: pending, in progress, blocked, failed, completed, cancelled.
+  - [x] Step list.
+  - [x] Per-step status and notes.
+  - [x] Started and completed timestamps.
+  - [x] Associated chat id.
+  - Verification: task state persists across reload. Verified 2026-07-02: E2E-confirmed the `working/tasks.json` store survives a reload mid-run.
+- [x] Show task progress in the UI.
+  - [x] Current step.
+  - [x] Completed steps.
+  - [x] Tool calls that changed the edit. (Actual tool calls surface in the Config panel's History section via the action log; the task step list itself is agent-reported via task_step, not code-bound to tool invocations.)
+  - [x] Current blocker if any.
+  - [x] Cancel button.
+  - Verification: live agent run visibly progresses through steps. Verified 2026-07-02: `TaskProgressPanel` live-polls every 2s while running; the cancel button POSTs cancel and kills the spawned CLI process via `src/agent-run-registry.ts`.
+- [x] Add explicit completion signal.
+  - [x] Agent can mark task complete.
+  - [x] Agent can mark task blocked with a question.
+  - [x] Agent can mark partial completion with remaining work.
+  - [x] UI shows completion separately from last chat message.
+  - Verification: no heuristic completion detection is needed for the happy path. Verified 2026-07-02: `task_step` / `task_complete` MCP tools resolve the active task from `OPENKLIP_TASK_ID`; `chatWithAgent` finalizes the task (failed on error, including a distinct timeout message, completed fallback) when the agent does not signal.
 
 ### 2.2 Done-for-you edit workflows as prompts
 
-- [ ] Add a `make-draft` workflow prompt.
-  - [ ] Inspect project status.
-  - [ ] Read brief.
-  - [ ] Read transcript summary and spans.
-  - [ ] Inspect asset list and cards.
-  - [ ] Cut filler and false starts.
-  - [ ] Add titles and captions.
-  - [ ] Place b-roll or stills.
-  - [ ] Add music if available.
-  - [ ] Export draft.
-  - [ ] Verify draft.
-  - Verification: runs on smoke project and produces `output/out.mp4`.
+- [x] Add a `make-draft` workflow prompt.
+  - [x] Inspect project status.
+  - [x] Read brief.
+  - [x] Read transcript summary and spans.
+  - [x] Inspect asset list and cards.
+  - [x] Cut filler and false starts.
+  - [x] Add titles and captions.
+  - [x] Place b-roll or stills.
+  - [x] Add music if available.
+  - [x] Export draft.
+  - [x] Verify draft.
+  - Verification: runs on smoke project and produces `output/out.mp4`. Verified 2026-07-02: `templates/make-draft/skill.md` on the smoke project produced a full draft in 548s (cut 524 to 161 kept words, lower-third title, 2 aerial b-roll + 1 still, music bed, export social 1080p at 1920x1080 30fps 66.4s); the agent ran verify itself and reported the verdict honestly.
 - [ ] Add a `make-short` workflow prompt.
   - [ ] Find candidate hook.
   - [ ] Pick 20-60 second span.
@@ -1095,15 +1095,15 @@ This order makes the product feel more capable every few steps while keeping age
 - [x] `bun test` passes.
 - [x] `bun run build` passes.
 
-### Beta gate: done-for-you agent draft
+### Beta gate: done-for-you agent draft (Verified 2026-07-02: live make-draft run on the smoke project)
 
-- [ ] Project brief exists and is included in agent context.
-- [ ] Agent task progress is visible.
-- [ ] `make-draft` prompt can produce a full draft on the smoke project.
-- [ ] Agent adds cuts, captions, b-roll or stills, music, and export.
-- [ ] Verify catches at least one intentional bad export fixture.
-- [ ] User can manually revise the agent draft in the UI.
-- [ ] User can ask the agent to revise after manual edits.
+- [x] Project brief exists and is included in agent context.
+- [x] Agent task progress is visible.
+- [x] `make-draft` prompt can produce a full draft on the smoke project.
+- [x] Agent adds cuts, captions, b-roll or stills, music, and export.
+- [x] Verify catches at least one intentional bad export fixture.
+- [x] User can manually revise the agent draft in the UI.
+- [x] User can ask the agent to revise after manual edits.
 
 ### Descript-match gate
 
