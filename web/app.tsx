@@ -467,6 +467,63 @@ export function App({
   const [chosenMusicAsset, setChosenMusicAsset] = useState(
     initialProject.assets?.find((a) => a.kind === "music")?.id ?? ""
   );
+
+  // G1: a GUI revert (HistoryPanel's onReverted prop) is the only place a
+  // server action can rewrite an ALREADY-OPEN project's revision out from
+  // under this component. `project` is a plain useState<Project> seeded
+  // once from initialProject at mount (page.tsx keys the tree by slug, not
+  // revision, so remounting on every edit isn't an option): without this,
+  // the transcript/preview would keep showing pre-revert state, and the
+  // next edit (toggleWord -> saveProjectEdits serializes the CLIENT's full
+  // words deleted-map; same wholesale-state pattern in saveLook/saveZooms/
+  // saveTitles/saveBroll) would silently resurrect it by overwriting the
+  // just-restored project.json with the stale in-memory copy.
+  //
+  // Reseeds project plus every piece of client state this component itself
+  // derives from initialProject at mount (captionsOn, vignetteOn, filter,
+  // color, motionSpeed, chosenAsset/chosenStillAsset/chosenMusicAsset above),
+  // mirroring that exact derivation rather than inventing a second one.
+  // Deliberately leaves dirPath/mediaVersion/brief/silences alone: none of
+  // those live in project.json, so revert never touches them (brief.md
+  // especially; see saveBrief and HistoryList's groupHasBriefSet caveat for
+  // a task revert that spans a brief-set entry).
+  //
+  // Any save already in flight when a revert lands is left to the existing
+  // enqueueSave/saveError path (see toggleWord etc. below): it will still
+  // write, just now on top of the reseeded state, which is the simplest
+  // correct behavior available without a bigger in-flight-save cancellation
+  // mechanism.
+  //
+  // Out of scope: a CLI/MCP revert (or any other out-of-band project.json
+  // write) made while this editor is open has no signal to reseed from and
+  // leaves the same stale client state behind; that is the same
+  // pre-existing class of staleness as any other external edit racing an
+  // open editor, not something this fix addresses.
+  const onHistoryReverted = useCallback((restored: EngineProject) => {
+    setProject((prev) => ({
+      ...prev,
+      ...(restored as unknown as Project),
+      brief: prev.brief,
+      dirPath: prev.dirPath,
+      mediaVersion: prev.mediaVersion,
+      silences: prev.silences,
+    }));
+    setCaptionsOn(restored.captions?.enabled ?? true);
+    setVignetteOn(restored.look?.vignette ?? false);
+    setFilterState(restored.look?.filter ?? "none");
+    setColorState(restored.look?.color ?? null);
+    setMotionSpeed(restored.motion?.speed ?? 1);
+    setChosenAsset(
+      restored.assets?.find((a) => (a.kind ?? "broll") === "broll")?.id ?? ""
+    );
+    setChosenStillAsset(
+      restored.assets?.find((a) => a.kind === "still")?.id ?? ""
+    );
+    setChosenMusicAsset(
+      restored.assets?.find((a) => a.kind === "music")?.id ?? ""
+    );
+  }, []);
+
   const [titleText, setTitleText] = useState("");
   const [titlePos, setTitlePos] = useState<"lower" | "center" | "hero">(
     "lower"
@@ -2642,7 +2699,10 @@ export function App({
               />
             </Section>
             <Section title="History">
-              <HistoryPanel slug={project.slug} />
+              <HistoryPanel
+                onReverted={onHistoryReverted}
+                slug={project.slug}
+              />
             </Section>
           </div>
         </SidebarContent>

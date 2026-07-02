@@ -2,7 +2,8 @@
 
 import { existsSync } from "node:fs";
 import { loadBrief, saveBrief as saveBriefFile } from "@engine/brief";
-import type { ColorAdjust, Cuts, Filter, Motion } from "@engine/edl";
+import { logBriefSet } from "@engine/brief-log";
+import type { ColorAdjust, Cuts, Filter, Motion, Project } from "@engine/edl";
 import type { ExportCompression } from "@engine/exporter";
 import { projectPaths } from "@engine/paths";
 import {
@@ -18,9 +19,10 @@ import {
   type clampTitleItems,
   type clampZoomItems,
 } from "@engine/projectMutations";
-import { mutateProject } from "@engine/projectStore";
+import { loadProject, mutateProject } from "@engine/projectStore";
 import { getAction, runAction } from "@engine/registry";
 import { revealInFileManager } from "@engine/reveal-path";
+import { type RevertTarget, revertProject } from "@engine/revert";
 
 export type ActionResult<T = void> =
   | ({ ok: true } & (T extends void ? object : { data: T }))
@@ -123,12 +125,15 @@ export async function saveMotion(
 
 // Project brief (brief.md): free-form context text, not a project.json field,
 // so this bypasses mutateProject and writes the file directly (src/brief.ts).
+// The write is still logged (best-effort, via the shared brief-log helper)
+// so it shows up in the History panel like every other GUI edit.
 export async function saveBrief(
   slug: string,
   text: string
 ): Promise<ActionResult> {
   try {
     await saveBriefFile(slug, text);
+    await logBriefSet(slug, "human", text);
     return { ok: true };
   } catch (e) {
     return fail(e);
@@ -267,6 +272,35 @@ export async function exportProject(
     }
     const result = await exportCut(slug, { compression, fps, maxHeight });
     return { ok: true, data: result };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+// GUI entry point for src/revert.ts: reverts through mutateProject like
+// every other server action here, always as actor "human" (the History
+// panel is the only GUI surface that offers revert). Target shape mirrors
+// the CLI's --to/--task/--last flags and the "revert" MCP tool 1:1.
+//
+// The success payload includes the restored project (loaded fresh, after
+// revertProject's own write) alongside {revision, restoredTo}: web/app.tsx's
+// `project` state is a plain useState<Project> with no effect that re-syncs
+// it from a fresh server render, so router.refresh() alone leaves the open
+// editor showing pre-revert transcript/preview state, and the next GUI edit
+// (toggleWord -> saveProjectEdits, or any of saveLook/saveZooms/saveTitles/
+// saveBroll) would serialize that stale client state wholesale right back
+// over the just-restored project.json. See HistoryPanel's onReverted prop
+// and App's reseed handler, which is the other half of this fix.
+export async function revertProjectAction(
+  slug: string,
+  target: RevertTarget
+): Promise<
+  ActionResult<{ project: Project; revision: number; restoredTo: number }>
+> {
+  try {
+    const data = await revertProject(slug, target, { actor: "human" });
+    const project = await loadProject(slug);
+    return { ok: true, data: { ...data, project } };
   } catch (e) {
     return fail(e);
   }

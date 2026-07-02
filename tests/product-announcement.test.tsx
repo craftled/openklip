@@ -3,6 +3,7 @@ import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
+import { readActionLog } from "../src/action-log.ts";
 import { ProjectSchema, SAMPLE_RATE } from "../src/edl.ts";
 import {
   PRODUCT_ANNOUNCEMENT_CATALOG,
@@ -11,6 +12,7 @@ import {
   validateProductAnnouncementSpec,
 } from "../src/product-announcement.ts";
 import { renderProductAnnouncementHtml } from "../src/product-announcement-html.tsx";
+import { loadProject, mutateProject } from "../src/projectStore.ts";
 import {
   actionManifest,
   actions,
@@ -512,5 +514,211 @@ test("CLI json-graphic-add rejects invalid input without mutating graphics", asy
       graphics?: Array<unknown>;
     };
     assert.equal(data.graphics?.length ?? 0, 0);
+  });
+});
+
+// ── ACTION HISTORY: CLI paths that bypassed logging now go through
+// mutateProject / the shared brief-log helper. These live in THIS file
+// (which already spawns `bun run <cli.ts>` subprocesses) so history-related
+// CLI tests share the same runCli helper.
+
+test("CLI template set logs a template-set entry and bumps revision", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const result = await runCli(["template", "set", slug, "talking-head"]);
+    assert.equal(result.code, 0, result.out);
+
+    const entries = await readActionLog(slug);
+    assert.equal(entries.length, 1);
+    assert.equal(entries[0].action, "template-set");
+    assert.equal(entries[0].actor, "cli");
+    assert.equal(entries[0].revisionBefore, 0);
+    assert.equal(entries[0].revisionAfter, 1);
+  });
+});
+
+test("CLI brand logs a brand entry and bumps revision", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const result = await runCli(["brand", slug, "default"]);
+    assert.equal(result.code, 0, result.out);
+
+    const entries = await readActionLog(slug);
+    assert.equal(entries.length, 1);
+    assert.equal(entries[0].action, "brand");
+    assert.equal(entries[0].actor, "cli");
+    assert.equal(entries[0].revisionBefore, 0);
+    assert.equal(entries[0].revisionAfter, 1);
+  });
+});
+
+test("CLI brief --set logs a brief-set entry that does not move the project revision", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const result = await runCli([
+      "brief",
+      slug,
+      "--set",
+      "Audience: founders. Goal: ship the demo.",
+    ]);
+    assert.equal(result.code, 0, result.out);
+
+    const entries = await readActionLog(slug);
+    assert.equal(entries.length, 1);
+    assert.equal(entries[0].action, "brief-set");
+    assert.equal(entries[0].actor, "cli");
+    assert.equal(entries[0].revisionBefore, entries[0].revisionAfter);
+  });
+});
+
+test("CLI asset-add logs an asset-add entry with actor cli", async () => {
+  await withTempProjectsRoot(async ({ slug, root }) => {
+    writeFixtureProject(slug, makeProject({ slug, assets: [] }));
+    const stillPath = join(root, "incoming.png");
+    await Bun.write(stillPath, Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+
+    const result = await runCli([
+      "asset-add",
+      slug,
+      stillPath,
+      "--kind",
+      "still",
+    ]);
+    assert.equal(result.code, 0, result.out);
+
+    const entries = await readActionLog(slug);
+    assert.equal(entries.length, 1);
+    assert.equal(entries[0].action, "asset-add");
+    assert.equal(entries[0].actor, "cli");
+    assert.equal(entries[0].revisionAfter, 1);
+  });
+});
+
+// ── CLI revert: openklip revert <slug> (--to|--task|--last) [--force] ──────
+
+test("CLI revert --to restores an earlier revision and prints the outcome", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const first = await runCli(["pad", slug, "10"]);
+    assert.equal(first.code, 0, first.out);
+    const second = await runCli(["pad", slug, "20"]);
+    assert.equal(second.code, 0, second.out);
+
+    const result = await runCli(["revert", slug, "--to", "0"]);
+    assert.equal(result.code, 0, result.out);
+    assert.match(result.out, /revision 0/);
+    assert.match(result.out, /revision 3/);
+
+    const entries = await readActionLog(slug);
+    assert.equal(entries[0].action, "revert");
+    assert.equal(entries[0].actor, "cli");
+  });
+});
+
+test("CLI revert --last reverts the most recent logged edit", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    await runCli(["pad", slug, "10"]);
+    const result = await runCli(["revert", slug, "--last"]);
+    assert.equal(result.code, 0, result.out);
+    const entries = await readActionLog(slug);
+    assert.equal(entries[0].action, "revert");
+  });
+});
+
+test("CLI revert requires exactly one of --to/--task/--last", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const result = await runCli(["revert", slug]);
+    assert.notEqual(result.code, 0);
+    assert.match(result.out, /usage: openklip revert/);
+  });
+});
+
+test("CLI revert --to a missing snapshot fails with a clear error", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    await runCli(["pad", slug, "10"]);
+    const result = await runCli(["revert", slug, "--to", "9"]);
+    assert.notEqual(result.code, 0);
+    assert.match(result.out, /no snapshot for revision 9/);
+  });
+});
+
+test("CLI revert --to rejects a non-numeric revision", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const result = await runCli(["revert", slug, "--to", "abc"]);
+    assert.notEqual(result.code, 0);
+    assert.match(result.out, /--to must be a non-negative integer revision/);
+  });
+});
+
+test("CLI revert --to rejects a negative revision", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const result = await runCli(["revert", slug, "--to", "-1"]);
+    assert.notEqual(result.code, 0);
+    assert.match(result.out, /--to must be a non-negative integer revision/);
+  });
+});
+
+test("CLI revert --to rejects a non-integer revision", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const result = await runCli(["revert", slug, "--to", "1.5"]);
+    assert.notEqual(result.code, 0);
+    assert.match(result.out, /--to must be a non-negative integer revision/);
+  });
+});
+
+test("CLI revert --to 0 is accepted as a legitimate target when a rev-0 snapshot exists", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const original = await loadProject(slug);
+    await runCli(["pad", slug, "10"]); // rev0 -> rev1, snapshot rev-0.json written
+    const result = await runCli(["revert", slug, "--to", "0"]);
+    assert.equal(result.code, 0, result.out);
+    assert.match(result.out, /revision 0/);
+    const reverted = await loadProject(slug);
+    assert.equal(reverted.padMs, original.padMs);
+  });
+});
+
+test("CLI revert --task without force fails when a later unrelated edit would be discarded, --force proceeds", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    // The CLI's own runLoggedAction never threads a taskId (only agent/MCP
+    // calls do, via OPENKLIP_TASK_ID -> toolTaskId() in src/agent-tools.ts),
+    // so build the task-tagged history directly through mutateProject, the
+    // same way tests/revert.test.ts does, and only exercise the CLI for the
+    // revert command itself.
+    await mutateProject(
+      slug,
+      (p) => {
+        p.padMs = 10;
+      },
+      { action: "pad", actor: "agent", taskId: "task-cli-1" }
+    );
+    await mutateProject(
+      slug,
+      (p) => {
+        p.padMs = 20;
+      },
+      { action: "pad", actor: "human" }
+    );
+
+    const blocked = await runCli(["revert", slug, "--task", "task-cli-1"]);
+    assert.notEqual(blocked.code, 0);
+    assert.match(blocked.out, /force/);
+
+    const forced = await runCli([
+      "revert",
+      slug,
+      "--task",
+      "task-cli-1",
+      "--force",
+    ]);
+    assert.equal(forced.code, 0, forced.out);
   });
 });

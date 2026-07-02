@@ -18,6 +18,8 @@ import {
   projectDeletedToast,
   projectDeleteFailedToast,
   revealFailedToast,
+  revertFailedToast,
+  revertSucceededToast,
   saveFailedToast,
   type ToastPayload,
   workspacePickFailedToast,
@@ -173,6 +175,17 @@ export function toastAssetRemoved(name?: string): void {
 
 export function toastAssetRemoveFailed(error: string): void {
   show(assetRemoveFailedToast(error));
+}
+
+export function toastRevertSucceeded(outcome: {
+  restoredTo: number;
+  revision: number;
+}): void {
+  show(revertSucceededToast(outcome));
+}
+
+export function toastRevertFailed(error: string): void {
+  show(revertFailedToast(error));
 }
 
 export function toastAssetsSynced(count: number): void {

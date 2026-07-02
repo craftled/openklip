@@ -1,6 +1,5 @@
 import { listAssetsByKind, registerAssetBytes } from "@engine/assets";
 import { type Asset, type AssetKind, AssetKindSchema } from "@engine/edl";
-import { withProjectLock } from "@engine/project-lock";
 import { loadProject } from "@engine/projectStore";
 import type { NextRequest } from "next/server";
 
@@ -43,10 +42,18 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
       kind = parsed.data;
     }
     const bytes = new Uint8Array(await file.arrayBuffer());
-    // Serialize against folder sync so an in-flight sync can't clobber the
-    // asset this upload registers (and vice versa) via project.json.
-    const asset = await withProjectLock(slug, () =>
-      registerAssetBytes(slug, file.name, bytes, kind)
+    // registerAssetBytes now owns its own per-slug locking via mutateProject
+    // (serializing against folder sync the same way this route used to with
+    // an outer withProjectLock). Do NOT wrap this in withProjectLock here:
+    // mutateProject acquires that same lock internally, and a second
+    // acquisition from the same call stack before the first releases would
+    // deadlock (see project-lock.ts).
+    const asset = await registerAssetBytes(
+      slug,
+      file.name,
+      bytes,
+      kind,
+      "human"
     );
     const project = await loadProject(slug);
     return Response.json({

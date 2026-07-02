@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
+import { readActionLog } from "../src/action-log.ts";
 import { assembleFromSelection, listTakes } from "../src/assembly.ts";
 import { ProjectSchema, SAMPLE_RATE, type Take } from "../src/edl.ts";
 import { FFMPEG, run } from "../src/ffmpeg.ts";
@@ -105,8 +106,24 @@ test("assembleFromSelection concats two seeded takes into a real source (smoke)"
     await Bun.write(staleAnalysisPath, JSON.stringify({ version: 1 }));
     const stalePcmSize = (await Bun.file(p.audioRaw).arrayBuffer()).byteLength;
 
-    // Remove the placeholder project.json so the ingest guard allows assembly.
-    await Bun.write(p.project, "");
+    // Replace the placeholder project.json with a valid, previously-edited
+    // project (revision 5): assembleFromSelection now writes through
+    // mutateProject, which requires an existing, parseable project.json to
+    // load and whose revision the assembly must continue from (not reset).
+    const placeholder = ProjectSchema.parse({
+      version: 1,
+      slug,
+      source: srcA,
+      proxy: "working/proxy.mp4",
+      sampleRate: SAMPLE_RATE,
+      fps: 30,
+      width: 320,
+      height: 240,
+      durationSamples: sec(1),
+      words: [],
+      revision: 5,
+    });
+    await Bun.write(p.project, JSON.stringify(placeholder, null, 2));
     const result = await assembleFromSelection(
       slug,
       {
@@ -116,7 +133,7 @@ test("assembleFromSelection concats two seeded takes into a real source (smoke)"
         ],
         padMs: 0,
       },
-      { force: true }
+      { force: true, actor: "cli" }
     );
 
     assert.equal(result.segments, 2);
@@ -132,6 +149,17 @@ test("assembleFromSelection concats two seeded takes into a real source (smoke)"
     assert.equal(project.assembly?.segments[1].outStartSample, sec(2));
     assert.ok(existsSync(join(p.dir, "source.mp4")));
     assert.ok(existsSync(p.proxy));
+
+    // The assembly write goes through mutateProject: it continues the
+    // previous revision counter (5 -> 6) instead of silently resetting it,
+    // and it appends one logged "assemble" entry to the action history.
+    assert.equal(project.revision, 6);
+    const entries = await readActionLog(slug);
+    assert.equal(entries.length, 1);
+    assert.equal(entries[0].action, "assemble");
+    assert.equal(entries[0].actor, "cli");
+    assert.equal(entries[0].revisionBefore, 5);
+    assert.equal(entries[0].revisionAfter, 6);
 
     // The takes survive the assembly (parked alongside the new source).
     const takes = await listTakes(slug);

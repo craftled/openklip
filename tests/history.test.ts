@@ -1,10 +1,21 @@
 import assert from "node:assert/strict";
-import { mkdirSync, readFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { readActionLog } from "../src/action-log.ts";
 import { projectPaths } from "../src/paths.ts";
-import { loadProject, mutateProject } from "../src/projectStore.ts";
+import {
+  listHistorySnapshotRevisions,
+  loadProject,
+  mutateProject,
+  pruneHistorySnapshots,
+} from "../src/projectStore.ts";
 import { runAction } from "../src/registry.ts";
 import {
   makeProject,
@@ -181,5 +192,133 @@ test("meta actor falls back to OPENKLIP_ACTOR when unset on the meta", async () 
     }
     const entries = await readActionLog(slug);
     assert.equal(entries[0].actor, "agent");
+  });
+});
+
+// ── HISTORY SNAPSHOTS: mutateProject writes a pre-mutation snapshot ─────────
+
+test("a logged mutation writes rev-<revisionBefore>.json with the pre-mutation project", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    // loadProject runs the fixture through ProjectSchema.parse (adds field
+    // defaults not present in the raw fixture literal), so compare the
+    // snapshot against the PARSED pre-mutation state, not the raw fixture.
+    const before = await loadProject(slug);
+    await mutateProject(
+      slug,
+      (p) => {
+        p.padMs = 999;
+      },
+      { action: "pad", actor: "human", input: { padMs: 999 } }
+    );
+    const snapshotPath = join(projectPaths(slug).historyDir, "rev-0.json");
+    assert.ok(existsSync(snapshotPath), "expected a rev-0.json snapshot");
+    const snapshot = JSON.parse(readFileSync(snapshotPath, "utf8"));
+    assert.deepEqual(snapshot, before);
+    // The live project moved on; the snapshot must not have.
+    const loaded = await loadProject(slug);
+    assert.equal(loaded.padMs, 999);
+    assert.equal(snapshot.padMs, before.padMs);
+  });
+});
+
+test("a second logged mutation writes rev-1.json capturing the state after the first", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    await mutateProject(
+      slug,
+      (p) => {
+        p.padMs = 10;
+      },
+      { action: "pad", actor: "human" }
+    );
+    await mutateProject(
+      slug,
+      (p) => {
+        p.padMs = 20;
+      },
+      { action: "pad", actor: "human" }
+    );
+    const dir = projectPaths(slug).historyDir;
+    assert.ok(existsSync(join(dir, "rev-0.json")));
+    assert.ok(existsSync(join(dir, "rev-1.json")));
+    const rev1 = JSON.parse(readFileSync(join(dir, "rev-1.json"), "utf8"));
+    assert.equal(rev1.padMs, 10);
+  });
+});
+
+test("an unlogged mutation (no meta) writes no snapshot", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    await mutateProject(slug, (p) => {
+      p.padMs = 25;
+    });
+    const dir = projectPaths(slug).historyDir;
+    assert.ok(!existsSync(dir) || readdirSync(dir).length === 0);
+  });
+});
+
+test("pruneHistorySnapshots keeps only the newest N by revision number", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    const dir = projectPaths(slug).historyDir;
+    mkdirSync(dir, { recursive: true });
+    for (const rev of [0, 1, 2, 3, 4]) {
+      writeFileSync(join(dir, `rev-${rev}.json`), JSON.stringify({ rev }));
+    }
+    await pruneHistorySnapshots(slug, 2);
+    const remaining = readdirSync(dir).sort();
+    assert.deepEqual(remaining, ["rev-3.json", "rev-4.json"]);
+  });
+});
+
+test("pruneHistorySnapshots is a no-op when the history dir does not exist", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    await assert.doesNotReject(pruneHistorySnapshots(slug, 2));
+  });
+});
+
+test("listHistorySnapshotRevisions returns the revisions that have a snapshot, ascending", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    await mutateProject(
+      slug,
+      (p) => {
+        p.padMs = 1;
+      },
+      { action: "pad", actor: "human" }
+    );
+    await mutateProject(
+      slug,
+      (p) => {
+        p.padMs = 2;
+      },
+      { action: "pad", actor: "human" }
+    );
+    assert.deepEqual(listHistorySnapshotRevisions(slug), [0, 1]);
+  });
+});
+
+test("listHistorySnapshotRevisions returns an empty array when no snapshots exist", async () => {
+  await withTempProjectsRoot(({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    assert.deepEqual(listHistorySnapshotRevisions(slug), []);
+  });
+});
+
+test("a failing snapshot write never fails the edit (best-effort, mirrors the log-append philosophy)", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    // Occupy the history dir PATH with a plain file so mkdir(recursive) throws.
+    writeFileSync(projectPaths(slug).historyDir, "not-a-directory");
+    await mutateProject(
+      slug,
+      (p) => {
+        p.padMs = 10;
+      },
+      { action: "pad", actor: "human" }
+    );
+    const project = await loadProject(slug);
+    assert.equal(project.padMs, 10);
+    assert.equal(project.revision, 1);
   });
 });

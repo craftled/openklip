@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
+import { readActionLog } from "../src/action-log.ts";
 import {
   deleteAsset,
   inferAssetKind,
@@ -126,6 +127,52 @@ test("registerAsset copies an external still into assets/ (no ../../ proxy)", as
   });
 });
 
+// ── ACTION HISTORY: asset registration is a logged, locked mutation ────────
+
+test("registerAsset with an explicit actor bumps revision and logs asset-add", async () => {
+  await withTempProjectsRoot(async ({ slug, root }) => {
+    writeFixtureProject(slug, makeProject({ slug, assets: [] }));
+    const assetsDir = join(root, "projects", slug, "assets");
+    mkdirSync(assetsDir, { recursive: true });
+    const stillPath = join(assetsDir, "incoming.png");
+    writeFileSync(stillPath, Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+
+    const asset = await registerAsset(slug, stillPath, "still", "cli");
+
+    const raw = readFileSync(
+      join(root, "projects", slug, "project.json"),
+      "utf8"
+    );
+    const project = ProjectSchema.parse(JSON.parse(raw));
+    assert.equal(project.revision, 1);
+
+    const entries = await readActionLog(slug);
+    assert.equal(entries.length, 1);
+    assert.equal(entries[0].action, "asset-add");
+    assert.equal(entries[0].actor, "cli");
+    assert.equal(entries[0].revisionBefore, 0);
+    assert.equal(entries[0].revisionAfter, 1);
+    assert.match(entries[0].input ?? "", new RegExp(asset.id));
+  });
+});
+
+test("registerAssetBytes with actor human logs asset-add", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug, assets: [] }));
+    await registerAssetBytes(
+      slug,
+      "incoming.png",
+      new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]),
+      "still",
+      "human"
+    );
+    const entries = await readActionLog(slug);
+    assert.equal(entries.length, 1);
+    assert.equal(entries[0].action, "asset-add");
+    assert.equal(entries[0].actor, "human");
+  });
+});
+
 test("deleteAsset removes registration and project-local files", async () => {
   await withTempProjectsRoot(async ({ slug, root }) => {
     writeFixtureProject(slug, makeProject({ slug, assets: [] }));
@@ -138,8 +185,30 @@ test("deleteAsset removes registration and project-local files", async () => {
     const proxyPath = join(root, "projects", slug, asset.proxy);
     assert.ok(existsSync(proxyPath));
 
-    const project = await deleteAsset(slug, asset.id);
+    const project = await deleteAsset(slug, asset.id, "human");
     assert.equal(project.assets.length, 0);
     assert.ok(!existsSync(proxyPath));
+  });
+});
+
+test("deleteAsset with an actor logs an asset-rm entry and bumps revision", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug, assets: [] }));
+    const asset = await registerAssetBytes(
+      slug,
+      "incoming.png",
+      new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]),
+      "still",
+      "human"
+    );
+    await deleteAsset(slug, asset.id, "human");
+
+    const entries = await readActionLog(slug);
+    assert.equal(entries.length, 2);
+    assert.equal(entries[0].action, "asset-rm");
+    assert.equal(entries[0].actor, "human");
+    assert.equal(entries[0].revisionBefore, 1);
+    assert.equal(entries[0].revisionAfter, 2);
+    assert.match(entries[0].input ?? "", new RegExp(asset.id));
   });
 });

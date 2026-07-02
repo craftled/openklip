@@ -1,6 +1,10 @@
 import { existsSync } from "node:fs";
 import { readActionLog } from "@engine/action-log";
 import { assertValidSlug, projectPaths } from "@engine/paths";
+import {
+  listHistorySnapshotRevisions,
+  MAX_HISTORY_SNAPSHOTS,
+} from "@engine/projectStore";
 import type { NextRequest } from "next/server";
 
 export const runtime = "nodejs";
@@ -37,5 +41,10 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
 
   return Response.json({
     entries: await readActionLog(slug, { limit: HISTORY_LIMIT }),
+    // Which revisions have a working/history/ snapshot: the History panel
+    // uses this to decide which entries are actually revertible (see
+    // src/revert.ts and src/projectStore.ts's mutateProject snapshot hook).
+    snapshotRevisions: listHistorySnapshotRevisions(slug),
+    maxHistorySnapshots: MAX_HISTORY_SNAPSHOTS,
   });
 }

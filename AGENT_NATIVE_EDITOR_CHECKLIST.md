@@ -185,8 +185,8 @@ Legend: Full means the surface can achieve the same outcome. Partial means the s
 | Takes | CLI/MCP add and assemble | CLI/MCP | Assemble creates new source | File-level only | Missing UI take browser and API routes. |
 | Exports | UI, CLI, MCP, API | File output, status, verify | Re-export overwrites | Manual file delete only | Needs presets, settings, history. |
 | Agent chats | UI/API | UI/API | UI/API rename/archive/append | UI/API | Not exposed to CLI/MCP as context or task log. |
-| Brief/context | UI, CLI, MCP | UI, CLI, MCP | CLI/MCP/UI save paths | File delete clears manually | `brief.md` shipped; GUI/CLI brief saves are not history-logged yet. |
-| Action history | Append-only log on every registry mutation | History route + Config panel section | Not applicable (append-only) | Not applicable (append-only) | No filters or undo; non-registry CLI mutations do not log yet. |
+| Brief/context | UI, CLI, MCP | UI, CLI, MCP | CLI/MCP/UI save paths | File delete clears manually | `brief.md` shipped; CLI/GUI/MCP saves all history-log (2026-07-02). |
+| Action history | Append-only log on every user-facing mutation | History route + Config panel section | `openklip revert` / MCP `revert` / GUI History panel | Not applicable (append-only) | Task-level revert exists (2026-07-02); still no filters (actor/action-type). |
 
 ### 0.3 Baseline audit conclusion
 
@@ -196,7 +196,7 @@ The biggest blockers to a capable agent-first editor are:
 
 1. Cross-surface parity holes remain: project create/delete, asset delete/register, inbox scan, analysis triggers, chat context, and task logs are not all available on UI, CLI, MCP, and HTTP.
 2. Manual correction gaps remain: b-roll PiP/audio modes, music timeline drag-trim, richer title/caption styles, and visual export transitions.
-3. Agent recovery gaps remain: resumable checkpoints, task-level revert, undo, and history filters.
+3. Agent recovery gaps remain: resumable checkpoints and history filters (task-level revert and undo shipped 2026-07-02, see Milestone 9.1).
 4. Context gaps remain: style recipes, brand-kit ingestion, and script/document ingestion beyond the free-form project brief.
 5. Shorts and reframing are still missing.
 6. Process safety is in-process only, so CLI plus server concurrent writes can race.
@@ -676,7 +676,7 @@ Goal: users trust agents because every change is inspectable, reversible, and re
   - [x] Actor: human, agent, CLI, MCP.
   - [x] Timestamp.
   - [x] Project revision before and after.
-  - Verification: every registry mutation records a log entry. Scope note 2026-07-02: every registry mutation logs across GUI/CLI/MCP; non-registry CLI paths (assets, template, assembly) do not log yet.
+  - Verification: every registry mutation records a log entry. Scope note 2026-07-02: every registry mutation logs across GUI/CLI/MCP. Updated 2026-07-02: previously-unlogged paths now log too, asset registration/deletion (`asset-add`/`asset-rm`), `template set`, `brand`/`ingest --brand`, and multi-take `assemble` (through `mutateProject`, preserving the revision counter), plus background folder-sync prune (`asset-prune`, actor `system`); verified via `tests/action-log.test.ts`, `tests/assets.test.ts`, `tests/asset-scanner.test.ts`, and `tests/assembly.test.ts`, and the full `bun test` run (1117 tests, all green).
 - [ ] Show action history in UI.
   - [ ] Filter by actor.
   - [ ] Filter by action type.
@@ -684,11 +684,13 @@ Goal: users trust agents because every change is inspectable, reversible, and re
   - [ ] Show note or rationale.
   - Verification: user can inspect what an agent changed.
 - [ ] Add undo and redo.
-  - [ ] Start with single-action undo for registry actions.
-  - [ ] Add batch undo for one agent task.
-  - [ ] Preserve redo until new mutation.
-  - [ ] Handle export artifacts separately.
-  - Verification: undo restores project JSON exactly for supported actions.
+  - [x] Start with single-action undo for registry actions.
+    - Verification 2026-07-02: `openklip revert <slug> --to <rev>` / `--last` restores `project.json` from the pre-mutation snapshot at `working/history/rev-<rev>.json` (`src/revert.ts`); pinned by `tests/revert.test.ts`.
+  - [x] Add batch undo for one agent task.
+    - Verification 2026-07-02: `openklip revert <slug> --task <taskId> [--force]` restores to before a task's earliest logged entry, refusing (without `--force`) when a foreign revision-bumping entry, including one interleaved between the task's own, would also be discarded; pinned by `tests/revert.test.ts`.
+  - [ ] Preserve redo until new mutation. (No explicit redo stack: a revert is itself a normal logged, revertible mutation, so reverting a revert gets back to the pre-revert state, but there is no dedicated "redo" concept or UI.)
+  - [ ] Handle export artifacts separately. (Revert restores `project.json` only; `output/out.mp4`, `brief.md`, chats, tasks, asset files, and derived media are untouched, see TODO.md Known Limitations.)
+  - Verification: undo restores project JSON exactly for supported actions. Partially met 2026-07-02: true for `project.json` (see sub-items above); export artifacts and non-EDL files (brief, chats, tasks, asset files) are out of scope for this revert.
 
 ### 9.2 Diff and review
 
@@ -1107,7 +1109,7 @@ This order makes the product feel more capable every few steps while keeping age
 - [x] Music, ducking, and loudness are usable. Verified 2026-07-02: live E2E 4K export rendered ducking and single-pass loudnorm (-16.6 LUFS measured vs -16 target) end to end; both are CLI/GUI/MCP-configurable.
 - [ ] Multi-take can be inspected or corrected in UI.
 - [ ] Export presets cover common platforms.
-- [ ] Undo or task-level revert exists.
+- [x] Undo or task-level revert exists. Verified 2026-07-02: `openklip revert <slug> (--to <rev> | --task <id> | --last) [--force]`, MCP tool `revert`, and a GUI History panel revert action all restore `project.json` to an earlier logged snapshot (`src/revert.ts`, `tests/revert.test.ts`); revert covers `project.json` only, not export artifacts or non-EDL files (brief, chats, tasks, asset files), see TODO.md Known Limitations.
 
 ### Agent-first gate
 

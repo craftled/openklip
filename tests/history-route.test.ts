@@ -9,6 +9,12 @@ import {
   writeFixtureProject,
 } from "./helpers/projectFixture.ts";
 
+interface HistoryResponse {
+  entries: ActionLogEntry[];
+  maxHistorySnapshots: number;
+  snapshotRevisions: number[];
+}
+
 function ctx(slug: string) {
   return { params: Promise.resolve({ slug }) };
 }
@@ -59,6 +65,52 @@ test("GET /api/projects/:slug/history returns empty entries with no log", async 
     assert.equal(res.status, 200);
     const data = (await res.json()) as { entries: unknown[] };
     assert.deepEqual(data.entries, []);
+  });
+});
+
+// ── snapshotRevisions: which revisions have a working/history/ snapshot ────
+
+test("GET /api/projects/:slug/history includes maxHistorySnapshots from projectStore", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const res = await get(slug);
+    assert.equal(res.status, 200);
+    const data = (await res.json()) as HistoryResponse;
+    assert.equal(data.maxHistorySnapshots, 100);
+  });
+});
+
+test("GET /api/projects/:slug/history includes snapshotRevisions for logged mutations", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    await mutateProject(
+      slug,
+      (p) => {
+        p.padMs = 10;
+      },
+      { action: "pad", actor: "human" }
+    );
+    await mutateProject(
+      slug,
+      (p) => {
+        p.padMs = 20;
+      },
+      { action: "pad", actor: "human" }
+    );
+    const res = await get(slug);
+    assert.equal(res.status, 200);
+    const data = (await res.json()) as HistoryResponse;
+    assert.deepEqual(data.snapshotRevisions, [0, 1]);
+  });
+});
+
+test("GET /api/projects/:slug/history returns an empty snapshotRevisions array with no snapshots", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const res = await get(slug);
+    assert.equal(res.status, 200);
+    const data = (await res.json()) as HistoryResponse;
+    assert.deepEqual(data.snapshotRevisions, []);
   });
 });
 

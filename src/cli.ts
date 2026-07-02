@@ -10,6 +10,7 @@ import { loadAudioAnalysis } from "./audio-analysis.ts";
 import type { SilenceSpan } from "./audio-analysis-core.ts";
 import { applyBrand, loadBrand } from "./brands.ts";
 import { loadBrief, saveBrief } from "./brief.ts";
+import { logBriefSet } from "./brief-log.ts";
 import {
   cleanupReport,
   fillerOnlyCleanupReport,
@@ -72,6 +73,7 @@ import {
   runAction,
   type Surface,
 } from "./registry.ts";
+import { type RevertTarget, revertProject } from "./revert.ts";
 import { analyzeSceneLog } from "./scene-log.ts";
 import {
   applyProjectTemplate,
@@ -212,6 +214,10 @@ Review & export
                                        --height <px>  max output height (e.g. 1080)
                                        --fps <n>      output frame rate, integer 1-120 (default: source)
                                        --compression <preset>  studio|social|web|web-low
+  openklip revert <slug> --to <rev>  restore an earlier logged revision
+  openklip revert <slug> --task <id> revert every change made by one agent task
+  openklip revert <slug> --last      undo the most recent logged edit
+                                       --force   proceed even if a later, unrelated edit is discarded
 
 Diagnostics
   openklip doctor [slug]             check ffmpeg, whisper, and project health
@@ -235,12 +241,6 @@ Post-export (optional, external)
 async function loadProject(slug: string): Promise<Project> {
   const p = projectPaths(slug);
   return ProjectSchema.parse(JSON.parse(await Bun.file(p.project).text()));
-}
-
-// Persist a project back to disk in the canonical pretty-printed shape.
-async function saveProject(slug: string, project: Project): Promise<void> {
-  const p = projectPaths(slug);
-  await Bun.write(p.project, JSON.stringify(project, null, 2));
 }
 
 // Best-effort VAD silences for a project's ranges/status output: only worth
@@ -517,9 +517,16 @@ try {
       }
       const ingestedSlug = await ingest(videoArg, { force });
       if (brandName) {
-        const project = await loadProject(ingestedSlug);
-        applyBrand(project, await loadBrand(brandName));
-        await saveProject(ingestedSlug, project);
+        // Only the brand application is a logged mutation; project creation
+        // above (ingest) is not a registry-style edit.
+        const brand = await loadBrand(brandName);
+        await mutateProject(
+          ingestedSlug,
+          (project) => {
+            applyBrand(project, brand);
+          },
+          { action: "brand", actor: "cli", input: { name: brandName } }
+        );
         console.log(`[ingest] applied brand "${brandName}"`);
       }
       break;
@@ -592,7 +599,7 @@ try {
           "usage: openklip asset-add <slug> <file> [--kind broll|music|still]"
         );
       }
-      const asset = await registerAsset(slug, fileArg, kind);
+      const asset = await registerAsset(slug, fileArg, kind, "cli");
       console.log(
         `registered ${asset.kind} "${asset.id}" (${asset.name}, ${samplesToSec(asset.durationSamples).toFixed(1)}s)`
       );
@@ -602,7 +609,7 @@ try {
       if (!(rest[0] && rest[1])) {
         throw new Error("usage: openklip broll <slug> <file>");
       }
-      await registerAsset(rest[0], rest[1], "broll");
+      await registerAsset(rest[0], rest[1], "broll", "cli");
       break;
     }
     case "transcript": {
@@ -1980,7 +1987,7 @@ try {
       const r = await assembleFromSelection(
         slug,
         { segments, ...(padMs === undefined ? {} : { padMs }) },
-        { force }
+        { force, actor: "cli" }
       );
       console.log(
         `assembled ${r.segments} segment(s), ${r.words} words, ${r.durationSec.toFixed(1)}s -> ${slug}`
@@ -1991,9 +1998,15 @@ try {
       if (!(rest[0] && rest[1])) {
         throw new Error("usage: openklip brand <slug> <name>");
       }
-      const project = await loadProject(rest[0]);
-      applyBrand(project, await loadBrand(rest[1]));
-      await saveProject(rest[0], project);
+      const brand = await loadBrand(rest[1]);
+      const project = await mutateProject(
+        rest[0],
+        (p) => {
+          applyBrand(p, brand);
+          return p;
+        },
+        { action: "brand", actor: "cli", input: { name: rest[1] } }
+      );
       console.log(
         `applied brand "${rest[1]}": captions ${project.captions.enabled ? "on" : "off"} (max ${project.captions.maxWords}), vignette ${project.look?.vignette ? "on" : "off"}, pad ${project.padMs}ms`
       );
@@ -2028,9 +2041,13 @@ try {
         if (!(slug && id)) {
           throw new Error("usage: openklip template set <slug> <id>");
         }
-        const project = await loadProject(slug);
-        applyProjectTemplate(project, id);
-        await saveProject(slug, project);
+        await mutateProject(
+          slug,
+          (project) => {
+            applyProjectTemplate(project, id);
+          },
+          { action: "template-set", actor: "cli", input: { id } }
+        );
         console.log(`template set to "${id}" for ${slug}`);
         break;
       }
@@ -2057,6 +2074,7 @@ try {
       }
       if (newText !== undefined) {
         await saveBrief(slug, newText);
+        await logBriefSet(slug, "cli", newText);
         console.log(
           newText.trim()
             ? `brief saved for ${slug}${source} (${newText.trim().length} chars)`
@@ -2072,6 +2090,45 @@ try {
         break;
       }
       console.log(brief);
+      break;
+    }
+    case "revert": {
+      const slug = rest[0];
+      if (!slug) {
+        throw new Error(
+          "usage: openklip revert <slug> (--to <rev> | --task <taskId> | --last) [--force]"
+        );
+      }
+      const toRaw = flagValue(rest, "--to");
+      const taskId = flagValue(rest, "--task");
+      const last = rest.includes("--last");
+      const force = rest.includes("--force");
+      const given = [toRaw !== undefined, taskId !== undefined, last].filter(
+        Boolean
+      ).length;
+      if (given !== 1) {
+        throw new Error(
+          "usage: openklip revert <slug> (--to <rev> | --task <taskId> | --last) [--force]"
+        );
+      }
+      let target: RevertTarget;
+      if (toRaw !== undefined) {
+        const to = Number(toRaw);
+        if (!Number.isInteger(to) || to < 0) {
+          throw new Error("--to must be a non-negative integer revision");
+        }
+        target = { to };
+      } else if (taskId === undefined) {
+        target = { last: true };
+      } else {
+        target = { task: taskId, force };
+      }
+      const { revision, restoredTo } = await revertProject(slug, target, {
+        actor: "cli",
+      });
+      console.log(
+        `reverted ${slug} to revision ${restoredTo} (new revision ${revision})`
+      );
       break;
     }
     case "reorder": {

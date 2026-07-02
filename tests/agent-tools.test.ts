@@ -696,3 +696,161 @@ test("agentToolManifest includes cleanup_report", () => {
   assert.ok(agentToolNames("mcp").includes("cleanup_report"));
   assert.ok(agentToolNames("cli").includes("cleanup_report"));
 });
+
+// ── ACTION HISTORY: OPENKLIP_TASK_ID threads onto logged entries ────────────
+
+test("callAgentTool mutation records taskId when OPENKLIP_TASK_ID is set", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    await withTaskId("task-abc", async () => {
+      await callAgentTool("cut", { slug, ids: ["w0"], deleted: true });
+    });
+    const entries = await readActionLog(slug);
+    assert.equal(entries.length, 1);
+    assert.equal(entries[0].action, "cut");
+    assert.equal(entries[0].taskId, "task-abc");
+  });
+});
+
+test("callAgentTool mutation omits taskId when OPENKLIP_TASK_ID is not set", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const prev = process.env.OPENKLIP_TASK_ID;
+    delete process.env.OPENKLIP_TASK_ID;
+    try {
+      await callAgentTool("cut", { slug, ids: ["w0"], deleted: true });
+    } finally {
+      if (prev === undefined) {
+        delete process.env.OPENKLIP_TASK_ID;
+      } else {
+        process.env.OPENKLIP_TASK_ID = prev;
+      }
+    }
+    const entries = await readActionLog(slug);
+    assert.equal(entries.length, 1);
+    assert.equal(entries[0].taskId, undefined);
+    assert.ok(!("taskId" in entries[0]));
+  });
+});
+
+test("callAgentTool title-add-phrase records taskId when OPENKLIP_TASK_ID is set", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    await withTaskId("task-phrase", async () => {
+      await callAgentTool("title-add-phrase", {
+        slug,
+        spokenPhrase: "Hello world",
+        text: "Jane",
+        position: "lower",
+      });
+    });
+    const entries = await readActionLog(slug);
+    const entry = entries.find((e) => e.action === "title-add-phrase");
+    assert.ok(entry, "title-add-phrase history entry missing");
+    assert.equal(entry?.taskId, "task-phrase");
+  });
+});
+
+test("brief_set records taskId on the brief-set history entry when OPENKLIP_TASK_ID is set", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    await withTaskId("task-brief", async () => {
+      await callAgentTool("brief_set", { slug, text: "Tone: playful." });
+    });
+    const entries = await readActionLog(slug);
+    const entry = entries.find((e) => e.action === "brief-set");
+    assert.ok(entry, "brief-set history entry missing");
+    assert.equal(entry?.taskId, "task-brief");
+  });
+});
+
+// ── revert: manual mutation-style MCP tool (not a registry action) ──────────
+
+test("revert tool is exposed on the mcp surface", () => {
+  assert.ok(agentToolNames("mcp").includes("revert"));
+});
+
+test("callAgentTool revert with {to} restores an earlier revision", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    await callAgentTool("cut", { slug, ids: ["w0"], deleted: true });
+    const result = (await callAgentTool("revert", { slug, to: 0 })) as {
+      revision: number;
+      restoredTo: number;
+    };
+    assert.equal(result.restoredTo, 0);
+    assert.equal(result.revision, 2);
+    const status = (await callAgentTool("project_status", { slug })) as {
+      words: { deleted: number };
+    };
+    assert.equal(status.words.deleted, 0);
+  });
+});
+
+test("callAgentTool revert rejects input with none of to/task/last set", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    await assert.rejects(
+      () => callAgentTool("revert", { slug }),
+      /invalid input/i
+    );
+  });
+});
+
+test("callAgentTool revert rejects input with more than one of to/task/last set", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    await assert.rejects(
+      () => callAgentTool("revert", { slug, to: 0, last: true }),
+      /invalid input/i
+    );
+  });
+});
+
+test("callAgentTool revert with {last:true} reverts the most recent logged edit", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    await callAgentTool("cut", { slug, ids: ["w0"], deleted: true });
+    const result = (await callAgentTool("revert", {
+      slug,
+      last: true,
+    })) as { restoredTo: number };
+    assert.equal(result.restoredTo, 0);
+  });
+});
+
+test("callAgentTool revert logs an actor mcp entry and threads OPENKLIP_TASK_ID", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    await callAgentTool("cut", { slug, ids: ["w0"], deleted: true });
+    await withTaskId("task-revert", async () => {
+      await callAgentTool("revert", { slug, to: 0 });
+    });
+    const entries = await readActionLog(slug);
+    assert.equal(entries[0].action, "revert");
+    assert.equal(entries[0].actor, "mcp");
+    assert.equal(entries[0].taskId, "task-revert");
+  });
+});
+
+test("callAgentTool revert with {task, force:true} proceeds despite a later interloping edit", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    await withTaskId("task-mcp-1", async () => {
+      await callAgentTool("cut", { slug, ids: ["w0"], deleted: true });
+    });
+    await callAgentTool("cut", { slug, ids: ["w1"], deleted: true });
+
+    await assert.rejects(
+      () => callAgentTool("revert", { slug, task: "task-mcp-1" }),
+      /force/i
+    );
+
+    const result = (await callAgentTool("revert", {
+      slug,
+      task: "task-mcp-1",
+      force: true,
+    })) as { restoredTo: number };
+    assert.equal(result.restoredTo, 0);
+  });
+});

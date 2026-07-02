@@ -9,6 +9,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { mkdir, rm } from "node:fs/promises";
 import { isAbsolute, join } from "node:path";
 import type { z } from "zod";
+import type { Actor } from "./action-log.ts";
 import { planAssembly } from "./assembly-plan.ts";
 import {
   AssemblySelectionSchema,
@@ -22,6 +23,7 @@ import { FFMPEG, probe, run } from "./ffmpeg.ts";
 import { buildProxy, extractAudio, transcribeToWords } from "./ingest.ts";
 import { assertProjectCanBeIngested } from "./ingest-guard.ts";
 import { projectPaths, slugify, takeDir, takeFile } from "./paths.ts";
+import { mutateProject } from "./projectStore.ts";
 import { cwdPath } from "./repo-paths.ts";
 import { defaultTemplateId } from "./templates.ts";
 
@@ -192,7 +194,7 @@ function buildConcatArgs(
 export async function assembleFromSelection(
   slug: string,
   rawSelection: AssemblySelectionInput,
-  opts?: { force?: boolean }
+  opts?: { force?: boolean; actor?: Actor }
 ): Promise<{
   slug: string;
   durationSec: number;
@@ -297,7 +299,27 @@ export async function assembleFromSelection(
     },
   });
 
-  await Bun.write(p.project, JSON.stringify(project, null, 2));
+  // Write through mutateProject (locked, logged) instead of a direct
+  // Bun.write: the fn replaces the loaded project's contents wholesale but
+  // must NOT set revision itself, so mutateProject continues the previous
+  // project's revision counter instead of silently resetting it.
+  await mutateProject(
+    slug,
+    (loaded) => {
+      for (const key of Object.keys(loaded)) {
+        delete (loaded as Record<string, unknown>)[key];
+      }
+      Object.assign(loaded, project);
+    },
+    {
+      action: "assemble",
+      actor: opts?.actor,
+      input: {
+        segments: selection.segments,
+        padMs: selection.padMs,
+      },
+    }
+  );
   await Bun.write(p.transcript, JSON.stringify({ words: plan.words }, null, 2));
 
   return {

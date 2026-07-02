@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { readActionLog } from "../src/action-log.ts";
 import {
   listAssetDropFiles,
   pruneStaleAssets,
@@ -149,6 +150,68 @@ describe("syncAssetsFromFolder", () => {
       expect(assets[0]?.kind).toBe("still");
       expect(assets[0]?.src).toContain("/assets/incoming.png");
       expect(assets[0]?.proxy).toBe("assets/incoming.png");
+    });
+  });
+
+  test("prunes with a logged asset-prune entry (actor system) so a vanished registration isn't silent", async () => {
+    await withTempProjectsRoot(async ({ slug, root }) => {
+      const assetsDir = projectAssetsDir(root, slug);
+      writeFixtureProject(
+        slug,
+        makeProject({ slug, assets: [orphanBrollAsset()] })
+      );
+      mkdirSync(assetsDir, { recursive: true });
+
+      await syncAssetsFromFolder(slug);
+      const entries = await readActionLog(slug);
+      expect(entries).toHaveLength(1);
+      expect(entries[0].action).toBe("asset-prune");
+      expect(entries[0].actor).toBe("system");
+      expect(entries[0].input).toContain("orphan");
+      expect(entries[0].revisionBefore).toBe(0);
+      expect(entries[0].revisionAfter).toBe(1);
+
+      const project = await loadProject(slug);
+      expect(project.assets).toHaveLength(0);
+      expect(project.revision ?? 0).toBe(1);
+    });
+  });
+
+  test("registering a newly dropped file during sync logs asset-add and bumps revision", async () => {
+    await withTempProjectsRoot(async ({ slug, root }) => {
+      writeFixtureProject(slug, makeProject({ slug, assets: [] }));
+      writeAssetDrop(root, slug, "incoming.png", TINY_PNG);
+
+      await syncAssetsFromFolder(slug);
+      const entries = await readActionLog(slug);
+      expect(entries).toHaveLength(1);
+      expect(entries[0].action).toBe("asset-add");
+
+      const project = await loadProject(slug);
+      expect(project.revision).toBe(1);
+    });
+  });
+
+  test("a sync with nothing stale skips the mutateProject call (project.json is untouched)", async () => {
+    await withTempProjectsRoot(async ({ slug, root }) => {
+      const assetsDir = projectAssetsDir(root, slug);
+      writeAssetDrop(root, slug, "keep.mp3");
+      writeFixtureProject(
+        slug,
+        makeProject({
+          slug,
+          assets: [keptMusicAsset(assetsDir)],
+        })
+      );
+      const projectJsonPath = join(root, "projects", slug, "project.json");
+      const before = readFileSync(projectJsonPath, "utf8");
+      const mtimeBefore = statSync(projectJsonPath).mtimeMs;
+
+      await syncAssetsFromFolder(slug);
+
+      const after = readFileSync(projectJsonPath, "utf8");
+      expect(after).toBe(before);
+      expect(statSync(projectJsonPath).mtimeMs).toBe(mtimeBefore);
     });
   });
 
