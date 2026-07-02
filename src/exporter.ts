@@ -92,17 +92,15 @@ export function resolveOutputFps(
 
 // The ",fps=N" retime for the base [0:v] chain, inserted immediately after
 // setpts (before scale/overlays) so overlay enable windows stay in output
-// seconds. No request means source passthrough (no retime, even on fractional
-// rates). An explicit request is a retime order (the export dialog offers
-// "Source" separately) and emits the filter unless the resolved rate equals
-// the source rate EXACTLY: requesting 30 on a 29.97 source retimes to a true
-// 30, instead of silently staying at 29.97 while the result reports 30.
+// seconds. The output rate is ALWAYS pinned explicitly, source passthrough
+// included: setpts=N/FRAME_RATE/TB depends on frame-rate metadata surviving
+// the select filter, and that propagation is ffmpeg-build-dependent (the
+// Linux ffmpeg-static build drops it and falls back to 25 fps, silently
+// exporting a 30 fps source at 25; caught by CI probing the smoke export).
+// Pinning also makes an explicit request on a fractional source a true
+// retime: requesting 30 on a 29.97 source yields exactly 30.
 export function fpsFilterFor(sourceFps: number, requested?: number): string {
-  if (requested === undefined) {
-    return "";
-  }
-  const resolved = resolveOutputFps(sourceFps, requested);
-  return resolved === sourceFps ? "" : `,fps=${resolved}`;
+  return `,fps=${resolveOutputFps(sourceFps, requested)}`;
 }
 
 // Parse the CLI `--fps` flag value with the same bounds the HTTP route and MCP
