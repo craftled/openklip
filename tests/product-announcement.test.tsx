@@ -4,6 +4,10 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { readActionLog } from "../src/action-log.ts";
+import {
+  createAgentTask,
+  resetAgentTaskIdSequenceForTests,
+} from "../src/agent-tasks.ts";
 import { ProjectSchema, SAMPLE_RATE } from "../src/edl.ts";
 import {
   PRODUCT_ANNOUNCEMENT_CATALOG,
@@ -720,5 +724,92 @@ test("CLI revert --task without force fails when a later unrelated edit would be
       "--force",
     ]);
     assert.equal(forced.code, 0, forced.out);
+  });
+});
+
+// ── CLI history: openklip history <slug> [--limit N] [--task <id>] [--action <name>] ──
+
+test("CLI history prints action history newest-first with snapshot revisions", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    await runCli(["pad", slug, "10"]);
+    await runCli(["pad", slug, "20"]);
+
+    const result = await runCli(["history", slug]);
+    assert.equal(result.code, 0, result.out);
+    assert.match(result.out, /pad\s+rev 1->2\s+cli/);
+    assert.match(result.out, /pad\s+rev 0->1\s+cli/);
+    assert.match(result.out, /2 entries/);
+    assert.match(result.out, /snapshot revisions: 0, 1/);
+  });
+});
+
+test("CLI history with no logged actions reports an empty log", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const result = await runCli(["history", slug]);
+    assert.equal(result.code, 0, result.out);
+    assert.match(result.out, /no history for/);
+  });
+});
+
+// ── CLI tasks: openklip tasks <slug> [--limit N] [--status <status>] ──────
+
+test("CLI tasks prints agent task records newest-first", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    resetAgentTaskIdSequenceForTests();
+    writeFixtureProject(slug, makeProject({ slug }));
+    const first = await createAgentTask(slug, { request: "First task" });
+    const second = await createAgentTask(slug, { request: "Second task" });
+
+    const result = await runCli(["tasks", slug]);
+    assert.equal(result.code, 0, result.out);
+    const firstLine = result.out.indexOf(first.id);
+    const secondLine = result.out.indexOf(second.id);
+    assert.ok(firstLine >= 0, result.out);
+    assert.ok(secondLine >= 0, result.out);
+    assert.ok(secondLine < firstLine, result.out);
+    assert.match(result.out, /2 tasks/);
+  });
+});
+
+test("CLI tasks with no tasks reports an empty list", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const result = await runCli(["tasks", slug]);
+    assert.equal(result.code, 0, result.out);
+    assert.match(result.out, /no tasks for/);
+  });
+});
+
+// ── CLI captions-style: openklip captions-style <slug> <style> ──────────────
+
+test("CLI captions-style sets project.captions.style and logs a captions-style entry", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const result = await runCli(["captions-style", slug, "karaoke"]);
+    assert.equal(result.code, 0, result.out);
+    assert.match(result.out, /karaoke/);
+
+    const project = await loadProject(slug);
+    assert.equal(project.captions.style, "karaoke");
+
+    const entries = await readActionLog(slug);
+    assert.equal(entries.length, 1);
+    assert.equal(entries[0].action, "captions-style");
+    assert.equal(entries[0].actor, "cli");
+  });
+});
+
+test("CLI captions-style rejects an unknown style id with a usage error listing valid ids", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const result = await runCli(["captions-style", slug, "not-a-style"]);
+    assert.notEqual(result.code, 0);
+    assert.match(result.out, /boxed/);
+    assert.match(result.out, /karaoke/);
+
+    const entries = await readActionLog(slug);
+    assert.equal(entries.length, 0);
   });
 });

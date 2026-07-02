@@ -4,6 +4,7 @@
 // are the operations an external coding agent drives from the terminal.
 
 import { randomUUID } from "node:crypto";
+import { CAPTION_STYLE_IDS, isCaptionStyleId } from "./caption-styles.ts";
 import { isNeutralColor } from "./color-adjust.ts";
 import {
   type Audio,
@@ -1068,6 +1069,17 @@ export function setCaptionMaxWords(
 ): Project {
   const mw = Math.max(1, Math.min(12, Math.round(maxWords)));
   project.captions = { ...project.captions, maxWords: mw };
+  return project;
+}
+
+// Set the caption look preset (src/caption-styles.ts owns the id list).
+export function setCaptionStyle(project: Project, style: string): Project {
+  if (!isCaptionStyleId(style)) {
+    throw new Error(
+      `unknown caption style "${style}". Valid styles: ${CAPTION_STYLE_IDS.join(", ")}`
+    );
+  }
+  project.captions = { ...project.captions, style };
   return project;
 }
 

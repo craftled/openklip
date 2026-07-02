@@ -18,7 +18,7 @@ export function makeProject(overrides: Partial<Project> = {}): Project {
     height: 720,
     durationSamples: sec(10),
     padMs: 50,
-    captions: { enabled: true, maxWords: 6 },
+    captions: { enabled: true, maxWords: 6, style: "boxed" },
     assets: [
       {
         id: "broll-a",

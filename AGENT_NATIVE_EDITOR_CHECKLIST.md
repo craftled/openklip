@@ -134,7 +134,7 @@ Legend: Full means the surface can achieve the same outcome. Partial means the s
 | Transcript text correction | Full: editor word edits | Full: `word-text` | Full: `word-text` | Full through server action / registry path | Good parity. |
 | Cut snap settings | Full: Config Audio controls | Partial: registry action is surfaced, no dedicated hand-facing command | Full: `cuts-snap` | Full via registry server action | VAD snap and export crossfades shipped; CLI affordance remains weak. |
 | Captions on/off and max words | Full | Full | Full | Full via registry server action | Good parity. |
-| Caption style presets | Missing | Missing | Missing | Missing | Product gap. |
+| Caption style presets | Full: Config panel picker | Full: `captions-style` | Full: `captions-style` | Full via registry server action | Shipped 2026-07-02: five presets (boxed/clean/karaoke/bold-caps/minimal), one definition consumed by preview and export; v1 is Arial-only, no custom fonts/colors. |
 | Pad around cuts | Full | Full | Full | Full via server action | Good parity. |
 | Asset upload/register | Full: upload and folder sync | Full: `asset-add`, `broll` | Missing direct upload/register | Full: assets POST and sync | MCP can list assets but cannot register files. CLI covers external agents. |
 | Asset list | Full | Full: `assets` | Full: `list_assets` | Full: assets GET | Good parity. |
@@ -180,13 +180,13 @@ Legend: Full means the surface can achieve the same outcome. Partial means the s
 | B-roll overlays | UI, CLI, MCP | UI, CLI, MCP | UI, CLI, MCP | UI, CLI, MCP | Needs PiP/audio modes. |
 | Still overlays | UI, CLI, MCP | UI, CLI, MCP | UI, CLI, MCP | UI, CLI, MCP | Needs richer motion modes. |
 | Graphics | UI, CLI, MCP | UI, CLI, MCP | UI, CLI, MCP | UI, CLI, MCP | Good parity. |
-| Captions | Ingest default | UI, CLI, MCP | UI, CLI, MCP | Off toggle, not deleted | Needs style presets and safe areas. |
+| Captions | Ingest default | UI, CLI, MCP | UI, CLI, MCP | Off toggle, not deleted | Style presets shipped (2026-07-02); still needs per-platform safe areas. |
 | Look and color | Project defaults | UI, CLI, MCP | UI, CLI, MCP | Reset by setting neutral values | Needs vignette strength/blur controls. |
 | Takes | CLI/MCP add and assemble | CLI/MCP | Assemble creates new source | File-level only | Missing UI take browser and API routes. |
 | Exports | UI, CLI, MCP, API | File output, status, verify | Re-export overwrites | Manual file delete only | Needs presets, settings, history. |
 | Agent chats | UI/API | UI/API | UI/API rename/archive/append | UI/API | Not exposed to CLI/MCP as context or task log. |
 | Brief/context | UI, CLI, MCP | UI, CLI, MCP | CLI/MCP/UI save paths | File delete clears manually | `brief.md` shipped; CLI/GUI/MCP saves all history-log (2026-07-02). |
-| Action history | Append-only log on every user-facing mutation | History route + Config panel section | `openklip revert` / MCP `revert` / GUI History panel | Not applicable (append-only) | Task-level revert exists (2026-07-02); still no filters (actor/action-type). |
+| Action history | Append-only log on every user-facing mutation | History route + Config panel section; `openklip history` / MCP `history_list` (2026-07-02) | `openklip revert` / MCP `revert` / GUI History panel | Not applicable (append-only) | Task-level revert exists (2026-07-02); agent-facing history/task query tools added (2026-07-02, filter by task id or action name); still no actor filter, and no filter UI in the GUI panel. |
 
 ### 0.3 Baseline audit conclusion
 
@@ -195,13 +195,13 @@ The current architecture is strong where it uses the registry: cuts by id, capti
 The biggest blockers to a capable agent-first editor are:
 
 1. Cross-surface parity holes remain: project create/delete, asset delete/register, inbox scan, analysis triggers, chat context, and task logs are not all available on UI, CLI, MCP, and HTTP.
-2. Manual correction gaps remain: b-roll PiP/audio modes, music timeline drag-trim, richer title/caption styles, and visual export transitions.
-3. Agent recovery gaps remain: resumable checkpoints and history filters (task-level revert and undo shipped 2026-07-02, see Milestone 9.1).
+2. Manual correction gaps remain: b-roll PiP/audio modes, music timeline drag-trim, richer title styles, and visual export transitions (caption style presets shipped 2026-07-02).
+3. Agent recovery gaps remain: resumable checkpoints and an actor filter on history (task-level revert and undo shipped 2026-07-02; agent-facing history/task query tools with task-id and action-name filters shipped 2026-07-02, see Milestone 9.1).
 4. Context gaps remain: style recipes, brand-kit ingestion, and script/document ingestion beyond the free-form project brief.
 5. Shorts and reframing are still missing.
 6. Process safety is in-process only, so CLI plus server concurrent writes can race.
 
-2026-07-02 update: UI phrase search/cuts, export settings, music placement, project briefs, append-only action history, visible agent task progress, VAD snap, seam crossfades, cleanup review, ducking, loudness, and voice highpass are resolved. Remaining gaps are now about deeper parity, recovery, richer audio/overlay controls, shorts, and process safety.
+2026-07-02 update: UI phrase search/cuts, export settings, music placement, project briefs, append-only action history, visible agent task progress, VAD snap, seam crossfades, cleanup review, ducking, loudness, voice highpass, task-level revert, caption style presets, and agent history/task query tools are resolved. Remaining gaps are now about deeper parity, recovery, richer audio/overlay controls, shorts, and process safety.
 
 Recommended next code task: **B-roll PiP and richer overlay controls**. The first-draft loop now exists; improving visual correction primitives gives agents more expressive choices while keeping human review inspectable.
 
@@ -329,7 +329,7 @@ Goal: an agent can pursue a video outcome in a visible loop until it produces a 
   - [ ] Export new draft.
   - [ ] Summarize what changed.
   - Verification: user can ask for a specific revision and see exact edits.
-  - Note 2026-07-02: `templates/revise-draft/skill.md` exists (auto-listed in the skills catalog alongside `make-draft`) and instructs each phase above (`project_overlays`/`transcript_grep` reads, targeted edits vs. whole-task `revert`, conditional re-export, a `task_complete` summary of what changed). `tests/templates.test.ts` pins that the file is listed and contains the expected keywords. Left unticked: no live run on a real project has exercised a revision request end to end yet, so the item's own verification line (user asks for a revision, sees exact edits) has not been demonstrated.
+  - Note 2026-07-02: `templates/revise-draft/skill.md` exists (auto-listed in the skills catalog alongside `make-draft`) and instructs each phase above (`project_overlays`/`transcript_grep` reads, targeted edits vs. whole-task `revert`, conditional re-export, a `task_complete` summary of what changed). `tests/templates.test.ts` pins that the file is listed and contains the expected keywords. Updated 2026-07-02: the skill now calls `task_list`/`history_list` (new MCP query tools, also `openklip tasks`/`openklip history` on the CLI) to find the task that produced the current draft instead of only being able to reuse a task id already seen in the same conversation. Left unticked: no live run on a real project has exercised a revision request end to end yet, so the item's own verification line (user asks for a revision, sees exact edits) has not been demonstrated.
 
 ### 2.3 Agent checkpoints and recovery
 
@@ -774,7 +774,7 @@ Goal: match the core jobs people expect from a modern transcript-first editor.
 - [ ] Captions.
   - [x] Preview captions.
   - [x] Export captions.
-  - [ ] Caption style presets.
+  - [x] Caption style presets. Verified 2026-07-02: five presets (`boxed`, `clean`, `karaoke`, `bold-caps`, `minimal`) defined once in `src/caption-styles.ts`, consumed by both the cinema preview and the ASS export burn-in; `tests/captions.test.ts`, `tests/caption-style-css.test.ts`, `tests/caption-style.test.tsx`, `tests/registry.test.ts` pass, plus the wider `bun test` run (1187 tests, all green). Live checks on an isolated copy of the `edgaras-raw` project (not the live one): a real 4K source exported at `bold-caps` (`openklip export --height 480`) showed all-caps text in a tight box with dimmed inactive words as expected; the Config sidebar picker was exercised live in the browser (all five presets render with correct labels/samples, current selection shows `pressed`). v1 is Arial-only with no custom fonts or per-project colors; see TODO.md Known Limitations.
   - [ ] Per-platform safe areas.
   - [x] Transcript correction flows into captions. Verified 2026-07-02: see Milestone 3.3.
 - [ ] Media overlays.
@@ -1106,7 +1106,7 @@ This order makes the product feel more capable every few steps while keeping age
 
 - [ ] Transcript editing is fast enough for full manual cleanup.
 - [x] Filler and dead-air cleanup works with review. Verified 2026-07-02: live E2E on the edgaras-raw smoke project (real 4K export): 4 filler candidates found and applied, 86 silences detected, UI apply round-trip recorded a history entry.
-- [ ] Captions are styleable and export reliably.
+- [x] Captions are styleable and export reliably. Verified 2026-07-02: five style presets (`src/caption-styles.ts`) switch live in the Config panel picker, `openklip captions-style`, and the `captions-style` action (cli/gui/mcp); `tests/captions.test.ts`, `tests/caption-style-css.test.ts`, `tests/caption-style.test.tsx` pin both renderers plus the `boxed` byte-compat pin, and the wider `bun test` run is green (1187 tests). A real 4K export (`edgaras-raw`, isolated copy) at the `bold-caps` preset showed the expected all-caps tight-box look with dimmed inactive words; a synthetic 1080x1920 libass render of a long `bold-caps` line confirmed the accompanying `WrapStyle: 0` fix wraps instead of clipping off-frame. Not covered: caption fonts are Arial-only and colors are fixed per preset (no custom fonts/colors yet), and per-platform safe areas are still missing.
 - [x] Music, ducking, and loudness are usable. Verified 2026-07-02: live E2E 4K export rendered ducking and single-pass loudnorm (-16.6 LUFS measured vs -16 target) end to end; both are CLI/GUI/MCP-configurable.
 - [ ] Multi-take can be inspected or corrected in UI.
 - [ ] Export presets cover common platforms.

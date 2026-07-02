@@ -854,3 +854,120 @@ test("callAgentTool revert with {task, force:true} proceeds despite a later inte
     assert.equal(result.restoredTo, 0);
   });
 });
+
+test("history_list returns entries newest-first with snapshot revisions", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    await callAgentTool("cut", { slug, ids: ["w0"], deleted: true });
+    await callAgentTool("cut", { slug, ids: ["w1"], deleted: true });
+
+    const result = (await callAgentTool("history_list", { slug })) as {
+      entries: Array<{
+        action: string;
+        revisionBefore: number;
+        revisionAfter: number;
+      }>;
+      snapshotRevisions: number[];
+    };
+    assert.equal(result.entries.length, 2);
+    assert.equal(result.entries[0].revisionBefore, 1);
+    assert.equal(result.entries[0].revisionAfter, 2);
+    assert.equal(result.entries[1].revisionBefore, 0);
+    assert.deepEqual(result.snapshotRevisions, [0, 1]);
+  });
+});
+
+test("history_list respects limit and filters by action name", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    await callAgentTool("cut", { slug, ids: ["w0"], deleted: true });
+    await callAgentTool("pad", { slug, padMs: 20 });
+    await callAgentTool("cut", { slug, ids: ["w1"], deleted: true });
+
+    const limited = (await callAgentTool("history_list", {
+      slug,
+      limit: 1,
+    })) as { entries: Array<{ action: string }> };
+    assert.equal(limited.entries.length, 1);
+    assert.equal(limited.entries[0].action, "cut");
+
+    const filtered = (await callAgentTool("history_list", {
+      slug,
+      action: "pad",
+    })) as { entries: Array<{ action: string }> };
+    assert.equal(filtered.entries.length, 1);
+    assert.equal(filtered.entries[0].action, "pad");
+  });
+});
+
+test("history_list filters entries by task id", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    await withTaskId("task-hist-1", async () => {
+      await callAgentTool("cut", { slug, ids: ["w0"], deleted: true });
+    });
+    await callAgentTool("cut", { slug, ids: ["w1"], deleted: true });
+
+    const result = (await callAgentTool("history_list", {
+      slug,
+      task: "task-hist-1",
+    })) as { entries: Array<{ taskId?: string }> };
+    assert.equal(result.entries.length, 1);
+    assert.equal(result.entries[0].taskId, "task-hist-1");
+  });
+});
+
+test("history_list on a project with no history returns empty entries and snapshots", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const result = (await callAgentTool("history_list", { slug })) as {
+      entries: unknown[];
+      snapshotRevisions: number[];
+    };
+    assert.deepEqual(result.entries, []);
+    assert.deepEqual(result.snapshotRevisions, []);
+  });
+});
+
+test("task_list returns tasks newest-first", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    resetAgentTaskIdSequenceForTests();
+    writeFixtureProject(slug, makeProject({ slug }));
+    const first = await createAgentTask(slug, { request: "First task" });
+    const second = await createAgentTask(slug, { request: "Second task" });
+
+    const result = (await callAgentTool("task_list", { slug })) as {
+      tasks: Array<{ id: string; request: string }>;
+    };
+    assert.equal(result.tasks.length, 2);
+    assert.equal(result.tasks[0].id, second.id);
+    assert.equal(result.tasks[1].id, first.id);
+  });
+});
+
+test("task_list respects limit and filters by status", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    resetAgentTaskIdSequenceForTests();
+    writeFixtureProject(slug, makeProject({ slug }));
+    const first = await createAgentTask(slug, { request: "First task" });
+    await withTaskId(first.id, async () => {
+      await callAgentTool("task_complete", { slug, outcome: "completed" });
+    });
+    const second = await createAgentTask(slug, { request: "Second task" });
+
+    const limited = (await callAgentTool("task_list", {
+      slug,
+      limit: 1,
+    })) as { tasks: Array<{ id: string }> };
+    assert.equal(limited.tasks.length, 1);
+    assert.equal(limited.tasks[0].id, second.id);
+
+    const completedOnly = (await callAgentTool("task_list", {
+      slug,
+      status: "completed",
+    })) as { tasks: Array<{ id: string; status: string }> };
+    assert.equal(completedOnly.tasks.length, 1);
+    assert.equal(completedOnly.tasks[0].id, first.id);
+    assert.equal(completedOnly.tasks[0].status, "completed");
+  });
+});

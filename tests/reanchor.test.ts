@@ -25,7 +25,7 @@ function project(wordTexts: string[]): Project {
     height: 720,
     durationSamples: sec(wordTexts.length),
     padMs: 0,
-    captions: { enabled: true, maxWords: 6 },
+    captions: { enabled: true, maxWords: 6, style: "boxed" },
     assets: [],
     broll: [],
     titles: [],

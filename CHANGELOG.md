@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.15.0.0 - 2026-07-02
+
+The caption style presets release: captions have a real look system instead of one hardcoded box, and agents can finally query action history and past task ids instead of only reverting blind.
+
+### Added
+- **Caption style presets**: five named presets (`boxed`, `clean`, `karaoke`, `bold-caps`, `minimal`) defined once in `src/caption-styles.ts` and consumed by both renderers, the cinema preview (`web/lib/caption-style-css.ts` maps a preset to CSS for the shared `CaptionLine` component used by both the inline preview and the fullscreen player) and the export burn-in (`buildAss` maps the same preset to an ASS style line). `captions.style` on `project.json` is read-tolerant: an unknown or missing id parses to `boxed` so a project written by a newer or older build never bricks on load; the writer side (the `captions-style` action) stays strict and rejects an unrecognized id. New registry action `captions-style` (cli/gui/mcp), CLI `openklip captions-style <slug> <style>`, and a "Caption style" picker section in the Config sidebar with a live per-preset sample. The `boxed` default reproduces the previous hardcoded look byte-for-byte in export and preview.
+- **Agent history and task query tools**: MCP `history_list` (`{slug, limit<=200, task?, action?}` to `{entries, snapshotRevisions}`) and `task_list` (`{slug, limit<=100, status?}` to `{tasks}`), plus CLI `openklip history <slug> [--limit] [--task] [--action]` and `openklip tasks <slug> [--limit] [--status]` (status validated, filtered-empty and genuinely-empty results print distinct messages). `templates/revise-draft/skill.md` now calls these tools to find the task that produced a draft before a whole-task revert, instead of only being able to reuse a task id already seen in the same conversation. This closes the "agents cannot query action history or task ids" gap in Known Limitations.
+- **`project_status` reports caption style**: `captions.style` is now part of the `project_status` JSON (CLI `status --json` and MCP `project_status`).
+
+### Fixed
+- **Caption export clipping in portrait/narrow frames**: the ASS header now emits `WrapStyle: 0` (libass smart wrapping) instead of `WrapStyle: 2` (no wrap) for every preset, so a long caption line wraps onto multiple lines instead of running off the right edge of the frame. This was a pre-existing bug, not new behavior from the presets.
+- **Box and outline alpha now reach the burn-in**: non-default presets' `box.alpha` previously had no effect on the exported ASS `OutlineColour`; it now sets the alpha byte correctly, so `clean`/`karaoke`/`bold-caps`/`minimal` render with their intended translucency instead of full opacity.
+- **Active-word emphasis follows the preset contract**: the active word now uses the preset's `accentColor` when defined (`karaoke`), or relies on opacity dimming of the other words to read as emphasized when it is not (matching the preview); `boxed` keeps its legacy accent-color behavior unchanged.
+
+### Changed
+- **Version**: bumped OpenKlip to `0.15.0.0`.
+
 ## 0.14.1.0 - 2026-07-02
 
 A trust-completion patch: the transcript editor no longer risks resurrecting cut words on a stray edit, and a new `revise-draft` playbook lets an agent make targeted edits or a whole-task revert to an existing draft.

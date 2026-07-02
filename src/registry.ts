@@ -32,6 +32,7 @@ import {
   restoreAll,
   setAudio,
   setCaptionMaxWords,
+  setCaptionStyle,
   setCaptions,
   setCutSnap,
   setLook,
@@ -46,6 +47,7 @@ import {
   updateTitle,
   updateZoom,
 } from "./actions.ts";
+import { CAPTION_STYLE_IDS } from "./caption-styles.ts";
 import { NEUTRAL_COLOR } from "./color-adjust.ts";
 import { FilterSchema, PhraseAnchorSchema, type Project } from "./edl.ts";
 import {
@@ -445,6 +447,16 @@ export const actions: ActionDef[] = [
     run: (p, i) => {
       setCaptionMaxWords(p, i.maxWords);
       return { maxWords: p.captions.maxWords };
+    },
+  }),
+  defineAction({
+    name: "captions-style",
+    summary: `Set the caption look preset (${CAPTION_STYLE_IDS.join(", ")}).`,
+    surfaces: ["cli", "gui", "mcp"],
+    schema: z.object({ style: z.enum(CAPTION_STYLE_IDS) }),
+    run: (p, i) => {
+      setCaptionStyle(p, i.style);
+      return { style: p.captions.style };
     },
   }),
   defineAction({

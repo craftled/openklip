@@ -42,7 +42,7 @@ function makeProject(words: Word[], overrides: Partial<Project> = {}): Project {
     height: 720,
     durationSamples: sec(30),
     padMs: 50,
-    captions: { enabled: true, maxWords: 6 },
+    captions: { enabled: true, maxWords: 6, style: "boxed" },
     assets: [],
     broll: [],
     look: { vignette: false },

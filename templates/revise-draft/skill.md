@@ -11,7 +11,7 @@ Change an existing draft on request: read what is already there, apply only what
 
 - Call project_status, then brief_get. The brief's audience, goal, tone, must-use assets, and avoid list still apply to any new edit; do not relax them just because this is a revision.
 - Call project_overlays for the ids of the titles, zooms, b-roll, stills, and music placements already on the timeline, so targeted patches have something to patch. Use transcript_grep or transcript_span to find the phrases the user is referring to.
-- There is no MCP tool that reads the action history log today; only the GUI History panel (`/api/projects/<slug>/history`) and `openklip revert` itself touch it. If this same conversation ran the task that produced the current draft, its id came back in that task's task_complete result, reuse it from context. If you cannot identify which task produced the draft and the request needs a revert, ask instead of guessing (task_complete outcome "blocked").
+- If this same conversation ran the task that produced the current draft, its id came back in that task's task_complete result, reuse it from context. Otherwise call task_list to find candidate task ids by request text and recency, then history_list with `task` set to that id to confirm which revisions it touched and whether `snapshotRevisions` covers them (a revert only works on a revision with a snapshot). If you still cannot identify which task produced the draft and the request needs a revert, ask instead of guessing (task_complete outcome "blocked").
 
 ## 2. Classify the request
 

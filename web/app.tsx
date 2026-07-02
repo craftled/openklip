@@ -1,6 +1,7 @@
 "use client";
 
 import type { SilenceSpan } from "@engine/audio-analysis-core";
+import { DEFAULT_CAPTION_STYLE } from "@engine/caption-styles";
 import type { CleanupCandidate } from "@engine/cleanup";
 import { partitionSafeCandidates } from "@engine/cleanup";
 import type {
@@ -32,6 +33,7 @@ import { AgentSidebar } from "@/components/agent-sidebar";
 import { withAssetKind } from "@/components/asset-bin";
 import { AudioControls, type AudioPatch } from "@/components/audio-controls";
 import { BriefEditor } from "@/components/brief-editor";
+import { CaptionStylePicker } from "@/components/caption-style-picker";
 import {
   CHAT_WIDTH_DEFAULT,
   ChatResizeHandle,
@@ -244,7 +246,7 @@ interface Project {
   audio?: Audio;
   brief?: string | null;
   broll: BrollItem[];
-  captions?: { enabled: boolean; maxWords?: number };
+  captions?: { enabled: boolean; maxWords?: number; style?: string };
   // cuts.deadAir/cuts.snap: registered by the Cleanup/Audio config sections
   // (dead-air-add/cuts-snap registry actions). Optional so this local Project
   // type keeps parsing project.json shapes saved before either existed.
@@ -1485,10 +1487,27 @@ export function App({
   const setMaxWords = (n: number) => {
     setProject((p) => ({
       ...p,
-      captions: { enabled: p.captions?.enabled ?? true, maxWords: n },
+      captions: {
+        enabled: p.captions?.enabled ?? true,
+        ...p.captions,
+        maxWords: n,
+      },
     }));
     enqueueSave(() =>
       runGuiAction(project.slug, "captions-max", { maxWords: n })
+    );
+  };
+  const setCaptionStyle = (styleId: string) => {
+    setProject((p) => ({
+      ...p,
+      captions: {
+        enabled: p.captions?.enabled ?? true,
+        ...p.captions,
+        style: styleId,
+      },
+    }));
+    enqueueSave(() =>
+      runGuiAction(project.slug, "captions-style", { style: styleId })
     );
   };
   const setPad = (n: number) => {
@@ -2631,6 +2650,12 @@ export function App({
                   />
                 </PropRow>
               </Section>
+              <Section title="Caption style">
+                <CaptionStylePicker
+                  onSelect={setCaptionStyle}
+                  selected={project.captions?.style ?? DEFAULT_CAPTION_STYLE}
+                />
+              </Section>
               <Section title="Timing">
                 <PropRow label="Pad" value={`${project.padMs ?? 50}ms`}>
                   <Slider
@@ -2737,6 +2762,7 @@ export function App({
             overlay={(playerSec) => (
               <PreviewOverlays
                 captionGroups={captionGroups}
+                captionStyleId={project.captions?.style}
                 captionsOn={captionsOn}
                 curSample={Math.round(playerSec * sr)}
                 graphics={project.graphics ?? []}
@@ -3005,6 +3031,7 @@ export function App({
                             )}
                             <PreviewOverlays
                               captionGroups={captionGroups}
+                              captionStyleId={project.captions?.style}
                               captionsOn={captionsOn}
                               curSample={curSample}
                               graphics={project.graphics ?? []}

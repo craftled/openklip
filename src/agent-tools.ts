@@ -2,10 +2,12 @@
 // commands in one manifest. CLI (`openklip tools`), MCP (stdio server), and docs
 // all read from here so surfaces stay in sync with the GUI's project.json edits.
 import { z } from "zod";
-import { type Actor, actorFromEnv } from "./action-log.ts";
+import { type Actor, actorFromEnv, readActionLog } from "./action-log.ts";
 import {
   type AgentTaskOutcome,
+  type AgentTaskStatus,
   completeAgentTask,
+  listAgentTasks,
   setAgentTaskStep,
 } from "./agent-tasks.ts";
 import { assembleFromSelection, listTakes, loadTake } from "./assembly.ts";
@@ -18,7 +20,12 @@ import { type Project, samplesToSec } from "./edl.ts";
 import { EXPORT_COMPRESSIONS, exportCut } from "./exporter.ts";
 import { listGraphics } from "./graphics.ts";
 import { listLuts } from "./lut.ts";
-import { listProjects, loadProject, mutateProject } from "./projectStore.ts";
+import {
+  listHistorySnapshotRevisions,
+  listProjects,
+  loadProject,
+  mutateProject,
+} from "./projectStore.ts";
 import {
   grepTranscript,
   listOverlays,
@@ -43,6 +50,20 @@ import {
 import { verifyCut, verifyVerdict } from "./verify.ts";
 
 const slug = z.string().min(1).describe("Project slug under projects/");
+
+// Mirrors AgentTaskStatus in src/agent-task-types.ts; kept as a local literal
+// tuple (rather than exporting the private TASK_STATUSES there) since z.enum
+// needs a compile-time tuple, not a string[]. Exported so the CLI's `tasks
+// --status` filter (src/cli.ts) validates against the same canonical list as
+// this MCP tool's schema (Finding 5).
+export const AGENT_TASK_STATUSES = [
+  "pending",
+  "running",
+  "blocked",
+  "failed",
+  "completed",
+  "cancelled",
+] as const satisfies readonly AgentTaskStatus[];
 
 export interface AgentToolDef {
   name: string;
@@ -301,6 +322,60 @@ const queryTools: AgentToolDef[] = [
     run: async ({ slug: projectSlug }) => {
       const project = await loadProject(projectSlug);
       return listOverlays(project);
+    },
+  }),
+  defineQueryTool({
+    name: "history_list",
+    summary:
+      "Action history log entries (newest first) plus which revisions have a revert snapshot. Mirrors the GUI History panel.",
+    schema: z.object({
+      slug,
+      limit: z.number().int().positive().max(200).default(50),
+      task: z
+        .string()
+        .min(1)
+        .optional()
+        .describe("Filter to entries logged under this agent task id."),
+      action: z
+        .string()
+        .min(1)
+        .optional()
+        .describe("Filter to entries with this action name."),
+    }),
+    run: async ({ slug: projectSlug, limit, task, action }) => {
+      let entries = await readActionLog(projectSlug);
+      if (task !== undefined) {
+        entries = entries.filter((e) => e.taskId === task);
+      }
+      if (action !== undefined) {
+        entries = entries.filter((e) => e.action === action);
+      }
+      return {
+        entries: entries.slice(0, limit),
+        snapshotRevisions: listHistorySnapshotRevisions(projectSlug),
+      };
+    },
+  }),
+  defineQueryTool({
+    name: "task_list",
+    summary:
+      "Agent task records (newest first): request, status, steps, and completion summary.",
+    schema: z.object({
+      slug,
+      limit: z.number().int().positive().max(100).default(20),
+      status: z.enum(AGENT_TASK_STATUSES).optional(),
+    }),
+    run: async ({ slug: projectSlug, limit, status }) => {
+      // The store has no status filter, so when one is requested we fetch
+      // beyond the store's own default limit, filter, THEN cap to the
+      // caller's limit: filtering after an already-limited fetch could
+      // silently return fewer matches than actually exist.
+      const tasks = await listAgentTasks(projectSlug, {
+        limit: status === undefined ? limit : Number.MAX_SAFE_INTEGER,
+      });
+      const filtered =
+        status === undefined ? tasks : tasks.filter((t) => t.status === status);
+      return { tasks: filtered.slice(0, limit) };
     },
   }),
   defineQueryTool({
