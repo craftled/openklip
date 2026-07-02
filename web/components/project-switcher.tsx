@@ -5,6 +5,7 @@ import { NewProjectDialog } from "@/components/new-project-dialog";
 import { ProjectCreateOverlay } from "@/components/project-create-overlay";
 import { ProjectDeleteAction } from "@/components/project-delete-action";
 import { ProjectInlineFolderAction } from "@/components/project-folder-action";
+import { ProjectOverwriteDialog } from "@/components/project-overwrite-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,7 +31,10 @@ import {
   FolderOpen,
   Plus,
 } from "@/lib/icon";
-import type { IngestProgressView } from "@/lib/project-create";
+import type {
+  IngestProgressView,
+  ProjectCreateOptions,
+} from "@/lib/project-create";
 import type { ProjectListing } from "@/lib/project-list";
 import {
   findActiveProject,
@@ -55,7 +59,8 @@ export function ProjectSwitcher({
   activeSlug: string;
   onCreateProject: (
     file: File,
-    onProgress: (p: IngestProgressView) => void
+    onProgress: (p: IngestProgressView) => void,
+    options?: ProjectCreateOptions
   ) => Promise<string>;
   onDeleteProject: (slug: string) => Promise<void>;
   onProjectCreated: (slug: string) => void;
@@ -64,11 +69,19 @@ export function ProjectSwitcher({
 }) {
   const { isMobile } = useSidebar();
   const [newProjectOpen, setNewProjectOpen] = useState(false);
-  const { createPhase, createdSlug, creating, ingestVideo, progress } =
-    useProjectCreate({
-      onCreateProject,
-      onProjectCreated,
-    });
+  const {
+    cancelOverwrite,
+    confirmOverwrite,
+    createPhase,
+    createdSlug,
+    creating,
+    ingestVideo,
+    pendingOverwrite,
+    progress,
+  } = useProjectCreate({
+    onCreateProject,
+    onProjectCreated,
+  });
   const [confirmDeleteSlug, setConfirmDeleteSlug] = useState<string | null>(
     null
   );
@@ -126,6 +139,12 @@ export function ProjectSwitcher({
         onOpenChange={setNewProjectOpen}
         onVideoSelected={ingestVideo}
         open={newProjectOpen}
+      />
+      <ProjectOverwriteDialog
+        fileName={pendingOverwrite?.file.name ?? ""}
+        onCancel={cancelOverwrite}
+        onConfirm={confirmOverwrite}
+        open={pendingOverwrite !== null}
       />
       <SidebarMenu>
         <SidebarMenuItem className="group/project-trigger relative">

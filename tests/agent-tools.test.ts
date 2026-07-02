@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { readActionLog } from "../src/action-log.ts";
 import {
   agentToolManifest,
   agentToolNames,
@@ -204,6 +205,52 @@ test("callAgentTool broll-add-phrase forwards a note onto the overlay", async ()
   });
 });
 
+// ── ACTION HISTORY: MCP mutations are recorded with an actor ────────────────
+
+test("callAgentTool mutation records a history entry with actor mcp", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const prev = process.env.OPENKLIP_ACTOR;
+    delete process.env.OPENKLIP_ACTOR;
+    try {
+      await callAgentTool("cut", { slug, ids: ["w0"], deleted: true });
+    } finally {
+      if (prev === undefined) {
+        delete process.env.OPENKLIP_ACTOR;
+      } else {
+        process.env.OPENKLIP_ACTOR = prev;
+      }
+    }
+    const entries = await readActionLog(slug);
+    assert.equal(entries.length, 1);
+    assert.equal(entries[0].action, "cut");
+    assert.equal(entries[0].actor, "mcp");
+    assert.equal(entries[0].revisionBefore, 0);
+    assert.equal(entries[0].revisionAfter, 1);
+  });
+});
+
+test("callAgentTool mutation records actor agent when OPENKLIP_ACTOR=agent", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const prev = process.env.OPENKLIP_ACTOR;
+    process.env.OPENKLIP_ACTOR = "agent";
+    try {
+      await callAgentTool("cut", { slug, ids: ["w1"], deleted: true });
+    } finally {
+      if (prev === undefined) {
+        delete process.env.OPENKLIP_ACTOR;
+      } else {
+        process.env.OPENKLIP_ACTOR = prev;
+      }
+    }
+    const entries = await readActionLog(slug);
+    assert.equal(entries.length, 1);
+    assert.equal(entries[0].actor, "agent");
+    assert.equal(entries[0].action, "cut");
+  });
+});
+
 // ── FEATURE 3: multi-take assembly tools (query surface, not registry) ──────
 
 test("multi-take tools are exposed as agent query tools", () => {
@@ -229,4 +276,30 @@ test("assemble inputSchema exposes the selection segments and optional padMs", (
   assert.ok(segItem?.takeId, "segments[].takeId");
   assert.ok(segItem?.startWordId, "segments[].startWordId");
   assert.ok(segItem?.endWordId, "segments[].endWordId");
+});
+
+// ── Export settings: the export tool accepts compression + fps ──────────────
+
+test("export tool schema accepts compression and fps and rejects bad values", () => {
+  const tool = getAgentTool("export");
+  assert.ok(tool, "export tool missing");
+  assert.equal(
+    tool.schema.safeParse({ slug: "demo", compression: "web", fps: 24 })
+      .success,
+    true
+  );
+  assert.equal(
+    tool.schema.safeParse({ slug: "demo", compression: "ultra" }).success,
+    false
+  );
+  assert.equal(tool.schema.safeParse({ slug: "demo", fps: 0 }).success, false);
+  // maxHeight shares the HTTP route's 8K cap on every surface.
+  assert.equal(
+    tool.schema.safeParse({ slug: "demo", maxHeight: 4320 }).success,
+    true
+  );
+  assert.equal(
+    tool.schema.safeParse({ slug: "demo", maxHeight: 4321 }).success,
+    false
+  );
 });

@@ -20,6 +20,7 @@ import { join } from "node:path";
 // bundle (the runtime use is the lazy dynamic import inside renderHeadlessAlpha).
 import type { Browser } from "puppeteer-core";
 import { FFMPEG, run } from "./ffmpeg.ts";
+import { graphicRuntimeEntryPath } from "./script-paths.ts";
 
 export interface HeadlessRenderInput {
   compositionHtml: string;
@@ -67,7 +68,7 @@ async function buildRuntimeBundle(): Promise<string> {
   if (runtimeBundle !== null) {
     return runtimeBundle;
   }
-  const entry = join(import.meta.dir, "graphic-runtime-entry.ts");
+  const entry = graphicRuntimeEntryPath();
   const out = await Bun.build({
     entrypoints: [entry],
     target: "browser",

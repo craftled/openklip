@@ -110,6 +110,27 @@ export const BrollSchema = z.object({
 });
 export type Broll = z.infer<typeof BrollSchema>;
 
+// Background music under the voice: a placement of a registered music asset
+// over a span of the SOURCE timeline. Unlike b-roll, export maps the span to
+// ONE continuous output window, so the bed keeps playing across collapsed
+// cuts instead of restarting per surviving range. All value bounds (gain 0-2,
+// fades 0-10, span-vs-duration clamps) live in the actions.ts primitives.
+export const MusicPlacementSchema = z.object({
+  id: z.string(),
+  assetId: z.string(),
+  startSample: z.number().int().nonnegative(),
+  endSample: z.number().int().nonnegative(),
+  srcInSample: z.number().int().nonnegative().default(0),
+  /** Linear gain applied to the bed (1 = unity). */
+  gain: z.number().default(1),
+  fadeInSec: z.number().default(0),
+  fadeOutSec: z.number().default(0),
+  /** trim: end clamps to the asset remainder; loop: repeats to cover the span. */
+  mode: z.enum(["trim", "loop"]).default("trim"),
+  note: z.string().optional(),
+});
+export type MusicPlacement = z.infer<typeof MusicPlacementSchema>;
+
 // A push-in over a span of the SOURCE timeline: ramp to `scale` over rampSec, then hold.
 export const ZoomSchema = z.object({
   id: z.string(),
@@ -366,6 +387,8 @@ export const ProjectSchema = z.object({
   titles: z.array(TitleSchema).default([]),
   stills: z.array(StillSchema).default([]),
   graphics: z.array(GraphicSchema).default([]),
+  /** Background music placements mixed under the voice at export. */
+  music: z.array(MusicPlacementSchema).default([]),
   words: z.array(WordSchema),
   /** Cut-quality settings. Analysis caches live under working/, not here. */
   cuts: CutsSchema,
@@ -377,6 +400,8 @@ export const ProjectSchema = z.object({
   assembly: AssemblyProvenanceSchema.optional(),
   /** Global animation feel for overlay entrances. */
   motion: MotionSchema,
+  /** Monotonic edit revision bumped by logged mutations (absent = 0). */
+  revision: z.number().int().nonnegative().optional(),
 });
 export type Project = z.infer<typeof ProjectSchema>;
 

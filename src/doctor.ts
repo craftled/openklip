@@ -4,10 +4,11 @@
 // doesn't die deep inside a subprocess. Pure (returns a structured report) so it
 // is testable without spawning anything.
 import { existsSync } from "node:fs";
-import { isAbsolute, join, resolve } from "node:path";
+import { isAbsolute, join } from "node:path";
 import { type Project, ProjectSchema } from "./edl.ts";
 import { FFMPEG, FFPROBE } from "./ffmpeg.ts";
 import { projectPaths, projectsRoot } from "./paths.ts";
+import { transcribeScriptPath } from "./script-paths.ts";
 
 export type DoctorStatus = "ok" | "warn" | "fail";
 
@@ -38,7 +39,7 @@ function binaryCheck(name: string, path: string): DoctorCheck {
 }
 
 function whisperCheck(): DoctorCheck {
-  const script = resolve(import.meta.dir, "transcribe.mjs");
+  const script = transcribeScriptPath();
   return existsSync(script)
     ? check("whisper", "ok", script)
     : check("whisper", "fail", `transcribe script missing: ${script}`);

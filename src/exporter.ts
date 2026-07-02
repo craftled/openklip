@@ -12,9 +12,11 @@ import { colorAdjustFilter } from "./color-adjust.ts";
 import {
   type Asset,
   type Broll,
+  type MusicPlacement,
   type Project,
   ProjectSchema,
   type Range,
+  SAMPLE_RATE,
   sec,
   sourceToOutputSec,
   survivingRanges,
@@ -41,8 +43,78 @@ import {
 import { buildTitlesAss, type TitleItem } from "./titles.ts";
 import { buildZoompanZExpr, type ZoomWindow } from "./zoom-ramp.ts";
 
+// Canonical export-settings vocabulary. The GUI dialog, CLI flags, HTTP route,
+// and MCP tool all consume these so every surface stays in lockstep with the
+// encoder. "social" pins the pre-settings encoder defaults, so an export with
+// no compression choice renders with exactly the historical args.
+export const EXPORT_COMPRESSIONS = [
+  "studio",
+  "social",
+  "web",
+  "web-low",
+] as const;
+
+export type ExportCompression = (typeof EXPORT_COMPRESSIONS)[number];
+
 export interface ExportOptions {
+  compression?: ExportCompression; // libx264 preset/CRF bundle; default "social"
+  fps?: number; // output frame rate; default = rounded source rate
   maxHeight?: number; // e.g. 1080 -> downscale output (and speed up filtering/encode)
+}
+
+// libx264 args per compression preset. Pure so tests pin the mapping; CRF must
+// stay strictly ordered studio < social < web < web-low.
+export function encoderArgsFor(compression?: ExportCompression): string[] {
+  switch (compression) {
+    case "studio":
+      return ["-preset", "slow", "-crf", "16"];
+    case "web":
+      return ["-preset", "medium", "-crf", "23"];
+    case "web-low":
+      return ["-preset", "fast", "-crf", "28"];
+    default:
+      return ["-preset", "medium", "-crf", "18"];
+  }
+}
+
+// The ONE resolved output rate: an explicit request (>= 1) wins, otherwise the
+// rounded source rate. Every fps consumer in exportCut (stills, rich graphics,
+// zoompan, retime filter) must use this value.
+export function resolveOutputFps(
+  sourceFps: number,
+  requested?: number
+): number {
+  if (requested !== undefined && requested >= 1) {
+    return Math.round(requested);
+  }
+  return Math.max(1, Math.round(sourceFps));
+}
+
+// The ",fps=N" retime for the base [0:v] chain, inserted immediately after
+// setpts (before scale/overlays) so overlay enable windows stay in output
+// seconds. No request means source passthrough (no retime, even on fractional
+// rates). An explicit request is a retime order (the export dialog offers
+// "Source" separately) and emits the filter unless the resolved rate equals
+// the source rate EXACTLY: requesting 30 on a 29.97 source retimes to a true
+// 30, instead of silently staying at 29.97 while the result reports 30.
+export function fpsFilterFor(sourceFps: number, requested?: number): string {
+  if (requested === undefined) {
+    return "";
+  }
+  const resolved = resolveOutputFps(sourceFps, requested);
+  return resolved === sourceFps ? "" : `,fps=${resolved}`;
+}
+
+// Parse the CLI `--fps` flag value with the same bounds the HTTP route and MCP
+// tool enforce (integer 1-120, documented in AGENTS.md). Lives here rather
+// than cli.ts because cli.ts runs its command switch at module scope and
+// cannot be imported by tests.
+export function parseExportFpsFlag(raw: string): number {
+  const fps = Number(raw);
+  if (!(Number.isInteger(fps) && fps >= 1 && fps <= 120)) {
+    throw new Error("--fps must be an integer between 1 and 120");
+  }
+  return fps;
 }
 
 export interface InputChoice {
@@ -82,8 +154,9 @@ export function chooseAssetInput(
   if (existsSync(proxy)) {
     return { kind: "proxy", path: proxy };
   }
+  // Name the asset's kind: this resolver serves b-roll, music, and stills.
   throw new Error(
-    `missing b-roll asset "${asset.id}": ${asset.src}. Also could not find proxy fallback: ${proxy}`
+    `missing ${asset.kind ?? "broll"} asset "${asset.id}": ${asset.src}. Also could not find proxy fallback: ${proxy}`
   );
 }
 
@@ -192,6 +265,137 @@ export function graphicWindowDurationSamples(
   return Math.max(1, Math.round((win.outEnd - win.outStart) * sampleRate));
 }
 
+// ── Music placement (pure planning seams, no ffmpeg) ────────────────────────
+
+export interface MusicWindow {
+  assetDurationSamples: number;
+  assetId: string;
+  fadeInSec: number;
+  fadeOutSec: number;
+  gain: number;
+  mode: MusicPlacement["mode"];
+  outEnd: number;
+  outStart: number;
+  srcInSec: number;
+}
+
+// Map each music placement to ONE CONTINUOUS window on the OUTPUT timeline:
+// outStart/outEnd are the output positions of the placement's source span, so
+// the bed keeps playing across collapsed cuts instead of restarting per
+// surviving range (deliberately unlike planBrollForRanges). Windows shorter
+// than 0.05s are dropped; placements whose asset is missing or not kind
+// "music" are skipped (mirrors the b-roll/still guards in exportCut).
+export function planMusicWindows(input: {
+  assets: Asset[];
+  music: MusicPlacement[];
+  ranges: Range[];
+  sampleRate: number;
+}): MusicWindow[] {
+  const assetById = new Map(input.assets.map((a) => [a.id, a]));
+  const windows: MusicWindow[] = [];
+  for (const m of input.music) {
+    const asset = assetById.get(m.assetId);
+    if (asset?.kind !== "music") {
+      continue;
+    }
+    const outStart = sourceToOutputSec(
+      m.startSample / input.sampleRate,
+      input.ranges
+    );
+    const outEnd = sourceToOutputSec(
+      m.endSample / input.sampleRate,
+      input.ranges
+    );
+    if (outEnd - outStart < 0.05) {
+      continue;
+    }
+    windows.push({
+      assetDurationSamples: asset.durationSamples,
+      assetId: m.assetId,
+      fadeInSec: m.fadeInSec,
+      fadeOutSec: m.fadeOutSec,
+      gain: m.gain,
+      mode: m.mode,
+      outEnd,
+      outStart,
+      srcInSec: (m.srcInSample ?? 0) / input.sampleRate,
+    });
+  }
+  return windows;
+}
+
+export interface MusicFilterGraph {
+  filterParts: string[];
+  inputArgs: string[];
+  mixInputLabels: string[];
+}
+
+// Render each music window into one ffmpeg audio chain on its own `-i` input:
+// aresample to the 48 kHz project grid -> (aloop for loop mode) -> atrim ->
+// asetpts -> volume -> optional fades -> adelay to its output start, labelled
+// [mN] for the final amix. Pure string building so tests pin the chains
+// without spawning ffmpeg.
+export function buildMusicFilterParts(
+  windows: Array<MusicWindow & { srcPath: string }>,
+  opts: { firstInputIndex: number }
+): MusicFilterGraph {
+  const filterParts: string[] = [];
+  const inputArgs: string[] = [];
+  const mixInputLabels: string[] = [];
+  windows.forEach((w, i) => {
+    const inputIndex = opts.firstInputIndex + i;
+    const dur = w.outEnd - w.outStart;
+    const chain: string[] = [];
+    // Resample FIRST: assetDurationSamples sits on the 48 kHz project grid,
+    // but chooseAssetInput prefers the original file (44.1 kHz mp3, 96 kHz
+    // wav, ...), and aloop's size counts samples at the input's native rate.
+    // Without this, loop mode loops the wrong span for non-48k sources.
+    chain.push(`aresample=${SAMPLE_RATE}`);
+    if (w.mode === "loop") {
+      chain.push(`aloop=loop=-1:size=${w.assetDurationSamples}`);
+    }
+    chain.push(`atrim=start=${sec(w.srcInSec)}:duration=${sec(dur)}`);
+    chain.push("asetpts=PTS-STARTPTS");
+    chain.push(`volume=${w.gain.toFixed(6)}`);
+    if (w.fadeInSec > 0) {
+      chain.push(`afade=t=in:st=0:d=${sec(w.fadeInSec)}`);
+    }
+    if (w.fadeOutSec > 0) {
+      chain.push(
+        `afade=t=out:st=${sec(Math.max(0, dur - w.fadeOutSec))}:d=${sec(w.fadeOutSec)}`
+      );
+    }
+    // all=1 delays every channel; the pipe form (ms|ms) covers only the first
+    // two, so a >2-channel source would start channels 3+ at t=0.
+    const delayMs = Math.max(0, Math.round(w.outStart * 1000));
+    chain.push(`adelay=${delayMs}:all=1`);
+    inputArgs.push("-i", w.srcPath);
+    filterParts.push(`[${inputIndex}:a]${chain.join(",")}[m${i}]`);
+    mixInputLabels.push(`m${i}`);
+  });
+  return { filterParts, inputArgs, mixInputLabels };
+}
+
+// The audio side of the filtergraph. CRITICAL invariant: with zero music the
+// single returned line is byte-identical to the historical voice-only chain
+// (tests pin this), so projects without music export exactly as before. With
+// music, the voice chain is renamed [avoice] and mixed with every [mN] using
+// duration=first (the voice defines the cut length) and normalize=0 (amix must
+// not duck the voice by 1/n).
+export function buildAudioParts(
+  selectExpr: string,
+  music: MusicFilterGraph
+): string[] {
+  if (music.mixInputLabels.length === 0) {
+    return [`[0:a]aselect='${selectExpr}',asetpts=N/SR/TB[aout]`];
+  }
+  return [
+    `[0:a]aselect='${selectExpr}',asetpts=N/SR/TB[avoice]`,
+    ...music.filterParts,
+    `[avoice]${music.mixInputLabels.map((l) => `[${l}]`).join("")}amix=inputs=${1 + music.mixInputLabels.length}:duration=first:normalize=0[aout]`,
+  ];
+}
+
 export async function exportCut(
   slug: string,
   opts: ExportOptions = {}
@@ -205,8 +409,11 @@ export async function exportCut(
   zooms: number;
   titles: number;
   graphics: number;
+  music: number;
   vignette: boolean;
   height: number;
+  fps: number;
+  compression: ExportCompression;
 }> {
   const p = projectPaths(slug);
   await mkdir(p.working, { recursive: true });
@@ -264,7 +471,9 @@ export async function exportCut(
 
   // stills -> output windows (Ken Burns push-in over a held image). Each still
   // becomes one extra looped-image input after the b-roll inputs.
-  const outFps = Math.max(1, Math.round(sourceMeta.fps));
+  // outFps is the ONE resolved output rate; stills, rich graphics, zoompan, and
+  // the base-chain retime below must all read it.
+  const outFps = resolveOutputFps(sourceMeta.fps, opts.fps);
   const stillPlans = (project.stills ?? [])
     .map((s) => {
       const asset = assetById.get(s.assetId);
@@ -425,6 +634,27 @@ export async function exportCut(
     inputIndex: 1 + plans.length + stillPlans.length + j,
   }));
 
+  // music -> ONE continuous output window per placement (the bed keeps playing
+  // across collapsed cuts; see planMusicWindows). Music `-i` inputs are
+  // appended strictly AFTER the rich-graphic inputs, so their index math never
+  // disturbs any video input index above.
+  const musicWindows = planMusicWindows({
+    assets: project.assets,
+    music: project.music ?? [],
+    ranges,
+    sampleRate: sr,
+  });
+  const musicGraph = buildMusicFilterParts(
+    musicWindows.map((w) => ({
+      ...w,
+      srcPath: chooseAssetInput(p.dir, assetById.get(w.assetId) as Asset).path,
+    })),
+    {
+      firstInputIndex:
+        1 + plans.length + stillPlans.length + richGraphics.length,
+    }
+  );
+
   // zooms -> output windows
   const zoomWins = (project.zooms ?? [])
     .map((z) => ({
@@ -488,7 +718,9 @@ export async function exportCut(
 
   // ---- filtergraph ----
   const parts: string[] = [];
-  let base = `[0:v]select='${selectExpr}',setpts=N/FRAME_RATE/TB`;
+  // Retime right after setpts (before scale/overlays) so every downstream
+  // enable window stays expressed in output seconds at outFps.
+  let base = `[0:v]select='${selectExpr}',setpts=N/FRAME_RATE/TB${fpsFilterFor(sourceMeta.fps, opts.fps)}`;
   if (outH !== sourceMeta.height) {
     base += `,scale=${outW}:${outH}`;
   }
@@ -497,16 +729,15 @@ export async function exportCut(
 
   if (zoomWins.length > 0) {
     // Animated push-in via zoompan (z is evaluated per output frame, so it can ramp).
-    const fps = Math.max(1, Math.round(sourceMeta.fps));
     const wins: ZoomWindow[] = zoomWins.map((z) => ({
       startSec: z.os,
       endSec: z.oe,
       scale: z.scale,
       rampSec: z.ramp,
     }));
-    const zexpr = buildZoompanZExpr(wins, fps);
+    const zexpr = buildZoompanZExpr(wins, outFps);
     parts.push(
-      `[${last}]zoompan=z='${zexpr}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=${outW}x${outH}:fps=${fps}[vz]`
+      `[${last}]zoompan=z='${zexpr}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=${outW}x${outH}:fps=${outFps}[vz]`
     );
     last = "vz";
   }
@@ -605,7 +836,9 @@ export async function exportCut(
     vlabel = "vgfx";
   }
   parts.push(`[${vlabel}]null[vout]`);
-  parts.push(`[0:a]aselect='${selectExpr}',asetpts=N/SR/TB[aout]`);
+  // Zero music emits the historical voice-only [aout] line byte-identically;
+  // otherwise the voice becomes [avoice] and is amixed with every music bed.
+  parts.push(...buildAudioParts(selectExpr, musicGraph));
 
   const inputs = [
     "-i",
@@ -624,6 +857,10 @@ export async function exportCut(
     // 1 + plans.length + stillPlans.length + j index math above correct. ProRes
     // 4444 alpha (yuva444p) is auto-detected by ffmpeg; no input codec flag.
     ...richGraphics.flatMap((rg) => ["-i", rg.asset.assetPath]),
+    // Music beds are audio-only inputs and MUST stay after every video input
+    // (source, b-roll, stills, rich graphics) so the video index math above
+    // never shifts; buildMusicFilterParts numbered them from firstInputIndex.
+    ...musicGraph.inputArgs,
   ];
   await run(
     FFMPEG,
@@ -638,10 +875,7 @@ export async function exportCut(
       "[aout]",
       "-c:v",
       "libx264",
-      "-preset",
-      "medium",
-      "-crf",
-      "18",
+      ...encoderArgsFor(opts.compression),
       "-pix_fmt",
       "yuv420p",
       "-c:a",
@@ -665,7 +899,10 @@ export async function exportCut(
     zooms: zoomWins.length,
     titles: titleItems.length,
     graphics: graphicsPlanned.length,
+    music: musicWindows.length,
     vignette,
     height: outH,
+    fps: outFps,
+    compression: opts.compression ?? "social",
   };
 }

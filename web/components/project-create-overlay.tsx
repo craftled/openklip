@@ -27,6 +27,7 @@ export function ProjectCreateOverlay({
       aria-busy={phase === "creating"}
       aria-live="polite"
       className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm"
+      data-project-create-overlay=""
       role="status"
     >
       <div className="flex w-full max-w-xs flex-col items-center gap-4 px-6 text-center">

@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.11.0.0 - 2026-07-02
+
+The Alpha gate release: OpenKlip is now a capable local editor end to end. You can create a project from the browser by uploading or dropping a video, search the transcript and batch-cut phrases without touching the CLI, lay a music bed under the voice track that plays in preview and mixes into the export, pick real compression and frame-rate settings in the export dialog, and see every edit any surface made in a per-project action history.
+
+### Added
+- **Browser project creation**: upload or drag-drop a video onto the empty workspace or the New Project dialog; the source file is copied into the project folder (full-quality exports survive moved downloads), ingest progress is shown live, and re-uploading an existing project asks before replacing it.
+- **Transcript search and batch cuts**: a search bar above the transcript (Cmd+F) finds phrases punctuation-insensitively across kept or cut words, seeks to matches, selects them as spans, and cuts or restores the first or every match with an optional note; matches are identical to `openklip transcript grep`.
+- **Music placement**: register a music asset and place a bed with gain, fade in/out, source offset, and trim or loop mode; the bed plays under the voice in preview (with its own mute toggle) and exports through ffmpeg as one continuous mix that never restarts at cuts. New `music-add`, `music-set`, `music-rm` actions on CLI, GUI, and MCP, with placements shown in overlays, status, and the timeline.
+- **Real export settings**: the export dialog's compression presets (Studio, Social Media, Web, Web Low) and frame rate (source, 24, 25, 30, 48, 60 fps) now change the rendered file; the same options are available as `openklip export --compression --fps`, in the export API route, and in the MCP export tool, and the size/time estimate follows the selection.
+- **Action history**: every registry mutation from the GUI, CLI, or MCP appends to a per-project `working/actions.jsonl` with the action, actor, input and result summaries, and a revision counter; a History section in the Config panel and `GET /api/projects/<slug>/history` expose it.
+
+### Changed
+- **Upload validation**: the upload endpoint and both drop surfaces now reject non-video files up front with the supported-format list (MP4, MOV, M4V, WebM, MKV, AVI) instead of failing minutes later inside ffprobe, and concurrent uploads of the same project are refused while an ingest is in flight.
+- **Export defaults**: the default export is byte-identical to previous releases (Social Media preset, source frame rate); settings only change the output when you change them.
+- **Version**: bumped OpenKlip to `0.11.0.0`.
+
+### Fixed
+- **Browser-triggered engine paths**: transcription, verify, doctor, and rich-graphic export resolved helper scripts through a Bun-only API that the Next server bundle compiles to `undefined`, so ingest started from the browser failed mid-transcription; all four now resolve from the repo root.
+- **Uploaded source persistence**: browser-created projects previously pointed at a deleted temp file, silently degrading exports to proxy quality; the upload is now kept inside the project folder under the project write lock.
+- **Music mix correctness**: music chains resample to the 48 kHz grid before looping (non-48 kHz files looped the wrong span) and delay all channels (5.1 beds no longer smear across the cut); a missing music file now names the right asset kind in the export error.
+- **Editor churn**: the music gain slider commits once per drag instead of dozens of times, timing fields commit on blur, the preview music element follows the playback-rate control, and invalid music timing is clamped client-side instead of surfacing a save error.
+
 ## 0.10.0.1 - 2026-07-01
 
 Hardening follow-up to the json-render product announcement graphics. The reviewed hardening from the alternate json-render branch was ported onto the shipped v0.10.0.0 implementation; the branch's frame-to-`src/` refactor and its `accent`-on-`HeroStatement` change were intentionally not taken (they would have reverted the v0.10.0.0 accent-on-scene fix).

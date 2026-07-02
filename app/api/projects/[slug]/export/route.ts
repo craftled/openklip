@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { survivingRanges } from "@engine/edl";
-import { exportCut } from "@engine/exporter";
+import { EXPORT_COMPRESSIONS, exportCut } from "@engine/exporter";
 import { assertValidSlug, projectPaths } from "@engine/paths";
 import { loadProject } from "@engine/projectStore";
 import type { NextRequest } from "next/server";
@@ -14,9 +14,12 @@ interface RouteParams {
 }
 
 // Export options the GUI / an agent may pass. `height` mirrors the CLI
-// `--height` flag (max output height); everything else stays project-driven.
+// `--height` flag (max output height); `compression` and `fps` mirror
+// `--compression` / `--fps`; everything else stays project-driven.
 const ExportRequestSchema = z
   .object({
+    compression: z.enum(EXPORT_COMPRESSIONS).optional(),
+    fps: z.number().int().min(1).max(120).optional(),
     height: z.number().int().positive().max(4320).optional(),
   })
   .strict();
@@ -70,7 +73,11 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
 
   // 5. Render.
   try {
-    const result = await exportCut(slug, { maxHeight: parsed.data.height });
+    const result = await exportCut(slug, {
+      compression: parsed.data.compression,
+      fps: parsed.data.fps,
+      maxHeight: parsed.data.height,
+    });
     return Response.json({ ok: true, ...result });
   } catch (e) {
     return Response.json({ error: (e as Error).message }, { status: 500 });

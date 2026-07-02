@@ -129,7 +129,7 @@ Legend: Full means the surface can achieve the same outcome. Partial means the s
 | Transcript list | Full: transcript panel | Full: `transcript` | Full: `transcript_list` | Partial through page data | Good CLI/MCP parity. |
 | Transcript grep/span/phrase | Missing UI phrase search | Full | Full | Missing public route | Biggest near-term Descript gap. |
 | Word cut and restore | Full: word click and batch save | Full: `cut`, `restore` | Full: `cut`, `restore-all` | Full via server actions | Good parity for word ids. |
-| Phrase cut | Missing UI | Full: `cut --text` | Full: `cut-text` | Missing public route | First recommended code task. |
+| Phrase cut | Full: transcript search with batch cuts | Full: `cut --text` | Full: `cut-text` | Missing public route | UI shipped 2026-07-02. |
 | Restore all | Full through actions where exposed | Full | Full | Full via registry server action | Good parity. |
 | Transcript text correction | Partial: server action accepts `text` | Missing dedicated CLI | Missing dedicated MCP | Partial through `saveProjectEdits` | Needs explicit action and query behavior. |
 | Cut snap settings | Full config path exists | Full registry action | Full registry tool | Full via registry server action | VAD implementation still incomplete. |
@@ -157,7 +157,7 @@ Legend: Full means the surface can achieve the same outcome. Partial means the s
 | Template set/list/show | Full select and skills | Full | Full | Full list route, set via server action | Good enough. |
 | Brand preset apply | Partial ingest/apply path not prominent in UI | Full: `brand` | Missing | Missing public route | CLI-only for now. |
 | Export MP4 | Full | Full | Full | Full: export route and server action | Good parity for height only. |
-| Export compression and frame rate | UI shows disabled or unwired options | Missing | Missing | Missing | Product gap. |
+| Export compression and frame rate | Full: export dialog | Full: `--compression`, `--fps` | Full: export tool inputs | Full: export route body | Shipped 2026-07-02. Format and destination controls remain disabled. |
 | Verify export | Full button | Full | Full | Partial server action path | Good CLI/MCP parity. |
 | Package post-export | Missing UI | Full: `package` | Missing | Missing | CLI-only optional feature. |
 | Multi-take add/list/transcript/assemble | Missing UI | Full | Full query/assemble tools | Missing public route | Strong agent feature, weak UI parity. |
@@ -174,7 +174,7 @@ Legend: Full means the surface can achieve the same outcome. Partial means the s
 | Transcript words | Ingest only | UI, CLI, MCP | Cut/restore full parity, text correction partial | Not intentionally deletable | Add explicit transcript correction action. |
 | B-roll asset | UI/API upload, CLI register | UI, CLI, MCP | Asset card via analyze only, metadata edit missing | UI/API only | Add CLI/MCP delete and asset-card edit if needed. |
 | Still asset | UI/API upload, CLI register | UI, CLI, MCP | Asset card via analyze only, metadata edit missing | UI/API only | Same asset CRUD gap. |
-| Music asset | UI/API upload, CLI register | UI, CLI, MCP | No first-class music placement yet | UI/API only | Music timeline model is missing. |
+| Music asset | UI/API upload, CLI register | UI, CLI, MCP | Placement via `music-add`/`music-set`/`music-rm` | UI/API only | Music timeline model shipped 2026-07-02; ducking and loudness normalization pending. |
 | Titles | UI, CLI, MCP | UI, CLI, MCP | UI, CLI, MCP | UI, CLI, MCP | Good parity. Needs richer styles. |
 | Zooms | UI, CLI, MCP | UI, CLI, MCP | UI, CLI, MCP | UI, CLI, MCP | Good parity. Needs target point/crop variants. |
 | B-roll overlays | UI, CLI, MCP | UI, CLI, MCP | UI, CLI, MCP | UI, CLI, MCP | Needs PiP/audio modes. |
@@ -186,7 +186,7 @@ Legend: Full means the surface can achieve the same outcome. Partial means the s
 | Exports | UI, CLI, MCP, API | File output, status, verify | Re-export overwrites | Manual file delete only | Needs presets, settings, history. |
 | Agent chats | UI/API | UI/API | UI/API rename/archive/append | UI/API | Not exposed to CLI/MCP as context or task log. |
 | Brief/context | Missing | Missing | Missing | Missing | Needed for done-for-you agent workflows. |
-| Action history | Missing | Missing | Missing | Missing | Needed for trust, undo, task revert. |
+| Action history | Append-only log on every registry mutation | History route + Config panel section | Not applicable (append-only) | Not applicable (append-only) | No filters or undo; non-registry CLI mutations do not log yet. |
 
 ### 0.3 Baseline audit conclusion
 
@@ -202,6 +202,8 @@ The biggest blockers to a capable agent-first editor are:
 6. Export settings beyond height are not wired.
 7. Process safety is in-process only, so CLI plus server concurrent writes can race.
 
+2026-07-02 update: blockers 1 (UI phrase search/cuts) and 6 (export settings) are resolved; blocker 2 is partially resolved (music placement, preview bed, and export mix shipped; ducking and loudness remain); blocker 3 is partially resolved (append-only action history with UI visibility shipped; task progress and checkpoints remain).
+
 Recommended next code task: **UI phrase search and phrase cuts**. It closes a visible Descript-level gap, reuses existing phrase-match and registry primitives, and is smaller than music, task state, or reframing.
 
 ## Milestone 1: Frictionless project intake
@@ -210,15 +212,15 @@ Goal: users can drop a messy folder of materials and OpenKlip turns it into agen
 
 ### 1.1 Browser project creation from raw media
 
-- [ ] Add browser upload for a first video on the empty workspace screen.
-  - [ ] Accept common video formats.
-  - [ ] Copy source into a new project folder.
-  - [ ] Start ingest job from the UI.
-  - [ ] Show ingest progress.
-  - [ ] Show ingest failure with actionable error.
-  - [ ] Open the editor when ingest completes.
+- [x] Add browser upload for a first video on the empty workspace screen.
+  - [x] Accept common video formats.
+  - [x] Copy source into a new project folder.
+  - [x] Start ingest job from the UI.
+  - [x] Show ingest progress.
+  - [x] Show ingest failure with actionable error.
+  - [x] Open the editor when ingest completes.
   - Agent parity: CLI already has `ingest`; MCP/API should expose project creation or document why CLI is the path.
-  - Verification: browser smoke creates a project from a video file.
+  - Verification: browser smoke creates a project from a video file. Verified 2026-07-02: browser smoke created a project from a real video; source persisted into the project folder.
 - [ ] Add drag-and-drop project intake.
   - [ ] Drop a video onto empty workspace.
   - [ ] Drop a folder containing video plus assets.
@@ -226,6 +228,7 @@ Goal: users can drop a messy folder of materials and OpenKlip turns it into agen
   - [ ] Register remaining files as assets.
   - [ ] Ask user to confirm if multiple primary videos are found.
   - Verification: fixture folder imports into one project with assets registered.
+  - Note: single-video drop onto the empty workspace shipped 2026-07-02; folder intake, primary detection, and multi-primary confirm remain open.
 
 ### 1.2 Asset registration and classification
 
@@ -349,25 +352,25 @@ Goal: text-based editing feels fast, safe, and obvious for humans and agents.
 
 ### 3.1 Phrase search and batch editing in UI
 
-- [ ] Add transcript search.
-  - [ ] Search exact text.
-  - [ ] Search punctuation-insensitive phrases.
-  - [ ] Show all matches.
-  - [ ] Click match to seek.
-  - [ ] Select match as editable span.
-  - Verification: UI search returns same spans as CLI phrase tools.
-- [ ] Add batch phrase cuts.
-  - [ ] Cut first match.
-  - [ ] Cut all matches.
-  - [ ] Preview affected words before applying.
-  - [ ] Add optional note.
-  - [ ] Re-anchor overlays after cut.
-  - Verification: batch cut matches CLI `cut --text --all` behavior.
-- [ ] Add restore by search.
-  - [ ] Search cut words.
-  - [ ] Restore phrase.
-  - [ ] Restore all matches.
-  - Verification: restored words appear in preview and export.
+- [x] Add transcript search.
+  - [x] Search exact text.
+  - [x] Search punctuation-insensitive phrases.
+  - [x] Show all matches.
+  - [x] Click match to seek.
+  - [x] Select match as editable span.
+  - Verification: UI search returns same spans as CLI phrase tools. Verified 2026-07-02: parity test pins UI search spans against `grepTranscript`.
+- [x] Add batch phrase cuts.
+  - [x] Cut first match.
+  - [x] Cut all matches.
+  - [x] Preview affected words before applying.
+  - [x] Add optional note.
+  - [x] Re-anchor overlays after cut.
+  - Verification: batch cut matches CLI `cut --text --all` behavior. Verified 2026-07-02: browser smoke cut a phrase on real footage and the cut persisted.
+- [x] Add restore by search.
+  - [x] Search cut words.
+  - [x] Restore phrase.
+  - [x] Restore all matches.
+  - Verification: restored words appear in preview and export. Verified 2026-07-02: browser smoke restored cut words on real footage and the restore persisted.
 
 ### 3.2 Filler and dead-air removal
 
@@ -418,25 +421,25 @@ Goal: exported videos can sound polished without leaving OpenKlip.
 
 ### 4.1 Music placement
 
-- [ ] Add music track placement model.
-  - [ ] Start and end sample.
-  - [ ] Source in-point.
-  - [ ] Gain.
-  - [ ] Fade in and fade out.
-  - [ ] Loop or trim mode.
+- [x] Add music track placement model.
+  - [x] Start and end sample.
+  - [x] Source in-point.
+  - [x] Gain.
+  - [x] Fade in and fade out.
+  - [x] Loop or trim mode.
   - Verification: project schema parses existing projects and new music placements.
-- [ ] Add music CLI/MCP actions.
-  - [ ] `music-add`.
-  - [ ] `music-set`.
-  - [ ] `music-rm`.
-  - [ ] `music-list` or include in overlays query.
+- [x] Add music CLI/MCP actions.
+  - [x] `music-add`.
+  - [x] `music-set`.
+  - [x] `music-rm`.
+  - [x] `music-list` or include in overlays query (covered: the overlays query and status `musicCount` include music placements).
   - Verification: action registry tests cover music CRUD.
 - [ ] Add music UI controls.
-  - [ ] Add music from asset bin.
+  - [x] Add music from asset bin (placement happens in the Config panel Music section).
   - [ ] Trim music on timeline.
-  - [ ] Adjust gain.
-  - [ ] Set fades.
-  - [ ] Mute music in preview.
+  - [x] Adjust gain.
+  - [x] Set fades.
+  - [x] Mute music in preview.
   - Verification: manual smoke adds background music and exports it.
 
 ### 4.2 Ducking and loudness
@@ -616,17 +619,17 @@ Goal: exports are fast, configurable, verified, and ready to publish.
 
 ### 8.1 Export settings
 
-- [ ] Wire compression setting.
-  - [ ] UI selection.
-  - [ ] CLI flag.
-  - [ ] MCP/API input.
-  - [ ] ffmpeg encoder parameters.
+- [x] Wire compression setting.
+  - [x] UI selection.
+  - [x] CLI flag.
+  - [x] MCP/API input.
+  - [x] ffmpeg encoder parameters.
   - Verification: output bitrate changes as expected.
-- [ ] Wire frame rate setting.
-  - [ ] Preserve source.
-  - [ ] 24 fps.
-  - [ ] 30 fps.
-  - [ ] 60 fps.
+- [x] Wire frame rate setting.
+  - [x] Preserve source.
+  - [x] 24 fps.
+  - [x] 30 fps.
+  - [x] 60 fps.
   - Verification: ffprobe reports selected frame rate.
 - [ ] Add export destination options.
   - [ ] Project output folder.
@@ -667,14 +670,14 @@ Goal: users trust agents because every change is inspectable, reversible, and re
 
 ### 9.1 Action history
 
-- [ ] Add append-only action log.
-  - [ ] Action name.
-  - [ ] Input summary.
-  - [ ] Result summary.
-  - [ ] Actor: human, agent, CLI, MCP.
-  - [ ] Timestamp.
-  - [ ] Project revision before and after.
-  - Verification: every registry mutation records a log entry.
+- [x] Add append-only action log.
+  - [x] Action name.
+  - [x] Input summary.
+  - [x] Result summary.
+  - [x] Actor: human, agent, CLI, MCP.
+  - [x] Timestamp.
+  - [x] Project revision before and after.
+  - Verification: every registry mutation records a log entry. Scope note 2026-07-02: every registry mutation logs across GUI/CLI/MCP; non-registry CLI paths (assets, template, assembly) do not log yet.
 - [ ] Show action history in UI.
   - [ ] Filter by actor.
   - [ ] Filter by action type.
@@ -763,7 +766,7 @@ Goal: match the core jobs people expect from a modern transcript-first editor.
 - [ ] Transcript-based cuts.
   - [x] Word click cuts.
   - [x] CLI phrase cuts.
-  - [ ] UI phrase cuts.
+  - [x] UI phrase cuts.
   - [ ] Batch filler cuts with review.
   - [ ] Dead-air cuts with review.
 - [ ] Captions.
@@ -781,8 +784,8 @@ Goal: match the core jobs people expect from a modern transcript-first editor.
   - [ ] Split screen.
   - [ ] Manual crop and scale.
 - [ ] Audio.
-  - [ ] Music placement.
-  - [ ] Music fades.
+  - [x] Music placement.
+  - [x] Music fades.
   - [ ] Music ducking.
   - [ ] Loudness normalization.
   - [ ] Basic audio cleanup.
@@ -794,12 +797,12 @@ Goal: match the core jobs people expect from a modern transcript-first editor.
 - [ ] Export.
   - [x] MP4 export.
   - [x] 720p, 1080p, 4K height choices.
-  - [ ] Compression setting.
-  - [ ] Frame rate setting.
+  - [x] Compression setting.
+  - [x] Frame rate setting.
   - [ ] Social presets.
   - [ ] Fast long-source export.
 - [ ] Collaboration and trust.
-  - [ ] Action history.
+  - [x] Action history.
   - [ ] Undo and redo.
   - [ ] Before and after review.
   - [ ] Agent task log.
@@ -1082,15 +1085,15 @@ This order makes the product feel more capable every few steps while keeping age
 
 ### Alpha gate: capable local editor
 
-- [ ] Browser project creation works.
-- [ ] UI phrase search and batch cuts work.
-- [ ] Music placement works in preview and export.
-- [ ] Export settings are real.
-- [ ] Basic action history exists.
-- [ ] `bun run check` passes.
-- [ ] `bun run typecheck` passes.
-- [ ] `bun test` passes.
-- [ ] `bun run build` passes.
+- [x] Browser project creation works.
+- [x] UI phrase search and batch cuts work.
+- [x] Music placement works in preview and export.
+- [x] Export settings are real.
+- [x] Basic action history exists.
+- [x] `bun run check` passes.
+- [x] `bun run typecheck` passes.
+- [x] `bun test` passes.
+- [x] `bun run build` passes.
 
 ### Beta gate: done-for-you agent draft
 

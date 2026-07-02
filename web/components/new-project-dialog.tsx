@@ -20,9 +20,11 @@ import { Spinner } from "@/components/ui/spinner";
 import {
   applyToasts,
   toastError,
+  toastProjectCreateFailed,
   toastWorkspacePickFailed,
 } from "@/lib/app-toast";
 import { APP_ICON_CLASS, Check, Film, FolderOpen, Upload } from "@/lib/icon";
+import { selectDroppedVideo } from "@/lib/project-intake";
 import { workspacePickerToasts } from "@/lib/toast-notifications";
 import { cn } from "@/lib/utils";
 import {
@@ -30,6 +32,10 @@ import {
   pickWorkspaceFolder,
   type WorkspaceInfo,
 } from "@/lib/workspace-client";
+import {
+  SUPPORTED_VIDEO_ACCEPT,
+  SUPPORTED_VIDEO_LABEL,
+} from "../../src/video-formats.ts";
 
 export type NewProjectStep = "folder" | "video";
 
@@ -176,10 +182,25 @@ export function NewProjectDialog({
     void onVideoSelected(file);
   };
 
+  // Shared client-side format gate for both the drop zone and the file
+  // picker: a .txt should fail here with actionable copy, not minutes later
+  // in ffprobe.
+  const intakeFiles = (files: readonly File[]) => {
+    if (files.length === 0) {
+      return;
+    }
+    const picked = selectDroppedVideo(files);
+    if ("error" in picked) {
+      toastProjectCreateFailed(picked.error);
+      return;
+    }
+    submitVideo(picked.file);
+  };
+
   const onDrop = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setDragging(false);
-    submitVideo(e.dataTransfer.files[0]);
+    intakeFiles(Array.from(e.dataTransfer.files));
   };
 
   const folderDone = step === "video";
@@ -268,6 +289,7 @@ export function NewProjectDialog({
                   ? "border-primary bg-primary/10"
                   : "border-border bg-muted/40"
               )}
+              data-drop-target="new-project-dialog"
               onDragEnter={(e) => {
                 e.preventDefault();
                 setDragging(true);
@@ -286,8 +308,8 @@ export function NewProjectDialog({
               </div>
               <p className="font-medium text-sm">Drop a video here</p>
               <p className="mt-1 text-muted-foreground text-xs">
-                MP4, MOV, or WebM. OpenKlip transcribes speech and builds your
-                edit.
+                {SUPPORTED_VIDEO_LABEL}. OpenKlip transcribes speech and builds
+                your edit.
               </p>
               <Button
                 className="mt-4"
@@ -309,11 +331,13 @@ export function NewProjectDialog({
         )}
 
         <input
-          accept="video/*"
+          accept={SUPPORTED_VIDEO_ACCEPT}
           className="hidden"
+          data-project-upload-input=""
           onChange={(e) => {
-            submitVideo(e.target.files?.[0]);
+            const files = Array.from(e.target.files ?? []);
             e.target.value = "";
+            intakeFiles(files);
           }}
           ref={inputRef}
           type="file"

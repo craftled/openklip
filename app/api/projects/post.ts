@@ -1,10 +1,19 @@
 import { existsSync } from "node:fs";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { startIngestJob } from "@engine/ingest-jobs";
+import {
+  releaseIngestSlug,
+  reserveIngestSlug,
+  startIngestJob,
+} from "@engine/ingest-jobs";
 import type { IngestProgress } from "@engine/ingest-types";
 import { projectPaths, slugFromVideo } from "@engine/paths";
+import { withProjectLock } from "@engine/project-lock";
+import {
+  isSupportedVideoFilename,
+  unsupportedVideoMessage,
+} from "@engine/video-formats";
 import type { NextRequest } from "next/server";
 
 export type IngestFn = (
@@ -22,6 +31,34 @@ export async function loadProjectIngest(): Promise<IngestFn> {
   return ingest;
 }
 
+// The temp upload dir is deleted once ingest settles, but project.json
+// `source` must keep pointing at a real absolute file: the exporter renders
+// full-res from source and silently degrades to the 720p proxy when it is
+// gone (src/exporter.ts, src/doctor.ts). Persist the upload at the project
+// root next to project.json (NOT assets/, which folder-sync would register
+// as b-roll) and repoint source at that absolute path.
+async function persistUploadedSource(
+  slug: string,
+  filename: string,
+  tmpPath: string
+): Promise<void> {
+  const paths = projectPaths(slug);
+  const storedSource = join(paths.dir, filename);
+  await copyFile(tmpPath, storedSource);
+  // Serialize under the same per-slug lock mutateProject uses: in the ?force=1
+  // overwrite path the editor may already be autosaving this slug, and an
+  // unlocked read-patch-write could drop that concurrent edit. mutateProject
+  // itself is deliberately not used; this internal repoint must not bump the
+  // revision or add a history entry.
+  await withProjectLock(slug, async () => {
+    const project = JSON.parse(await readFile(paths.project, "utf8")) as {
+      source?: string;
+    };
+    project.source = storedSource;
+    await writeFile(paths.project, JSON.stringify(project, null, 2));
+  });
+}
+
 export function createProjectsPost({ loadIngest, tempRoot }: ProjectsPostDeps) {
   return async function POST(req: NextRequest): Promise<Response> {
     const form = await req.formData();
@@ -29,21 +66,55 @@ export function createProjectsPost({ loadIngest, tempRoot }: ProjectsPostDeps) {
     if (!(file instanceof File)) {
       return Response.json({ error: "missing file field" }, { status: 400 });
     }
+    // Fail fast on non-video uploads instead of minutes later in ffprobe.
+    if (!isSupportedVideoFilename(file.name)) {
+      return Response.json(
+        { error: unsupportedVideoMessage(file.name) },
+        { status: 400 }
+      );
+    }
     const force = new URL(req.url).searchParams.get("force") === "1";
     const filename = file.name.replace(/[^\w.-]+/g, "_") || "video.mp4";
     const slug = slugFromVideo(filename);
-    if (!force && existsSync(projectPaths(slug).project)) {
+    // Ingest wipes the project dir FIRST and writes project.json LAST, so the
+    // existsSync guard below cannot see a half-done ingest. Claim the slug
+    // ATOMICALLY here (force included; scan-inbox applies the same guard):
+    // the awaits below (temp write, arrayBuffer, loadIngest) would otherwise
+    // let two same-name uploads both pass a bare in-flight check and race two
+    // ingests over one directory. Every early exit after this point must
+    // release the claim; startIngestJob takes ownership and releases when the
+    // job settles.
+    if (!reserveIngestSlug(slug)) {
+      // `code` disambiguates the two 409s: only "exists" may offer the
+      // destructive replace flow client-side; an in-flight conflict must
+      // surface as a plain failure (confirming a replace after the running
+      // ingest finished would wipe the just-created project).
       return Response.json(
         {
+          code: "in-flight",
+          error: `ingest already in progress for ${slug}`,
+        },
+        { status: 409 }
+      );
+    }
+    if (!force && existsSync(projectPaths(slug).project)) {
+      releaseIngestSlug(slug);
+      return Response.json(
+        {
+          code: "exists",
           error: `project already exists: ${slug} (re-ingest would wipe it; confirm to overwrite)`,
         },
         { status: 409 }
       );
     }
 
-    const tmpDir = await mkdtemp(
-      join(tempRoot ?? tmpdir(), "openklip-ingest-")
-    );
+    let tmpDir: string;
+    try {
+      tmpDir = await mkdtemp(join(tempRoot ?? tmpdir(), "openklip-ingest-"));
+    } catch (error) {
+      releaseIngestSlug(slug);
+      throw error;
+    }
     const tmpPath = join(tmpDir, filename);
     try {
       await writeFile(tmpPath, new Uint8Array(await file.arrayBuffer()));
@@ -54,7 +125,12 @@ export function createProjectsPost({ loadIngest, tempRoot }: ProjectsPostDeps) {
         slug,
         run: async (onProgress) => {
           try {
-            return await ingest(tmpPath, { force, onProgress });
+            const createdSlug = await ingest(tmpPath, { force, onProgress });
+            // Copy after ingest resolves (ingest wipes the project dir at
+            // start) and before temp cleanup; a failed copy lands in
+            // job.error and surfaces through the existing poll path.
+            await persistUploadedSource(createdSlug, filename, tmpPath);
+            return createdSlug;
           } finally {
             await rm(tmpDir, { recursive: true, force: true });
           }
@@ -62,6 +138,7 @@ export function createProjectsPost({ loadIngest, tempRoot }: ProjectsPostDeps) {
       });
       return Response.json({ jobId: job.id, slug });
     } catch (error) {
+      releaseIngestSlug(slug);
       await rm(tmpDir, { recursive: true, force: true });
       throw error;
     }

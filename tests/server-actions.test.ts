@@ -11,6 +11,9 @@ import {
   saveTitles,
   saveZooms,
 } from "../app/actions.ts";
+import { readActionLog } from "../src/action-log.ts";
+import { SAMPLE_RATE } from "../src/edl.ts";
+import type { ExportCompression } from "../src/exporter.ts";
 import { loadProject } from "../src/projectStore.ts";
 import {
   makeProject,
@@ -65,14 +68,87 @@ test("runGuiAction persists registry-backed GUI actions", async () => {
   });
 });
 
-test("runGuiAction rejects actions outside the GUI surface", async () => {
+test("runGuiAction rejects unknown actions", async () => {
   await withTempProjectsRoot(async ({ slug }) => {
     writeFixtureProject(slug, makeProject({ slug }));
-    const result = await runGuiAction(slug, "cut-text", { phrase: "hello" });
+    const result = await runGuiAction(slug, "does-not-exist", {});
     assert.equal(result.ok, false);
     if (!result.ok) {
-      assert.match(result.error, /not available in the GUI/);
+      assert.match(result.error, /unknown GUI action/);
     }
+  });
+});
+
+// ── MILESTONE 3.1: UI phrase search and batch cuts through the GUI surface ──
+
+function phraseWords(texts: string[]) {
+  return texts.map((text, i) => ({
+    id: `w${i}`,
+    text,
+    startSample: i * SAMPLE_RATE,
+    endSample: (i + 1) * SAMPLE_RATE,
+    deleted: false,
+  }));
+}
+
+test("runGuiAction cut-text cuts every match and carries the note", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(
+      slug,
+      makeProject({
+        slug,
+        words: phraseWords(["you", "know", "this", "you", "know"]),
+      })
+    );
+    const result = await runGuiAction(slug, "cut-text", {
+      phrase: "you know",
+      all: true,
+      note: "filler",
+    });
+    assert.equal(result.ok, true);
+    const loaded = await loadProject(slug);
+    const byId = new Map(loaded.words.map((w) => [w.id, w]));
+    for (const id of ["w0", "w1", "w3", "w4"]) {
+      assert.equal(byId.get(id)?.deleted, true, `${id} not cut`);
+      assert.equal(byId.get(id)?.note, "filler", `${id} missing note`);
+    }
+    assert.equal(byId.get("w2")?.deleted, false);
+  });
+});
+
+test("runGuiAction cut with deleted:false restores words", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    const project = makeProject({ slug });
+    project.words[0].deleted = true;
+    writeFixtureProject(slug, project);
+    const result = await runGuiAction(slug, "cut", {
+      ids: ["w0"],
+      deleted: false,
+    });
+    assert.equal(result.ok, true);
+    const loaded = await loadProject(slug);
+    assert.equal(loaded.words[0].deleted, false);
+  });
+});
+
+test("runGuiAction cut-text flags a phrase-anchored overlay stale", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    const project = makeProject({ slug });
+    project.broll = [
+      {
+        id: "br1",
+        assetId: "broll-a",
+        startSample: SAMPLE_RATE,
+        endSample: 2 * SAMPLE_RATE,
+        srcInSample: 0,
+        anchor: { phrase: "world", wordIds: ["w1"], stale: false },
+      },
+    ];
+    writeFixtureProject(slug, project);
+    const result = await runGuiAction(slug, "cut-text", { phrase: "world" });
+    assert.equal(result.ok, true);
+    const loaded = await loadProject(slug);
+    assert.equal(loaded.broll[0].anchor?.stale, true);
   });
 });
 
@@ -230,6 +306,27 @@ test("exportProject returns ok:false for missing projects", async () => {
   });
 });
 
+test("exportProject rejects out-of-bounds options before any export work", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    // The fixture has no real media, so reaching exportCut would fail with a
+    // missing-source error; matching the validation copy proves the request
+    // failed fast before ffmpeg (or any export work) was invoked.
+    const badFps = await exportProject(slug, { fps: 1e9 });
+    assert.equal(badFps.ok, false);
+    if (!badFps.ok) {
+      assert.match(badFps.error, /fps must be an integer between 1 and 120/);
+    }
+    const badCompression = await exportProject(slug, {
+      compression: "ultra" as ExportCompression,
+    });
+    assert.equal(badCompression.ok, false);
+    if (!badCompression.ok) {
+      assert.match(badCompression.error, /unknown compression preset "ultra"/);
+    }
+  });
+});
+
 test("exportProject returns ok:false when all words are cut", async () => {
   await withTempProjectsRoot(async ({ slug }) => {
     writeFixtureProject(
@@ -244,6 +341,38 @@ test("exportProject returns ok:false when all words are cut", async () => {
     if (!result.ok) {
       assert.match(result.error, /nothing to export/);
     }
+  });
+});
+
+// ── ACTION HISTORY: GUI mutations are recorded with actor "human" ───────────
+
+test("runGuiAction records a history entry with actor human", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const result = await runGuiAction(slug, "look-vignette", {
+      vignette: true,
+    });
+    assert.equal(result.ok, true);
+    const entries = await readActionLog(slug);
+    assert.equal(entries.length, 1);
+    assert.equal(entries[0].action, "look-vignette");
+    assert.equal(entries[0].actor, "human");
+    assert.equal(entries[0].revisionBefore, 0);
+    assert.equal(entries[0].revisionAfter, 1);
+  });
+});
+
+test("saveProjectEdits records an edit-words history entry", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const result = await saveProjectEdits(slug, {
+      words: [{ id: "w0", deleted: true }],
+    });
+    assert.equal(result.ok, true);
+    const entries = await readActionLog(slug);
+    assert.equal(entries.length, 1);
+    assert.equal(entries[0].action, "edit-words");
+    assert.equal(entries[0].actor, "human");
   });
 });
 

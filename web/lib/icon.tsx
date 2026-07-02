@@ -22,6 +22,7 @@ import {
   IconMoon,
   IconMovie,
   IconMusic,
+  IconMusicOff,
   IconPackage,
   IconPalette,
   IconPencil,
@@ -115,6 +116,7 @@ export const Monitor = IconDeviceDesktop;
 export const Moon = IconMoon;
 export const MoreHorizontal = IconDots;
 export const Music = IconMusic;
+export const MusicOff = IconMusicOff;
 export const NewChatIcon = IconMessagePlus;
 export const Palette = IconPalette;
 export const PanelLeft = IconLayoutSidebarLeftCollapse;

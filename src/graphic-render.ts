@@ -23,7 +23,7 @@ export interface RenderGraphicInput {
   compositionHtml?: string;
   // Overlay span length on the 48kHz sample grid (endSample - startSample).
   durationSamples: number;
-  // Output fps (exporter passes Math.max(1, Math.round(sourceMeta.fps))).
+  // Output fps (the exporter passes its single resolved outFps).
   fps: number;
   height: number;
   // The overlay's UNIQUE id (g.id). Keys the emitted asset filename so two

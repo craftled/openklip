@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -9,6 +10,7 @@ import {
 } from "../app/api/projects/post.ts";
 import { GET, POST } from "../app/api/projects/route.ts";
 import { getIngestJob, type IngestJob } from "../src/ingest-jobs.ts";
+import { projectsRoot } from "../src/paths.ts";
 import {
   makeProject,
   withTempProjectsRoot,
@@ -68,7 +70,14 @@ test("POST /api/projects returns 400 when file is missing", async () => {
 test("POST /api/projects starts an ingest job and returns its id + slug", async () => {
   await withTempProjectsRoot(async () => {
     const post = createProjectsPost({
-      loadIngest: async () => async () => "uploaded-demo",
+      // Like real ingest, the stub leaves a created project dir behind.
+      loadIngest: async () => () => {
+        writeFixtureProject(
+          "uploaded-demo",
+          makeProject({ slug: "uploaded-demo" })
+        );
+        return Promise.resolve("uploaded-demo");
+      },
     });
 
     const res = await post(
@@ -124,8 +133,52 @@ test("POST /api/projects returns 409 when the project already exists", async () 
       ingestRequest(new File(["fake-bytes"], "demo.mp4", { type: "video/mp4" }))
     );
     assert.equal(res.status, 409);
-    const json = (await res.json()) as { error?: string };
+    const json = (await res.json()) as { code?: string; error?: string };
+    // code "exists" is what lets the client offer the destructive replace.
+    assert.equal(json.code, "exists");
     assert.match(json.error ?? "", /already exists/i);
+  });
+});
+
+test("POST /api/projects returns 409 while an ingest for the slug is in flight", async () => {
+  await withTempProjectsRoot(async () => {
+    let release: (slug: string) => void = () => undefined;
+    const gate = new Promise<string>((resolve) => {
+      release = resolve;
+    });
+    const post = createProjectsPost({
+      // Slow ingest: the job stays "running" until the test opens the gate.
+      loadIngest: async () => async () => {
+        const slug = await gate;
+        writeFixtureProject(slug, makeProject({ slug }));
+        return slug;
+      },
+    });
+
+    const first = await post(
+      ingestRequest(new File(["fake-bytes"], "clip.mp4", { type: "video/mp4" }))
+    );
+    assert.equal(first.status, 200);
+    const firstJson = (await first.json()) as { jobId?: string };
+    assert.ok(firstJson.jobId);
+
+    // Same filename -> same slug. Ingest wipes the project dir first and
+    // writes project.json last, so the existsSync guard cannot cover this
+    // window; the in-flight guard must.
+    const second = await post(
+      ingestRequest(new File(["fake-bytes"], "clip.mp4", { type: "video/mp4" }))
+    );
+    assert.equal(second.status, 409);
+    const json = (await second.json()) as { code?: string; error?: string };
+    // code "in-flight", NOT "exists": the client must show a plain failure,
+    // never the replace-project confirmation.
+    assert.equal(json.code, "in-flight");
+    assert.match(json.error ?? "", /already in progress/i);
+
+    // Settle the first job so the in-flight guard clears for later tests.
+    release("clip");
+    const done = await pollJob(firstJson.jobId as string);
+    assert.equal(done.status, "done");
   });
 });
 
@@ -135,6 +188,7 @@ test("POST /api/projects?force=1 passes force through to ingest", async () => {
     const post = createProjectsPost({
       loadIngest: async () => (_video, opts) => {
         receivedForce = opts?.force;
+        writeFixtureProject("force-demo", makeProject({ slug: "force-demo" }));
         return Promise.resolve("force-demo");
       },
     });
@@ -151,5 +205,134 @@ test("POST /api/projects?force=1 passes force through to ingest", async () => {
     assert.ok(json.jobId);
     await pollJob(json.jobId);
     assert.equal(receivedForce, true);
+  });
+});
+
+test("POST /api/projects rejects unsupported formats with actionable copy", async () => {
+  await withTempProjectsRoot(async () => {
+    const res = await POST(
+      ingestRequest(new File(["hello"], "notes.txt", { type: "text/plain" }))
+    );
+    assert.equal(res.status, 400);
+    const json = (await res.json()) as { error?: string };
+    assert.match(json.error ?? "", /unsupported/i);
+    assert.match(json.error ?? "", /\.txt/);
+    assert.match(json.error ?? "", /MP4, MOV, M4V, WebM, MKV, AVI/);
+  });
+});
+
+test("POST /api/projects persists the upload and repoints project.json source", async () => {
+  await withTempProjectsRoot(async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "openklip-route-test-"));
+    try {
+      const post = createProjectsPost({
+        // Minimal stand-in for real ingest: creates the project dir and a
+        // project.json whose source is the temp upload path it received.
+        loadIngest: async () => (videoArg) => {
+          const dir = join(projectsRoot(), "clip");
+          mkdirSync(dir, { recursive: true });
+          writeFileSync(
+            join(dir, "project.json"),
+            JSON.stringify({ slug: "clip", source: videoArg }, null, 2)
+          );
+          return Promise.resolve("clip");
+        },
+        tempRoot,
+      });
+
+      const res = await post(
+        ingestRequest(
+          new File(["fake-bytes"], "clip.mp4", { type: "video/mp4" })
+        )
+      );
+      assert.equal(res.status, 200);
+      const json = (await res.json()) as { jobId?: string };
+      assert.ok(json.jobId);
+      const done = await pollJob(json.jobId as string);
+      assert.equal(done.status, "done");
+
+      // The uploaded source survives at the project root and project.json
+      // points at it, so full-res export does not degrade to the proxy.
+      const stored = join(projectsRoot(), "clip", "clip.mp4");
+      assert.ok(existsSync(stored), "uploaded source copied to project root");
+      assert.equal(readFileSync(stored, "utf8"), "fake-bytes");
+      const project = JSON.parse(
+        readFileSync(join(projectsRoot(), "clip", "project.json"), "utf8")
+      ) as { source?: string };
+      assert.equal(project.source, stored);
+
+      assert.deepEqual([...(await openKlipTempDirs(tempRoot))], []);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+test("POST /api/projects surfaces a persist failure through the job error", async () => {
+  await withTempProjectsRoot(async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "openklip-route-test-"));
+    try {
+      const post = createProjectsPost({
+        // Ingest succeeds but blocks the copy target: a DIRECTORY already
+        // sits where persistUploadedSource wants to store clip.mp4, so
+        // copyFile throws and the failure must land in job.error.
+        loadIngest: async () => () => {
+          const dir = join(projectsRoot(), "clip");
+          mkdirSync(join(dir, "clip.mp4"), { recursive: true });
+          writeFileSync(
+            join(dir, "project.json"),
+            JSON.stringify({ slug: "clip", source: "/tmp/x.mp4" }, null, 2)
+          );
+          return Promise.resolve("clip");
+        },
+        tempRoot,
+      });
+
+      const res = await post(
+        ingestRequest(
+          new File(["fake-bytes"], "clip.mp4", { type: "video/mp4" })
+        )
+      );
+      assert.equal(res.status, 200);
+      const json = (await res.json()) as { jobId?: string };
+      assert.ok(json.jobId);
+      const done = await pollJob(json.jobId as string);
+      assert.equal(done.status, "error");
+      assert.match(done.error ?? "", /clip\.mp4|directory/i);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+test("POST /api/projects ingest failure surfaces the job error and cleans up", async () => {
+  await withTempProjectsRoot(async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "openklip-route-test-"));
+    try {
+      const post = createProjectsPost({
+        loadIngest: async () => () => Promise.reject(new Error("probe failed")),
+        tempRoot,
+      });
+
+      const res = await post(
+        ingestRequest(
+          new File(["fake-bytes"], "clip.mp4", { type: "video/mp4" })
+        )
+      );
+      assert.equal(res.status, 200);
+      const json = (await res.json()) as { jobId?: string };
+      assert.ok(json.jobId);
+      const done = await pollJob(json.jobId as string);
+      assert.equal(done.status, "error");
+      assert.match(done.error ?? "", /probe failed/);
+
+      assert.deepEqual([...(await openKlipTempDirs(tempRoot))], []);
+      assert.ok(
+        !existsSync(join(projectsRoot(), "clip", "clip.mp4")),
+        "no stray copied source after a failed ingest"
+      );
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
   });
 });

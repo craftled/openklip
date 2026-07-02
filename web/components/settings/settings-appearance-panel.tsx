@@ -13,12 +13,7 @@ import {
   setColorScheme,
   subscribeColorScheme,
 } from "@/lib/theme-preferences";
-
-function firstToggleValue(
-  value: string | readonly string[]
-): string | undefined {
-  return typeof value === "string" ? value : value[0];
-}
+import { firstToggleValue } from "@/lib/toggle-value";
 
 export function SettingsAppearancePanel() {
   const [colorScheme, setColorSchemeState] = useState<ColorScheme>("light");

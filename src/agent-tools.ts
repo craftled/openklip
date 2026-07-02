@@ -2,9 +2,10 @@
 // commands in one manifest. CLI (`openklip tools`), MCP (stdio server), and docs
 // all read from here so surfaces stay in sync with the GUI's project.json edits.
 import { z } from "zod";
+import { type Actor, actorFromEnv } from "./action-log.ts";
 import { assembleFromSelection, listTakes, loadTake } from "./assembly.ts";
 import { samplesToSec } from "./edl.ts";
-import { exportCut } from "./exporter.ts";
+import { EXPORT_COMPRESSIONS, exportCut } from "./exporter.ts";
 import { listGraphics } from "./graphics.ts";
 import { listLuts } from "./lut.ts";
 import { listProjects, loadProject, mutateProject } from "./projectStore.ts";
@@ -55,6 +56,13 @@ function zodShapeFromSchema(schema: z.ZodType): Record<string, z.ZodType> {
       ? schema
       : z.object({ slug: z.string().min(1) });
   return merged.shape as Record<string, z.ZodType>;
+}
+
+// These tools mostly run inside the MCP stdio server, so mutations default to
+// actor "mcp". The agent chat path sets OPENKLIP_ACTOR=agent on the spawned
+// server so its edits attribute to the agent instead.
+function toolActor(): Actor {
+  return actorFromEnv() ?? "mcp";
 }
 
 function scopedProjectSlug(): string | undefined {
@@ -118,8 +126,10 @@ function mutationTool(action: ActionDef): AgentToolDef {
         unknown
       >;
       const { slug: projectSlug, ...actionInput } = input;
-      return mutateProject(projectSlug, (project) =>
-        runAction(action.name, project, actionInput)
+      return mutateProject(
+        projectSlug,
+        (project) => runAction(action.name, project, actionInput),
+        { action: action.name, actor: toolActor(), input: actionInput }
       );
     },
   };
@@ -319,10 +329,16 @@ const queryTools: AgentToolDef[] = [
     summary: "Attach a template id to project.json.",
     schema: z.object({ slug, id: z.string().min(1) }),
     run: async ({ slug: projectSlug, id }) =>
-      mutateProject(projectSlug, (project) => {
-        applyProjectTemplate(project, id);
-        return { template: project.template };
-      }),
+      mutateProject(
+        projectSlug,
+        (project) => {
+          applyProjectTemplate(project, id);
+          return { template: project.template };
+        },
+        // Logged as "template-set": history action names are hyphenated even
+        // though the MCP tool itself keeps its underscored name.
+        { action: "template-set", actor: toolActor(), input: { id } }
+      ),
   }),
   defineQueryTool({
     name: "title-add-phrase",
@@ -335,20 +351,28 @@ const queryTools: AgentToolDef[] = [
       note: z.string().optional(),
     }),
     run: async ({ slug: projectSlug, spokenPhrase, text, position, note }) =>
-      mutateProject(projectSlug, (project) => {
-        const span = placeFromPhrase(project, spokenPhrase);
-        if (!span.matched) {
-          throw new Error(`no match for spoken phrase: "${spokenPhrase}"`);
+      mutateProject(
+        projectSlug,
+        (project) => {
+          const span = placeFromPhrase(project, spokenPhrase);
+          if (!span.matched) {
+            throw new Error(`no match for spoken phrase: "${spokenPhrase}"`);
+          }
+          return runAction("title-add", project, {
+            fromSec: span.fromSec,
+            toSec: span.toSec,
+            text: text.replace(/\\n/g, "\n"),
+            position,
+            note,
+            anchor: { phrase: spokenPhrase, wordIds: span.ids, stale: false },
+          });
+        },
+        {
+          action: "title-add-phrase",
+          actor: toolActor(),
+          input: { spokenPhrase, text, position, note },
         }
-        return runAction("title-add", project, {
-          fromSec: span.fromSec,
-          toSec: span.toSec,
-          text: text.replace(/\\n/g, "\n"),
-          position,
-          note,
-          anchor: { phrase: spokenPhrase, wordIds: span.ids, stale: false },
-        });
-      }),
+      ),
   }),
   defineQueryTool({
     name: "zoom-add-phrase",
@@ -361,20 +385,28 @@ const queryTools: AgentToolDef[] = [
       note: z.string().optional(),
     }),
     run: async ({ slug: projectSlug, spokenPhrase, scale, rampSec, note }) =>
-      mutateProject(projectSlug, (project) => {
-        const span = placeFromPhrase(project, spokenPhrase);
-        if (!span.matched) {
-          throw new Error(`no match for spoken phrase: "${spokenPhrase}"`);
+      mutateProject(
+        projectSlug,
+        (project) => {
+          const span = placeFromPhrase(project, spokenPhrase);
+          if (!span.matched) {
+            throw new Error(`no match for spoken phrase: "${spokenPhrase}"`);
+          }
+          return runAction("zoom-add", project, {
+            fromSec: span.fromSec,
+            toSec: span.toSec,
+            scale,
+            rampSec,
+            note,
+            anchor: { phrase: spokenPhrase, wordIds: span.ids, stale: false },
+          });
+        },
+        {
+          action: "zoom-add-phrase",
+          actor: toolActor(),
+          input: { spokenPhrase, scale, rampSec, note },
         }
-        return runAction("zoom-add", project, {
-          fromSec: span.fromSec,
-          toSec: span.toSec,
-          scale,
-          rampSec,
-          note,
-          anchor: { phrase: spokenPhrase, wordIds: span.ids, stale: false },
-        });
-      }),
+      ),
   }),
   defineQueryTool({
     name: "broll-add-phrase",
@@ -386,29 +418,48 @@ const queryTools: AgentToolDef[] = [
       note: z.string().optional(),
     }),
     run: async ({ slug: projectSlug, assetId, spokenPhrase, note }) =>
-      mutateProject(projectSlug, (project) => {
-        const span = placeFromPhrase(project, spokenPhrase);
-        if (!span.matched) {
-          throw new Error(`no match for spoken phrase: "${spokenPhrase}"`);
+      mutateProject(
+        projectSlug,
+        (project) => {
+          const span = placeFromPhrase(project, spokenPhrase);
+          if (!span.matched) {
+            throw new Error(`no match for spoken phrase: "${spokenPhrase}"`);
+          }
+          return runAction("broll-add", project, {
+            assetId,
+            fromSec: span.fromSec,
+            toSec: span.toSec,
+            note,
+            anchor: { phrase: spokenPhrase, wordIds: span.ids, stale: false },
+          });
+        },
+        {
+          action: "broll-add-phrase",
+          actor: toolActor(),
+          input: { assetId, spokenPhrase, note },
         }
-        return runAction("broll-add", project, {
-          assetId,
-          fromSec: span.fromSec,
-          toSec: span.toSec,
-          note,
-          anchor: { phrase: spokenPhrase, wordIds: span.ids, stale: false },
-        });
-      }),
+      ),
   }),
   defineQueryTool({
     name: "export",
     summary: "Render the current cut to output/out.mp4.",
     schema: z.object({
       slug,
-      maxHeight: z.number().int().positive().optional(),
+      maxHeight: z.number().int().positive().max(4320).optional(),
+      compression: z
+        .enum(EXPORT_COMPRESSIONS)
+        .optional()
+        .describe("Encoder preset; default social (today's settings)"),
+      fps: z
+        .number()
+        .int()
+        .min(1)
+        .max(120)
+        .optional()
+        .describe("Output frame rate; default = source rate"),
     }),
-    run: async ({ slug: projectSlug, maxHeight }) =>
-      exportCut(projectSlug, { maxHeight }),
+    run: async ({ slug: projectSlug, maxHeight, compression, fps }) =>
+      exportCut(projectSlug, { compression, fps, maxHeight }),
   }),
   defineQueryTool({
     name: "verify",

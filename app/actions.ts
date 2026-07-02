@@ -2,6 +2,7 @@
 
 import { existsSync } from "node:fs";
 import type { ColorAdjust, Cuts, Filter, Motion } from "@engine/edl";
+import type { ExportCompression } from "@engine/exporter";
 import { projectPaths } from "@engine/paths";
 import {
   applyBroll,
@@ -49,8 +50,10 @@ export async function runGuiAction(
     if (!action.surfaces.includes("gui")) {
       throw new Error(`action is not available in the GUI: ${actionName}`);
     }
-    const result = await mutateProject(slug, (project) =>
-      runAction(actionName, project, input)
+    const result = await mutateProject(
+      slug,
+      (project) => runAction(actionName, project, input),
+      { action: actionName, actor: "human", input }
     );
     return { ok: true, data: { result } };
   } catch (e) {
@@ -69,7 +72,11 @@ export async function saveProjectEdits(
   }
 ): Promise<ActionResult> {
   try {
-    await mutateProject(slug, (project) => applyProjectEdits(project, body));
+    await mutateProject(slug, (project) => applyProjectEdits(project, body), {
+      action: "edit-words",
+      actor: "human",
+      input: body,
+    });
     return { ok: true };
   } catch (e) {
     return fail(e);
@@ -86,7 +93,11 @@ export async function saveLook(
   }
 ): Promise<ActionResult> {
   try {
-    await mutateProject(slug, (project) => applyLook(project, body));
+    await mutateProject(slug, (project) => applyLook(project, body), {
+      action: "look",
+      actor: "human",
+      input: body,
+    });
     return { ok: true };
   } catch (e) {
     return fail(e);
@@ -98,7 +109,11 @@ export async function saveMotion(
   body: Partial<Motion>
 ): Promise<ActionResult> {
   try {
-    await mutateProject(slug, (project) => applyMotion(project, body));
+    await mutateProject(slug, (project) => applyMotion(project, body), {
+      action: "motion",
+      actor: "human",
+      input: body,
+    });
     return { ok: true };
   } catch (e) {
     return fail(e);
@@ -110,10 +125,14 @@ export async function saveZooms(
   zooms: unknown[]
 ): Promise<ActionResult<{ zooms: ReturnType<typeof clampZoomItems> }>> {
   try {
-    const items = await mutateProject(slug, (project) => {
-      applyZooms(project, zooms);
-      return project.zooms;
-    });
+    const items = await mutateProject(
+      slug,
+      (project) => {
+        applyZooms(project, zooms);
+        return project.zooms;
+      },
+      { action: "zooms", actor: "human", input: zooms }
+    );
     return { ok: true, data: { zooms: items } };
   } catch (e) {
     return fail(e);
@@ -125,10 +144,14 @@ export async function saveBroll(
   broll: unknown[]
 ): Promise<ActionResult<{ broll: ReturnType<typeof clampBrollItems> }>> {
   try {
-    const items = await mutateProject(slug, (project) => {
-      applyBroll(project, broll);
-      return project.broll;
-    });
+    const items = await mutateProject(
+      slug,
+      (project) => {
+        applyBroll(project, broll);
+        return project.broll;
+      },
+      { action: "broll", actor: "human", input: broll }
+    );
     return { ok: true, data: { broll: items } };
   } catch (e) {
     return fail(e);
@@ -140,10 +163,14 @@ export async function saveTitles(
   titles: unknown[]
 ): Promise<ActionResult<{ titles: ReturnType<typeof clampTitleItems> }>> {
   try {
-    const items = await mutateProject(slug, (project) => {
-      applyTitles(project, titles);
-      return project.titles;
-    });
+    const items = await mutateProject(
+      slug,
+      (project) => {
+        applyTitles(project, titles);
+        return project.titles;
+      },
+      { action: "titles", actor: "human", input: titles }
+    );
     return { ok: true, data: { titles: items } };
   } catch (e) {
     return fail(e);
@@ -155,10 +182,14 @@ export async function saveStills(
   stills: unknown[]
 ): Promise<ActionResult<{ stills: ReturnType<typeof clampStillItems> }>> {
   try {
-    const items = await mutateProject(slug, (project) => {
-      applyStills(project, stills);
-      return project.stills;
-    });
+    const items = await mutateProject(
+      slug,
+      (project) => {
+        applyStills(project, stills);
+        return project.stills;
+      },
+      { action: "stills", actor: "human", input: stills }
+    );
     return { ok: true, data: { stills: items } };
   } catch (e) {
     return fail(e);
@@ -167,18 +198,48 @@ export async function saveStills(
 
 export async function exportProject(
   slug: string,
-  maxHeight?: number
+  options?: {
+    compression?: ExportCompression;
+    fps?: number;
+    maxHeight?: number;
+  }
 ): Promise<
   ActionResult<{
     ranges: number;
     height: number;
+    fps: number;
+    compression: ExportCompression;
     durationSec: number;
     out: string;
   }>
 > {
   try {
-    const { exportCut } = await import("@engine/exporter");
-    const result = await exportCut(slug, { maxHeight });
+    const { EXPORT_COMPRESSIONS, exportCut } = await import("@engine/exporter");
+    // Server actions are network-reachable: enforce the same bounds the HTTP
+    // route and MCP tool do before any export work, instead of trusting the
+    // caller (an unchecked fps would land verbatim in the filtergraph).
+    const { compression, fps, maxHeight } = options ?? {};
+    if (
+      fps !== undefined &&
+      !(Number.isInteger(fps) && fps >= 1 && fps <= 120)
+    ) {
+      throw new Error("fps must be an integer between 1 and 120");
+    }
+    if (
+      compression !== undefined &&
+      !EXPORT_COMPRESSIONS.includes(compression)
+    ) {
+      throw new Error(
+        `unknown compression preset "${compression}" (expected one of: ${EXPORT_COMPRESSIONS.join(", ")})`
+      );
+    }
+    if (
+      maxHeight !== undefined &&
+      !(Number.isInteger(maxHeight) && maxHeight >= 1 && maxHeight <= 4320)
+    ) {
+      throw new Error("maxHeight must be an integer between 1 and 4320");
+    }
+    const result = await exportCut(slug, { compression, fps, maxHeight });
     return { ok: true, data: result };
   } catch (e) {
     return fail(e);

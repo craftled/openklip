@@ -87,6 +87,8 @@ interface EditTimelineProps {
   graphics: TimelineClip[];
   libraryMusic?: TimelineClip[];
   libraryStills?: TimelineClip[];
+  /** Placed music beds (project.music); rendered as simple spans, no drag-trim. */
+  music?: TimelineClip[];
   onClipTiming: (
     kind: TimelineClipKind,
     id: string,
@@ -555,6 +557,7 @@ export function EditTimeline({
   durationSec,
   libraryMusic = [],
   libraryStills = [],
+  music = [],
   graphics,
   onClipTiming,
   onSeek,
@@ -760,6 +763,32 @@ export function EditTimeline({
             label="Stills"
             trackKind="still"
           />
+
+          {music.length > 0 && (
+            <TrackRow
+              contentWidthPx={contentWidthPx}
+              icon={Music}
+              label="Music"
+              onSeek={onSeek}
+              scrollLeft={scrollLeft}
+              ticks={gridTicks}
+              zoom={zoom}
+            >
+              {music.map((clip) => (
+                <div
+                  className="absolute top-1 bottom-1 truncate rounded border border-border bg-muted/70 px-1 text-foreground text-xs leading-none"
+                  key={clip.id}
+                  style={{
+                    left: clipLeftPx(clip.startSec, zoom),
+                    width: clipWidthPx(clip.startSec, clip.endSec, zoom),
+                  }}
+                  title={`${clip.label} (music bed)`}
+                >
+                  {clip.label}
+                </div>
+              ))}
+            </TrackRow>
+          )}
 
           {libraryMusic.length > 0 && (
             <TrackRow

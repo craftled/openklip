@@ -4,7 +4,7 @@
 
 OpenKlip is a lean, local-first **agent-native video toolchain**: external agents drive the edit loop via CLI; humans review in the browser. Both read/write the same `project.json` on disk.
 
-**Current release:** v0.10.0.1 (2026-07-01). Working local editor: cut → captions → b-roll → vignette → push-in zoom → titles → grade/LUT → rich graphics → json-render product announcement graphics → export; cinema player with live graphics/titles/captions overlays; resizable right chat sidebar with Claude MCP edits; right-side Config shell with color temperature controls; smaller-screen Chat and Config overlays; asset cards (`openklip analyze` + **Describe assets**); skills slash menu; MCP agent tools (55 tools); edit templates; native HTML/CSS graphics templates (pixel-faithful headless-Chrome export to ProRes 4444 alpha); default shadcn neutral theme with Base UI primitives; export dialog; macOS workspace folder picker; multi-agent filler cuts; sidebar asset bin with folder sync; written rationale notes on cuts/overlays; phrase-anchored cues that re-snap after a re-cut; multi-take assembly; 623 tests; MIT.
+**Current release:** v0.10.0.1 (2026-07-01); main has unreleased work since. Working local editor: cut → captions → b-roll → vignette → push-in zoom → titles → grade/LUT → rich graphics → json-render product announcement graphics → music placement → export; browser project creation (upload or drop a video onto the empty workspace); transcript phrase search with batch cuts and restore; real export settings (compression presets + output frame rate); append-only action history; cinema player with live graphics/titles/captions overlays; resizable right chat sidebar with Claude MCP edits; right-side Config shell with color temperature controls; smaller-screen Chat and Config overlays; asset cards (`openklip analyze` + **Describe assets**); skills slash menu; MCP agent tools (58 tools); 34 registry actions; edit templates; native HTML/CSS graphics templates (pixel-faithful headless-Chrome export to ProRes 4444 alpha); default shadcn neutral theme with Base UI primitives; export dialog; macOS workspace folder picker; multi-agent filler cuts; sidebar asset bin with folder sync; written rationale notes on cuts/overlays; phrase-anchored cues that re-snap after a re-cut; multi-take assembly; 745 tests; MIT.
 
 Preview cuts get a Glimm WebGL sweep in the browser; exported MP4s still hard-cut until the ffmpeg transition graph lands.
 
@@ -36,7 +36,7 @@ Preview cuts get a Glimm WebGL sweep in the browser; exported MP4s still hard-cu
 - [x] **Project write serialization** (`src/project-lock.ts`, `mutateProject()`; in-process per-slug locks for `project.json` and `chats.json`)
 - [x] **Chats + asset hardening** (atomic `chats.json` writes, POST folder sync, re-ingest guard with `--force`, external still copy-in)
 - [x] **Design system: default shadcn theme + Base UI primitives** (`components.json` + `app/globals.css`: stock neutral tokens, light/dark color scheme)
-- [x] **TDD test suite** (`bun test`: 623 tests across actions, captions, EDL, exporter, project lock, chats, assets, workspace, agent-tools, templates, graphics, headless render, reanchor, multi-take assembly, product announcement, and more)
+- [x] **TDD test suite** (`bun test`: 745 tests across actions, captions, EDL, exporter, project lock, chats, assets, workspace, agent-tools, templates, graphics, headless render, reanchor, multi-take assembly, product announcement, and more)
 - [x] **GitHub Actions CI** (`check`, `typecheck`, `test`, `build`)
 - [x] **Open-sourced** (public GitHub repo, MIT license, source media gitignored + purged from history)
 - [x] **Center chat panel** (agent threads + prompt input in center column; chat list in left sidebar; PR #12)
@@ -58,6 +58,12 @@ Preview cuts get a Glimm WebGL sweep in the browser; exported MP4s still hard-cu
 - [x] **Multi-take assembly** (`src/assembly-plan.ts` pure planner + `src/assembly.ts`; v0.8.10.0): `take-add` / `takes` / `assemble` ingest alternate takes into `takes/<id>/` and splice the best line per take into one single-source `project.json` (integer-exact re-timing, provenance block) the cut/overlay/export engine edits unchanged
 - [x] **Product announcement json-render graphics** (v0.10.0.0): validated catalog-constrained announcement specs render in preview and export, route through CLI / GUI / MCP actions, and include hard guards for graph cycles, orphans, oversized specs, and missing json-render catalog/spec fields.
 - [x] **Config shell and responsive right panels** (v0.10.0.0): right-side Config panel carries color temperature, captions, and timing controls; Chat and Config stay reachable below the desktop breakpoint through overlay buttons.
+- [x] **UI phrase search and batch cuts** (unreleased, 2026-07-02): transcript panel search bar (Mod+F, Kept/Cut scopes) built on the same `findPhraseRuns` engine as the CLI (`web/lib/phrase-search.ts`, parity pinned against `grepTranscript`); match list with click-to-seek and select-as-span; batch Cut first / Cut all and Restore / Restore all with affected-word counts and optional note (`web/components/transcript-search.tsx`); the `cut-text` action gained the `gui` surface.
+- [x] **Music placement** (unreleased, 2026-07-02): `music` array on `project.json` (`MusicPlacementSchema` in `src/edl.ts`; legacy projects parse unchanged); `music-add` / `music-set` / `music-rm` registry actions on cli+gui+mcp; exporter mixes each placement as one continuous window (aloop/atrim/volume/afade/adelay + amix); preview plays the bed via a synced hidden audio element with a mute toggle; Config panel Music section + placed-music timeline track.
+- [x] **Real export settings** (unreleased, 2026-07-02): compression presets studio / social / web / web-low (`encoderArgsFor`) and output frame rate (`resolveOutputFps`) in `src/exporter.ts`, wired through the export dialog (live size/time estimate), `POST /api/projects/[slug]/export`, `openklip export --fps --compression`, and the MCP export tool.
+- [x] **Append-only action history** (unreleased, 2026-07-02): `src/action-log.ts` writes `working/actions.jsonl` (action, actor, input/result summaries, timestamp, revision before/after) for every registry mutation across GUI/CLI/MCP plus GUI direct-save paths, via `mutateProject` meta; optional `revision` counter on `project.json` bumped inside the write lock; `GET /api/projects/[slug]/history` + History section in the Config panel; `OPENKLIP_ACTOR` attributes GUI-spawned agent edits.
+- [x] **Browser project creation hardening** (unreleased, 2026-07-02): shared format validation on client + server (`src/video-formats.ts`); the uploaded source persists to the project root and `project.json` `source` points at it; drag-drop onto the empty workspace; explicit overwrite confirm on 409 that re-invokes with `?force=1`.
+- [x] **Bundle-safe script paths** (unreleased, 2026-07-02): `src/script-paths.ts` anchors the transcribe script and graphic runtime entry at `repoPath` instead of `import.meta.dir` (compiled to undefined by Turbopack), fixing browser-triggered ingest, GUI verify, doctor, and rich-graphic export through Next server routes.
 
 ## Architecture & Key Decisions
 
@@ -74,7 +80,8 @@ Preview cuts get a Glimm WebGL sweep in the browser; exported MP4s still hard-cu
 
 ### Export
 
-- [ ] Wire export dialog compression, frame rate, and clipboard destination through to ffmpeg (UI exists but disabled).
+- [x] Wire export dialog compression and frame rate through to ffmpeg (presets studio / social / web / web-low + output fps on dialog, CLI, MCP, API).
+- [ ] Wire export format (GIF) and destination (file picker / clipboard) controls (UI exists but disabled).
 - [ ] Fast 4K export via per-segment input seeking (avoid full-stream `select` decode of the whole source).
 - [x] Export-from-proxy fallback when the original source file is missing.
 
@@ -133,16 +140,20 @@ Single list of current gaps (code is truth). README and release notes point here
 ### Export & media
 
 - 4K export re-decodes the whole source (slow) even for a short cut.
-- Export dialog shows compression, frame rate, and clipboard options but only **resolution** affects export today.
+- Export dialog format (MP4/GIF) and destination (file/clipboard) controls remain disabled; resolution, compression preset, and frame rate are real. The dialog's size/time estimate is approximate.
 - Glimm cut transitions are preview-only; exported MP4 hard-jumps between kept ranges.
 - B-roll is full-cover only (no PiP mode or b-roll audio ducking yet).
 - HyperFrames post-export (`openklip package`) is opt-in: requires separate `hyperframes` npm install and Chrome; not bundled.
 - `product-announcement` is the only json-render graphic catalog today; `json-graphic-add` / `json-graphic-set` accept no other type. An invalid json-render spec now shows an "Invalid graphic spec" card in the editor preview, but still degrades silently on export (the graphic is skipped).
 - json-render timeline interactions (select / trim / reload) and the smaller-screen Chat/Config overlay flows are wired and unit-covered but not yet verified end to end in a browser.
 
+### Audio & music
+
+- Music placements have no timeline drag-trim (adjust from/to in the Config panel Music section), no voice-aware ducking, and no loudness normalization.
+- Preview caps music gain at 1.0; export honors gains up to 2.0.
+
 ### Editing & transcript
 
-- Phrase-based cutting (`openklip cut --text`, `transcript grep`) is CLI/MCP-only; transcript UI uses per-word click, not phrase search.
 - Whisper word timestamps are ~100 ms loose; cuts can clip a phoneme until VAD-snapping lands.
 - Cuts are word-boundary based; no VAD snap-to-silence or equal-power audio crossfade at boundaries yet.
 - Phrase-anchored overlays re-snap to their anchor on every cut: a manual `*-set` span on a phrase-placed overlay can be re-moved by the next word deletion (place a plain `*-add` overlay to pin a span). A deleted anchor phrase leaves the overlay `stale` with its last good span until the words are restored.
@@ -150,8 +161,11 @@ Single list of current gaps (code is truth). README and release notes point here
 
 ### Workspace & platform
 
-- Workspace folder picker is **macOS-only**; Linux/Windows need `OPENKLIP_PROJECTS_ROOT` or CLI ingest. Empty landing does not upload video from the browser.
+- Workspace folder picker is **macOS-only**; Linux/Windows need `OPENKLIP_PROJECTS_ROOT` or CLI ingest. Empty landing uploads or accepts a single dropped video; folder drop, multi-file intake, and primary-footage detection are not implemented.
 - Ingester plugins are manifest + CLI discovery only (`openklip ingesters`); no GUI URL/batch ingest flow.
+- Browser uploads buffer the whole video file in memory before the temp write; streaming the body and a size limit are a follow-up.
+- `actions.jsonl` has no rotation, and history reads parse the whole file before applying the 200-entry response limit; tail-reading and rotation are a follow-up.
+- A persist-source failure after a successful ingest marks the job errored even though the project exists on disk (it opens fine, but exports fall back to the proxy); partial-success surfacing is a follow-up.
 
 ### Agent & chat
 
@@ -168,7 +182,10 @@ Single list of current gaps (code is truth). README and release notes point here
 ### Architecture & parity
 
 - GUI server actions do not dispatch through `runAction()`: CLI uses `src/registry.ts`; GUI uses `app/actions.ts` + `projectMutations` (same `project.json`, separate code paths).
-- Project write locks are in-process only. Two concurrent **processes** writing the same slug (e.g. CLI agent + running editor server) can still race.
+- Project write locks are in-process only. Two concurrent **processes** writing the same slug (e.g. CLI agent + running editor server) can still race; the `revision` counter shares the same limit, so cross-process revision bumps can race.
+- Action history logs registry and GUI mutations only: non-registry CLI paths (asset registration, template set, assembly) do not log yet. History has no filters and no undo. Multi-take `assemble` also rewrites `project.json` outside `mutateProject`, resetting the revision counter without a history entry.
+- `ProjectSchema` strips unknown keys on parse: an older OpenKlip build that saves a project created here would silently drop newer fields (for example `music`, `revision`). Adopt a forward-compat policy (passthrough or version gating) before the next schema addition.
+- Batch phrase cuts persist the phrase (`cut-text`), not the resolved word ids: if an external agent edits the transcript between render and save, the server can cut different words than the optimistic UI showed. The serialized save chain makes this unlikely; reload after external CLI edits (already the rule below).
 - Reload the browser after CLI edits to see changes in the editor.
 - A local `.openklip/projects-root` affects `projectsRoot()` for CLI and server started from that cwd (intentional; isolate tests with a clean temp cwd).
 

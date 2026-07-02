@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { addBroll, addTitle, addZoom } from "../src/actions.ts";
+import { addBroll, addMusic, addTitle, addZoom } from "../src/actions.ts";
 import type { Project } from "../src/edl.ts";
 import { SAMPLE_RATE, samplesToSec } from "../src/edl.ts";
 import {
@@ -213,6 +213,45 @@ test("listOverlays returns structured b-roll titles zooms stills", () => {
   assert.equal(o.titles[0].text, "Hook");
   assert.equal(o.zooms[0].scale, 1.2);
   assert.equal(o.stills.length, 0);
+});
+
+test("listOverlays includes music placements with seconds, gain, and mode", () => {
+  const p = makeProject();
+  p.assets.push({
+    id: "bed",
+    kind: "music",
+    name: "bed.mp3",
+    src: "/tmp/bed.mp3",
+    proxy: "assets/bed.aac",
+    durationSamples: 10 * SAMPLE_RATE,
+  });
+  addMusic(p, {
+    assetId: "bed",
+    fromSec: 1,
+    toSec: 4,
+    gain: 0.4,
+    fadeInSec: 0.5,
+    fadeOutSec: 1,
+    srcInSec: 2,
+    mode: "loop",
+    note: "score",
+  });
+  const o = listOverlays(p);
+  assert.equal(o.music.length, 1);
+  assert.equal(o.music[0].assetId, "bed");
+  assert.equal(o.music[0].fromSec, 1);
+  assert.equal(o.music[0].toSec, 4);
+  assert.equal(o.music[0].srcInSec, 2);
+  assert.equal(o.music[0].gain, 0.4);
+  assert.equal(o.music[0].fadeInSec, 0.5);
+  assert.equal(o.music[0].fadeOutSec, 1);
+  assert.equal(o.music[0].mode, "loop");
+  assert.equal(o.music[0].note, "score");
+});
+
+test("listOverlays returns an empty music list when nothing is placed", () => {
+  const o = listOverlays(makeProject());
+  assert.deepEqual(o.music, []);
 });
 
 test("listOverlays surfaces a note when present and omits the key otherwise", () => {

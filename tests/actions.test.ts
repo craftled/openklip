@@ -3,6 +3,7 @@ import { test } from "node:test";
 import {
   addBroll,
   addGraphic,
+  addMusic,
   addStill,
   addTitle,
   addZoom,
@@ -11,6 +12,7 @@ import {
   cutWords,
   removeAsset,
   removeBroll,
+  removeMusic,
   removeTitle,
   removeZoom,
   restoreAll,
@@ -20,6 +22,7 @@ import {
   setPadMs,
   summarize,
   updateBroll,
+  updateMusic,
   updateTitle,
   updateZoom,
 } from "../src/actions.ts";
@@ -511,6 +514,181 @@ test("cutWords records a per-word note and clears it on empty string", () => {
   assert.equal(w?.note, undefined);
 });
 
+// ── MILESTONE 4.1: music placement primitives ────────────────────────────────
+
+// Register a 4-second music asset on the shared fixture (project runs 6s).
+function withMusicAsset(p: Project): Project {
+  p.assets.push({
+    id: "music-1",
+    kind: "music",
+    name: "bed.mp3",
+    src: "/tmp/bed.mp3",
+    proxy: "working/assets/music-1.aac",
+    durationSamples: 4 * SAMPLE_RATE,
+  });
+  return p;
+}
+
+test("addMusic converts seconds to samples and stores gain/fades/mode", () => {
+  const p = withMusicAsset(makeProject());
+  const item = addMusic(p, {
+    assetId: "music-1",
+    fromSec: 1,
+    toSec: 3,
+    gain: 0.5,
+    fadeInSec: 0.5,
+    fadeOutSec: 1,
+    srcInSec: 0.25,
+    note: "bed under the hook",
+  });
+  assert.match(item.id, /^m\d+$/);
+  assert.equal(item.assetId, "music-1");
+  assert.equal(item.startSample, SAMPLE_RATE);
+  assert.equal(item.endSample, 3 * SAMPLE_RATE);
+  assert.equal(item.srcInSample, Math.round(0.25 * SAMPLE_RATE));
+  assert.equal(item.gain, 0.5);
+  assert.equal(item.fadeInSec, 0.5);
+  assert.equal(item.fadeOutSec, 1);
+  assert.equal(item.mode, "trim");
+  assert.equal(item.note, "bed under the hook");
+  assert.equal(p.music?.length, 1);
+});
+
+test("addMusic throws on an unknown asset id", () => {
+  const p = withMusicAsset(makeProject());
+  assert.throws(
+    () => addMusic(p, { assetId: "nope", fromSec: 0, toSec: 2 }),
+    /unknown asset/
+  );
+  assert.equal(p.music?.length ?? 0, 0);
+});
+
+test("addMusic rejects a non-music asset kind", () => {
+  const p = withMusicAsset(makeProject());
+  assert.throws(
+    () => addMusic(p, { assetId: "broll-1", fromSec: 0, toSec: 2 }),
+    /kind music/
+  );
+});
+
+test("addMusic throws on an empty span", () => {
+  const p = withMusicAsset(makeProject());
+  assert.throws(
+    () => addMusic(p, { assetId: "music-1", fromSec: 3, toSec: 3 }),
+    /empty/
+  );
+});
+
+test("addMusic rejects gain outside 0-2", () => {
+  const p = withMusicAsset(makeProject());
+  assert.throws(
+    () => addMusic(p, { assetId: "music-1", fromSec: 0, toSec: 2, gain: 2.5 }),
+    /gain/
+  );
+  assert.throws(
+    () => addMusic(p, { assetId: "music-1", fromSec: 0, toSec: 2, gain: -0.1 }),
+    /gain/
+  );
+});
+
+test("addMusic rejects fades outside 0-10 seconds", () => {
+  const p = withMusicAsset(makeProject());
+  assert.throws(
+    () =>
+      addMusic(p, { assetId: "music-1", fromSec: 0, toSec: 2, fadeInSec: 11 }),
+    /fade/
+  );
+  assert.throws(
+    () =>
+      addMusic(p, {
+        assetId: "music-1",
+        fromSec: 0,
+        toSec: 2,
+        fadeOutSec: -1,
+      }),
+    /fade/
+  );
+});
+
+test("addMusic trim mode clamps to the asset remainder; loop covers the span", () => {
+  const p = withMusicAsset(makeProject());
+  // Asset is 4s; srcIn 1s leaves 3s of audio for a 0-6s request.
+  const trimmed = addMusic(p, {
+    assetId: "music-1",
+    fromSec: 0,
+    toSec: 6,
+    srcInSec: 1,
+  });
+  assert.equal(trimmed.endSample, 3 * SAMPLE_RATE);
+  const looped = addMusic(p, {
+    assetId: "music-1",
+    fromSec: 0,
+    toSec: 6,
+    srcInSec: 1,
+    mode: "loop",
+  });
+  assert.equal(looped.endSample, 6 * SAMPLE_RATE);
+});
+
+test("addMusic clamps the end to the project duration", () => {
+  const p = withMusicAsset(makeProject());
+  const item = addMusic(p, {
+    assetId: "music-1",
+    fromSec: 4,
+    toSec: 99,
+    mode: "loop",
+  });
+  assert.equal(item.endSample, 6 * SAMPLE_RATE);
+});
+
+test("updateMusic patches selected fields and revalidates bounds", () => {
+  const p = withMusicAsset(makeProject());
+  const item = addMusic(p, { assetId: "music-1", fromSec: 0, toSec: 2 });
+  updateMusic(p, item.id, {
+    gain: 0.25,
+    fadeOutSec: 2,
+    mode: "loop",
+    toSec: 5,
+  });
+  assert.equal(item.gain, 0.25);
+  assert.equal(item.fadeOutSec, 2);
+  assert.equal(item.mode, "loop");
+  assert.equal(item.endSample, 5 * SAMPLE_RATE);
+  // Untouched fields survive the patch.
+  assert.equal(item.startSample, 0);
+  assert.equal(item.fadeInSec, 0);
+  assert.throws(() => updateMusic(p, item.id, { gain: 3 }), /gain/);
+  assert.throws(() => updateMusic(p, "missing", { gain: 1 }), /unknown music/);
+});
+
+test("updateMusic sets a note then clears it on empty string", () => {
+  const p = withMusicAsset(makeProject());
+  const item = addMusic(p, { assetId: "music-1", fromSec: 0, toSec: 2 });
+  updateMusic(p, item.id, { note: "why this bed" });
+  assert.equal(item.note, "why this bed");
+  updateMusic(p, item.id, { note: "" });
+  assert.equal(item.note, undefined);
+});
+
+test("removeMusic removes a placement by id and reports the removed flag", () => {
+  const p = withMusicAsset(makeProject());
+  const item = addMusic(p, { assetId: "music-1", fromSec: 0, toSec: 2 });
+  assert.equal(removeMusic(p, item.id), true);
+  assert.equal(p.music?.length, 0);
+  assert.equal(removeMusic(p, "does-not-exist"), false);
+});
+
+test("removeAsset prunes music placements that reference the asset", () => {
+  const p = withMusicAsset(makeProject());
+  addMusic(p, { assetId: "music-1", fromSec: 0, toSec: 2 });
+  assert.equal(removeAsset(p, "music-1"), true);
+  assert.equal(p.music?.length, 0);
+  assert.equal(
+    p.assets.some((a) => a.id === "music-1"),
+    false
+  );
+});
+
 // ── FEATURE 2: phrase-anchored cues (anchor) ────────────────────────────────
 
 test("addTitle stores an optional phrase anchor", () => {
@@ -527,7 +705,7 @@ test("addTitle stores an optional phrase anchor", () => {
   assert.equal(plain.anchor, undefined);
 });
 
-test("summarize counts words, cuts, ranges, broll, and kept duration", () => {
+test("summarize counts words, cuts, ranges, broll, music, and kept duration", () => {
   const p = makeProject();
   // No cuts: all 6 words kept, padMs=0 so one contiguous 6s range.
   let s = summarize(p);
@@ -536,6 +714,7 @@ test("summarize counts words, cuts, ranges, broll, and kept duration", () => {
   assert.equal(s.deleted, 0);
   assert.equal(s.cuts, 1);
   assert.equal(s.brollCount, 0);
+  assert.equal(s.musicCount, 0);
   assert.equal(s.assetCount, 1);
   assert.equal(s.titleCount, 0);
   assert.equal(s.zoomCount, 0);
@@ -544,10 +723,20 @@ test("summarize counts words, cuts, ranges, broll, and kept duration", () => {
   // Cut w2 + w3 (the middle): splits the run into two ranges (w0-w1, w4-w5).
   cutWords(p, ["w2", "w3"]);
   addBroll(p, { assetId: "broll-1", fromSec: 0, toSec: 1 });
+  p.assets.push({
+    id: "bed",
+    kind: "music",
+    name: "bed.mp3",
+    src: "/tmp/bed.mp3",
+    proxy: "assets/bed.aac",
+    durationSamples: 10 * SAMPLE_RATE,
+  });
+  addMusic(p, { assetId: "bed", fromSec: 0, toSec: 3 });
   s = summarize(p);
   assert.equal(s.deleted, 2);
   assert.equal(s.kept, 4);
   assert.equal(s.cuts, 2);
   assert.equal(s.brollCount, 1);
+  assert.equal(s.musicCount, 1);
   assert.ok(Math.abs(s.keptDurationSec - 4) < 1e-6);
 });

@@ -54,8 +54,10 @@ export function projectDir(slug: string): string {
 
 // Layered project layout. `project.json` (the edit) stays at the project root;
 // user originals live in assets/; everything derived lives under working/
-// (proxy, transcript, audio, frames, asset proxies, chats) and rendered output
-// under output/. Proxy paths in project.json are relative to dir
+// (proxy, transcript, audio, frames, asset proxies) and rendered output under
+// output/. Two working/ files are NOT derived and must never be regenerated:
+// chats.json (agent threads) and actions.jsonl (append-only action history).
+// Proxy paths in project.json are relative to dir
 // (e.g. "working/assets/b1.mp4"); user sources use "assets/track.mp3".
 export function projectPaths(slug: string) {
   const dir = projectDir(slug);
@@ -75,6 +77,8 @@ export function projectPaths(slug: string) {
     /** Generated asset proxies (ffmpeg output). */
     assetProxies: join(working, "assets"),
     chats: join(working, "chats.json"),
+    /** Append-only action history: one JSON entry per line. */
+    actionsLog: join(working, "actions.jsonl"),
     out: join(output, "out.mp4"),
     /** Multi-take ingest parking lot: takes/<id>/ (F3). */
     takes: join(dir, "takes"),

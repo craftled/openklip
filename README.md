@@ -69,10 +69,11 @@ Agent sidebar chats use `working/chats.json`, not `localStorage` (color scheme a
 
 ## What works today
 
-Verified against the current codebase (623 tests, v0.10.0.1):
+Verified against the current codebase (745 tests; main is ahead of the last release, v0.10.0.1):
 
 - **Ingest**: video → local transcript + preview proxy + `project.json` (`openklip ingest`; refuses re-ingest unless `--force`)
 - **Transcript editing**: click words to toggle `deleted`; `openklip cut` / `cut --text` / `restore` on CLI
+- **Phrase search + batch cuts**: transcript search bar (Mod+F to focus, Enter next match, Escape clear) with exact and punctuation-insensitive matching, Kept/Cut scopes, click-to-seek, select-as-span, Cut first / Cut all and Restore / Restore all with affected-word counts and an optional note; same phrase engine as the CLI
 - **Bounded transcript reads**: `openklip transcript grep`, `span`, `phrase` for agent discovery without dumping full transcripts
 - **Preview**: all-intra proxy; scheduler plays kept ranges only; compact center column (`max-w-2xl`)
 - **Editor layout**: Resizable right chat sidebar (340–760px, persisted); center column is preview with Properties/Settings below video; transcript toggle; timeline in a bottom drawer
@@ -83,7 +84,8 @@ Verified against the current codebase (623 tests, v0.10.0.1):
 - **Captions**: preview overlay + ASS burn-in on export
 - **Assets**: register b-roll, music, stills; sidebar asset bin with upload + `assets/` folder sync; upload from chat `+`
 - **Overlays**: b-roll cover, Ken Burns stills, push-in zooms, title cards (lower / center / hero), vignette; phrase helpers (`*-add-phrase`) on CLI
-- **Export**: ffmpeg composes kept ranges + overlays + captions; GUI export dialog picks max height (720p / 1080p / 4K)
+- **Export**: ffmpeg composes kept ranges + overlays + captions; GUI export dialog picks max height (720p / 1080p / 4K), compression preset (studio / social / web / web-low), and output frame rate (source / 24 / 25 / 30 / 48 / 60) with a live size/time estimate; same settings on CLI (`--height`, `--fps`, `--compression`), MCP, and the export API
+- **Music placement**: place a registered music asset under the edit with gain, fades, source in-point, and trim/loop mode (`openklip music-add` / `music-set` / `music-rm`); Config panel Music section, placed-music timeline track, preview bed with a mute toggle, mixed into the export by ffmpeg
 - **Rich graphics templates**: HTML/CSS graphic templates (`kind: "rich"`) render through headless Chrome (`chrome-headless-shell` via `puppeteer-core`), driven by the same `web/lib/graphic-runtime.ts` as the live preview, so export matches preview frame-for-frame. Frames capture with a transparent background to a ProRes 4444 alpha MOV (`src/headless-render.ts`), then composite as a timed ffmpeg overlay. Chrome is an optional, one-time download (`bunx puppeteer browsers install chrome-headless-shell`); the default text path needs no browser
 - **Fullscreen overlays**: the cinema player renders the graphics/titles/captions overlay stack (`web/components/preview-overlays.tsx`), shared with the inline preview and synced to playback
 - **Product announcement graphics**: a catalog-constrained `product-announcement` json-render graphic type; agents author a validated JSON spec via `openklip json-graphic-add` / `json-graphic-set` (CLI / GUI / MCP), the editor previews the exact same React render, and it exports through the normal timeline. Specs are hard-validated (accent values, spec size, graph cycles, orphaned elements, non-scene roots, missing catalog/spec fields) before preview or export; invalid graphics degrade gracefully instead of bricking the render
@@ -91,15 +93,17 @@ Verified against the current codebase (623 tests, v0.10.0.1):
 - **Written rationale**: `--note "<why>"` on any `cut` or overlay records why a pick was made; metadata only, never reaches ffmpeg, surfaces in `overlays` / transcript / MCP (`--note ""` clears it)
 - **Phrase-anchored cues**: phrase-placed overlays remember the spoken phrase and re-resolve onto the current kept words after a re-cut (`openklip reanchor`); a deleted phrase flags `stale` and keeps the last good span
 - **Multi-take assembly**: `openklip take-add` / `takes` / `assemble` splice the best take per line into one single-source `project.json` the cut/overlay/export engine edits unchanged
+- **Action history**: append-only per-project log (`working/actions.jsonl`) records every registry mutation with actor (human / agent / cli / mcp), input/result summaries, timestamp, and revision before/after; History section in the Config panel; `GET /api/projects/<slug>/history`
+- **Browser project creation**: upload a video in the New Project dialog or drop one onto the empty workspace; format-validated on client and server, source persisted into the project folder, explicit overwrite confirm on name collisions, ingest progress overlay, editor opens on completion
 - **Workspace**: macOS folder picker on empty landing; inline project create; projects root persisted in `.openklip/projects-root`
 - **CLI**: full edit surface; `openklip actions --json` mutations manifest; `openklip tools --json` full agent tool list
-- **MCP server**: `openklip mcp` (stdio) exposes 55 tools with CLI/GUI parity; `.cursor/mcp.json` wired for Cursor
+- **MCP server**: `openklip mcp` (stdio) exposes 58 tools with CLI/GUI parity; `.cursor/mcp.json` wired for Cursor
 - **Edit templates**: `templates/<id>/skill.md` playbooks; `openklip template set`; brand presets at ingest (`openklip brand`)
 - **Agent selector**: drive filler cuts via Claude Code, Codex, Cursor, or Grok subscription CLIs
 - **Design system**: default shadcn/ui tokens with Base UI primitives (`app/globals.css`, `components.json`); light/dark via `.dark` class; icons via `web/lib/icon.tsx`
 - **Agent demo**: `bun run agent-demo` (phrase list → cut → status → optional export)
 
-Phrase-based cutting is CLI/MCP-only today (`openklip cut --text`). The transcript UI is word click, not phrase search. First project on a machine: use `openklip ingest` from the CLI, or pick a folder in the GUI (macOS) that already contains ingested projects. Known gaps: **[TODO.md](./TODO.md)**.
+Phrase-based cutting works on both surfaces: the transcript UI has search with batch cut and restore, and the CLI has `openklip cut --text`. First project on a machine: upload or drop a video in the browser, or use `openklip ingest` from the CLI. Known gaps: **[TODO.md](./TODO.md)**.
 
 ---
 
@@ -131,7 +135,8 @@ Typical external-agent sequence (no LLM inside OpenKlip):
 openklip status <slug> --json
 openklip transcript grep <slug> "phrase"
 openklip cut <slug> --text "phrase to remove"
-openklip export <slug>
+openklip music-add <slug> <assetId> 0 20 --gain 0.3
+openklip export <slug> --compression web --fps 30
 ```
 
 In Cursor, enable the bundled MCP server (`.cursor/mcp.json`) and call the same tools without shelling out. Tool manifest: `openklip tools --json --surface mcp`.
@@ -150,7 +155,7 @@ Command reference: **[AGENTS.md](./AGENTS.md)**. Mutation manifest: `openklip ac
 
 - **Cut spine**: `deleted` words → kept source-time ranges (`compileTimeline`, preview scheduler, exporter).
 - **Preview**: `<video>` on `working/proxy.mp4`; seeks across kept ranges.
-- **Export**: ffmpeg `filter_complex`: range concat, b-roll/still cover, zoompan, vignette, libass captions/titles.
+- **Export**: ffmpeg `filter_complex`: range concat, b-roll/still cover, zoompan, vignette, libass captions/titles, music mix; compression presets pick the encoder args and the output can retime to a chosen frame rate.
 - **Export source**: prefers original media; can fall back to project proxies when source files are missing (see exporter).
 - **Rich graphics**: `kind: "rich"` templates render to a transparent ProRes 4444 MOV via headless Chrome (`src/headless-render.ts`, lazy-loaded), then ffmpeg overlays it like a still. ffmpeg stays the master compositor; the text/ASS path stays browser-free.
 

@@ -1,12 +1,14 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import type { DragEvent } from "react";
 import { useCallback, useEffect, useState } from "react";
+import { EmptyWorkspaceMain } from "@/components/empty-workspace-main";
 import { NewProjectDialog } from "@/components/new-project-dialog";
 import { ProjectCreateOverlay } from "@/components/project-create-overlay";
+import { ProjectOverwriteDialog } from "@/components/project-overwrite-dialog";
 import { SettingsSidebarNav } from "@/components/settings/settings-sidebar-nav";
 import { SettingsView } from "@/components/settings/settings-view";
-import { Button } from "@/components/ui/button";
 import {
   Sidebar,
   SidebarContent,
@@ -28,15 +30,10 @@ import {
   setDefaultAgentModel,
   subscribeDefaultAgent,
 } from "@/lib/agent-preferences";
-import {
-  APP_ICON_CLASS,
-  Film,
-  FolderOpen,
-  Plus,
-  SettingsIcon,
-  Sparkles,
-} from "@/lib/icon";
+import { toastProjectCreateFailed } from "@/lib/app-toast";
+import { APP_ICON_CLASS, FolderOpen, Plus, SettingsIcon } from "@/lib/icon";
 import { createProjectFromVideo } from "@/lib/project-create";
+import { selectDroppedVideo } from "@/lib/project-intake";
 import type { SettingsSectionId } from "@/lib/settings-navigation";
 import {
   SIDEBAR_LEADING_GLYPH_CLASS,
@@ -56,6 +53,7 @@ export function EmptyWorkspace() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsSection, setSettingsSection] =
     useState<SettingsSectionId>("appearance");
+  const [dropActive, setDropActive] = useState(false);
 
   useEffect(() => {
     setDefaultAgent(getDefaultAgentModel());
@@ -92,7 +90,16 @@ export function EmptyWorkspace() {
     [router]
   );
 
-  const { createPhase, createdSlug, ingestVideo, progress } = useProjectCreate({
+  const {
+    cancelOverwrite,
+    confirmOverwrite,
+    createPhase,
+    createdSlug,
+    creating,
+    ingestVideo,
+    pendingOverwrite,
+    progress,
+  } = useProjectCreate({
     onCreateProject: createProjectFromVideo,
     onProjectCreated,
   });
@@ -101,6 +108,45 @@ export function EmptyWorkspace() {
   const inboxJobs = useInboxWatch(onIngested);
 
   const folderReady = workspace?.configured || !workspace?.pickerSupported;
+  // Whole-workspace drop is live only once the folder is ready, no create is
+  // already in flight, and no overwrite confirmation is pending (a drop while
+  // the dialog is open would start a second create behind it).
+  const dropEnabled =
+    Boolean(folderReady) && !creating && pendingOverwrite === null;
+
+  const onWorkspaceDragEnter = (e: DragEvent<HTMLElement>) => {
+    e.preventDefault();
+    if (dropEnabled) {
+      setDropActive(true);
+    }
+  };
+  const onWorkspaceDragOver = (e: DragEvent<HTMLElement>) => {
+    // preventDefault advertises the surface as a drop target; while disabled,
+    // let the browser show the default no-drop affordance instead of
+    // swallowing the file.
+    if (dropEnabled) {
+      e.preventDefault();
+    }
+  };
+  const onWorkspaceDragLeave = (e: DragEvent<HTMLElement>) => {
+    e.preventDefault();
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setDropActive(false);
+    }
+  };
+  const onWorkspaceDrop = (e: DragEvent<HTMLElement>) => {
+    e.preventDefault();
+    setDropActive(false);
+    if (!dropEnabled) {
+      return;
+    }
+    const picked = selectDroppedVideo(Array.from(e.dataTransfer.files));
+    if ("error" in picked) {
+      toastProjectCreateFailed(picked.error);
+      return;
+    }
+    void ingestVideo(picked.file);
+  };
 
   return (
     <>
@@ -131,6 +177,12 @@ export function EmptyWorkspace() {
         }}
         onVideoSelected={ingestVideo}
         open={dialogOpen}
+      />
+      <ProjectOverwriteDialog
+        fileName={pendingOverwrite?.file.name ?? ""}
+        onCancel={cancelOverwrite}
+        onConfirm={confirmOverwrite}
+        open={pendingOverwrite !== null}
       />
       <SidebarProvider>
         <Sidebar collapsible="offcanvas" side="left">
@@ -209,58 +261,18 @@ export function EmptyWorkspace() {
               onExport1080Change={setExport1080}
             />
           ) : (
-            <main className="flex flex-1 flex-col items-center justify-center gap-6 p-8 text-center">
-              <div className="flex size-14 items-center justify-center rounded-lg border border-border bg-muted">
-                <Sparkles className={APP_ICON_CLASS} />
-              </div>
-              <div className="max-w-md space-y-2">
-                <h1 className="font-semibold text-xl tracking-tight">
-                  Welcome to OpenKlip
-                </h1>
-                <p className="text-muted-foreground text-sm leading-relaxed">
-                  {folderReady
-                    ? "Your workspace is ready. Add a video to transcribe, cut filler, and export."
-                    : "Choose a folder for your projects, then add a video to get started."}
-                </p>
-                {workspace?.displayRoot ? (
-                  <p className="truncate font-mono text-muted-foreground text-xs">
-                    {workspace.displayRoot}
-                  </p>
-                ) : null}
-              </div>
-              <div className="flex flex-wrap items-center justify-center gap-3">
-                {folderReady ? (
-                  <Button onClick={() => setDialogOpen(true)} type="button">
-                    <Film data-icon="inline-start" />
-                    Add video
-                  </Button>
-                ) : (
-                  <Button onClick={() => setDialogOpen(true)} type="button">
-                    <FolderOpen data-icon="inline-start" />
-                    Choose folder
-                  </Button>
-                )}
-              </div>
-              {inboxJobs.length > 0 ? (
-                <div className="flex flex-col items-center gap-1 rounded-lg border border-border bg-muted px-4 py-3">
-                  {inboxJobs.map((job) => (
-                    <p className="text-muted-foreground text-sm" key={job.id}>
-                      Ingesting {job.filename}
-                      {job.progress
-                        ? `: ${job.progress.message}… (${job.progress.step}/${job.progress.total})`
-                        : "…"}
-                    </p>
-                  ))}
-                </div>
-              ) : null}
-              {!dialogOpen && folderReady && inboxJobs.length === 0 ? (
-                <p className="max-w-sm text-muted-foreground text-xs">
-                  Tip: drop a video into your projects folder to auto-ingest it,
-                  or use <code>openklip ingest &lt;video&gt;</code> from the
-                  CLI.
-                </p>
-              ) : null}
-            </main>
+            <EmptyWorkspaceMain
+              dialogOpen={dialogOpen}
+              dropActive={dropActive}
+              folderReady={Boolean(folderReady)}
+              inboxJobs={inboxJobs}
+              onDragEnter={onWorkspaceDragEnter}
+              onDragLeave={onWorkspaceDragLeave}
+              onDragOver={onWorkspaceDragOver}
+              onDrop={onWorkspaceDrop}
+              onOpenDialog={() => setDialogOpen(true)}
+              workspaceDisplayRoot={workspace?.displayRoot}
+            />
           )}
         </SidebarInset>
       </SidebarProvider>

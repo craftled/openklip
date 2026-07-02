@@ -64,6 +64,18 @@ export interface OverlayViews {
     type: "template" | "json-render";
     validation?: { issues: string[]; success: boolean };
   }>;
+  music: Array<{
+    assetId: string;
+    fadeInSec: number;
+    fadeOutSec: number;
+    fromSec: number;
+    gain: number;
+    id: string;
+    mode: "trim" | "loop";
+    note?: string;
+    srcInSec: number;
+    toSec: number;
+  }>;
   stills: Array<{
     anchor: PhraseAnchor | null;
     assetId: string;
@@ -245,6 +257,18 @@ export function listOverlays(project: Project): OverlayViews {
       toSec: sec(s.endSample),
       anchor: s.anchor ?? null,
       ...(s.note === undefined ? {} : { note: s.note }),
+    })),
+    music: (project.music ?? []).map((m) => ({
+      id: m.id,
+      assetId: m.assetId,
+      fromSec: sec(m.startSample),
+      toSec: sec(m.endSample),
+      srcInSec: sec(m.srcInSample ?? 0),
+      gain: m.gain,
+      fadeInSec: m.fadeInSec,
+      fadeOutSec: m.fadeOutSec,
+      mode: m.mode,
+      ...(m.note === undefined ? {} : { note: m.note }),
     })),
     graphics: (project.graphics ?? []).map((g) => {
       const type = g.type ?? "template";

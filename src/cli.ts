@@ -20,6 +20,7 @@ import { runDoctor } from "./doctor.ts";
 import {
   type Broll,
   type Graphic,
+  type MusicPlacement,
   type Project,
   ProjectSchema,
   type Still,
@@ -27,7 +28,12 @@ import {
   type Title,
   type Zoom,
 } from "./edl.ts";
-import { exportCut } from "./exporter.ts";
+import {
+  EXPORT_COMPRESSIONS,
+  type ExportCompression,
+  exportCut,
+  parseExportFpsFlag,
+} from "./exporter.ts";
 import { FFMPEG, FFPROBE } from "./ffmpeg.ts";
 import { FILTER_NAMES, isFilter } from "./filter.ts";
 import { ingest } from "./ingest.ts";
@@ -105,6 +111,16 @@ Overlays
                                      cover a source-time span with a registered asset
   openklip broll-set <slug> <brollId>  patch b-roll (--asset --from --to --src-in)
   openklip broll-rm <slug> <brollId> remove a b-roll clip
+  openklip music-add <slug> <assetId> <fromSec> <toSec>
+                                     place background music under the voice
+                                       --gain <0-2>      (default 1)
+                                       --fade-in <s>  --fade-out <s>  (0-10)
+                                       --src-in <s>   --mode trim|loop
+                                       --note <text>
+  openklip music-set <slug> <musicId>  patch music (--asset --gain --fade-in
+                                       --fade-out --from --to --src-in --mode
+                                       --note)
+  openklip music-rm <slug> <musicId> remove a music placement
   openklip title-add <slug> <fromSec> <toSec> <text>
                                      burn a title card over a source-time span
                                        --position lower|center|hero  (default lower)
@@ -168,9 +184,11 @@ Review & export
   openklip status <slug>             summarize the current edit
                                        --json            agent-friendly JSON
   openklip ranges <slug> [--json]    kept source-time segments after cuts
-  openklip overlays <slug> [--json]  b-roll, titles, zooms, stills with ids
+  openklip overlays <slug> [--json]  b-roll, music, titles, zooms, stills with ids
   openklip export <slug>             render the current cut to out.mp4
                                        --height <px>  max output height (e.g. 1080)
+                                       --fps <n>      output frame rate, integer 1-120 (default: source)
+                                       --compression <preset>  studio|social|web|web-low
 
 Diagnostics
   openklip doctor [slug]             check ffmpeg, whisper, and project health
@@ -200,6 +218,27 @@ async function loadProject(slug: string): Promise<Project> {
 async function saveProject(slug: string, project: Project): Promise<void> {
   const p = projectPaths(slug);
   await Bun.write(p.project, JSON.stringify(project, null, 2));
+}
+
+// Run a registry action through the shared store: the mutation happens inside
+// the per-slug lock, bumps the project revision, and appends one entry to
+// working/actions.jsonl with actor "cli". Returns the action result plus the
+// mutated project so commands can print state-derived output (e.g. padMs).
+async function runLoggedAction<T = unknown>(
+  slug: string,
+  name: string,
+  input: unknown
+): Promise<{ project: Project; result: T }> {
+  let mutated: Project | undefined;
+  const result = await mutateProject(
+    slug,
+    (project) => {
+      mutated = project;
+      return runAction(name, project, input) as T;
+    },
+    { action: name, actor: "cli", input }
+  );
+  return { project: mutated as Project, result };
 }
 
 function mmss(sample: number): string {
@@ -288,6 +327,18 @@ function trackFlag(args: string[]): "broll" | "title" | "zoom" | undefined {
     throw new Error("--track must be broll, title, or zoom");
   }
   return t;
+}
+
+// Parse the optional --mode flag for music placements (trim|loop).
+function musicModeFlag(args: string[]): "trim" | "loop" | undefined {
+  const mode = flagValue(args, "--mode");
+  if (mode === undefined) {
+    return;
+  }
+  if (mode !== "trim" && mode !== "loop") {
+    throw new Error("--mode must be trim or loop");
+  }
+  return mode;
 }
 
 // Expand cut tokens (word ids "w12" and inclusive ranges "w12-w20") into the
@@ -594,7 +645,6 @@ try {
       const textIdx = args.indexOf("--text");
       // F1: optional human rationale recorded on the cut words.
       const note = flagValue(args, "--note");
-      const project = await loadProject(slug);
 
       if (textIdx !== -1) {
         const phrase = args[textIdx + 1];
@@ -607,31 +657,27 @@ try {
           throw new Error("--restore is not supported with --text");
         }
         if (cutAll) {
-          const result = runAction("cut-text", project, {
-            phrase,
-            all: true,
-            note,
-          }) as { matches: number; ids: string[] };
+          const { result } = await runLoggedAction<{
+            matches: number;
+            ids: string[];
+          }>(slug, "cut-text", { phrase, all: true, note });
           if (result.matches === 0) {
             console.log(`no contiguous runs matched: "${phrase}"`);
             break;
           }
-          await saveProject(slug, project);
           console.log(
             `cut ${result.matches} run(s), ${result.ids.length} words: ${result.ids.join(", ")}`
           );
           break;
         }
-        const result = runAction("cut-text", project, {
-          phrase,
-          all: false,
-          note,
-        }) as { matched: boolean; ids: string[] };
+        const { result } = await runLoggedAction<{
+          matched: boolean;
+          ids: string[];
+        }>(slug, "cut-text", { phrase, all: false, note });
         if (!result.matched) {
           console.log(`no contiguous run of words matched: "${phrase}"`);
           break;
         }
-        await saveProject(slug, project);
         console.log(`cut ${result.ids.length} words: ${result.ids.join(", ")}`);
         break;
       }
@@ -650,9 +696,10 @@ try {
           "usage: openklip cut <slug> <w12> <w15-w20> [--restore] [--note <why>]"
         );
       }
+      // Read-only load to expand word tokens, then the logged mutation.
+      const project = await loadProject(slug);
       const ids = resolveCutIds(project, tokens);
-      runAction("cut", project, { ids, deleted: !restore, note });
-      await saveProject(slug, project);
+      await runLoggedAction(slug, "cut", { ids, deleted: !restore, note });
       console.log(
         `${restore ? "restored" : "cut"} ${ids.length} words: ${ids.join(", ")}`
       );
@@ -662,9 +709,7 @@ try {
       if (!rest[0]) {
         throw new Error("usage: openklip restore <slug>");
       }
-      const project = await loadProject(rest[0]);
-      runAction("restore-all", project, {});
-      await saveProject(rest[0], project);
+      await runLoggedAction(rest[0], "restore-all", {});
       console.log("restored all words");
       break;
     }
@@ -680,13 +725,11 @@ try {
       if (!(Number.isFinite(fromSec) && Number.isFinite(toSec))) {
         throw new Error("fromSec and toSec must be numbers (seconds)");
       }
-      const project = await loadProject(slug);
-      const item = runAction("broll-add", project, {
+      const { result: item } = await runLoggedAction<Broll>(slug, "broll-add", {
         assetId: rest[1],
         fromSec,
         toSec,
-      }) as Broll;
-      await saveProject(slug, project);
+      });
       console.log(
         `added b-roll ${item.id} (asset "${item.assetId}", ${fromSec}s-${toSec}s)`
       );
@@ -696,15 +739,15 @@ try {
       if (!(rest[0] && rest[1])) {
         throw new Error("usage: openklip broll-rm <slug> <brollId>");
       }
-      const project = await loadProject(rest[0]);
-      const { removed } = runAction("broll-rm", project, { id: rest[1] }) as {
-        removed: boolean;
-      };
-      if (!removed) {
+      const { result } = await runLoggedAction<{ removed: boolean }>(
+        rest[0],
+        "broll-rm",
+        { id: rest[1] }
+      );
+      if (!result.removed) {
         console.log(`no b-roll clip with id "${rest[1]}"`);
         break;
       }
-      await saveProject(rest[0], project);
       console.log(`removed b-roll ${rest[1]}`);
       break;
     }
@@ -716,18 +759,94 @@ try {
       }
       const slug = rest[0];
       const args = rest.slice(2);
-      const project = await loadProject(slug);
-      const item = runAction("broll-set", project, {
+      const { result: item } = await runLoggedAction<Broll>(slug, "broll-set", {
         id: rest[1],
         assetId: flagValue(args, "--asset"),
         fromSec: flagNumber(args, "--from"),
         toSec: flagNumber(args, "--to"),
         srcInSec: flagNumber(args, "--src-in"),
-      }) as Broll;
-      await saveProject(slug, project);
+      });
       console.log(
         `updated b-roll ${item.id} (asset "${item.assetId}", ${secSpan(item.startSample, item.endSample)})`
       );
+      break;
+    }
+    case "music-add": {
+      if (!(rest[0] && rest[1] && rest[2] && rest[3])) {
+        throw new Error(
+          "usage: openklip music-add <slug> <assetId> <fromSec> <toSec> [--gain N] [--fade-in s] [--fade-out s] [--src-in s] [--mode trim|loop] [--note text]"
+        );
+      }
+      const slug = rest[0];
+      const args = rest.slice(4);
+      const fromSec = Number(rest[2]);
+      const toSec = Number(rest[3]);
+      if (!(Number.isFinite(fromSec) && Number.isFinite(toSec))) {
+        throw new Error("fromSec and toSec must be numbers (seconds)");
+      }
+      const { result: item } = await runLoggedAction<MusicPlacement>(
+        slug,
+        "music-add",
+        {
+          assetId: rest[1],
+          fromSec,
+          toSec,
+          gain: flagNumber(args, "--gain"),
+          fadeInSec: flagNumber(args, "--fade-in"),
+          fadeOutSec: flagNumber(args, "--fade-out"),
+          srcInSec: flagNumber(args, "--src-in"),
+          mode: musicModeFlag(args),
+          note: flagValue(args, "--note"),
+        }
+      );
+      console.log(
+        `added music ${item.id} (asset "${item.assetId}", ${secSpan(item.startSample, item.endSample)}, gain ${item.gain}, ${item.mode})`
+      );
+      break;
+    }
+    case "music-set": {
+      if (!(rest[0] && rest[1])) {
+        throw new Error(
+          "usage: openklip music-set <slug> <musicId> [--asset id] [--gain N] [--fade-in s] [--fade-out s] [--from N] [--to N] [--src-in s] [--mode trim|loop] [--note text]"
+        );
+      }
+      const slug = rest[0];
+      const args = rest.slice(2);
+      const { result: item } = await runLoggedAction<MusicPlacement>(
+        slug,
+        "music-set",
+        {
+          id: rest[1],
+          assetId: flagValue(args, "--asset"),
+          fromSec: flagNumber(args, "--from"),
+          toSec: flagNumber(args, "--to"),
+          gain: flagNumber(args, "--gain"),
+          fadeInSec: flagNumber(args, "--fade-in"),
+          fadeOutSec: flagNumber(args, "--fade-out"),
+          srcInSec: flagNumber(args, "--src-in"),
+          mode: musicModeFlag(args),
+          note: flagValue(args, "--note"),
+        }
+      );
+      console.log(
+        `updated music ${item.id} (asset "${item.assetId}", ${secSpan(item.startSample, item.endSample)}, gain ${item.gain}, ${item.mode})`
+      );
+      break;
+    }
+    case "music-rm": {
+      if (!(rest[0] && rest[1])) {
+        throw new Error("usage: openklip music-rm <slug> <musicId>");
+      }
+      const { result } = await runLoggedAction<{ removed: boolean }>(
+        rest[0],
+        "music-rm",
+        { id: rest[1] }
+      );
+      if (!result.removed) {
+        console.log(`no music placement with id "${rest[1]}"`);
+        break;
+      }
+      console.log(`removed music ${rest[1]}`);
       break;
     }
     case "still-add": {
@@ -743,16 +862,14 @@ try {
       if (!(Number.isFinite(fromSec) && Number.isFinite(toSec))) {
         throw new Error("fromSec and toSec must be numbers (seconds)");
       }
-      const project = await loadProject(slug);
-      const item = runAction("still-add", project, {
+      const { result: item } = await runLoggedAction<Still>(slug, "still-add", {
         assetId: rest[1],
         fromSec,
         toSec,
         scale: flagNumber(args, "--scale"),
         focusX: flagNumber(args, "--focus-x"),
         focusY: flagNumber(args, "--focus-y"),
-      }) as Still;
-      await saveProject(slug, project);
+      });
       console.log(
         `added still ${item.id} (asset "${item.assetId}", ${fromSec}s-${toSec}s, ${item.scale}x focus ${item.focusX},${item.focusY})`
       );
@@ -766,8 +883,7 @@ try {
       }
       const slug = rest[0];
       const args = rest.slice(2);
-      const project = await loadProject(slug);
-      const item = runAction("still-set", project, {
+      const { result: item } = await runLoggedAction<Still>(slug, "still-set", {
         id: rest[1],
         assetId: flagValue(args, "--asset"),
         fromSec: flagNumber(args, "--from"),
@@ -775,8 +891,7 @@ try {
         scale: flagNumber(args, "--scale"),
         focusX: flagNumber(args, "--focus-x"),
         focusY: flagNumber(args, "--focus-y"),
-      }) as Still;
-      await saveProject(slug, project);
+      });
       console.log(
         `updated still ${item.id} (asset "${item.assetId}", ${secSpan(item.startSample, item.endSample)}, ${item.scale}x)`
       );
@@ -786,15 +901,15 @@ try {
       if (!(rest[0] && rest[1])) {
         throw new Error("usage: openklip still-rm <slug> <stillId>");
       }
-      const project = await loadProject(rest[0]);
-      const { removed } = runAction("still-rm", project, { id: rest[1] }) as {
-        removed: boolean;
-      };
-      if (!removed) {
+      const { result } = await runLoggedAction<{ removed: boolean }>(
+        rest[0],
+        "still-rm",
+        { id: rest[1] }
+      );
+      if (!result.removed) {
         console.log(`no still overlay with id "${rest[1]}"`);
         break;
       }
-      await saveProject(rest[0], project);
       console.log(`removed still ${rest[1]}`);
       break;
     }
@@ -811,15 +926,17 @@ try {
       if (!(Number.isFinite(fromSec) && Number.isFinite(toSec))) {
         throw new Error("fromSec and toSec must be numbers (seconds)");
       }
-      const project = await loadProject(slug);
-      const item = runAction("graphic-add", project, {
-        template: rest[1],
-        fromSec,
-        toSec,
-        params: collectParams(args),
-        track: trackFlag(args),
-      }) as Graphic;
-      await saveProject(slug, project);
+      const { result: item } = await runLoggedAction<Graphic>(
+        slug,
+        "graphic-add",
+        {
+          template: rest[1],
+          fromSec,
+          toSec,
+          params: collectParams(args),
+          track: trackFlag(args),
+        }
+      );
       console.log(
         `added graphic ${item.id} (template "${item.template}", ${fromSec}s-${toSec}s, ${item.track})`
       );
@@ -834,16 +951,18 @@ try {
       const slug = rest[0];
       const args = rest.slice(2);
       const params = collectParams(args);
-      const project = await loadProject(slug);
-      const item = runAction("graphic-set", project, {
-        id: rest[1],
-        template: flagValue(args, "--template"),
-        fromSec: flagNumber(args, "--from"),
-        toSec: flagNumber(args, "--to"),
-        params: Object.keys(params).length > 0 ? params : undefined,
-        track: trackFlag(args),
-      }) as Graphic;
-      await saveProject(slug, project);
+      const { result: item } = await runLoggedAction<Graphic>(
+        slug,
+        "graphic-set",
+        {
+          id: rest[1],
+          template: flagValue(args, "--template"),
+          fromSec: flagNumber(args, "--from"),
+          toSec: flagNumber(args, "--to"),
+          params: Object.keys(params).length > 0 ? params : undefined,
+          track: trackFlag(args),
+        }
+      );
       console.log(
         `updated graphic ${item.id} (template "${item.template}", ${secSpan(item.startSample, item.endSample)}, ${item.track})`
       );
@@ -867,15 +986,17 @@ try {
       if (!(Number.isFinite(fromSec) && Number.isFinite(toSec))) {
         throw new Error("fromSec and toSec must be numbers (seconds)");
       }
-      const project = await loadProject(slug);
-      const item = runAction("json-graphic-add", project, {
-        catalog,
-        fromSec,
-        toSec,
-        spec: await readJsonSpecFile(rest),
-        track: trackFlag(rest),
-      }) as Graphic;
-      await saveProject(slug, project);
+      const { result: item } = await runLoggedAction<Graphic>(
+        slug,
+        "json-graphic-add",
+        {
+          catalog,
+          fromSec,
+          toSec,
+          spec: await readJsonSpecFile(rest),
+          track: trackFlag(rest),
+        }
+      );
       console.log(
         `added JSON graphic ${item.id} (catalog "${item.catalog}", ${fromSec}s-${toSec}s, ${item.track})`
       );
@@ -892,15 +1013,17 @@ try {
       const spec = args.includes("--spec-file")
         ? await readJsonSpecFile(args)
         : undefined;
-      const project = await loadProject(slug);
-      const item = runAction("json-graphic-set", project, {
-        id: rest[1],
-        fromSec: flagNumber(args, "--from"),
-        toSec: flagNumber(args, "--to"),
-        spec,
-        track: trackFlag(args),
-      }) as Graphic;
-      await saveProject(slug, project);
+      const { result: item } = await runLoggedAction<Graphic>(
+        slug,
+        "json-graphic-set",
+        {
+          id: rest[1],
+          fromSec: flagNumber(args, "--from"),
+          toSec: flagNumber(args, "--to"),
+          spec,
+          track: trackFlag(args),
+        }
+      );
       console.log(
         `updated JSON graphic ${item.id} (catalog "${item.catalog}", ${secSpan(item.startSample, item.endSample)}, ${item.track})`
       );
@@ -910,17 +1033,15 @@ try {
       if (!(rest[0] && rest[1])) {
         throw new Error("usage: openklip graphic-rm <slug> <graphicId>");
       }
-      const project = await loadProject(rest[0]);
-      const { removed } = runAction("graphic-rm", project, {
-        id: rest[1],
-      }) as {
-        removed: boolean;
-      };
-      if (!removed) {
+      const { result } = await runLoggedAction<{ removed: boolean }>(
+        rest[0],
+        "graphic-rm",
+        { id: rest[1] }
+      );
+      if (!result.removed) {
         console.log(`no graphic overlay with id "${rest[1]}"`);
         break;
       }
-      await saveProject(rest[0], project);
       console.log(`removed graphic ${rest[1]}`);
       break;
     }
@@ -956,14 +1077,12 @@ try {
         throw new Error("fromSec and toSec must be numbers (seconds)");
       }
       const text = timingAndText.slice(2).join(" ").replace(/\\n/g, "\n");
-      const project = await loadProject(slug);
-      const item = runAction("title-add", project, {
+      const { result: item } = await runLoggedAction<Title>(slug, "title-add", {
         fromSec,
         toSec,
         text,
         position,
-      }) as Title;
-      await saveProject(slug, project);
+      });
       console.log(
         `added title ${item.id} (${fromSec}s-${toSec}s, ${position}): "${item.text}"`
       );
@@ -973,15 +1092,15 @@ try {
       if (!(rest[0] && rest[1])) {
         throw new Error("usage: openklip title-rm <slug> <titleId>");
       }
-      const project = await loadProject(rest[0]);
-      const { removed } = runAction("title-rm", project, { id: rest[1] }) as {
-        removed: boolean;
-      };
-      if (!removed) {
+      const { result } = await runLoggedAction<{ removed: boolean }>(
+        rest[0],
+        "title-rm",
+        { id: rest[1] }
+      );
+      if (!result.removed) {
         console.log(`no title card with id "${rest[1]}"`);
         break;
       }
-      await saveProject(rest[0], project);
       console.log(`removed title ${rest[1]}`);
       break;
     }
@@ -1003,15 +1122,13 @@ try {
         throw new Error("--position must be lower, center, or hero");
       }
       const textRaw = flagValue(args, "--text");
-      const project = await loadProject(slug);
-      const item = runAction("title-set", project, {
+      const { result: item } = await runLoggedAction<Title>(slug, "title-set", {
         id: rest[1],
         text: textRaw?.replace(/\\n/g, "\n"),
         position: pos,
         fromSec: flagNumber(args, "--from"),
         toSec: flagNumber(args, "--to"),
-      }) as Title;
-      await saveProject(slug, project);
+      });
       console.log(
         `updated title ${item.id} (${item.position}): "${item.text.replace(/\n/g, "\\n")}"`
       );
@@ -1058,14 +1175,12 @@ try {
       if (!(Number.isFinite(fromSec) && Number.isFinite(toSec))) {
         throw new Error("fromSec and toSec must be numbers (seconds)");
       }
-      const project = await loadProject(slug);
-      const item = runAction("zoom-add", project, {
+      const { result: item } = await runLoggedAction<Zoom>(slug, "zoom-add", {
         fromSec,
         toSec,
         scale,
         rampSec,
-      }) as Zoom;
-      await saveProject(slug, project);
+      });
       console.log(
         `added zoom ${item.id} (${fromSec}s-${toSec}s, ${item.scale}x, ramp ${item.rampSec}s)`
       );
@@ -1075,15 +1190,15 @@ try {
       if (!(rest[0] && rest[1])) {
         throw new Error("usage: openklip zoom-rm <slug> <zoomId>");
       }
-      const project = await loadProject(rest[0]);
-      const { removed } = runAction("zoom-rm", project, { id: rest[1] }) as {
-        removed: boolean;
-      };
-      if (!removed) {
+      const { result } = await runLoggedAction<{ removed: boolean }>(
+        rest[0],
+        "zoom-rm",
+        { id: rest[1] }
+      );
+      if (!result.removed) {
         console.log(`no zoom with id "${rest[1]}"`);
         break;
       }
-      await saveProject(rest[0], project);
       console.log(`removed zoom ${rest[1]}`);
       break;
     }
@@ -1095,15 +1210,13 @@ try {
       }
       const slug = rest[0];
       const args = rest.slice(2);
-      const project = await loadProject(slug);
-      const item = runAction("zoom-set", project, {
+      const { result: item } = await runLoggedAction<Zoom>(slug, "zoom-set", {
         id: rest[1],
         scale: flagNumber(args, "--scale"),
         rampSec: flagNumber(args, "--ramp"),
         fromSec: flagNumber(args, "--from"),
         toSec: flagNumber(args, "--to"),
-      }) as Zoom;
-      await saveProject(slug, project);
+      });
       console.log(
         `updated zoom ${item.id} (${item.scale}x, ramp ${item.rampSec}s, ${secSpan(item.startSample, item.endSample)})`
       );
@@ -1114,9 +1227,7 @@ try {
         throw new Error("usage: openklip captions <slug> <on|off>");
       }
       const enabled = parseOnOff(rest[1], "openklip captions <slug>");
-      const project = await loadProject(rest[0]);
-      runAction("captions", project, { enabled });
-      await saveProject(rest[0], project);
+      await runLoggedAction(rest[0], "captions", { enabled });
       console.log(`captions ${enabled ? "on" : "off"}`);
       break;
     }
@@ -1128,9 +1239,9 @@ try {
       if (!Number.isFinite(n)) {
         throw new Error("n must be a number between 1 and 12");
       }
-      const project = await loadProject(rest[0]);
-      runAction("captions-max", project, { maxWords: n });
-      await saveProject(rest[0], project);
+      const { project } = await runLoggedAction(rest[0], "captions-max", {
+        maxWords: n,
+      });
       console.log(`captions max words: ${project.captions.maxWords}`);
       break;
     }
@@ -1145,9 +1256,9 @@ try {
         if (!isFilter(rest[2])) {
           throw new Error(`usage: ${filterUsage}`);
         }
-        const project = await loadProject(rest[0]);
-        runAction("look-filter", project, { filter: rest[2] });
-        await saveProject(rest[0], project);
+        const { project } = await runLoggedAction(rest[0], "look-filter", {
+          filter: rest[2],
+        });
         console.log(`filter: ${project.look.filter}`);
         break;
       }
@@ -1160,9 +1271,9 @@ try {
             : "no LUTs in luts/ (drop a name.cube there)";
           throw new Error(`LUT not found: ${rest[2]} (${hint})`);
         }
-        const project = await loadProject(rest[0]);
-        runAction("look-lut", project, { lut: clearing ? "" : rest[2] });
-        await saveProject(rest[0], project);
+        const { project } = await runLoggedAction(rest[0], "look-lut", {
+          lut: clearing ? "" : rest[2],
+        });
         console.log(`lut: ${project.look.lut ?? "none"}`);
         break;
       }
@@ -1211,9 +1322,7 @@ try {
             );
           }
         }
-        const project = await loadProject(rest[0]);
-        runAction("look-color", project, input);
-        await saveProject(rest[0], project);
+        const { project } = await runLoggedAction(rest[0], "look-color", input);
         console.log(`color: ${colorAdjustSummary(project.look.color)}`);
         break;
       }
@@ -1223,9 +1332,7 @@ try {
         );
       }
       const vignette = parseOnOff(rest[2], "openklip look <slug> vignette");
-      const project = await loadProject(rest[0]);
-      runAction("look-vignette", project, { vignette });
-      await saveProject(rest[0], project);
+      await runLoggedAction(rest[0], "look-vignette", { vignette });
       console.log(`vignette ${vignette ? "on" : "off"}`);
       break;
     }
@@ -1264,9 +1371,7 @@ try {
       if (slideFrac !== undefined) {
         input.slideFrac = slideFrac;
       }
-      const project = await loadProject(slug);
-      runAction("motion", project, input);
-      await saveProject(slug, project);
+      const { project } = await runLoggedAction(slug, "motion", input);
       const m = project.motion;
       console.log(
         `motion: speed ${m.speed}, fade ${m.fadeMs}ms, hero ${m.heroFadeMs}ms, slide ${m.slideFrac}`
@@ -1281,9 +1386,7 @@ try {
       if (!Number.isFinite(ms)) {
         throw new Error("ms must be a number between 0 and 500");
       }
-      const project = await loadProject(rest[0]);
-      runAction("pad", project, { padMs: ms });
-      await saveProject(rest[0], project);
+      const { project } = await runLoggedAction(rest[0], "pad", { padMs: ms });
       console.log(`pad: ${project.padMs}ms`);
       break;
     }
@@ -1385,19 +1488,19 @@ try {
       }
       const spokenPhrase = positional[0];
       const text = positional.slice(1).join(" ").replace(/\\n/g, "\n");
+      // Read-only load to resolve the phrase span, then the logged mutation.
       const project = await loadProject(slug);
       const span = placeFromPhrase(project, spokenPhrase);
       if (!span.matched) {
         throw new Error(`no match for spoken phrase: "${spokenPhrase}"`);
       }
-      const item = runAction("title-add", project, {
+      const { result: item } = await runLoggedAction<Title>(slug, "title-add", {
         fromSec: span.fromSec,
         toSec: span.toSec,
         text,
         position,
         anchor: { phrase: spokenPhrase, wordIds: span.ids, stale: false },
-      }) as Title;
-      await saveProject(slug, project);
+      });
       console.log(
         `added title ${item.id} at phrase "${spokenPhrase}" (${span.fromSec.toFixed(3)}s-${span.toSec.toFixed(3)}s, ${position}): "${item.text.replace(/\n/g, "\\n")}"`
       );
@@ -1443,19 +1546,19 @@ try {
           'usage: openklip zoom-add-phrase <slug> "spoken phrase" [--scale N] [--ramp N]'
         );
       }
+      // Read-only load to resolve the phrase span, then the logged mutation.
       const project = await loadProject(slug);
       const span = placeFromPhrase(project, spokenPhrase);
       if (!span.matched) {
         throw new Error(`no match for spoken phrase: "${spokenPhrase}"`);
       }
-      const item = runAction("zoom-add", project, {
+      const { result: item } = await runLoggedAction<Zoom>(slug, "zoom-add", {
         fromSec: span.fromSec,
         toSec: span.toSec,
         scale,
         rampSec,
         anchor: { phrase: spokenPhrase, wordIds: span.ids, stale: false },
-      }) as Zoom;
-      await saveProject(slug, project);
+      });
       console.log(
         `added zoom ${item.id} at phrase "${spokenPhrase}" (${span.fromSec.toFixed(3)}s-${span.toSec.toFixed(3)}s, ${item.scale}x)`
       );
@@ -1475,18 +1578,18 @@ try {
           'usage: openklip broll-add-phrase <slug> <assetId> "spoken phrase"'
         );
       }
+      // Read-only load to resolve the phrase span, then the logged mutation.
       const project = await loadProject(slug);
       const span = placeFromPhrase(project, spokenPhrase);
       if (!span.matched) {
         throw new Error(`no match for spoken phrase: "${spokenPhrase}"`);
       }
-      const item = runAction("broll-add", project, {
+      const { result: item } = await runLoggedAction<Broll>(slug, "broll-add", {
         assetId,
         fromSec: span.fromSec,
         toSec: span.toSec,
         anchor: { phrase: spokenPhrase, wordIds: span.ids, stale: false },
-      }) as Broll;
-      await saveProject(slug, project);
+      });
       console.log(
         `added b-roll ${item.id} at phrase "${spokenPhrase}" (asset "${assetId}", ${span.fromSec.toFixed(3)}s-${span.toSec.toFixed(3)}s)`
       );
@@ -1494,7 +1597,9 @@ try {
     }
     case "export": {
       if (!rest[0]) {
-        throw new Error("usage: openklip export <slug> [--height <px>]");
+        throw new Error(
+          "usage: openklip export <slug> [--height <px>] [--fps <n>] [--compression <preset>]"
+        );
       }
       const heightIdx = rest.indexOf("--height");
       let maxHeight: number | undefined;
@@ -1503,10 +1608,28 @@ try {
         if (!Number.isFinite(maxHeight)) {
           throw new Error("--height must be a positive number");
         }
+        // Same cap as the HTTP route, server action, and MCP tool (8K).
+        if (maxHeight > 4320) {
+          throw new Error("--height must be at most 4320 (8K)");
+        }
       }
-      const r = await exportCut(rest[0], { maxHeight });
+      const fpsRaw = flagValue(rest, "--fps");
+      const fps = fpsRaw === undefined ? undefined : parseExportFpsFlag(fpsRaw);
+      const compressionRaw = flagValue(rest, "--compression");
+      let compression: ExportCompression | undefined;
+      if (compressionRaw !== undefined) {
+        if (
+          !EXPORT_COMPRESSIONS.includes(compressionRaw as ExportCompression)
+        ) {
+          throw new Error(
+            `unknown compression preset "${compressionRaw}" (expected one of: ${EXPORT_COMPRESSIONS.join(", ")})`
+          );
+        }
+        compression = compressionRaw as ExportCompression;
+      }
+      const r = await exportCut(rest[0], { compression, fps, maxHeight });
       console.log(
-        `exported ${r.ranges} ranges, ${r.durationSec.toFixed(1)}s (${r.height}p) -> ${r.out}`
+        `exported ${r.ranges} ranges, ${r.durationSec.toFixed(1)}s (${r.height}p, ${r.fps}fps, ${r.compression}, music ${r.music}) -> ${r.out}`
       );
       break;
     }
@@ -1672,9 +1795,7 @@ try {
       if (!Number.isFinite(toIndex)) {
         throw new Error("toIndex must be a number");
       }
-      const project = await loadProject(slug);
-      runAction("reorder", project, { track: kind, id, toIndex });
-      await saveProject(slug, project);
+      await runLoggedAction(slug, "reorder", { track: kind, id, toIndex });
       console.log(`reordered ${kind} ${id} -> index ${toIndex}`);
       break;
     }
@@ -1684,13 +1805,9 @@ try {
       }
       const slug = rest[0];
       const overlayId = rest[1];
-      const project = await loadProject(slug);
-      const results = runAction(
-        "reanchor",
-        project,
-        overlayId ? { id: overlayId } : {}
-      ) as Array<{ id: string; kind: string; status: string }>;
-      await saveProject(slug, project);
+      const { result: results } = await runLoggedAction<
+        Array<{ id: string; kind: string; status: string }>
+      >(slug, "reanchor", overlayId ? { id: overlayId } : {});
       if (results.length === 0) {
         console.log("no phrase-anchored overlays to re-resolve");
         break;
