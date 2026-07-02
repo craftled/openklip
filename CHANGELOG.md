@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.19.0.0 - 2026-07-03
+
+The b-roll split-screen release: a third display mode places the speaker on the left and b-roll on the right.
+
+### Added
+- **B-roll split display** (Milestone 5.2): `display: "split"` on b-roll placements composites a 50/50 landscape split (speaker cropped left, b-roll right) at preview and export via `hstack` in `buildBrollOverlayFilters`. CLI/MCP/registry/GUI Cover/PiP/Split toggle parity.
+
+### Changed
+- **Version**: bumped OpenKlip to `0.19.0.0`.
+
 ## 0.18.0.0 - 2026-07-03
 
 The b-roll audio modes release: a placed b-roll clip can mix its soundtrack with the voice at export, not only swap the picture.

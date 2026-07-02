@@ -5,11 +5,13 @@ import {
   brollOverlayPosition,
   brollPipBox,
   brollScaleFilter,
+  brollSplitHalfWidth,
+  buildBrollOverlayFilters,
   normalizeBrollDisplay,
 } from "../src/broll-display.ts";
 
-test("BROLL_DISPLAY_IDS lists cover and pip", () => {
-  assert.deepEqual(BROLL_DISPLAY_IDS, ["cover", "pip"]);
+test("BROLL_DISPLAY_IDS lists cover, pip, and split", () => {
+  assert.deepEqual(BROLL_DISPLAY_IDS, ["cover", "pip", "split"]);
 });
 
 test("normalizeBrollDisplay defaults missing to cover", () => {
@@ -73,5 +75,51 @@ test("brollOverlayPosition anchors pip bottom-right with margin", () => {
   assert.equal(
     brollOverlayPosition("pip", 1920, 1080),
     `W-w-${margin}:H-h-${margin}`
+  );
+});
+
+test("brollSplitHalfWidth returns an even half frame width", () => {
+  assert.equal(brollSplitHalfWidth(1920), 960);
+  assert.equal(brollSplitHalfWidth(1281) % 2, 0);
+});
+
+test("brollScaleFilter uses half-frame scaling for split", () => {
+  const halfW = brollSplitHalfWidth(1280);
+  const filter = brollScaleFilter({
+    display: "split",
+    inputIndex: 2,
+    outW: 1280,
+    outH: 720,
+    durationSec: 3,
+    srcInSec: 0,
+    outStart: 1,
+    label: "bv2",
+  });
+  assert.match(
+    filter,
+    new RegExp(
+      `scale=${halfW}:720:force_original_aspect_ratio=increase,crop=${halfW}:720`
+    )
+  );
+});
+
+test("buildBrollOverlayFilters hstacks speaker left and b-roll right for split", () => {
+  const parts = buildBrollOverlayFilters({
+    display: "split",
+    inputIndex: 2,
+    outW: 1280,
+    outH: 720,
+    outStart: 1,
+    outEnd: 4,
+    srcInSec: 0,
+    lastLabel: "v0",
+  });
+  assert.equal(parts.length, 5);
+  assert.match(parts[0] ?? "", /\[2:v\]trim=/);
+  assert.match(parts[1] ?? "", /\[v0\]split=2\[bf2\]\[bl2\]/);
+  assert.match(parts[3] ?? "", /hstack=inputs=2\[split2\]/);
+  assert.match(
+    parts[4] ?? "",
+    /\[bf2\]\[split2\]overlay=0:0:eof_action=pass:enable='between\(t,/
   );
 });
