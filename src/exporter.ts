@@ -1088,17 +1088,18 @@ export async function exportCut(
   }
 
   for (const pl of plans) {
-    const [scalePart, overlayPart] = buildBrollOverlayFilters({
-      display: pl.display,
-      inputIndex: pl.inputIndex,
-      lastLabel: last,
-      outEnd: pl.outEnd,
-      outH,
-      outStart: pl.outStart,
-      outW,
-      srcInSec: pl.srcInSec,
-    });
-    parts.push(scalePart, overlayPart);
+    parts.push(
+      ...buildBrollOverlayFilters({
+        display: pl.display,
+        inputIndex: pl.inputIndex,
+        lastLabel: last,
+        outEnd: pl.outEnd,
+        outH,
+        outStart: pl.outStart,
+        outW,
+        srcInSec: pl.srcInSec,
+      })
+    );
     last = `ov${pl.inputIndex}`;
   }
 

@@ -139,7 +139,7 @@ Transcript edits
 Overlays
   openklip broll-add <slug> <assetId> <fromSec> <toSec>
                                      cover a source-time span with a registered asset
-                                       --display cover|pip  (default cover)
+                                       --display cover|pip|split  (default cover)
                                        --audio-mode silent|broll|mix|duck-voice|duck-broll
   openklip broll-set <slug> <brollId>  patch b-roll (--asset --from --to --src-in
                                        --display cover|pip --audio-mode ...)
@@ -367,7 +367,7 @@ function parseBrollDisplayFlag(
   if (raw === undefined) {
     return;
   }
-  if (raw === "cover" || raw === "pip") {
+  if (raw === "cover" || raw === "pip" || raw === "split") {
     return raw;
   }
   throw new Error(

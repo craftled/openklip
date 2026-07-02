@@ -48,7 +48,7 @@ export interface OverlayViews {
     anchor: PhraseAnchor | null;
     assetId: string;
     audioMode: "broll" | "duck-broll" | "duck-voice" | "mix" | "silent";
-    display: "cover" | "pip";
+    display: "cover" | "pip" | "split";
     fromSec: number;
     id: string;
     note?: string;

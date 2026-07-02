@@ -217,7 +217,7 @@ interface Asset {
 interface BrollItem {
   assetId: string;
   audioMode?: "broll" | "duck-broll" | "duck-voice" | "mix" | "silent";
-  display?: "cover" | "pip";
+  display?: "cover" | "pip" | "split";
   endSample: number;
   id: string;
   srcInSample: number;
@@ -656,14 +656,13 @@ export function App({
   const activeBroll = project?.broll?.find(
     (b) => curSample >= b.startSample && curSample < b.endSample
   );
+  const activeBrollDisplay = activeBroll?.display ?? "cover";
   const activeCoverBroll =
-    activeBroll && (activeBroll.display ?? "cover") !== "pip"
-      ? activeBroll
-      : undefined;
+    activeBroll && activeBrollDisplay === "cover" ? activeBroll : undefined;
   const activePipBroll =
-    activeBroll && (activeBroll.display ?? "cover") === "pip"
-      ? activeBroll
-      : undefined;
+    activeBroll && activeBrollDisplay === "pip" ? activeBroll : undefined;
+  const activeSplitBroll =
+    activeBroll && activeBrollDisplay === "split" ? activeBroll : undefined;
   const zoomWindows = useMemo<ZoomWindow[]>(
     () =>
       project
@@ -730,7 +729,8 @@ export function App({
     if (!v) {
       return;
     }
-    const brollForPreview = activeCoverBroll ?? activePipBroll;
+    const brollForPreview =
+      activeCoverBroll ?? activePipBroll ?? activeSplitBroll;
     if (!brollForPreview) {
       if (!v.paused) {
         v.pause();
@@ -755,7 +755,14 @@ export function App({
     if (!(playing || v.paused)) {
       v.pause();
     }
-  }, [activeCoverBroll, activePipBroll, curSample, playing, sr]);
+  }, [
+    activeCoverBroll,
+    activePipBroll,
+    activeSplitBroll,
+    curSample,
+    playing,
+    sr,
+  ]);
 
   // Music bed under the voice (brollRef sibling pattern): a hidden <audio>
   // follows the active placement. Its desired position is CONTINUOUS on the
@@ -1970,7 +1977,12 @@ export function App({
             {
               icon: Scan,
               label: "Display",
-              value: (selBroll.display ?? "cover") === "pip" ? "PiP" : "Cover",
+              value:
+                (selBroll.display ?? "cover") === "pip"
+                  ? "PiP"
+                  : (selBroll.display ?? "cover") === "split"
+                    ? "Split"
+                    : "Cover",
             },
             {
               icon: Volume2,
@@ -2389,7 +2401,11 @@ export function App({
                       className="w-full"
                       onValueChange={(value) => {
                         const mode = firstToggleValue(value);
-                        if (mode === "cover" || mode === "pip") {
+                        if (
+                          mode === "cover" ||
+                          mode === "pip" ||
+                          mode === "split"
+                        ) {
                           updateBroll(selBroll.id, { display: mode });
                         }
                       }}
@@ -2403,6 +2419,9 @@ export function App({
                       </ToggleGroupItem>
                       <ToggleGroupItem className="flex-1" value="pip">
                         PiP
+                      </ToggleGroupItem>
+                      <ToggleGroupItem className="flex-1" value="split">
+                        Split
                       </ToggleGroupItem>
                     </ToggleGroup>
                   </Section>
@@ -3101,7 +3120,12 @@ export function App({
                           >
                             {/* biome-ignore lint/a11y/useMediaCaption: editor preview; transcript is the caption source */}
                             <video
-                              className="block h-full w-full bg-black object-cover"
+                              className={cn(
+                                "block bg-black object-cover",
+                                activeSplitBroll
+                                  ? "absolute inset-y-0 left-0 z-0 h-full w-1/2"
+                                  : "h-full w-full"
+                              )}
                               playsInline
                               ref={videoRef}
                               src={`/media/proxy.mp4?v=${project.mediaVersion ?? 0}`}
@@ -3118,7 +3142,9 @@ export function App({
                                   ? "inset-0 block h-full w-full"
                                   : activePipBroll
                                     ? "right-2 bottom-2 block aspect-video w-[28%] rounded-md border border-white/25 shadow-lg"
-                                    : "hidden"
+                                    : activeSplitBroll
+                                      ? "inset-y-0 right-0 block h-full w-1/2"
+                                      : "hidden"
                               )}
                               muted
                               playsInline
