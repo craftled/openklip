@@ -3,11 +3,50 @@
 // and export (output-time) produce identical lines.
 
 import { colorToHex } from "./color.ts";
+// Type-only import: erased at compile time, so this module stays a pure,
+// browser-safe leaf (compiledTimeline.ts depends on that).
+import type { Project, Range } from "./edl.ts";
 
 export interface CaptionWord {
   endSec: number;
   startSec: number;
   text: string;
+}
+
+// Map every kept word into OUTPUT time against the effective ranges. R1: a
+// word is emitted when its span OVERLAPS a kept range, not merely when its
+// START lies inside one - VAD snap can move a range start forward past a soft
+// word onset, and a dead-air span can cover a kept word's start, and in both
+// cases most of the word's audio still plays, so the caption must too. Start
+// and end are clamped to the range before mapping into output time; a word
+// straddling multiple ranges is emitted once, in the first range it overlaps.
+// The single shared implementation for the export burn-in (src/exporter.ts)
+// and the derived UI timeline (src/compiledTimeline.ts), which previously
+// carried identical (and identically buggy) copies.
+export function keptWordsInOutputTime(
+  project: Pick<Project, "sampleRate" | "words">,
+  ranges: Range[]
+): CaptionWord[] {
+  const sr = project.sampleRate;
+  const out: CaptionWord[] = [];
+  for (const w of project.words) {
+    if (w.deleted) {
+      continue;
+    }
+    const ws = w.startSample / sr;
+    const we = w.endSample / sr;
+    let cum = 0;
+    for (const r of ranges) {
+      if (we > r.startSec && ws < r.endSec) {
+        const s = cum + Math.max(0, ws - r.startSec);
+        const e = cum + Math.max(0, Math.min(we, r.endSec) - r.startSec);
+        out.push({ text: w.text, startSec: s, endSec: Math.max(e, s + 0.05) });
+        break;
+      }
+      cum += r.endSec - r.startSec;
+    }
+  }
+  return out;
 }
 
 export interface CaptionGroup {

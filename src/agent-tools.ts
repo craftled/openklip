@@ -14,8 +14,11 @@ import {
   setAgentTaskStep,
 } from "./agent-tasks.ts";
 import { assembleFromSelection, listTakes, loadTake } from "./assembly.ts";
+import { loadAudioAnalysis } from "./audio-analysis.ts";
+import type { SilenceSpan } from "./audio-analysis-core.ts";
 import { loadBrief, saveBrief } from "./brief.ts";
-import { samplesToSec } from "./edl.ts";
+import { cleanupReport, fillerOnlyCleanupReport } from "./cleanup.ts";
+import { type Project, samplesToSec } from "./edl.ts";
 import { EXPORT_COMPRESSIONS, exportCut } from "./exporter.ts";
 import { listGraphics } from "./graphics.ts";
 import { listLuts } from "./lut.ts";
@@ -177,6 +180,24 @@ function defineQueryTool<S extends z.ZodRawShape>(def: {
   };
 }
 
+// F1: project_status and project_ranges both need `silences` to agree with
+// the CLI/exporter timeline (effectiveRanges is a snap no-op without it), but
+// loading audio analysis is best-effort everywhere else in this file too (see
+// cleanup_report below) - only attempted when snap is actually enabled in VAD
+// mode, and swallowed on failure (missing audio16k.f32, corrupt cache, ...)
+// so a query tool never fails just because analysis isn't available yet.
+async function loadSilences(
+  project: Project
+): Promise<SilenceSpan[] | undefined> {
+  const snap = project.cuts?.snap;
+  if (!(snap?.enabled && snap.mode === "vad")) {
+    return;
+  }
+  return await loadAudioAnalysis(project.slug)
+    .then((a) => a.silences)
+    .catch(() => undefined);
+}
+
 const queryTools: AgentToolDef[] = [
   defineQueryTool({
     name: "list_projects",
@@ -248,7 +269,8 @@ const queryTools: AgentToolDef[] = [
     schema: z.object({ slug }),
     run: async ({ slug: projectSlug }) => {
       const project = await loadProject(projectSlug);
-      return projectStatus(project);
+      const silences = await loadSilences(project);
+      return projectStatus(project, silences);
     },
   }),
   defineQueryTool({
@@ -257,7 +279,8 @@ const queryTools: AgentToolDef[] = [
     schema: z.object({ slug }),
     run: async ({ slug: projectSlug }) => {
       const project = await loadProject(projectSlug);
-      return { ranges: listRanges(project) };
+      const silences = await loadSilences(project);
+      return { ranges: listRanges(project, silences) };
     },
   }),
   defineQueryTool({
@@ -267,6 +290,23 @@ const queryTools: AgentToolDef[] = [
     run: async ({ slug: projectSlug }) => {
       const project = await loadProject(projectSlug);
       return listOverlays(project);
+    },
+  }),
+  defineQueryTool({
+    name: "cleanup_report",
+    summary:
+      "Filler-word and dead-air candidates with savings estimates and safe/review risk. Apply the safe ones with the cut action (filler wordIds) and the dead-air-add action (spans); leave review candidates to a human unless the brief says aggressive.",
+    schema: z.object({ slug }),
+    run: async ({ slug: projectSlug }) => {
+      const project = await loadProject(projectSlug);
+      try {
+        const analysis = await loadAudioAnalysis(projectSlug);
+        return cleanupReport(project, analysis.silences);
+      } catch {
+        // No audio analysis yet (project never re-ingested since
+        // audio16k.f32 was introduced): degrade to filler-only.
+        return fillerOnlyCleanupReport(project);
+      }
     },
   }),
   defineQueryTool({

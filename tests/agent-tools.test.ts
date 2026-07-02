@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { writeFileSync } from "node:fs";
 import { test } from "node:test";
 import { readActionLog } from "../src/action-log.ts";
 import {
@@ -13,6 +14,7 @@ import {
   getAgentTool,
 } from "../src/agent-tools.ts";
 import { SAMPLE_RATE } from "../src/edl.ts";
+import { projectPaths } from "../src/paths.ts";
 import { actions } from "../src/registry.ts";
 import {
   makeProject,
@@ -508,4 +510,189 @@ test("task_complete called twice: the second (terminal) call is a no-op, not an 
       assert.equal(second.task.summary, "first summary");
     });
   });
+});
+
+// ── cleanup_report ───────────────────────────────────────────────────────
+
+const ANALYSIS_SR = 16_000;
+
+function tonePcm(seconds: number, amplitude = 0.5): Float32Array {
+  const n = Math.round(ANALYSIS_SR * seconds);
+  const pcm = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    pcm[i] = amplitude * Math.sin((2 * Math.PI * 440 * i) / ANALYSIS_SR);
+  }
+  return pcm;
+}
+
+function concatPcm(parts: Float32Array[]): Float32Array {
+  const total = parts.reduce((n, p) => n + p.length, 0);
+  const out = new Float32Array(total);
+  let offset = 0;
+  for (const p of parts) {
+    out.set(p, offset);
+    offset += p.length;
+  }
+  return out;
+}
+
+function word48(id: string, text: string, startSec: number, endSec: number) {
+  return {
+    id,
+    text,
+    startSample: Math.round(startSec * SAMPLE_RATE),
+    endSample: Math.round(endSec * SAMPLE_RATE),
+    deleted: false,
+  };
+}
+
+test("cleanup_report: degrades to filler-only with a warning when there is no audio analysis yet", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(
+      slug,
+      makeProject({
+        slug,
+        words: [word48("w0", "um", 0, 0.4), word48("w1", "hello", 0.4, 0.9)],
+      })
+    );
+    const result = (await callAgentTool("cleanup_report", { slug })) as {
+      candidates: Array<{ kind: string }>;
+      deadAirCount: number;
+      fillerCount: number;
+      warnings: string[];
+    };
+    assert.equal(result.fillerCount, 1);
+    assert.equal(result.deadAirCount, 0);
+    assert.equal(result.candidates.length, 1);
+    assert.ok(
+      result.warnings.some((w) => /needs audio analysis/i.test(w)),
+      `expected a degraded-mode warning, got ${JSON.stringify(result.warnings)}`
+    );
+  });
+});
+
+test("cleanup_report: merges filler and dead-air candidates once audio analysis is available", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(
+      slug,
+      makeProject({
+        slug,
+        words: [
+          word48("w0", "so", 0, 0.3),
+          word48("w1", "um", 0.3, 0.7),
+          word48("w2", "hello", 0.7, 1.2),
+          word48("w3", "world", 3.2, 3.7),
+        ],
+        durationSamples: SAMPLE_RATE * 4,
+      })
+    );
+    const pcm = concatPcm([
+      tonePcm(1.2),
+      new Float32Array(ANALYSIS_SR * 2),
+      tonePcm(0.8),
+    ]);
+    writeFileSync(
+      projectPaths(slug).audioRaw,
+      Buffer.from(pcm.buffer, pcm.byteOffset, pcm.byteLength)
+    );
+
+    const result = (await callAgentTool("cleanup_report", { slug })) as {
+      candidates: Array<{ kind: string }>;
+      deadAirCount: number;
+      fillerCount: number;
+      warnings: string[];
+    };
+    assert.equal(result.fillerCount, 1);
+    assert.equal(result.deadAirCount, 1);
+    assert.equal(result.candidates.length, 2);
+    assert.ok(result.candidates.some((c) => c.kind === "filler"));
+    assert.ok(result.candidates.some((c) => c.kind === "dead-air"));
+  });
+});
+
+// ── F1: project_status / project_ranges load silences when snap is enabled ─
+
+// A single word "hello" 0-1s, real acoustic silence detected starting 40ms
+// before the transcribed word boundary (tone stops at 0.96s, well inside the
+// window-quantized analysis grid) - the same "silence begins slightly before
+// the word boundary" shape as tests/edl.test.ts's effectiveRanges snap test,
+// but exercised end to end through a real audioRaw file + loadAudioAnalysis
+// instead of a hand-built SilenceSpan array.
+function writeSnapFixture(slug: string): void {
+  writeFixtureProject(
+    slug,
+    makeProject({
+      slug,
+      durationSamples: SAMPLE_RATE * 2,
+      words: [word48("w0", "hello", 0, 1.0)],
+      cuts: {
+        snap: { enabled: true, mode: "vad", maxShiftMs: 120, crossfadeMs: 24 },
+        deadAir: [],
+      },
+    })
+  );
+  const pcm = concatPcm([tonePcm(0.96), new Float32Array(ANALYSIS_SR * 0.54)]);
+  writeFileSync(
+    projectPaths(slug).audioRaw,
+    Buffer.from(pcm.buffer, pcm.byteOffset, pcm.byteLength)
+  );
+}
+
+test("project_ranges: loads silences when snap is enabled, so the range end reflects the snapped (not raw padded) boundary", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeSnapFixture(slug);
+    const result = (await callAgentTool("project_ranges", { slug })) as {
+      ranges: Array<{ endSec: number; startSec: number }>;
+    };
+    assert.equal(result.ranges.length, 1);
+    // Raw padded end (word end 1.0 + 50ms pad) would be 1.05; snapped end
+    // pulls back onto the detected silence boundary near 0.96.
+    assert.ok(
+      result.ranges[0].endSec < 1.0,
+      `expected a snapped range end under 1.0s, got ${result.ranges[0].endSec}`
+    );
+    assert.ok(
+      Math.abs(result.ranges[0].endSec - 0.96) < 0.05,
+      `expected the range end near the 0.96s silence boundary, got ${result.ranges[0].endSec}`
+    );
+  });
+});
+
+test("project_status: ranges reflect the same silence-snapped boundary as project_ranges", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeSnapFixture(slug);
+    const status = (await callAgentTool("project_status", { slug })) as {
+      ranges: Array<{ endSec: number; startSec: number }>;
+    };
+    assert.equal(status.ranges.length, 1);
+    assert.ok(
+      status.ranges[0].endSec < 1.0,
+      `expected a snapped range end under 1.0s, got ${status.ranges[0].endSec}`
+    );
+  });
+});
+
+test("project_ranges: snap disabled never loads silences (call path stays robust without audio analysis)", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(
+      slug,
+      makeProject({
+        slug,
+        durationSamples: SAMPLE_RATE * 2,
+        words: [word48("w0", "hello", 0, 1.0)],
+      })
+    );
+    // No audioRaw at all: if project_ranges tried to load analysis anyway,
+    // this would throw instead of falling back cleanly.
+    const result = (await callAgentTool("project_ranges", { slug })) as {
+      ranges: Array<{ endSec: number; startSec: number }>;
+    };
+    assert.equal(result.ranges.length, 1);
+    assert.ok(Math.abs(result.ranges[0].endSec - 1.05) < 1e-9);
+  });
+});
+
+test("agentToolManifest includes cleanup_report", () => {
+  assert.ok(agentToolNames("mcp").includes("cleanup_report"));
+  assert.ok(agentToolNames("cli").includes("cleanup_report"));
 });

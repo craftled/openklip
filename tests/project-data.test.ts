@@ -1,6 +1,8 @@
 import { describe, expect, mock, test } from "bun:test";
+import { statSync } from "node:fs";
 import { loadEditorProject } from "../app/lib/project-data.ts";
 import { saveBrief } from "../src/brief.ts";
+import { projectPaths } from "../src/paths.ts";
 import { defaultFixtureOrphan } from "./helpers/assetFixture.ts";
 import {
   makeProject,
@@ -44,6 +46,81 @@ describe("loadEditorProject", () => {
       writeFixtureProject(slug, makeProject({ slug }));
       const loaded = await loadEditorProject(slug);
       expect(loaded.brief).toBeNull();
+    });
+  });
+
+  test("silences is null when snap is disabled (no analysis cost paid)", async () => {
+    await withTempProjectsRoot(async ({ slug }) => {
+      writeFixtureProject(slug, makeProject({ slug }));
+      const loaded = await loadEditorProject(slug);
+      expect(loaded.silences).toBeNull();
+    });
+  });
+
+  test("silences is null when snap is enabled but no audio has been extracted", async () => {
+    await withTempProjectsRoot(async ({ slug }) => {
+      writeFixtureProject(
+        slug,
+        makeProject({
+          slug,
+          cuts: {
+            snap: {
+              enabled: true,
+              mode: "vad",
+              maxShiftMs: 120,
+              crossfadeMs: 24,
+            },
+            deadAir: [],
+          },
+        })
+      );
+      const loaded = await loadEditorProject(slug);
+      expect(loaded.silences).toBeNull();
+    });
+  });
+
+  test("silences is populated from a cached audio-analysis.json when snap is enabled", async () => {
+    await withTempProjectsRoot(async ({ slug }) => {
+      writeFixtureProject(
+        slug,
+        makeProject({
+          slug,
+          cuts: {
+            snap: {
+              enabled: true,
+              mode: "vad",
+              maxShiftMs: 120,
+              crossfadeMs: 24,
+            },
+            deadAir: [],
+          },
+        })
+      );
+      const paths = projectPaths(slug);
+      await Bun.write(
+        paths.audioRaw,
+        new Float32Array(1600).buffer as ArrayBuffer
+      );
+      const sourceMtimeMs = statSync(paths.audioRaw).mtimeMs;
+      const silences = [{ startSec: 1.2, endSec: 1.5 }];
+      // F13: loadAudioAnalysis validates the cache shape (AudioAnalysisSchema)
+      // before trusting it, so this fixture must be a complete AudioAnalysis
+      // object, not just the sourceMtimeMs + silences this test exercises.
+      await Bun.write(
+        `${paths.working}/audio-analysis.json`,
+        JSON.stringify({
+          version: 1,
+          sampleRate: 16_000,
+          windowMs: 20,
+          thresholdDb: -38,
+          minSilenceMs: 300,
+          sourceMtimeMs,
+          silences,
+        })
+      );
+
+      const loaded = await loadEditorProject(slug);
+      expect(loaded.silences).toEqual(silences);
     });
   });
 

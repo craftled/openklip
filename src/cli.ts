@@ -6,8 +6,15 @@ import { agentToolManifest, agentToolTable } from "./agent-tools.ts";
 import { assembleFromSelection, ingestTake, listTakes } from "./assembly.ts";
 import { analyzeAssets } from "./asset-cards.ts";
 import { registerAsset } from "./assets.ts";
+import { loadAudioAnalysis } from "./audio-analysis.ts";
+import type { SilenceSpan } from "./audio-analysis-core.ts";
 import { applyBrand, loadBrand } from "./brands.ts";
 import { loadBrief, saveBrief } from "./brief.ts";
+import {
+  cleanupReport,
+  fillerOnlyCleanupReport,
+  partitionSafeCandidates,
+} from "./cleanup.ts";
 import {
   runOverlays,
   runRanges,
@@ -106,6 +113,9 @@ Transcript edits
                                        --text "..."  cut the first run matching a phrase
                                        --all         with --text, cut every matching run
   openklip restore <slug>            restore every word (clear all cuts)
+  openklip word-text <slug> <wordId> <text...>
+                                     correct one word's transcript text
+                                       (GUI bulk edits use edit-words instead)
 
 Overlays
   openklip broll-add <slug> <assetId> <fromSec> <toSec>
@@ -165,6 +175,11 @@ Look & captions
   openklip captions-max <slug> <n>       words per caption line (1-12)
   openklip look <slug> vignette <on|off> toggle vignette
   openklip look <slug> color [--temp n] [--tint n] [--bright n] [--contrast n] [--sat n] | --reset
+  openklip audio <slug>                  print current export audio quality settings
+  openklip audio <slug> [--duck on|off] [--duck-amount <1-30 dB>]
+                        [--duck-attack <1-500 ms>] [--duck-release <20-2000 ms>]
+                        [--loudness on|off] [--loudness-target <-30..-10 LUFS>]
+                        [--highpass on|off] [--highpass-hz <40-200>]
   openklip pad <slug> <ms>               cut boundary padding (0-500 ms)
   openklip brand <slug> <name>           apply a brand preset (look defaults)
   openklip template list                 list edit templates (templates/*/skill.md)
@@ -190,6 +205,9 @@ Review & export
                                        --json            agent-friendly JSON
   openklip ranges <slug> [--json]    kept source-time segments after cuts
   openklip overlays <slug> [--json]  b-roll, music, titles, zooms, stills with ids
+  openklip cleanup <slug> [--json]   filler-word and dead-air candidates (safe/review)
+                                       --apply-safe      apply the safe candidates and print what changed
+  openklip dead-air-rm <slug> <id>   remove a registered dead-air span by id
   openklip export <slug>             render the current cut to out.mp4
                                        --height <px>  max output height (e.g. 1080)
                                        --fps <n>      output frame rate, integer 1-120 (default: source)
@@ -225,6 +243,22 @@ async function saveProject(slug: string, project: Project): Promise<void> {
   await Bun.write(p.project, JSON.stringify(project, null, 2));
 }
 
+// Best-effort VAD silences for a project's ranges/status output: only worth
+// loading when the project actually snaps to VAD, and a missing/failed
+// analysis must never break `ranges`/`status` (mirrors the exporter's own
+// fallback). Keeps CLI output in lockstep with export truth without paying
+// the analysis cost for projects that don't use snap.
+async function loadSilencesForCli(
+  project: Project
+): Promise<SilenceSpan[] | undefined> {
+  if (!(project.cuts?.snap?.enabled && project.cuts.snap.mode === "vad")) {
+    return;
+  }
+  return await loadAudioAnalysis(project.slug)
+    .then((a) => a.silences)
+    .catch(() => undefined);
+}
+
 // Run a registry action through the shared store: the mutation happens inside
 // the per-slug lock, bumps the project revision, and appends one entry to
 // working/actions.jsonl with actor "cli". Returns the action result plus the
@@ -244,6 +278,10 @@ async function runLoggedAction<T = unknown>(
     { action: name, actor: "cli", input }
   );
   return { project: mutated as Project, result };
+}
+
+function secRange(startSec: number, endSec: number): string {
+  return `${startSec.toFixed(1)}s-${endSec.toFixed(1)}s`;
 }
 
 function mmss(sample: number): string {
@@ -716,6 +754,21 @@ try {
       }
       await runLoggedAction(rest[0], "restore-all", {});
       console.log("restored all words");
+      break;
+    }
+    case "word-text": {
+      if (!(rest[0] && rest[1] && rest.length > 2)) {
+        throw new Error("usage: openklip word-text <slug> <wordId> <text...>");
+      }
+      const slug = rest[0];
+      const id = rest[1];
+      const text = rest.slice(2).join(" ");
+      const { result } = await runLoggedAction<{
+        id: string;
+        text: string;
+        originalText?: string;
+      }>(slug, "word-text", { id, text });
+      console.log(`word ${result.id}: "${result.text}"`);
       break;
     }
     case "broll-add": {
@@ -1383,6 +1436,90 @@ try {
       );
       break;
     }
+    case "audio": {
+      if (!rest[0]) {
+        throw new Error(
+          "usage: openklip audio <slug> [--duck on|off] [--duck-amount <db>] [--duck-attack <ms>] [--duck-release <ms>] [--loudness on|off] [--loudness-target <lufs>] [--highpass on|off] [--highpass-hz <n>]"
+        );
+      }
+      const slug = rest[0];
+      const duck = flagValue(rest, "--duck");
+      const duckAmount = flagNumber(rest, "--duck-amount");
+      const duckAttack = flagNumber(rest, "--duck-attack");
+      const duckRelease = flagNumber(rest, "--duck-release");
+      const loudness = flagValue(rest, "--loudness");
+      const loudnessTarget = flagNumber(rest, "--loudness-target");
+      const highpass = flagValue(rest, "--highpass");
+      const highpassHz = flagNumber(rest, "--highpass-hz");
+
+      const input: {
+        ducking?: {
+          enabled?: boolean;
+          amountDb?: number;
+          attackMs?: number;
+          releaseMs?: number;
+        };
+        loudness?: { enabled?: boolean; targetLufs?: number };
+        voiceHighpass?: { enabled?: boolean; hz?: number };
+      } = {};
+      if (
+        duck !== undefined ||
+        duckAmount !== undefined ||
+        duckAttack !== undefined ||
+        duckRelease !== undefined
+      ) {
+        input.ducking = {};
+        if (duck !== undefined) {
+          input.ducking.enabled = parseOnOff(
+            duck,
+            "openklip audio <slug> --duck"
+          );
+        }
+        if (duckAmount !== undefined) {
+          input.ducking.amountDb = duckAmount;
+        }
+        if (duckAttack !== undefined) {
+          input.ducking.attackMs = duckAttack;
+        }
+        if (duckRelease !== undefined) {
+          input.ducking.releaseMs = duckRelease;
+        }
+      }
+      if (loudness !== undefined || loudnessTarget !== undefined) {
+        input.loudness = {};
+        if (loudness !== undefined) {
+          input.loudness.enabled = parseOnOff(
+            loudness,
+            "openklip audio <slug> --loudness"
+          );
+        }
+        if (loudnessTarget !== undefined) {
+          input.loudness.targetLufs = loudnessTarget;
+        }
+      }
+      if (highpass !== undefined || highpassHz !== undefined) {
+        input.voiceHighpass = {};
+        if (highpass !== undefined) {
+          input.voiceHighpass.enabled = parseOnOff(
+            highpass,
+            "openklip audio <slug> --highpass"
+          );
+        }
+        if (highpassHz !== undefined) {
+          input.voiceHighpass.hz = highpassHz;
+        }
+      }
+
+      const project =
+        Object.keys(input).length === 0
+          ? await loadProject(slug)
+          : (await runLoggedAction(slug, "audio", input)).project;
+      const a = project.audio;
+      console.log(
+        `audio: duck ${a.ducking.enabled ? "on" : "off"} (${a.ducking.amountDb}dB, attack ${a.ducking.attackMs}ms, release ${a.ducking.releaseMs}ms), loudness ${a.loudness.enabled ? "on" : "off"} (${a.loudness.targetLufs} LUFS), highpass ${a.voiceHighpass.enabled ? "on" : "off"} (${a.voiceHighpass.hz}Hz)`
+      );
+      break;
+    }
     case "pad": {
       if (!(rest[0] && rest[1])) {
         throw new Error("usage: openklip pad <slug> <ms>");
@@ -1400,11 +1537,12 @@ try {
         throw new Error("usage: openklip status <slug> [--json]");
       }
       const project = await loadProject(rest[0]);
+      const silences = await loadSilencesForCli(project);
       if (rest.includes("--json")) {
-        process.stdout.write(runStatusJson(project));
+        process.stdout.write(runStatusJson(project, silences));
         break;
       }
-      const s = summarize(project);
+      const s = summarize(project, silences);
       console.log(`project: ${project.slug}`);
       if (project.template) {
         console.log(`  template:     ${project.template}`);
@@ -1451,8 +1589,9 @@ try {
         throw new Error("usage: openklip ranges <slug> [--json]");
       }
       const project = await loadProject(rest[0]);
+      const silences = await loadSilencesForCli(project);
       process.stdout.write(
-        runRanges(project, { json: rest.includes("--json") })
+        runRanges(project, { json: rest.includes("--json"), silences })
       );
       break;
     }
@@ -1463,6 +1602,100 @@ try {
       const project = await loadProject(rest[0]);
       process.stdout.write(
         runOverlays(project, { json: rest.includes("--json") })
+      );
+      break;
+    }
+    case "cleanup": {
+      if (!rest[0]) {
+        throw new Error(
+          "usage: openklip cleanup <slug> [--json] [--apply-safe]"
+        );
+      }
+      const slug = rest[0];
+      const project = await loadProject(slug);
+      const silences = await loadAudioAnalysis(slug)
+        .then((a) => a.silences)
+        .catch(() => null);
+      if (silences === null) {
+        console.error(
+          "warning: no audio analysis yet; dead-air candidates skipped (re-ingest or open the project once with analysis available)"
+        );
+      }
+      const report = silences
+        ? cleanupReport(project, silences)
+        : fillerOnlyCleanupReport(project);
+
+      if (rest.includes("--apply-safe")) {
+        const { fillerIds, deadAirSpans } = partitionSafeCandidates(
+          report.candidates
+        );
+        if (fillerIds.length === 0 && deadAirSpans.length === 0) {
+          console.log("cleanup: no safe candidates to apply");
+          break;
+        }
+        if (fillerIds.length > 0) {
+          await runLoggedAction(slug, "cut", {
+            ids: fillerIds,
+            deleted: true,
+            note: "cleanup: apply all safe",
+          });
+          console.log(`cleanup: cut ${fillerIds.length} filler word(s)`);
+        }
+        if (deadAirSpans.length > 0) {
+          await runLoggedAction(slug, "dead-air-add", {
+            spans: deadAirSpans,
+          });
+          console.log(
+            `cleanup: registered ${deadAirSpans.length} dead-air span(s)`
+          );
+        }
+        break;
+      }
+
+      if (rest.includes("--json")) {
+        process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+        break;
+      }
+
+      console.log(
+        `cleanup: ${report.fillerCount} filler, ${report.deadAirCount} dead-air, ~${report.estSavedSec.toFixed(1)}s total`
+      );
+      for (const warning of report.warnings) {
+        console.log(`  warning: ${warning}`);
+      }
+      const filler = report.candidates.filter((c) => c.kind === "filler");
+      const deadAir = report.candidates.filter((c) => c.kind === "dead-air");
+      if (filler.length > 0) {
+        console.log("  filler:");
+        for (const c of filler) {
+          console.log(
+            `    ${c.id}  ${c.risk.padEnd(6)}  ${secRange(c.startSec, c.endSec)}  ~${c.estSavedSec.toFixed(1)}s  ${c.reason}  "${c.text}"`
+          );
+        }
+      }
+      if (deadAir.length > 0) {
+        console.log("  dead-air:");
+        for (const c of deadAir) {
+          console.log(
+            `    ${c.id}  ${c.risk.padEnd(6)}  ${secRange(c.startSec, c.endSec)}  ~${c.estSavedSec.toFixed(1)}s  ${c.reason}`
+          );
+        }
+      }
+      break;
+    }
+    case "dead-air-rm": {
+      if (!(rest[0] && rest[1])) {
+        throw new Error("usage: openklip dead-air-rm <slug> <id>");
+      }
+      const { result } = await runLoggedAction<{ removed: boolean }>(
+        rest[0],
+        "dead-air-rm",
+        { id: rest[1] }
+      );
+      console.log(
+        result.removed
+          ? `dead-air-rm: removed ${rest[1]}`
+          : `dead-air-rm: no span with id ${rest[1]}`
       );
       break;
     }

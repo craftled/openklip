@@ -4,7 +4,8 @@
 // actions.ts barrel would drag that whole module, including its server-only
 // graphics catalog (node:fs), into the browser bundle. This module imports only
 // from edl.ts (pure zod + math), so it bundles cleanly for client and server.
-import { type Project, survivingRanges } from "./edl.ts";
+import type { SilenceSpan } from "./audio-analysis-core.ts";
+import { effectiveRanges, type Project } from "./edl.ts";
 
 export interface ProjectSummary {
   assetCount: number;
@@ -20,10 +21,17 @@ export interface ProjectSummary {
 }
 
 // A quick health read of the edit: word counts, number of surviving ranges, and
-// the kept duration in seconds (what the exported cut will run to).
-export function summarize(project: Project): ProjectSummary {
+// the kept duration in seconds (what the exported cut will run to). Stays
+// sync (the client hover card calls it directly): `silences` is optional and,
+// when supplied, lets effectiveRanges() apply VAD snap on top of the always-on
+// dead-air subtraction. Callers with no silence data still get correct
+// dead-air-adjusted counts; they just don't reflect snap.
+export function summarize(
+  project: Project,
+  silences?: SilenceSpan[]
+): ProjectSummary {
   const deleted = project.words.filter((w) => w.deleted).length;
-  const ranges = survivingRanges(project);
+  const ranges = effectiveRanges(project, silences);
   const keptDurationSec = ranges.reduce(
     (a, r) => a + (r.endSec - r.startSec),
     0

@@ -5,6 +5,7 @@ import {
   type CaptionGroup,
   captionPlacementForGroup,
   captionPlacementForSpan,
+  keptWordsInOutputTime,
 } from "../src/captions.ts";
 
 const GROUPS: CaptionGroup[] = [
@@ -138,4 +139,73 @@ test("buildAss omits dialogue lines hidden by hero title overlap", () => {
   assert.match(ass, /Dialogue: 0,0:00:00\.00,0:00:02\.00,CapBottom/);
   assert.doesNotMatch(ass, /Dialogue: 0,0:00:02\.00/);
   assert.match(ass, /Dialogue: 0,0:00:05\.00,0:00:06\.00,CapBottom/);
+});
+
+// ── keptWordsInOutputTime (R1: shared by exporter.ts + compiledTimeline.ts) ─
+
+const kwSec = (n: number) => Math.round(n * 48_000);
+
+function kwWord(id: string, text: string, startSec: number, endSec: number) {
+  return {
+    id,
+    text,
+    startSample: kwSec(startSec),
+    endSample: kwSec(endSec),
+    deleted: false,
+  };
+}
+
+test("keptWordsInOutputTime: a range start 100ms inside a word still emits the word, clamped to the range", () => {
+  // Snap moved the range start FORWARD past word 1's soft onset (or a
+  // dead-air span covers its start): most of the word's audio still plays,
+  // so the caption must too.
+  const project = {
+    sampleRate: 48_000,
+    words: [kwWord("w0", "hello", 0, 1), kwWord("w1", "world", 1, 2)],
+  };
+  const ranges = [{ startSec: 0.1, endSec: 2 }];
+  const out = keptWordsInOutputTime(project, ranges);
+  assert.equal(out.length, 2);
+  // w0 clamps to the range start: output time 0 through 0.9.
+  assert.equal(out[0].text, "hello");
+  assert.ok(Math.abs(out[0].startSec - 0) < 1e-9);
+  assert.ok(Math.abs(out[0].endSec - 0.9) < 1e-9);
+  // w1 is untouched: output 0.9 through 1.9.
+  assert.ok(Math.abs(out[1].startSec - 0.9) < 1e-9);
+  assert.ok(Math.abs(out[1].endSec - 1.9) < 1e-9);
+});
+
+test("keptWordsInOutputTime: a word end is clamped to the range end", () => {
+  const project = {
+    sampleRate: 48_000,
+    words: [kwWord("w0", "hello", 0, 1)],
+  };
+  const ranges = [{ startSec: 0, endSec: 0.8 }];
+  const out = keptWordsInOutputTime(project, ranges);
+  assert.equal(out.length, 1);
+  assert.ok(Math.abs(out[0].endSec - 0.8) < 1e-9);
+});
+
+test("keptWordsInOutputTime: a kept word with NO range overlap is not emitted", () => {
+  // The whole word span was subtracted (dead air covering it entirely).
+  const project = {
+    sampleRate: 48_000,
+    words: [kwWord("w0", "gone", 1, 2), kwWord("w1", "kept", 3, 4)],
+  };
+  const ranges = [
+    { startSec: 0, endSec: 0.9 },
+    { startSec: 2.5, endSec: 4 },
+  ];
+  const out = keptWordsInOutputTime(project, ranges);
+  assert.equal(out.length, 1);
+  assert.equal(out[0].text, "kept");
+});
+
+test("keptWordsInOutputTime: deleted words never emit", () => {
+  const project = {
+    sampleRate: 48_000,
+    words: [{ ...kwWord("w0", "cut", 0, 1), deleted: true }],
+  };
+  const out = keptWordsInOutputTime(project, [{ startSec: 0, endSec: 1 }]);
+  assert.equal(out.length, 0);
 });

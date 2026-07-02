@@ -202,6 +202,43 @@ test("listRanges does not let padding swallow a short deleted word", () => {
   assert.ok(ranges[1].startSec >= 0.3);
 });
 
+test("listRanges reflects dead-air subtraction (effectiveRanges truth)", () => {
+  const p = makeProject();
+  p.cuts = {
+    snap: { enabled: false, mode: "off", maxShiftMs: 120, crossfadeMs: 24 },
+    deadAir: [
+      { id: "d1", startSample: SAMPLE_RATE * 2, endSample: SAMPLE_RATE * 3 },
+    ],
+  };
+  const ranges = listRanges(p);
+  assert.equal(ranges.length, 2);
+  assert.equal(ranges[0].endSec, 2);
+  assert.equal(ranges[1].startSec, 3);
+});
+
+test("listRanges accepts optional silences and applies VAD snap when enabled", () => {
+  const p = makeProject();
+  p.cuts = {
+    snap: { enabled: true, mode: "vad", maxShiftMs: 120, crossfadeMs: 24 },
+    deadAir: [],
+  };
+  const withoutSilences = listRanges(p);
+  const withSilences = listRanges(p, [{ startSec: 5.9, endSec: 6.3 }]);
+  assert.equal(withoutSilences[withoutSilences.length - 1].endSec, 6);
+  assert.equal(withSilences[withSilences.length - 1].endSec, 5.9);
+});
+
+test("projectStatus threads optional silences through to ranges/keptDurationSec", () => {
+  const p = makeProject();
+  p.cuts = {
+    snap: { enabled: true, mode: "vad", maxShiftMs: 120, crossfadeMs: 24 },
+    deadAir: [],
+  };
+  const withoutSilences = projectStatus(p);
+  const withSilences = projectStatus(p, [{ startSec: 5.9, endSec: 6.3 }]);
+  assert.ok(withSilences.keptDurationSec < withoutSilences.keptDurationSec);
+});
+
 test("listOverlays returns structured b-roll titles zooms stills", () => {
   const p = makeProject();
   addBroll(p, { assetId: "broll-1", fromSec: 0, toSec: 2 });

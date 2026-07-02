@@ -66,3 +66,93 @@ test("compileTimeline never mutates the input project", () => {
   compileTimeline(project);
   assert.deepEqual(project, before);
 });
+
+test("compileTimeline reflects dead-air subtraction in ranges and duration", () => {
+  const project = makeProject({
+    padMs: 0,
+    words: [
+      {
+        id: "w0",
+        text: "A",
+        startSample: 0,
+        endSample: sec(2),
+        deleted: false,
+      },
+    ],
+    durationSamples: sec(2),
+    cuts: {
+      snap: { enabled: false, mode: "off", maxShiftMs: 120, crossfadeMs: 24 },
+      deadAir: [{ id: "d1", startSample: sec(0.5), endSample: sec(1) }],
+    },
+  });
+  const tl = compileTimeline(project);
+  assert.equal(tl.ranges.length, 2);
+  assert.ok(tl.outputDurationSec < 2);
+});
+
+// R1: a dead-air span covering a kept word's START must not drop its caption
+// (the old start-inside-range match did); the word emits clamped to the
+// post-subtraction range instead.
+test("compileTimeline keeps a caption whose word start is covered by dead air (clamped, not dropped)", () => {
+  const project = makeProject({
+    padMs: 0,
+    words: [
+      {
+        id: "w0",
+        text: "hello",
+        startSample: 0,
+        endSample: sec(1),
+        deleted: false,
+      },
+      {
+        id: "w1",
+        text: "world",
+        startSample: sec(1),
+        endSample: sec(2),
+        deleted: false,
+      },
+    ],
+    durationSamples: sec(2),
+    cuts: {
+      snap: { enabled: false, mode: "off", maxShiftMs: 120, crossfadeMs: 24 },
+      // Covers w0's first 100ms: the range start now sits 100ms inside w0.
+      deadAir: [{ id: "d1", startSample: 0, endSample: sec(0.1) }],
+    },
+  });
+  const tl = compileTimeline(project);
+  assert.deepEqual(tl.ranges, [{ startSec: 0.1, endSec: 2 }]);
+  const words = tl.captionGroups.flatMap((g) => g.words);
+  assert.deepEqual(
+    words.map((w) => w.text),
+    ["hello", "world"]
+  );
+  // w0 clamps to the range start (output 0) and keeps its surviving tail.
+  assert.ok(Math.abs(words[0].startSec - 0) < 1e-9);
+  assert.ok(Math.abs(words[0].endSec - 0.9) < 1e-9);
+});
+
+test("compileTimeline threads optional silences into the snap pass", () => {
+  const project = makeProject({
+    padMs: 0,
+    words: [
+      {
+        id: "w0",
+        text: "A",
+        startSample: 0,
+        endSample: sec(1),
+        deleted: false,
+      },
+    ],
+    durationSamples: sec(1),
+    cuts: {
+      snap: { enabled: true, mode: "vad", maxShiftMs: 120, crossfadeMs: 24 },
+      deadAir: [],
+    },
+  });
+  const withoutSilences = compileTimeline(project);
+  const withSilences = compileTimeline(project, [
+    { startSec: 0.9, endSec: 1.2 },
+  ]);
+  assert.equal(withoutSilences.ranges[0].endSec, 1);
+  assert.equal(withSilences.ranges[0].endSec, 0.9);
+});

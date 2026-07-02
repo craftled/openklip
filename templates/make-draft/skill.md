@@ -15,6 +15,7 @@ One prompt to a full first draft: cuts, captions, titles, b-roll or stills, musi
 ## 2. Cut
 
 - Remove filler and false starts with cut-text (repeat per phrase, all matches). Cut whole sentences or phrases, not lone words mid-sentence.
+- Call cleanup_report, then apply its "safe" candidates: one cut call with the filler wordIds, one dead-air-add call with the spans. Leave "review" candidates to the human unless the brief says aggressive.
 - If the brief names a target length, keep cutting weakest material until close; note anything you chose to keep anyway.
 
 ## 3. Captions and titles
@@ -31,6 +32,7 @@ One prompt to a full first draft: cuts, captions, titles, b-roll or stills, musi
 ## 5. Music
 
 - If a music asset is registered, place one bed with music-add under the main kept range: gain 0.25 to 0.4, fade-out 1 to 2 seconds. Skip silently when no music asset exists.
+- When placing music, enable ducking via the audio tool (audio {"ducking": {"enabled": true}}) so the bed sits under speech.
 
 ## 6. Export and verify
 

@@ -1,3 +1,4 @@
+import type { SilenceSpan } from "./audio-analysis-core.ts";
 import type { Project } from "./edl.ts";
 import {
   grepTranscript,
@@ -95,9 +96,9 @@ export function runTranscriptPhrase(
 
 export function runRanges(
   project: Project,
-  options: { json?: boolean }
+  options: { json?: boolean; silences?: SilenceSpan[] }
 ): string {
-  const ranges = listRanges(project);
+  const ranges = listRanges(project, options.silences);
   return options.json ? jsonOut({ ranges }) : formatRangesHuman(ranges);
 }
 
@@ -158,8 +159,11 @@ export function runOverlays(
   return `${lines.join("\n")}\n`;
 }
 
-export function runStatusJson(project: Project): string {
-  return jsonOut(projectStatus(project));
+export function runStatusJson(
+  project: Project,
+  silences?: SilenceSpan[]
+): string {
+  return jsonOut(projectStatus(project, silences));
 }
 
 // Resolve a spoken phrase to an overlay placement span. Delegates to the pure

@@ -3,16 +3,18 @@
 // this just computes the kept ranges, overlays mapped into OUTPUT time with their
 // paint order, the caption groups, and the runtime : so the GUI doesn't have to
 // re-derive (and risk drifting from) what the exporter does. Pure: reads only.
+
+import type { SilenceSpan } from "./audio-analysis-core.ts";
 import {
   type CaptionGroup,
-  type CaptionWord,
   groupCaptions,
+  keptWordsInOutputTime,
 } from "./captions.ts";
 import {
+  effectiveRanges,
   type Project,
   type Range,
   sourceToOutputSec,
-  survivingRanges,
   totalDurationSec,
 } from "./edl.ts";
 
@@ -33,31 +35,9 @@ export interface CompiledTimeline {
   ranges: Range[];
 }
 
-function keptWordsInOutputTime(
-  project: Project,
-  ranges: Range[]
-): CaptionWord[] {
-  const sr = project.sampleRate;
-  const out: CaptionWord[] = [];
-  for (const w of project.words) {
-    if (w.deleted) {
-      continue;
-    }
-    const ws = w.startSample / sr;
-    const we = w.endSample / sr;
-    let cum = 0;
-    for (const r of ranges) {
-      if (ws >= r.startSec - 1e-6 && ws <= r.endSec + 1e-6) {
-        const s = cum + Math.max(0, ws - r.startSec);
-        const e = cum + Math.max(0, Math.min(we, r.endSec) - r.startSec);
-        out.push({ text: w.text, startSec: s, endSec: Math.max(e, s + 0.05) });
-        break;
-      }
-      cum += r.endSec - r.startSec;
-    }
-  }
-  return out;
-}
+// keptWordsInOutputTime now lives in src/captions.ts (R1): one shared
+// implementation with src/exporter.ts, matching words to ranges by OVERLAP so
+// snap/dead-air boundary shifts cannot drop a playing word's caption.
 
 function compileOverlays(project: Project, ranges: Range[]): CompiledOverlay[] {
   const sr = project.sampleRate;
@@ -90,8 +70,14 @@ function compileOverlays(project: Project, ranges: Range[]): CompiledOverlay[] {
   return overlays;
 }
 
-export function compileTimeline(project: Project): CompiledTimeline {
-  const ranges = survivingRanges(project);
+// `silences` is optional so sync/no-analysis callers still get correct
+// dead-air subtraction from effectiveRanges(); passing silences additionally
+// lets VAD snap adjust boundaries (see effectiveRanges() in edl.ts).
+export function compileTimeline(
+  project: Project,
+  silences?: SilenceSpan[]
+): CompiledTimeline {
+  const ranges = effectiveRanges(project, silences);
   const captionGroups =
     project.captions?.enabled === false
       ? []

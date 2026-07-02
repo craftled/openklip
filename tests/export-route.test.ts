@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { POST } from "../app/api/projects/[slug]/export/route.ts";
+import { SAMPLE_RATE } from "../src/edl.ts";
 import {
   makeProject,
   withTempProjectsRoot,
@@ -92,6 +93,34 @@ test("export route returns 400 when every word is cut", async () => {
       makeProject({
         slug,
         words: makeProject().words.map((w) => ({ ...w, deleted: true })),
+      })
+    );
+    const res = await POST(exportRequest({}), ctx(slug));
+    assert.equal(res.status, 400);
+    const json = (await res.json()) as { error?: string };
+    assert.match(json.error ?? "", /nothing to export/i);
+  });
+});
+
+// F2: dead-air subtraction (cuts.deadAir) can empty an otherwise-nonempty cut
+// even though survivingRanges() alone reports words kept - the pre-flight
+// guard must read effectiveRanges (what exportCut itself computes) or this
+// slips past the guard and exportCut throws a 500 instead of a clean 400.
+test("export route returns 400 when dead-air subtraction empties the cut (not a 500)", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(
+      slug,
+      makeProject({
+        slug,
+        cuts: {
+          snap: {
+            enabled: false,
+            mode: "off",
+            maxShiftMs: 120,
+            crossfadeMs: 24,
+          },
+          deadAir: [{ id: "da1", startSample: 0, endSample: SAMPLE_RATE * 3 }],
+        },
       })
     );
     const res = await POST(exportRequest({}), ctx(slug));

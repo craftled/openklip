@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import type { SilenceSpan } from "../src/audio-analysis-core.ts";
 import {
   AssemblySelectionSchema,
+  AudioSchema,
   BrollSchema,
+  effectiveRanges,
   GraphicSchema,
   MusicPlacementSchema,
   PhraseAnchorSchema,
@@ -124,6 +127,7 @@ test("ProjectSchema defaults cut snapping off (backward-compat parse)", () => {
       maxShiftMs: 120,
       crossfadeMs: 24,
     },
+    deadAir: [],
   });
 });
 
@@ -213,6 +217,59 @@ test("ProjectSchema round-trips VAD cut snap settings", () => {
   assert.equal(project.cuts.snap.mode, "vad");
   assert.equal(project.cuts.snap.maxShiftMs, 160);
   assert.equal(project.cuts.snap.crossfadeMs, 32);
+});
+
+// ── MILESTONE 4.2: export audio quality (ducking, loudness, voice highpass) ──
+
+test("ProjectSchema defaults audio off (backward-compat parse)", () => {
+  const project = ProjectSchema.parse({
+    version: 1,
+    slug: "no-audio",
+    source: "/tmp/source.mp4",
+    proxy: "proxy.mp4",
+    sampleRate: SAMPLE_RATE,
+    fps: 30,
+    width: 1920,
+    height: 1080,
+    durationSamples: SAMPLE_RATE,
+    words: [],
+  });
+  assert.deepEqual(project.audio, {
+    ducking: { enabled: false, amountDb: 12, attackMs: 25, releaseMs: 250 },
+    loudness: { enabled: false, targetLufs: -16 },
+    voiceHighpass: { enabled: false, hz: 80 },
+  });
+});
+
+test("ProjectSchema round-trips fully specified audio settings", () => {
+  const project = ProjectSchema.parse({
+    version: 1,
+    slug: "with-audio",
+    source: "/tmp/source.mp4",
+    proxy: "proxy.mp4",
+    sampleRate: SAMPLE_RATE,
+    fps: 30,
+    width: 1920,
+    height: 1080,
+    durationSamples: SAMPLE_RATE,
+    words: [],
+    audio: {
+      ducking: { enabled: true, amountDb: 18, attackMs: 10, releaseMs: 400 },
+      loudness: { enabled: true, targetLufs: -14 },
+      voiceHighpass: { enabled: true, hz: 100 },
+    },
+  });
+  assert.deepEqual(project.audio, {
+    ducking: { enabled: true, amountDb: 18, attackMs: 10, releaseMs: 400 },
+    loudness: { enabled: true, targetLufs: -14 },
+    voiceHighpass: { enabled: true, hz: 100 },
+  });
+});
+
+test("AudioSchema rejects out-of-range values (Motion/CutSnap precedent: bounds live in the schema)", () => {
+  assert.throws(() => AudioSchema.parse({ ducking: { amountDb: 999 } }));
+  assert.throws(() => AudioSchema.parse({ loudness: { targetLufs: 5 } }));
+  assert.throws(() => AudioSchema.parse({ voiceHighpass: { hz: 1 } }));
 });
 
 test("ProjectSchema parses a project that already has graphics", () => {
@@ -479,4 +536,167 @@ test("ProjectSchema round-trips an assembly provenance block", () => {
     },
   });
   assert.equal(project.assembly?.segments[0].takeId, "t1");
+});
+
+// ── D1: effectiveRanges (survivingRanges + dead-air subtraction + VAD snap) ──
+
+test("effectiveRanges matches survivingRanges when cuts is empty", () => {
+  const project = makeProject({ padMs: 0 });
+  assert.deepEqual(effectiveRanges(project), survivingRanges(project));
+});
+
+test("effectiveRanges subtracts dead-air spans even with no silences supplied", () => {
+  const project = makeProject({
+    padMs: 0,
+    words: [
+      {
+        id: "w0",
+        text: "A",
+        startSample: 0,
+        endSample: 48_000,
+        deleted: false,
+      },
+      {
+        id: "w1",
+        text: "B",
+        startSample: 48_000,
+        endSample: 144_000,
+        deleted: false,
+      },
+    ],
+    cuts: {
+      snap: { enabled: false, mode: "off", maxShiftMs: 120, crossfadeMs: 24 },
+      deadAir: [{ id: "d1", startSample: 60_000, endSample: 96_000 }],
+    },
+  });
+  const ranges = effectiveRanges(project);
+  assert.deepEqual(ranges, [
+    { startSec: 0, endSec: 1.25 },
+    { startSec: 2, endSec: 3 },
+  ]);
+});
+
+test("effectiveRanges snaps boundaries onto silences within maxShiftMs when snap is enabled", () => {
+  const project = makeProject({
+    padMs: 0,
+    words: [
+      {
+        id: "w0",
+        text: "A",
+        startSample: 0,
+        endSample: 48_000,
+        deleted: false,
+      },
+    ],
+    durationSamples: 48_000,
+    cuts: {
+      snap: { enabled: true, mode: "vad", maxShiftMs: 120, crossfadeMs: 24 },
+      deadAir: [],
+    },
+  });
+  // Actual acoustic silence begins 30ms before the transcript word boundary
+  // (0.97s vs 1.0s), well inside the 120ms max shift, so the range end
+  // pulls back onto it.
+  const silences: SilenceSpan[] = [{ startSec: 0.97, endSec: 1.3 }];
+  const [range] = effectiveRanges(project, silences);
+  assert.equal(range.startSec, 0);
+  assert.equal(range.endSec, 0.97);
+  assert.ok(Math.abs(range.endSec - 1.0) * 1000 <= 120);
+});
+
+test("effectiveRanges ignores silences when snap is disabled", () => {
+  const project = makeProject({
+    padMs: 0,
+    words: [
+      {
+        id: "w0",
+        text: "A",
+        startSample: 0,
+        endSample: 48_000,
+        deleted: false,
+      },
+    ],
+    durationSamples: 48_000,
+    cuts: {
+      snap: { enabled: false, mode: "off", maxShiftMs: 120, crossfadeMs: 24 },
+      deadAir: [],
+    },
+  });
+  const silences: SilenceSpan[] = [{ startSec: 0.6, endSec: 0.97 }];
+  const ranges = effectiveRanges(project, silences);
+  assert.deepEqual(ranges, survivingRanges(project));
+});
+
+test("effectiveRanges ignores silences when mode is off even if enabled is true", () => {
+  const project = makeProject({
+    padMs: 0,
+    words: [
+      {
+        id: "w0",
+        text: "A",
+        startSample: 0,
+        endSample: 48_000,
+        deleted: false,
+      },
+    ],
+    durationSamples: 48_000,
+    cuts: {
+      snap: { enabled: true, mode: "off", maxShiftMs: 120, crossfadeMs: 24 },
+      deadAir: [],
+    },
+  });
+  const silences: SilenceSpan[] = [{ startSec: 0.6, endSec: 0.97 }];
+  const ranges = effectiveRanges(project, silences);
+  assert.deepEqual(ranges, survivingRanges(project));
+});
+
+test("effectiveRanges applies dead-air subtraction before snap (documented ordering)", () => {
+  const project = makeProject({
+    padMs: 0,
+    words: [
+      {
+        id: "w0",
+        text: "A",
+        startSample: 0,
+        endSample: 96_000,
+        deleted: false,
+      },
+    ],
+    durationSamples: 96_000,
+    cuts: {
+      snap: { enabled: true, mode: "vad", maxShiftMs: 120, crossfadeMs: 24 },
+      deadAir: [{ id: "d1", startSample: 48_000, endSample: 60_000 }],
+    },
+  });
+  // After dead-air subtraction the range splits into [0,1] and [1.25,2]; the
+  // silence just outside the second segment's start should still snap it.
+  const silences: SilenceSpan[] = [{ startSec: 1.2, endSec: 1.26 }];
+  const ranges = effectiveRanges(project, silences);
+  assert.equal(ranges.length, 2);
+  assert.equal(ranges[0].startSec, 0);
+  assert.equal(ranges[0].endSec, 1);
+  assert.equal(ranges[1].startSec, 1.26);
+  assert.equal(ranges[1].endSec, 2);
+});
+
+// ── D4: WordSchema.originalText (preserves pre-correction transcript text) ──
+
+test("WordSchema parses without originalText and round-trips one", () => {
+  const plain = WordSchema.parse({
+    id: "w0",
+    text: "Hello",
+    startSample: 0,
+    endSample: 48_000,
+  });
+  assert.equal(plain.originalText, undefined);
+
+  const corrected = WordSchema.parse({
+    id: "w0",
+    text: "Hello there",
+    startSample: 0,
+    endSample: 48_000,
+    originalText: "Hullo their",
+  });
+  assert.equal(corrected.originalText, "Hullo their");
+  assert.equal(corrected.text, "Hello there");
 });
