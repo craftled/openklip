@@ -330,6 +330,41 @@ test("exportProject rejects out-of-bounds options before any export work", async
   });
 });
 
+test("exportProject rejects an unknown platform id before any export work", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const result = await exportProject(slug, {
+      platform: "tiktok" as never,
+    });
+    assert.equal(result.ok, false);
+    if (!result.ok) {
+      assert.match(result.error, /unknown export platform "tiktok"/);
+    }
+  });
+});
+
+test("exportProject rejects an out-of-bounds loudnessTargetLufs before any export work", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const tooLoud = await exportProject(slug, { loudnessTargetLufs: -5 });
+    assert.equal(tooLoud.ok, false);
+    if (!tooLoud.ok) {
+      assert.match(
+        tooLoud.error,
+        /loudnessTargetLufs must be between -30 and -10/
+      );
+    }
+    const tooQuiet = await exportProject(slug, { loudnessTargetLufs: -31 });
+    assert.equal(tooQuiet.ok, false);
+    if (!tooQuiet.ok) {
+      assert.match(
+        tooQuiet.error,
+        /loudnessTargetLufs must be between -30 and -10/
+      );
+    }
+  });
+});
+
 test("exportProject returns ok:false when all words are cut", async () => {
   await withTempProjectsRoot(async ({ slug }) => {
     writeFixtureProject(

@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.16.0.0 - 2026-07-03
+
+The export platform presets release: exporting for a destination is now one pick instead of four separate flags to remember.
+
+### Added
+- **Export platform presets** (Milestone 8.1): four named presets in `src/export-platforms.ts`: `youtube` (1080p, social compression, -14 LUFS), `youtube-4k` (2160p, studio compression, -14 LUFS), `x` (1080p, 30fps, web compression, -14 LUFS), `linkedin` (1080p, 30fps, web compression, -14 LUFS). A preset supplies defaults only: `resolvePlatformOptions` fills any of compression/fps/maxHeight/loudnessTargetLufs the caller left unset, and any explicitly passed option always wins (`--platform youtube --fps 24` exports at 24fps). `maxHeight` is a source-capped ceiling, never an upscale (`youtube-4k` on 1080p footage exports 1080p). A preset's loudness target applies `loudnorm` for that export invocation only and never mutates the project's saved `audio.loudness`. All four surfaces get it from one resolution point in `exportCut`: CLI `openklip export --platform <id>` plus a new `--loudness <lufs>` override flag, the export API route, the `exportProject` server action, the MCP `export` tool (all accept `{ platform, loudnessTargetLufs }`), and a Platform picker in the GUI export dialog that sets the visible compression/fps/resolution controls to the preset's values and shows a "-14 LUFS" note when a target applies. `project_status` is unaffected. v1 ships landscape-honest presets only; vertical destinations (TikTok, Reels, Shorts) need the 9:16 reframe milestone before a preset for them would do what its name promises.
+
+### Fixed
+- **Export dialog 4K resolution mismatch**: the dialog's "4K" resolution control could submit the source height instead of the intended ceiling, so the displayed dimensions, the size/time estimate, and the actual rendered output could disagree. `outputDimensionsForMaxHeight` and `effectiveMaxHeight` (`web/components/export-dialog.tsx`) now compute one shared maxHeight for display, estimates, and the submitted export request, and `web/lib/export-max-height.ts`'s `resolveExportMaxHeight` stops the legacy `export1080` toggle from silently overriding a dialog-supplied maxHeight (including `undefined` for Manual + Source) on the first export of a session.
+
+### Changed
+- **Version**: bumped OpenKlip to `0.16.0.0`.
+
 ## 0.15.0.0 - 2026-07-02
 
 The caption style presets release: captions have a real look system instead of one hardcoded box, and agents can finally query action history and past task ids instead of only reverting blind.

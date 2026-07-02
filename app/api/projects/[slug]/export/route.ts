@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import { effectiveRanges } from "@engine/edl";
+import { EXPORT_PLATFORM_IDS } from "@engine/export-platforms";
 import { EXPORT_COMPRESSIONS, exportCut } from "@engine/exporter";
 import { assertValidSlug, projectPaths } from "@engine/paths";
 import { loadProject } from "@engine/projectStore";
@@ -15,12 +16,18 @@ interface RouteParams {
 
 // Export options the GUI / an agent may pass. `height` mirrors the CLI
 // `--height` flag (max output height); `compression` and `fps` mirror
-// `--compression` / `--fps`; everything else stays project-driven.
+// `--compression` / `--fps`; `platform` mirrors `--platform` (fills any of
+// the above left unset; explicit fields always win); `loudnessTargetLufs`
+// overrides project.audio.loudness for this export only (never mutates the
+// project) and shares the AudioSchema's -30..-10 LUFS bound. Everything else
+// stays project-driven.
 const ExportRequestSchema = z
   .object({
     compression: z.enum(EXPORT_COMPRESSIONS).optional(),
     fps: z.number().int().min(1).max(120).optional(),
     height: z.number().int().positive().max(4320).optional(),
+    loudnessTargetLufs: z.number().min(-30).max(-10).optional(),
+    platform: z.enum(EXPORT_PLATFORM_IDS).optional(),
   })
   .strict();
 
@@ -85,7 +92,9 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     const result = await exportCut(slug, {
       compression: parsed.data.compression,
       fps: parsed.data.fps,
+      loudnessTargetLufs: parsed.data.loudnessTargetLufs,
       maxHeight: parsed.data.height,
+      platform: parsed.data.platform,
     });
     return Response.json({ ok: true, ...result });
   } catch (e) {

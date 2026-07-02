@@ -1,7 +1,18 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import {
+  listExportPlatforms,
+  resolvePlatformOptions,
+} from "@engine/export-platforms";
 import { renderToStaticMarkup } from "react-dom/server";
-import { ExportOptionsForm } from "../web/components/export-options-form.tsx";
+import {
+  effectiveMaxHeight,
+  outputDimensionsForMaxHeight,
+} from "../web/components/export-dialog.tsx";
+import {
+  ExportOptionsForm,
+  platformFormValues,
+} from "../web/components/export-options-form.tsx";
 
 // The full ExportDialog only mounts its content in a portal when opened, so the
 // options form is extracted into a presentational component (the
@@ -17,7 +28,9 @@ function renderForm(
       frameRate="source"
       onCompressionChange={() => undefined}
       onFrameRateChange={() => undefined}
+      onPlatformChange={() => undefined}
       onResolutionChange={() => undefined}
+      platform="manual"
       resolution="4k"
       sourceFps={30}
       {...overrides}
@@ -70,4 +83,106 @@ test("destination and format stay disabled (out of scope)", () => {
       `"${label}" should stay disabled`
     );
   }
+});
+
+test("platform row renders Manual plus one chip per export platform", () => {
+  const html = renderForm();
+  assert.ok(
+    !isDisabledButton(buttonAttrs(html, "Manual")),
+    'platform item "Manual" should be enabled'
+  );
+  for (const def of listExportPlatforms()) {
+    assert.ok(
+      !isDisabledButton(buttonAttrs(html, def.label)),
+      `platform item "${def.label}" should be enabled`
+    );
+  }
+});
+
+test("platformFormValues maps youtube-4k to visible 4K, studio, Source fps", () => {
+  const def = listExportPlatforms().find((p) => p.id === "youtube-4k");
+  assert.ok(def, "youtube-4k platform must exist");
+  const values = platformFormValues(def);
+  assert.equal(values.resolution, "4k");
+  assert.equal(values.compression, "studio");
+  assert.equal(values.fpsValue, "source");
+});
+
+test("platformFormValues maps x platform to visible 1080p, web, 30 fps", () => {
+  const def = listExportPlatforms().find((p) => p.id === "x");
+  assert.ok(def, "x platform must exist");
+  const values = platformFormValues(def);
+  assert.equal(values.resolution, "1080");
+  assert.equal(values.compression, "web");
+  assert.equal(values.fpsValue, "30");
+});
+
+test("LUFS note renders under an active platform with a loudness target", () => {
+  const html = renderForm({ platform: "youtube" });
+  assert.match(html, /Loudness normalized to -14 LUFS for this export/);
+});
+
+test("LUFS note does not render when Manual is selected", () => {
+  const html = renderForm({ platform: "manual" });
+  assert.doesNotMatch(html, /Loudness normalized/);
+});
+
+// ── Platform-aware effective maxHeight (WYSIWYG for platform presets) ──────
+
+test("effectiveMaxHeight keeps Manual+Source source-native (undefined), never forced to a number", () => {
+  assert.equal(effectiveMaxHeight("manual", "4k", 2988), undefined);
+});
+
+test("effectiveMaxHeight keeps plain Manual resolution buckets unchanged", () => {
+  assert.equal(effectiveMaxHeight("manual", "1080", 2988), 1080);
+  assert.equal(effectiveMaxHeight("manual", "720", 2988), 720);
+});
+
+test("effectiveMaxHeight uses youtube-4k's real 2160 ceiling (capped at source) when resolution is left on its auto-picked 4k bucket", () => {
+  assert.equal(effectiveMaxHeight("youtube-4k", "4k", 2988), 2160);
+  // A 1080p source can't be upscaled to 2160: honest cap at source.
+  assert.equal(effectiveMaxHeight("youtube-4k", "4k", 1080), 1080);
+});
+
+test("effectiveMaxHeight: an explicit 720/1080 resolution pick still wins over an active platform's own ceiling", () => {
+  assert.equal(effectiveMaxHeight("youtube-4k", "1080", 2988), 1080);
+  assert.equal(effectiveMaxHeight("youtube-4k", "720", 2988), 720);
+});
+
+test("outputDimensionsForMaxHeight caps a tall source at youtube-4k's real ceiling, preserving aspect ratio", () => {
+  const maxHeight = effectiveMaxHeight("youtube-4k", "4k", 2988);
+  const dims = outputDimensionsForMaxHeight(maxHeight, 5312, 2988);
+  assert.deepEqual(dims, { width: 3840, height: 2160 });
+});
+
+test("outputDimensionsForMaxHeight cannot upscale a source smaller than the platform ceiling", () => {
+  const maxHeight = effectiveMaxHeight("youtube-4k", "4k", 1080);
+  const dims = outputDimensionsForMaxHeight(maxHeight, 1920, 1080);
+  assert.deepEqual(dims, { width: 1920, height: 1080 });
+});
+
+test("outputDimensionsForMaxHeight is a source-dims no-op for Manual+Source", () => {
+  const maxHeight = effectiveMaxHeight("manual", "4k", 2988);
+  const dims = outputDimensionsForMaxHeight(maxHeight, 5312, 2988);
+  assert.deepEqual(dims, { width: 5312, height: 2988 });
+});
+
+// ── Client/server agreement: dialog's effectiveMaxHeight vs resolvePlatformOptions ──
+
+test("dialog's youtube-4k maxHeight agrees with the server's resolvePlatformOptions on a 1080p source", () => {
+  const dialogMax = effectiveMaxHeight("youtube-4k", "4k", 1080);
+  assert.equal(dialogMax, 1080);
+  const resolved = resolvePlatformOptions("youtube-4k", {
+    maxHeight: dialogMax,
+  });
+  assert.equal(resolved.maxHeight, 1080);
+});
+
+test("dialog's youtube-4k maxHeight agrees with the server's resolvePlatformOptions on a 5312x2988 source", () => {
+  const dialogMax = effectiveMaxHeight("youtube-4k", "4k", 2988);
+  assert.equal(dialogMax, 2160);
+  const resolved = resolvePlatformOptions("youtube-4k", {
+    maxHeight: dialogMax,
+  });
+  assert.equal(resolved.maxHeight, 2160);
 });

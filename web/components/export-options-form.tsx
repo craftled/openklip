@@ -1,5 +1,10 @@
 "use client";
 
+import type {
+  ExportPlatformDef,
+  ExportPlatformId,
+} from "@engine/export-platforms";
+import { listExportPlatforms } from "@engine/export-platforms";
 import type { ExportCompression } from "@engine/exporter";
 import type { ComponentType } from "react";
 import {
@@ -25,6 +30,9 @@ import { firstToggleValue } from "@/lib/toggle-value";
 
 export type ExportResolution = "720" | "1080" | "4k";
 export type ExportDestination = "file" | "clipboard";
+/** "manual" keeps the four controls independent; any other value is a
+ * selected export platform preset that fills them via platformFormValues. */
+export type ExportPlatformSelection = ExportPlatformId | "manual";
 
 export const COMPRESSION_COPY: Record<
   ExportCompression,
@@ -62,6 +70,25 @@ export const COMPRESSION_COPY: Record<
 
 export const FRAME_RATES = [24, 25, 30, 48, 60] as const;
 
+/**
+ * Pure mapping from an export platform's preset defaults to the concrete
+ * values the form's own controls already speak (fps-select value and
+ * resolution-toggle value), so a platform pick sets the visible controls
+ * instead of hiding a second, silent set of numbers behind a platform id.
+ */
+export function platformFormValues(def: ExportPlatformDef): {
+  compression: ExportCompression;
+  fpsValue: string;
+  resolution: ExportResolution;
+} {
+  return {
+    compression: def.compression,
+    fpsValue: def.fps === undefined ? "source" : String(def.fps),
+    resolution:
+      def.maxHeight <= 720 ? "720" : def.maxHeight <= 1080 ? "1080" : "4k",
+  };
+}
+
 function ExportOptionLabel({
   icon: Icon,
   label,
@@ -88,7 +115,9 @@ export function ExportOptionsForm({
   frameRate,
   onCompressionChange,
   onFrameRateChange,
+  onPlatformChange,
   onResolutionChange,
+  platform,
   resolution,
   sourceFps,
 }: {
@@ -99,16 +128,50 @@ export function ExportOptionsForm({
   frameRate: string;
   onCompressionChange: (value: ExportCompression) => void;
   onFrameRateChange: (value: string) => void;
+  onPlatformChange: (value: ExportPlatformSelection) => void;
   onResolutionChange: (value: ExportResolution) => void;
+  platform: ExportPlatformSelection;
   resolution: ExportResolution;
   sourceFps: number;
 }) {
   const sourceRateLabel = `Source (${Math.round(sourceFps)} fps)`;
   const frameRateLabel = (value: string | null) =>
     !value || value === "source" ? sourceRateLabel : `${value} FPS`;
+  const activePlatformDef =
+    platform === "manual"
+      ? undefined
+      : listExportPlatforms().find((def) => def.id === platform);
 
   return (
     <>
+      <div className="mb-5">
+        <div className="mb-2 font-medium text-sm">Platform</div>
+        <ToggleGroup
+          className="w-full flex-wrap"
+          onValueChange={(value) => {
+            const platformValue = firstToggleValue(value);
+            if (platformValue) {
+              onPlatformChange(platformValue as ExportPlatformSelection);
+            }
+          }}
+          value={[platform]}
+          variant="outline"
+        >
+          <ToggleGroupItem value="manual">Manual</ToggleGroupItem>
+          {listExportPlatforms().map((def) => (
+            <ToggleGroupItem key={def.id} value={def.id}>
+              {def.label}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+        {activePlatformDef?.targetLufs !== undefined && (
+          <p className="mt-2 text-muted-foreground text-xs">
+            Loudness normalized to {activePlatformDef.targetLufs} LUFS for this
+            export.
+          </p>
+        )}
+      </div>
+
       <div className="grid gap-5 sm:grid-cols-2">
         <div>
           <ExportOptionLabel icon={Video} label="Format" />

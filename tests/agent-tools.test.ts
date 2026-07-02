@@ -311,6 +311,36 @@ test("export tool schema accepts compression and fps and rejects bad values", ()
   );
 });
 
+test("export tool schema accepts a known platform and rejects an unknown one", () => {
+  const tool = getAgentTool("export");
+  assert.ok(tool, "export tool missing");
+  assert.equal(
+    tool.schema.safeParse({ slug: "demo", platform: "youtube" }).success,
+    true
+  );
+  assert.equal(
+    tool.schema.safeParse({ slug: "demo", platform: "tiktok" }).success,
+    false
+  );
+});
+
+test("export tool schema bounds loudnessTargetLufs to -30..-10", () => {
+  const tool = getAgentTool("export");
+  assert.ok(tool, "export tool missing");
+  assert.equal(
+    tool.schema.safeParse({ slug: "demo", loudnessTargetLufs: -14 }).success,
+    true
+  );
+  assert.equal(
+    tool.schema.safeParse({ slug: "demo", loudnessTargetLufs: -9 }).success,
+    false
+  );
+  assert.equal(
+    tool.schema.safeParse({ slug: "demo", loudnessTargetLufs: -31 }).success,
+    false
+  );
+});
+
 // ── PROJECT BRIEF: brief_get / brief_set (brief.md, not a project.json field) ─
 
 test("brief_set then brief_get round-trip through callAgentTool", async () => {

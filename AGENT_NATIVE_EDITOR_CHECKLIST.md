@@ -637,11 +637,13 @@ Goal: exports are fast, configurable, verified, and ready to publish.
   - [ ] Copy path to clipboard if supported.
   - Verification: export lands in selected destination.
 - [ ] Add export presets.
-  - [ ] YouTube 16:9.
-  - [ ] Shorts/Reels/TikTok 9:16.
-  - [ ] LinkedIn square or landscape.
-  - [ ] Custom.
-  - Verification: preset sets dimensions, captions, and safe areas.
+  - [x] YouTube 16:9.
+    - Verification 2026-07-03: `youtube` (1080p) and `youtube-4k` (2160p) presets in `src/export-platforms.ts`, both social/studio compression at a -14 LUFS loudness target; pinned by `tests/export-platforms.test.ts`. Live CLI export on an isolated copy of the real 4K `edgaras-raw` project (`OPENKLIP_PROJECTS_ROOT` pointed at a scratch copy): `openklip export --platform youtube` produced a 1920x1080 output and `openklip export --platform youtube-4k` produced a 3840x2160 output (never upscaling past the 4K source), both confirmed via `ffprobe`. An `x` (Twitter/X) preset also shipped (1080p/30fps/web/-14 LUFS), beyond this checklist's original YouTube/Shorts/LinkedIn/Custom list.
+  - [ ] Shorts/Reels/TikTok 9:16. Not implemented: vertical/9:16 presets need the vertical reframe milestone before a preset for them would do what its name promises. See TODO.md Known Limitations.
+  - [x] LinkedIn square or landscape.
+    - Verification 2026-07-03: `linkedin` preset (1080p, 30fps, web compression, -14 LUFS) in `src/export-platforms.ts`; landscape only, no square variant shipped. Pinned by `tests/export-platforms.test.ts`.
+  - [ ] Custom. Not implemented: only the four fixed named presets exist; there is no user-defined preset builder.
+  - Verification: preset sets dimensions, captions, and safe areas. Partially met 2026-07-03: `youtube`/`youtube-4k`/`x`/`linkedin` set dimensions (a source-capped `maxHeight`), compression, fps, and a loudness target correctly (`resolvePlatformOptions`, any explicit flag still wins), verified above and by `tests/export-platforms.test.ts`, `tests/exporter.test.ts`, `tests/agent-tools.test.ts`, `tests/export-route.test.ts`, `tests/server-actions.test.ts`. Presets do not touch captions or safe areas; a project's caption style and any per-platform safe-area layout (not implemented at all yet) are unaffected by picking a platform.
 
 ### 8.2 Export performance and quality
 
@@ -1109,7 +1111,7 @@ This order makes the product feel more capable every few steps while keeping age
 - [x] Captions are styleable and export reliably. Verified 2026-07-02: five style presets (`src/caption-styles.ts`) switch live in the Config panel picker, `openklip captions-style`, and the `captions-style` action (cli/gui/mcp); `tests/captions.test.ts`, `tests/caption-style-css.test.ts`, `tests/caption-style.test.tsx` pin both renderers plus the `boxed` byte-compat pin, and the wider `bun test` run is green (1187 tests). A real 4K export (`edgaras-raw`, isolated copy) at the `bold-caps` preset showed the expected all-caps tight-box look with dimmed inactive words; a synthetic 1080x1920 libass render of a long `bold-caps` line confirmed the accompanying `WrapStyle: 0` fix wraps instead of clipping off-frame. Not covered: caption fonts are Arial-only and colors are fixed per preset (no custom fonts/colors yet), and per-platform safe areas are still missing.
 - [x] Music, ducking, and loudness are usable. Verified 2026-07-02: live E2E 4K export rendered ducking and single-pass loudnorm (-16.6 LUFS measured vs -16 target) end to end; both are CLI/GUI/MCP-configurable.
 - [ ] Multi-take can be inspected or corrected in UI.
-- [ ] Export presets cover common platforms.
+- [ ] Export presets cover common platforms. Landscape destinations (YouTube, YouTube 4K, X, LinkedIn) shipped 2026-07-03 (see Milestone 8.1); still missing vertical destinations (TikTok, Reels, Shorts), so "common platforms" is not yet fully covered.
 - [x] Undo or task-level revert exists. Verified 2026-07-02: `openklip revert <slug> (--to <rev> | --task <id> | --last) [--force]`, MCP tool `revert`, and a GUI History panel revert action all restore `project.json` to an earlier logged snapshot (`src/revert.ts`, `tests/revert.test.ts`); revert covers `project.json` only, not export artifacts or non-EDL files (brief, chats, tasks, asset files), see TODO.md Known Limitations.
 
 ### Agent-first gate

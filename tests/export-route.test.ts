@@ -102,6 +102,56 @@ test("export route returns 400 when every word is cut", async () => {
   });
 });
 
+test("export route accepts a known platform id (404 for a missing project, not 400)", async () => {
+  await withTempProjectsRoot(async () => {
+    const res = await POST(
+      exportRequest({ platform: "youtube" }),
+      ctx("missing")
+    );
+    assert.equal(res.status, 404);
+  });
+});
+
+test("export route returns 400 for an unknown platform id", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const res = await POST(exportRequest({ platform: "tiktok" }), ctx(slug));
+    assert.equal(res.status, 400);
+  });
+});
+
+test("export route accepts a loudnessTargetLufs within -30..-10 (404 for a missing project, not 400)", async () => {
+  await withTempProjectsRoot(async () => {
+    const res = await POST(
+      exportRequest({ loudnessTargetLufs: -14 }),
+      ctx("missing")
+    );
+    assert.equal(res.status, 404);
+  });
+});
+
+test("export route returns 400 when loudnessTargetLufs is above -10", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const res = await POST(
+      exportRequest({ loudnessTargetLufs: -5 }),
+      ctx(slug)
+    );
+    assert.equal(res.status, 400);
+  });
+});
+
+test("export route returns 400 when loudnessTargetLufs is below -30", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const res = await POST(
+      exportRequest({ loudnessTargetLufs: -31 }),
+      ctx(slug)
+    );
+    assert.equal(res.status, 400);
+  });
+});
+
 // F2: dead-air subtraction (cuts.deadAir) can empty an otherwise-nonempty cut
 // even though survivingRanges() alone reports words kept - the pre-flight
 // guard must read effectiveRanges (what exportCut itself computes) or this

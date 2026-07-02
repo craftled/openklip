@@ -131,6 +131,7 @@ import {
 } from "@/lib/app-toast";
 import type { AssetBinUpdate } from "@/lib/asset-bin-update";
 import { type DeadAirItem, reconcileDeadAirItems } from "@/lib/dead-air-state";
+import { resolveExportMaxHeight } from "@/lib/export-max-height";
 import {
   APP_ICON_CLASS,
   Captions,
@@ -1795,7 +1796,16 @@ export function App({
   );
 
   const onExport = async (options?: ExportDialogOptions) => {
-    const maxHeight = options?.maxHeight ?? (export1080 ? 1080 : undefined);
+    // export1080 only fills in a default when there is no dialog options
+    // object at all (the CinemaPlayer toolbar's bare Export button, which
+    // calls onExport() directly without opening the dialog). Once the dialog
+    // has supplied options, its maxHeight (including undefined for
+    // Manual+Source) is trusted verbatim; see web/lib/export-max-height.ts.
+    const maxHeight = resolveExportMaxHeight(
+      options?.maxHeight,
+      options !== undefined,
+      export1080
+    );
     if (options?.resolution) {
       setExport1080(
         options.resolution === "1080" || options.resolution === "720"
@@ -1814,6 +1824,7 @@ export function App({
             fps:
               options?.frameRate === "source" ? undefined : options?.frameRate,
             maxHeight,
+            platform: options?.platform,
           });
           if (!r.ok) {
             throw new Error(r.error);
