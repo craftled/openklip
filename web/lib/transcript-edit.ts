@@ -74,6 +74,27 @@ export function transcriptTextTokens(text: string): string[] {
     .filter(Boolean);
 }
 
+/**
+ * True when `editedText` tokenizes to exactly the words' current text, in
+ * order. A contentEditable transcript renders deleted words struck through
+ * but still present in the DOM, so a blur with no real edit (or one that
+ * only changed whitespace/styling) must not trigger a save: reconcile would
+ * otherwise be invoked on unchanged content for no reason.
+ */
+export function transcriptTextUnchanged<T extends TranscriptEditWord>(
+  words: readonly T[],
+  editedText: string
+): boolean {
+  const currentTokens = transcriptTextTokens(
+    words.map((word) => word.text ?? "").join(" ")
+  );
+  const editedTokens = transcriptTextTokens(editedText);
+  if (currentTokens.length !== editedTokens.length) {
+    return false;
+  }
+  return currentTokens.every((token, index) => token === editedTokens[index]);
+}
+
 export function reconcileTranscriptText<T extends TranscriptEditWord>(
   words: readonly T[],
   editedText: string
@@ -84,7 +105,13 @@ export function reconcileTranscriptText<T extends TranscriptEditWord>(
     edited
   );
   const next = words.map((word) => ({ ...word }));
+  // lastWordIndex tracks the most recent match/replace target regardless of
+  // its deleted flag (used to decide, at the next insert, whether forward
+  // folding is safe). lastNonDeletedWordIndex tracks only non-deleted
+  // targets, and is the anchor for a trailing insert that never finds a
+  // later non-deleted match (backward fold).
   let lastWordIndex: number | null = null;
+  let lastNonDeletedWordIndex: number | null = null;
   let pendingPrefix = "";
 
   for (const op of ops) {
@@ -97,24 +124,59 @@ export function reconcileTranscriptText<T extends TranscriptEditWord>(
       op.wordIndex !== undefined &&
       op.editedIndex !== undefined
     ) {
-      next[op.wordIndex] = {
-        ...next[op.wordIndex],
-        deleted: false,
-        text: `${pendingPrefix} ${edited[op.editedIndex]}`.trim(),
-      };
-      pendingPrefix = "";
+      // A word being present (matched or with edited text) in the
+      // contentEditable is not evidence the user restored it: deleted words
+      // stay visible (struck through) alongside kept ones, so every blur
+      // would otherwise resurrect every cut. Restoring stays an explicit
+      // action (timeline toggle, search restore, cleanup, revert).
+      const isDeleted = next[op.wordIndex].deleted;
+      if (isDeleted) {
+        // A deleted word is never a valid anchor for inserted text: leave
+        // pendingPrefix untouched so it keeps accumulating for the next
+        // non-deleted match (or the backward fold below).
+        next[op.wordIndex] = {
+          ...next[op.wordIndex],
+          text: edited[op.editedIndex],
+        };
+      } else {
+        next[op.wordIndex] = {
+          ...next[op.wordIndex],
+          text: `${pendingPrefix} ${edited[op.editedIndex]}`.trim(),
+        };
+        pendingPrefix = "";
+        lastNonDeletedWordIndex = op.wordIndex;
+      }
       lastWordIndex = op.wordIndex;
       continue;
     }
     if (op.kind === "insert" && op.editedIndex !== undefined) {
-      if (lastWordIndex !== null) {
+      if (lastWordIndex !== null && !next[lastWordIndex].deleted) {
         next[lastWordIndex] = {
           ...next[lastWordIndex],
           text: `${next[lastWordIndex].text ?? ""} ${edited[op.editedIndex]}`.trim(),
         };
       } else if (next.length > 0) {
+        // No safe (non-deleted) anchor yet: accumulate for the next
+        // non-deleted match, or the end-of-loop backward fold below.
         pendingPrefix = `${pendingPrefix} ${edited[op.editedIndex]}`.trim();
       }
+    }
+  }
+
+  if (pendingPrefix) {
+    if (lastNonDeletedWordIndex !== null) {
+      next[lastNonDeletedWordIndex] = {
+        ...next[lastNonDeletedWordIndex],
+        text: `${next[lastNonDeletedWordIndex].text ?? ""} ${pendingPrefix}`.trim(),
+      };
+    } else if (lastWordIndex !== null) {
+      // Degenerate case: every word in the transcript is deleted, so there
+      // is no non-deleted anchor at all. Fall back to grafting onto the
+      // last touched (deleted) word rather than silently dropping the text.
+      next[lastWordIndex] = {
+        ...next[lastWordIndex],
+        text: `${next[lastWordIndex].text ?? ""} ${pendingPrefix}`.trim(),
+      };
     }
   }
 

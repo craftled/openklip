@@ -25,7 +25,10 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Copy, RotateCcw, Scissors, X } from "@/lib/icon";
-import { selectedWordStats } from "@/lib/transcript-edit";
+import {
+  selectedWordStats,
+  transcriptTextUnchanged,
+} from "@/lib/transcript-edit";
 import { cn } from "@/lib/utils";
 
 interface TranscriptWord {
@@ -128,6 +131,12 @@ export function EditorTranscriptPanel({
 
   const commitEditedText = () => {
     const text = editorRef.current?.innerText ?? "";
+    // Every word (including struck-through deleted ones) lives in this one
+    // contentEditable, so a blur with no real edit extracts the same text
+    // every time. Skip the save entirely rather than reconcile a no-op.
+    if (transcriptTextUnchanged(words, text)) {
+      return;
+    }
     onTextEdit(text);
   };
 
@@ -139,6 +148,16 @@ export function EditorTranscriptPanel({
     if (nativeRange) {
       onSelectRange(nativeRange);
     }
+    // A caret-only Backspace/Delete (no selection range) intentionally falls
+    // through to native contentEditable editing below rather than being
+    // preventDefault()'d, so character-level typing corrections keep
+    // working. This is safe only because of two guards downstream:
+    // reconcileTranscriptText preserves each word's existing deleted flag on
+    // match/replace ops (a word merely being present, or having edited
+    // text, is not evidence of restoration), and commitEditedText no-ops
+    // when the extracted text is token-identical to the current words. A
+    // stray edit therefore costs at most one word's text, which is logged
+    // and revertible, never a mass resurrection of cut words.
     if (event.key === "Backspace" || event.key === "Delete") {
       const range = nativeRange ?? selRange;
       if (range) {
