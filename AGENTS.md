@@ -21,7 +21,8 @@ projects/<slug>/
   project.json            the EDL - the edit itself (the only file you edit)
   assets/                 user originals (flat): drop b-roll, music, stills here
   working/                derived media + scratch: proxy.mp4, transcript.json,
-                          audio16k.f32, frames/, asset proxies, chats.json…
+                          audio16k.f32, frames/, asset proxies, chats.json,
+                          actions.jsonl…
   output/out.mp4          the rendered export
 ```
 
@@ -33,7 +34,9 @@ templates/<id>/skill.md   agent playbook (cuts, overlays, export loop)
 
 Optional `template` field on `project.json` points at a template id (e.g. `talking-head`).
 
-**`project.json` IS the edit.** It holds every transcribed word with a `deleted` flag, b-roll overlays, still (Ken Burns) overlays, push-in zooms, title cards, graphics (HTML/CSS template overlays), captions settings, and look flags. Everything under `working/` and `output/` is regenerated from it. The GUI editor and these CLI commands both read and write this same file; they are **equivalent (parity)**. Edit it through the CLI; the browser editor will show the same result, and vice-versa.
+**`project.json` IS the edit.** It holds every transcribed word with a `deleted` flag, b-roll overlays, still (Ken Burns) overlays, push-in zooms, title cards, graphics (HTML/CSS template overlays), music placements, captions settings, and look flags. Everything under `working/` and `output/` is regenerated from it. The GUI editor and these CLI commands both read and write this same file; they are **equivalent (parity)**. Edit it through the CLI; the browser editor will show the same result, and vice-versa.
+
+**Action history.** Every registry mutation (GUI, CLI, MCP) appends one entry to `working/actions.jsonl`: an append-only log with action name, actor (`human|agent|cli|mcp`), truncated input/result summaries, timestamp, and the `project.json` `revision` counter before and after (bumped inside the write lock). Read it via `GET /api/projects/<slug>/history` or the History section in the Config panel. Set `OPENKLIP_ACTOR` in the environment to attribute GUI-spawned agent edits as `agent`. Non-registry CLI mutations (asset registration, template set, assembly, brand) do not log yet.
 
 Time is integer audio samples at 48 kHz. The CLI takes seconds where a human number is natural (overlay spans) and converts for you.
 
@@ -54,6 +57,7 @@ Time is integer audio samples at 48 kHz. The CLI takes seconds where a human num
 | Describe media (subagents) | `openklip analyze <slug>` |
 | Place / patch / remove b-roll | `openklip broll-add`, `broll-set`, `broll-rm`, `broll-add-phrase` |
 | Place / patch / remove still (Ken Burns) | `openklip still-add`, `still-set`, `still-rm` |
+| Place / patch / remove music placement | `openklip music-add`, `music-set`, `music-rm` |
 | Place / patch / remove graphic (HTML/CSS template) | `openklip graphic-add`, `graphic-set`, `graphic-rm` |
 | Add / patch json-render graphic (product announcement) | `openklip json-graphic-add`, `json-graphic-set` |
 | Place / patch / remove title | `openklip title-add`, `title-set`, `title-rm`, `title-add-phrase` |
@@ -131,6 +135,9 @@ Add `--note "<why>"` to any `cut` or overlay-add to record the rationale on the 
 | `openklip broll-add-phrase <slug> <assetId> "spoken phrase"` | Cover the span of the first spoken phrase match. |
 | `openklip broll-set <slug> <brollId>` | Patch b-roll: `--asset`, `--from`, `--to`, `--src-in` (seconds). |
 | `openklip broll-rm <slug> <brollId>` | Remove a b-roll clip. |
+| `openklip music-add <slug> <assetId> <fromSec> <toSec>` | Place a registered **music** asset as a background bed. `--gain 0.3` (0–2), `--fade-in <sec>` / `--fade-out <sec>` (0–10), `--src-in <sec>`, `--mode loop\|trim`, `--note "<why>"`. |
+| `openklip music-set <slug> <musicId>` | Patch a music placement: same flags plus `--asset`. |
+| `openklip music-rm <slug> <musicId>` | Remove a music placement. |
 | `openklip title-add <slug> <fromSec> <toSec> <text>` | Burn a title card. `--position lower\|center\|hero` (default lower). Use `\n` for two lines. |
 | `openklip title-add-phrase <slug> "spoken" "title text"` | Place a title at the first spoken phrase match (min 2s span). |
 | `openklip title-set <slug> <titleId>` | Patch title: `--text`, `--position`, `--from`, `--to`. |
@@ -189,7 +196,7 @@ Workflow: `take-add` each recording, read `take_transcript <slug> <takeId>` to f
 | `openklip status <slug> --json` | Same data as compact JSON (preferred for agents). |
 | `openklip ranges <slug> [--json]` | Kept source-time segments after cuts and pad. |
 | `openklip overlays <slug> [--json]` | All b-roll, titles, zooms, stills with ids and spans. |
-| `openklip export <slug>` | Render the current cut to `out.mp4`. `--height 1080` for max output height. |
+| `openklip export <slug>` | Render the current cut to `out.mp4`. `--height 1080` for max output height, `--fps <n>` for output frame rate (1–120), `--compression studio\|social\|web\|web-low` for encoder preset (default `social`). |
 | `openklip verify <slug>` | The verify loop: re-transcribe `output/out.mp4` with the same Whisper path used at ingest and diff it against the EDL. Flags filler that survived, deleted words that leaked back in, and low kept-word coverage (clipped words). Exits non-zero on drift. Requires an export. Also the `verify` agent tool. |
 | `openklip doctor [slug]` | Health check: ffmpeg/ffprobe binaries, Whisper script, and (with a slug) the project's `project.json`, source/proxy media, and asset proxies. Exits non-zero if any check fails. Run it when the agent loop fails deep inside a subprocess. |
 | `openklip ingesters` | List ingester plugins (`ingesters/<id>/ingester.json`): declarative seams for non-file media import (URL, batch, etc.). |
