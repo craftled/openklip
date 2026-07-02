@@ -375,45 +375,45 @@ Goal: text-based editing feels fast, safe, and obvious for humans and agents.
 ### 3.2 Filler and dead-air removal
 
 - [ ] Add deterministic filler detection.
-  - [ ] Configurable filler phrase list.
-  - [ ] Detect repeated fillers.
-  - [ ] Detect isolated filler words.
-  - [ ] Avoid cutting words inside meaningful phrases.
-  - [ ] Show proposed cuts before applying.
-  - Verification: unit tests for safe and unsafe filler cases.
-- [ ] Add silence and dead-air detection.
-  - [ ] Generate or reuse audio analysis data.
-  - [ ] Detect silence longer than threshold.
-  - [ ] Convert silence spans to candidate cuts.
-  - [ ] Let user apply all or selected cuts.
-  - Verification: fixture with known silence produces expected candidates.
-- [ ] Add an agent-readable cleanup report.
-  - [ ] Count fillers found.
-  - [ ] Count dead-air spans found.
-  - [ ] Estimated duration removed.
-  - [ ] Risk warnings for tight cuts.
-  - Verification: MCP/CLI can read cleanup candidates before mutation.
+  - [ ] Configurable filler phrase list. `src/cleanup.ts` exposes `FillerCandidatesOpts` (`tokens`/`phrases`) in code, but no CLI/GUI/MCP surface lets a user change the default list yet (`CORE_FILLER_TOKENS`, `DEFAULT_FILLER_PHRASES` are fixed).
+  - [x] Detect repeated fillers. Verified 2026-07-02: `coreFillerRuns` merges adjacent core disfluencies into one "repeated filler" candidate; `repeatedTokenRuns` flags repeated "like"/"so" as review; `tests/cleanup.test.ts`.
+  - [x] Detect isolated filler words. Verified 2026-07-02: a lone `um`/`uh`/`er`/etc. is a safe candidate (`fillerCandidates` in `src/cleanup.ts`); `tests/cleanup.test.ts`.
+  - [x] Avoid cutting words inside meaningful phrases. Verified 2026-07-02: only a fixed core-disfluency set (`um`, `uh`, `er`, …) auto-cuts; ambiguous words ("like", "so", "you know", "sort of", "kind of", "i mean") are always risk `"review"`, never auto-applied.
+  - [x] Show proposed cuts before applying. Verified 2026-07-02: Cleanup section in the Config panel (`web/components/cleanup-panel.tsx`) lists every candidate before apply; `openklip cleanup <slug>` prints the report without `--apply-safe`.
+  - Verification: unit tests for safe and unsafe filler cases. Verified 2026-07-02: `tests/cleanup.test.ts` (387 lines) covers isolated/repeated/review classification end to end.
+- [x] Add silence and dead-air detection.
+  - [x] Generate or reuse audio analysis data. Verified 2026-07-02: `loadAudioAnalysis` (`src/audio-analysis.ts`) caches `working/audio-analysis.json` keyed on source mtime plus analysis options, zod-validated on read.
+  - [x] Detect silence longer than threshold. Verified 2026-07-02: `analyzeSilences` (`src/audio-analysis-core.ts`) RMS windows at 20ms, -38dBFS, 300ms minimum; live E2E found 86 silences on the edgaras-raw smoke project.
+  - [x] Convert silence spans to candidate cuts. Verified 2026-07-02: `deadAirCandidates` turns silence overlapping a raw word gap into a padded candidate span, graded safe above a 1.2s raw gap.
+  - [x] Let user apply all or selected cuts. Verified 2026-07-02: Cleanup panel has a per-row apply button (any risk) and an "apply all safe" batch action; CLI `openklip cleanup <slug> --apply-safe`; agents apply selected candidates via the `cut` and `dead-air-add` actions.
+  - Verification: fixture with known silence produces expected candidates. Verified 2026-07-02: `tests/audio-analysis.test.ts` (290 lines) and `tests/cleanup.test.ts` pin known-silence fixtures to expected candidates.
+- [x] Add an agent-readable cleanup report.
+  - [x] Count fillers found. Verified 2026-07-02: `CleanupReport.fillerCount`.
+  - [x] Count dead-air spans found. Verified 2026-07-02: `CleanupReport.deadAirCount`.
+  - [x] Estimated duration removed. Verified 2026-07-02: `CleanupReport.estSavedSec` sums every candidate's `estSavedSec`.
+  - [x] Risk warnings for tight cuts. Verified 2026-07-02: every candidate carries `risk: "safe" | "review"`, and any candidate within 0.3s of a b-roll/title/zoom/still/graphic overlay is forced to `"review"` with a report-level warning (`cleanupReport` in `src/cleanup.ts`).
+  - Verification: MCP/CLI can read cleanup candidates before mutation. Verified 2026-07-02: MCP `cleanup_report` tool and `openklip cleanup <slug> --json`; live E2E on the edgaras-raw smoke project found 4 filler candidates and applied them via `--apply-safe`.
 
 ### 3.3 Better cut quality
 
 - [ ] Add VAD snap-to-silence.
-  - [ ] Analyze speech activity near word boundaries.
-  - [ ] Snap cut starts and ends to nearby silence.
-  - [ ] Preserve sample-accurate timing.
-  - [ ] Expose snap setting in CLI and UI.
-  - Verification: cut boundary fixture snaps to expected samples.
+  - [x] Analyze speech activity near word boundaries. Verified 2026-07-02: RMS silence detection over the full ingest-time PCM (`analyzeSilences`, `src/audio-analysis-core.ts`) is consumed at every cut boundary by `snapBoundary`/`snapRanges`; a whole-file silence scan applied where it matters (cut edges), not a per-word VAD model.
+  - [x] Snap cut starts and ends to nearby silence. Verified 2026-07-02: `effectiveRanges` (`src/edl.ts`) applies `snapRanges` when `cuts.snap.enabled && mode === "vad"`; wired through the exporter, preview scheduler, `compiledTimeline`, CLI/MCP `status`/`ranges`, and the hover-card summary so every surface agrees; `tests/cut-snap.test.ts`.
+  - [ ] Preserve sample-accurate timing. Snap boundaries land on the 20ms RMS analysis window grid (`analyzeSilences`'s own comment: "callers should not expect sample-accurate edges"), not an arbitrary 48kHz sample. Seam duration IS exact end to end (a snapped+crossfaded export duration byte-matched the plain export at 64.5s on the edgaras-raw smoke project), but boundary placement itself is window-quantized, not sample-accurate.
+  - [ ] Expose snap setting in CLI and UI. GUI Config panel Audio section (`web/components/audio-controls.tsx`: "Snap cuts to silence" toggle, max shift, crossfade) and the GUI/MCP `cuts-snap` action expose it; no dedicated CLI subcommand exists yet (a pre-existing gap, not part of this change).
+  - Verification: cut boundary fixture snaps to expected samples. Verified 2026-07-02: `tests/cut-snap.test.ts` (168 lines) pins `snapBoundary`/`snapRanges`/`subtractDeadAir` fixtures to expected values, including the no-inversion and conflict-revert guarantees.
 - [ ] Add equal-power audio crossfades at cuts.
-  - [ ] Define crossfade duration setting.
-  - [ ] Apply to preview if feasible.
-  - [ ] Apply to export.
-  - [ ] Avoid crossfade across very short kept ranges.
-  - Verification: export graph includes fades and audio has no clicks in smoke test.
-- [ ] Add transcript correction.
-  - [ ] Edit word text without changing timing.
-  - [ ] Preserve original transcript text if needed.
-  - [ ] Update captions from corrected text.
-  - [ ] Expose through CLI/MCP.
-  - Verification: corrected word appears in captions and export.
+  - [x] Define crossfade duration setting. Verified 2026-07-02: `cuts.snap.crossfadeMs` (0-100ms, `CutSnapSchema`) is live; UI slider in the Audio section, GUI/MCP `cuts-snap` action.
+  - [ ] Apply to preview if feasible. Not done: preview is a native `<video>` element on `working/proxy.mp4` with gap-skip scheduling, not an ffmpeg filter graph, so crossfades are export-only (the Audio section caption says so: "Applied at export; preview audio is unprocessed").
+  - [x] Apply to export. Verified 2026-07-02: `buildSeamedVoiceParts` (`src/exporter.ts`) renders per-range segments joined by equal-power (`qsin` curve) `acrossfade`, engaged whenever snap is enabled with `crossfadeMs > 0` and more than one surviving range.
+  - [x] Avoid crossfade across very short kept ranges. Verified 2026-07-02: each seam's `d` is clamped to `min(crossfadeMs/1000, gap, leftRangeLen, rightRangeLen)`; under 4ms it falls back to an 8ms fade-out/fade-in butt join instead of an unstable micro-crossfade (`tests/exporter.test.ts`: "a clamped d under 4ms falls back to the duration-preserving butt join").
+  - Verification: export graph includes fades and audio has no clicks in smoke test. Verified 2026-07-02: `tests/exporter.test.ts` (1107 lines) pins the filter-graph construction (acrossfade/afade/concat) and skip-gated ffmpeg smokes prove total duration is preserved to the sample; live E2E: a snapped+crossfaded export duration byte-matched the plain export at 64.5s. Audible click-freeness itself is not separately measured.
+- [x] Add transcript correction.
+  - [x] Edit word text without changing timing. Verified 2026-07-02: `setWordText` (`src/actions.ts`) only touches `word.text`, never `startSample`/`endSample`.
+  - [x] Preserve original transcript text if needed. Verified 2026-07-02: `word.originalText` is set once on the first real correction and never overwritten again (`tests/actions.test.ts`: "sets originalText once on first correction and never overwrites it").
+  - [x] Update captions from corrected text. Verified 2026-07-02: the shared `keptWordsInOutputTime` (`src/captions.ts`) reads `word.text` directly, so a correction flows into both the export ASS burn-in and the derived UI timeline with no separate caption edit path to drift.
+  - [x] Expose through CLI/MCP. Verified 2026-07-02: `openklip word-text <slug> <wordId> <text...>`; `word-text` registry action on cli/gui/mcp surfaces; `tests/cli-query.test.ts`.
+  - Verification: corrected word appears in captions and export. Verified 2026-07-02: `tests/captions.test.ts` and `tests/actions.test.ts` cover correction plus `originalText` preservation; captions read live `word.text` by construction (see above).
 
 ## Milestone 4: Audio, music, and sound design
 
@@ -444,23 +444,23 @@ Goal: exported videos can sound polished without leaving OpenKlip.
 
 ### 4.2 Ducking and loudness
 
-- [ ] Add voice-aware music ducking.
-  - [ ] Lower music during speech.
-  - [ ] Configurable duck amount.
-  - [ ] Configurable attack and release.
-  - [ ] Export through ffmpeg.
-  - Verification: fixture export has expected filter chain and audible ducking.
-- [ ] Add loudness normalization.
-  - [ ] Analyze source loudness.
-  - [ ] Normalize voice track.
-  - [ ] Normalize music output level.
-  - [ ] Add UI toggle and CLI option.
-  - Verification: ffmpeg loudness stats are within target range.
+- [x] Add voice-aware music ducking.
+  - [x] Lower music during speech. Verified 2026-07-02: `sidechaincompress` keyed off a split of the voice bus ducks the music mix in `buildAudioParts` (`src/exporter.ts`) when `audio.ducking.enabled` and a music bed is present.
+  - [x] Configurable duck amount. Verified 2026-07-02: `amountDb` (1-30dB) maps to a pinned ratio band (`duckRatioFor`); CLI `--duck-amount`, UI slider.
+  - [x] Configurable attack and release. Verified 2026-07-02: `attackMs` (1-500) / `releaseMs` (20-2000) pass straight through to `sidechaincompress`; CLI `--duck-attack`/`--duck-release`, UI sliders.
+  - [x] Export through ffmpeg. Verified 2026-07-02: live E2E export on the edgaras-raw smoke project rendered the ducking chain end to end.
+  - Verification: fixture export has expected filter chain and audible ducking. Verified 2026-07-02: `tests/exporter.test.ts` pins the sidechaincompress/split/remix chain and the light/medium/heavy ratio bands; ducking is export-only, preview audio stays unprocessed (Audio section caption).
+- [x] Add loudness normalization.
+  - [x] Analyze source loudness. Verified 2026-07-02: single-pass `loudnorm` measures and normalizes in the same ffmpeg pass (no separate two-pass analyze step).
+  - [x] Normalize voice track. Verified 2026-07-02: `loudnorm=I=<targetLufs>:TP=-1.5:LRA=11` runs on the final output bus (voice-only when no music).
+  - [x] Normalize music output level. Verified 2026-07-02: the same `loudnorm` stage runs on the post-amix bus when a music bed is present, so voice and music are normalized together as one mix, not as separate tracks.
+  - [x] Add UI toggle and CLI option. Verified 2026-07-02: Config panel Audio section loudness toggle + target slider; `openklip audio <slug> --loudness on|off --loudness-target <lufs>`.
+  - Verification: ffmpeg loudness stats are within target range. Verified 2026-07-02: live E2E 4K export on the edgaras-raw smoke project measured -16.6 LUFS integrated against a -16 LUFS target (single-pass lands near, not exactly at, target; two-pass loudnorm is a future upgrade for exact targeting).
 - [ ] Add basic audio cleanup.
-  - [ ] Noise reduction option if feasible with ffmpeg filters.
-  - [ ] High-pass voice filter.
-  - [ ] De-esser or documented non-goal if too heavy.
-  - Verification: audio filter tests and export smoke.
+  - [ ] Noise reduction option if feasible with ffmpeg filters. Not implemented.
+  - [x] High-pass voice filter. Verified 2026-07-02: `audio.voiceHighpass` (40-200Hz) prepends `highpass=f=<hz>` on both the seamed and plain voice paths; CLI `--highpass on|off --highpass-hz <n>`, UI toggle.
+  - [ ] De-esser or documented non-goal if too heavy. Not implemented; not yet formally documented as a non-goal.
+  - Verification: audio filter tests and export smoke. Verified 2026-07-02 (highpass only): `tests/exporter.test.ts` pins the highpass prefix on both voice paths; noise reduction and de-essing have no tests because they do not exist.
 
 ## Milestone 5: Rich manual timeline editing
 
@@ -763,18 +763,18 @@ Goal: OpenKlip can be driven by external agents and scripts without relying on t
 
 Goal: match the core jobs people expect from a modern transcript-first editor.
 
-- [ ] Transcript-based cuts.
+- [x] Transcript-based cuts.
   - [x] Word click cuts.
   - [x] CLI phrase cuts.
   - [x] UI phrase cuts.
-  - [ ] Batch filler cuts with review.
-  - [ ] Dead-air cuts with review.
+  - [x] Batch filler cuts with review. Verified 2026-07-02: Cleanup panel plus `openklip cleanup --apply-safe` plus MCP `cleanup_report`/`cut` (Milestone 3.2).
+  - [x] Dead-air cuts with review. Verified 2026-07-02: same cleanup engine surfaces dead-air candidates; `dead-air-add`/`dead-air-rm` actions (Milestone 3.2).
 - [ ] Captions.
   - [x] Preview captions.
   - [x] Export captions.
   - [ ] Caption style presets.
   - [ ] Per-platform safe areas.
-  - [ ] Transcript correction flows into captions.
+  - [x] Transcript correction flows into captions. Verified 2026-07-02: see Milestone 3.3.
 - [ ] Media overlays.
   - [x] B-roll full cover.
   - [x] Still overlays.
@@ -786,9 +786,9 @@ Goal: match the core jobs people expect from a modern transcript-first editor.
 - [ ] Audio.
   - [x] Music placement.
   - [x] Music fades.
-  - [ ] Music ducking.
-  - [ ] Loudness normalization.
-  - [ ] Basic audio cleanup.
+  - [x] Music ducking. Verified 2026-07-02: see Milestone 4.2.
+  - [x] Loudness normalization. Verified 2026-07-02: see Milestone 4.2.
+  - [ ] Basic audio cleanup. Highpass only; noise reduction and de-esser not implemented (Milestone 4.2).
 - [ ] Multi-take and composition.
   - [x] CLI multi-take assembly.
   - [ ] UI take browser.
@@ -1108,9 +1108,9 @@ This order makes the product feel more capable every few steps while keeping age
 ### Descript-match gate
 
 - [ ] Transcript editing is fast enough for full manual cleanup.
-- [ ] Filler and dead-air cleanup works with review.
+- [x] Filler and dead-air cleanup works with review. Verified 2026-07-02: live E2E on the edgaras-raw smoke project (real 4K export): 4 filler candidates found and applied, 86 silences detected, UI apply round-trip recorded a history entry.
 - [ ] Captions are styleable and export reliably.
-- [ ] Music, ducking, and loudness are usable.
+- [x] Music, ducking, and loudness are usable. Verified 2026-07-02: live E2E 4K export rendered ducking and single-pass loudnorm (-16.6 LUFS measured vs -16 target) end to end; both are CLI/GUI/MCP-configurable.
 - [ ] Multi-take can be inspected or corrected in UI.
 - [ ] Export presets cover common platforms.
 - [ ] Undo or task-level revert exists.

@@ -56,6 +56,10 @@ Time is integer audio samples at 48 kHz. The CLI takes seconds where a human num
 | Grep transcript | `openklip transcript grep`, `span`, `phrase` |
 | Review edit (JSON) | `openklip status <slug> --json`, `ranges`, `overlays` |
 | Cut / restore words | `openklip cut`, `openklip restore` |
+| Correct one word's transcript text | `openklip word-text <slug> <wordId> <text...>` |
+| Read filler/dead-air cleanup candidates | `openklip cleanup <slug> [--json]` |
+| Apply safe cleanup candidates | `openklip cleanup <slug> --apply-safe` |
+| Remove a registered dead-air span | `openklip dead-air-rm <slug> <id>` |
 | Register b-roll file | `openklip broll <slug> <file>` |
 | Register a still or music asset | `openklip asset-add <slug> <file> --kind still\|music` |
 | List b-roll assets | `openklip assets <slug>` |
@@ -82,6 +86,7 @@ Time is integer audio samples at 48 kHz. The CLI takes seconds where a human num
 | Fine-tune the grade (color knobs) | `openklip look <slug> color --temp 0.15 --contrast 0.96 --sat 0.84` |
 | Apply a LUT (.cube) | `openklip look <slug> lut <name>` |
 | List available LUTs | `openklip luts` |
+| Set export audio quality (ducking / loudness / highpass) | `openklip audio <slug> [--duck on\|off] [--loudness on\|off] [--highpass on\|off]` |
 | Cut boundary padding | `openklip pad <slug> <ms>` |
 | Review edit | `openklip status <slug>` (`--json` for agents) |
 | Kept ranges / overlays | `openklip ranges <slug>`, `openklip overlays <slug>` |
@@ -130,6 +135,7 @@ Prefer bounded reads over dumping the full transcript. Use `--json` for machine 
 | `openklip cut <slug> --text "phrase" --all` | Cut **every** matching run (e.g. repeated filler words). |
 | `openklip cut <slug> <tokens...> --restore` | Restore the listed words instead of cutting them. |
 | `openklip restore <slug>` | Restore every word (clear all cuts). |
+| `openklip word-text <slug> <wordId> <text...>` | Correct one word's transcript text without changing its timing. The original text is preserved once, on the first correction (`originalText`, never overwritten again). GUI bulk edits go through the same preservation logic via `edit-words`. |
 
 Add `--note "<why>"` to any `cut` or overlay-add to record the rationale on the edit (metadata only, never reaches ffmpeg; `--note ""` clears it). Surfaces in `transcript`, `overlays`, and the agent tools so the next pass knows why.
 
@@ -190,6 +196,8 @@ Workflow: `take-add` each recording, read `take_transcript <slug> <takeId>` to f
 | `openklip look <slug> grade <name>` | Set the color grade applied to the whole picture at export: `none`, `neutral`, `warm`, `cool`, `cool_desat`, `filmic`, `punchy`. Expands to a deterministic ffmpeg filter chain. `none` is the default no-op. |
 | `openklip look <slug> color [--temp n] [--tint n] [--bright n] [--contrast n] [--sat n] \| --reset` | Continuous color knobs **on top of** the base grade (the deck's "control room"): temperature/tint (colorbalance), then contrast/brightness/saturation (eq), in that order. Each knob defaults to the identity; only the ones you pass change, and an all-neutral result clears `look.color`. `--reset` returns to neutral. The GUI exposes the same knobs as live sliders previewed on a real frame; both write `look.color` through the one `look-color` action. |
 | `openklip look <slug> lut <name\|none>` | Apply a named `.cube` LUT from `luts/` (the technical color transform, e.g. log to Rec.709), applied before the grade. `none` clears it. Drop `name.cube` into `luts/`; reference by name so `project.json` stays portable. `openklip luts` lists them. |
+| `openklip audio <slug>` | Print current export audio quality settings (ducking, loudness, voice highpass). |
+| `openklip audio <slug> [--duck on\|off] [--duck-amount <1-30 dB>] [--duck-attack <1-500 ms>] [--duck-release <20-2000 ms>] [--loudness on\|off] [--loudness-target <-30..-10 LUFS>] [--highpass on\|off] [--highpass-hz <40-200>]` | Patch export audio quality: sidechain-duck the music bed under speech, apply single-pass loudness normalization toward a target LUFS, and/or highpass the voice track. Export-only; preview audio is unprocessed. |
 | `openklip pad <slug> <ms>` | Symmetric padding around kept ranges (0–500 ms). |
 | `openklip brand <slug> <name>` | Apply a brand preset (`brands/<name>.json`): sets caption/vignette/pad **defaults** only. `project.json` stays the edit; words and overlays are untouched. Also available at ingest: `openklip ingest <video> --brand <name>`. |
 | `openklip template list` | List edit templates (`templates/<id>/skill.md`): agent playbooks for cuts, overlays, and export. |
@@ -204,6 +212,9 @@ Workflow: `take-add` each recording, read `take_transcript <slug> <takeId>` to f
 | `openklip status <slug> --json` | Same data as compact JSON (preferred for agents). |
 | `openklip ranges <slug> [--json]` | Kept source-time segments after cuts and pad. |
 | `openklip overlays <slug> [--json]` | All b-roll, titles, zooms, stills with ids and spans. |
+| `openklip cleanup <slug> [--json]` | Filler-word and dead-air cleanup candidates with risk (`safe`/`review`), reason, and estimated seconds saved. Degrades to filler-only (with a warning) when no audio analysis is available yet. |
+| `openklip cleanup <slug> --apply-safe` | Apply every `safe` candidate (cuts filler words, registers dead-air spans) and print what changed. `review` candidates are never auto-applied; apply them individually via `cut`/`dead-air-add` after a human or agent judgment call. |
+| `openklip dead-air-rm <slug> <id>` | Remove a registered dead-air span by id. CLI/MCP only; no GUI remove affordance yet. |
 | `openklip export <slug>` | Render the current cut to `out.mp4`. `--height 1080` for max output height, `--fps <n>` for output frame rate (1–120), `--compression studio\|social\|web\|web-low` for encoder preset (default `social`). |
 | `openklip verify <slug>` | The verify loop: re-transcribe `output/out.mp4` with the same Whisper path used at ingest and diff it against the EDL. Flags filler that survived, deleted words that leaked back in, and low kept-word coverage (clipped words). Exits non-zero on drift. Requires an export. Also the `verify` agent tool. |
 | `openklip doctor [slug]` | Health check: ffmpeg/ffprobe binaries, Whisper script, and (with a slug) the project's `project.json`, source/proxy media, and asset proxies. Exits non-zero if any check fails. Run it when the agent loop fails deep inside a subprocess. |
@@ -232,8 +243,8 @@ All MCP tools route through `src/agent-tools.ts` → `mutateProject` / `runActio
 
 | Layer | MCP tool names | Same as CLI |
 | --- | --- | --- |
-| Query | `list_projects`, `transcript_grep`, `transcript_phrase`, `scene_log`, `project_status`, `project_overlays`, … | `openklip transcript grep`, `status --json`, `overlays --json` |
-| Mutate | `cut`, `cut-text`, `broll-add`, `title-set`, … | `openklip cut`, `broll-add`, … |
+| Query | `list_projects`, `transcript_grep`, `transcript_phrase`, `scene_log`, `project_status`, `project_overlays`, `cleanup_report`, … | `openklip transcript grep`, `status --json`, `overlays --json`, `cleanup --json` |
+| Mutate | `cut`, `cut-text`, `broll-add`, `title-set`, `word-text`, `dead-air-add`, `dead-air-rm`, `audio`, … | `openklip cut`, `broll-add`, `word-text`, `dead-air-rm`, `audio`, … |
 | Phrase compose | `title-add-phrase`, `zoom-add-phrase`, `broll-add-phrase` | `openklip title-add-phrase`, … |
 | Brief | `brief_get`, `brief_set` | `openklip brief`, `openklip brief --set` |
 | Agent task progress | `task_step`, `task_complete` | no CLI equivalent: scoped to the running agent's own task via `OPENKLIP_TASK_ID` |
