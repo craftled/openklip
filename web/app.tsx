@@ -128,6 +128,7 @@ import {
   toastSaveError,
 } from "@/lib/app-toast";
 import type { AssetBinUpdate } from "@/lib/asset-bin-update";
+import { type DeadAirItem, reconcileDeadAirItems } from "@/lib/dead-air-state";
 import {
   APP_ICON_CLASS,
   Captions,
@@ -236,11 +237,6 @@ interface StillItem {
   focusY: number;
   id: string;
   scale: number;
-  startSample: number;
-}
-interface DeadAirItem {
-  endSample: number;
-  id: string;
   startSample: number;
 }
 interface Project {
@@ -1162,12 +1158,11 @@ export function App({
           ...prev,
           cuts: {
             ...prev.cuts,
-            deadAir: [
-              ...(prev.cuts?.deadAir ?? []).filter(
-                (d) => d.id !== optimisticId
-              ),
-              ...created,
-            ],
+            deadAir: reconcileDeadAirItems(
+              prev.cuts?.deadAir ?? [],
+              created,
+              (id) => id === optimisticId
+            ),
           },
         }));
       }
@@ -1242,12 +1237,11 @@ export function App({
           ...prev,
           cuts: {
             ...prev.cuts,
-            deadAir: [
-              ...(prev.cuts?.deadAir ?? []).filter(
-                (d) => !d.id.startsWith(optimisticId)
-              ),
-              ...created,
-            ],
+            deadAir: reconcileDeadAirItems(
+              prev.cuts?.deadAir ?? [],
+              created,
+              (id) => id.startsWith(optimisticId)
+            ),
           },
         }));
         return { ok: true } as const;

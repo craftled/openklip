@@ -203,6 +203,60 @@ test("CLI ranges --json applies VAD snap end-to-end via a cached audio-analysis.
   });
 });
 
+test("CLI cleanup --apply-safe chunks more than 50 dead-air spans", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    const wordCount = 52;
+    const wordDurationSec = 0.2;
+    const gapSec = 1.5;
+    const stepSec = wordDurationSec + gapSec;
+    const words = Array.from({ length: wordCount }, (_, i) => {
+      const startSec = i * stepSec;
+      return {
+        id: `w${i}`,
+        text: `word${i}`,
+        startSample: Math.round(startSec * SAMPLE_RATE),
+        endSample: Math.round((startSec + wordDurationSec) * SAMPLE_RATE),
+        deleted: false,
+      };
+    });
+    const silences = Array.from({ length: wordCount - 1 }, (_, i) => ({
+      startSec: i * stepSec + wordDurationSec,
+      endSec: (i + 1) * stepSec,
+    }));
+    const durationSamples = Math.round(
+      ((wordCount - 1) * stepSec + wordDurationSec) * SAMPLE_RATE
+    );
+    const p = makeProject({ slug, durationSamples, padMs: 0, words });
+    writeFixtureProject(slug, p);
+
+    const paths = projectPaths(slug);
+    await Bun.write(
+      paths.audioRaw,
+      new Float32Array(1600).buffer as ArrayBuffer
+    );
+    const sourceMtimeMs = statSync(paths.audioRaw).mtimeMs;
+    await Bun.write(
+      `${paths.working}/audio-analysis.json`,
+      JSON.stringify({
+        version: 1,
+        sampleRate: 16_000,
+        windowMs: 20,
+        thresholdDb: -38,
+        minSilenceMs: 300,
+        sourceMtimeMs,
+        silences,
+      })
+    );
+
+    const r = await runCli(["cleanup", slug, "--apply-safe"]);
+    assert.equal(r.code, 0, r.out);
+    assert.match(r.out, /registered 51 dead-air span\(s\)/);
+
+    const saved = JSON.parse(await Bun.file(paths.project).text());
+    assert.equal(saved.cuts.deadAir.length, 51);
+  });
+});
+
 test("CLI word-text corrects a word and preserves the original as originalText", async () => {
   await withTempProjectsRoot(async ({ slug }) => {
     writeFixtureProject(slug, makeProject({ slug }));

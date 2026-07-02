@@ -280,6 +280,24 @@ async function runLoggedAction<T = unknown>(
   return { project: mutated as Project, result };
 }
 
+interface DeadAirAddSpan {
+  fromSec: number;
+  toSec: number;
+}
+
+const DEAD_AIR_ADD_BATCH_SIZE = 50;
+
+async function addDeadAirSpansInBatches(
+  slug: string,
+  spans: DeadAirAddSpan[]
+): Promise<void> {
+  for (let i = 0; i < spans.length; i += DEAD_AIR_ADD_BATCH_SIZE) {
+    await runLoggedAction(slug, "dead-air-add", {
+      spans: spans.slice(i, i + DEAD_AIR_ADD_BATCH_SIZE),
+    });
+  }
+}
+
 function secRange(startSec: number, endSec: number): string {
   return `${startSec.toFixed(1)}s-${endSec.toFixed(1)}s`;
 }
@@ -1642,9 +1660,7 @@ try {
           console.log(`cleanup: cut ${fillerIds.length} filler word(s)`);
         }
         if (deadAirSpans.length > 0) {
-          await runLoggedAction(slug, "dead-air-add", {
-            spans: deadAirSpans,
-          });
+          await addDeadAirSpansInBatches(slug, deadAirSpans);
           console.log(
             `cleanup: registered ${deadAirSpans.length} dead-air span(s)`
           );
