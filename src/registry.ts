@@ -97,7 +97,14 @@ function defineAction<S extends z.ZodType>(def: {
 // which throw or clamp. Keeping bounds in one place : the primitive : is what
 // makes this registry DRY rather than a second copy of the rules to drift.
 const sec = z.number();
-const position = z.enum(["lower", "center", "hero"]);
+const position = z.enum([
+  "lower",
+  "center",
+  "hero",
+  "quote",
+  "divider",
+  "callout",
+]);
 const track = z.enum(["broll", "title", "zoom"]);
 const ProductAnnouncementActionSpecSchema =
   ProductAnnouncementSpecSchema.superRefine((spec, ctx) => {

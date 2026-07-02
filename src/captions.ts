@@ -153,7 +153,7 @@ export type CaptionPlacement = "bottom" | "raised" | "hidden";
 
 export interface TitleSpan {
   endSec: number;
-  position: "center" | "hero" | "lower";
+  position: "callout" | "center" | "divider" | "hero" | "lower" | "quote";
   startSec: number;
 }
 

@@ -233,7 +233,7 @@ interface ZoomItem {
 interface TitleItem {
   endSample: number;
   id: string;
-  position: "lower" | "center" | "hero";
+  position: "callout" | "center" | "divider" | "hero" | "lower" | "quote";
   startSample: number;
   text: string;
 }
@@ -2387,6 +2387,11 @@ export function App({
                           <SelectItem value="lower">Lower third</SelectItem>
                           <SelectItem value="center">Centered</SelectItem>
                           <SelectItem value="hero">Hero card</SelectItem>
+                          <SelectItem value="quote">Quote card</SelectItem>
+                          <SelectItem value="divider">
+                            Section divider
+                          </SelectItem>
+                          <SelectItem value="callout">Callout label</SelectItem>
                         </SelectGroup>
                       </SelectContent>
                     </Select>

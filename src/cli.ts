@@ -97,6 +97,7 @@ import {
   listTemplates,
   loadTemplateSkill,
 } from "./templates.ts";
+import { TITLE_POSITION_IDS } from "./titles.ts";
 import { verifyCut, verifyVerdict } from "./verify.ts";
 
 const [cmd, ...rest] = process.argv.slice(2);
@@ -156,7 +157,7 @@ Overlays
   openklip music-rm <slug> <musicId> remove a music placement
   openklip title-add <slug> <fromSec> <toSec> <text>
                                      burn a title card over a source-time span
-                                       --position lower|center|hero  (default lower)
+                                       --position lower|center|hero|quote|divider|callout
   openklip title-set <slug> <titleId>  patch title (--text --position --from --to)
   openklip title-rm <slug> <titleId> remove a title card
   openklip zoom-add <slug> <fromSec> <toSec>
@@ -372,6 +373,21 @@ function parseBrollDisplayFlag(
   }
   throw new Error(
     `unknown b-roll display "${raw}" (expected one of: ${BROLL_DISPLAY_IDS.join(", ")})`
+  );
+}
+
+function parseTitlePositionFlag(
+  raw: string | undefined
+): Title["position"] | undefined {
+  if (raw === undefined) {
+    return;
+  }
+  const pos = raw.toLowerCase();
+  if ((TITLE_POSITION_IDS as readonly string[]).includes(pos)) {
+    return pos as Title["position"];
+  }
+  throw new Error(
+    `unknown title position "${raw}" (expected one of: ${TITLE_POSITION_IDS.join(", ")})`
   );
 }
 
@@ -1206,19 +1222,15 @@ try {
     case "title-add": {
       if (!rest[0]) {
         throw new Error(
-          "usage: openklip title-add <slug> <fromSec> <toSec> <text> [--position lower|center|hero]"
+          "usage: openklip title-add <slug> <fromSec> <toSec> <text> [--position lower|center|hero|quote|divider|callout]"
         );
       }
       const slug = rest[0];
       const args = rest.slice(1);
       const posIdx = args.indexOf("--position");
-      let position: "lower" | "center" | "hero" = "lower";
+      let position: Title["position"] = "lower";
       if (posIdx !== -1) {
-        const pos = args[posIdx + 1]?.toLowerCase();
-        if (pos !== "lower" && pos !== "center" && pos !== "hero") {
-          throw new Error("--position must be lower, center, or hero");
-        }
-        position = pos;
+        position = parseTitlePositionFlag(args[posIdx + 1]) ?? position;
       }
       const timingAndText =
         posIdx === -1
@@ -1226,7 +1238,7 @@ try {
           : args.filter((_, i) => i !== posIdx && i !== posIdx + 1);
       if (timingAndText.length < 3) {
         throw new Error(
-          "usage: openklip title-add <slug> <fromSec> <toSec> <text> [--position lower|center|hero]"
+          "usage: openklip title-add <slug> <fromSec> <toSec> <text> [--position lower|center|hero|quote|divider|callout]"
         );
       }
       const fromSec = Number(timingAndText[0]);
@@ -1265,20 +1277,12 @@ try {
     case "title-set": {
       if (!(rest[0] && rest[1])) {
         throw new Error(
-          'usage: openklip title-set <slug> <titleId> [--text "..."] [--position lower|center|hero] [--from N] [--to N]'
+          'usage: openklip title-set <slug> <titleId> [--text "..."] [--position lower|center|hero|quote|divider|callout] [--from N] [--to N]'
         );
       }
       const slug = rest[0];
       const args = rest.slice(2);
-      const pos = flagValue(args, "--position")?.toLowerCase();
-      if (
-        pos !== undefined &&
-        pos !== "lower" &&
-        pos !== "center" &&
-        pos !== "hero"
-      ) {
-        throw new Error("--position must be lower, center, or hero");
-      }
+      const pos = parseTitlePositionFlag(flagValue(args, "--position"));
       const textRaw = flagValue(args, "--text");
       const { result: item } = await runLoggedAction<Title>(slug, "title-set", {
         id: rest[1],
@@ -1817,26 +1821,22 @@ try {
     case "title-add-phrase": {
       if (!rest[0]) {
         throw new Error(
-          'usage: openklip title-add-phrase <slug> "spoken phrase" "title text" [--position lower|center|hero]'
+          'usage: openklip title-add-phrase <slug> "spoken phrase" "title text" [--position lower|center|hero|quote|divider|callout]'
         );
       }
       const slug = rest[0];
       const args = rest.slice(1);
       const posIdx = args.indexOf("--position");
-      let position: "lower" | "center" | "hero" = "lower";
+      let position: Title["position"] = "lower";
       if (posIdx !== -1) {
-        const pos = args[posIdx + 1]?.toLowerCase();
-        if (pos !== "lower" && pos !== "center" && pos !== "hero") {
-          throw new Error("--position must be lower, center, or hero");
-        }
-        position = pos;
+        position = parseTitlePositionFlag(args[posIdx + 1]) ?? position;
       }
       const positional = args.filter(
         (_, i) => posIdx === -1 || (i !== posIdx && i !== posIdx + 1)
       );
       if (positional.length < 2) {
         throw new Error(
-          'usage: openklip title-add-phrase <slug> "spoken phrase" "title text" [--position lower|center|hero]'
+          'usage: openklip title-add-phrase <slug> "spoken phrase" "title text" [--position lower|center|hero|quote|divider|callout]'
         );
       }
       const spokenPhrase = positional[0];

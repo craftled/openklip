@@ -598,7 +598,9 @@ const queryTools: AgentToolDef[] = [
       slug,
       spokenPhrase: z.string().min(1),
       text: z.string().min(1),
-      position: z.enum(["lower", "center", "hero"]).default("lower"),
+      position: z
+        .enum(["lower", "center", "hero", "quote", "divider", "callout"])
+        .default("lower"),
       note: z.string().optional(),
     }),
     run: async ({ slug: projectSlug, spokenPhrase, text, position, note }) =>

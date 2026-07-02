@@ -143,6 +143,46 @@ test("PlayResX/PlayResY reflect opts.width/height", () => {
   assert.ok(ass.includes("PlayResY: 720"), "PlayResY echoes height");
 });
 
+test("a quote title is centered, italic, and splits attribution on a second line", () => {
+  const items: TitleItem[] = [
+    {
+      text: "The best time to plant a tree\nAncient proverb",
+      startSec: 0,
+      endSec: 3,
+      position: "quote",
+    },
+  ];
+  const ass = buildTitlesAss(items, OPTS);
+  const line = dialogueLines(ass)[0];
+  assert.ok(line.includes("TitleQuote"), "uses TitleQuote style");
+  assert.ok(line.includes("\\an5"), "quote is centered");
+  assert.ok(line.includes("\\i1"), "quote body is italic");
+  assert.ok(line.includes("plant a tree"), "contains quote text");
+  assert.ok(line.includes("Ancient proverb"), "contains attribution");
+});
+
+test("a divider title renders as a centered section label", () => {
+  const items: TitleItem[] = [
+    { text: "Act Two", startSec: 1, endSec: 2.5, position: "divider" },
+  ];
+  const ass = buildTitlesAss(items, OPTS);
+  const line = dialogueLines(ass)[0];
+  assert.ok(line.includes("TitleDivider"), "uses TitleDivider style");
+  assert.ok(line.includes("ACT TWO"), "divider text is uppercased");
+  assert.ok(line.includes("- ACT TWO -"), "divider wraps with hyphen rules");
+});
+
+test("a callout title anchors top-left with a compact label style", () => {
+  const items: TitleItem[] = [
+    { text: "New feature", startSec: 0, endSec: 2, position: "callout" },
+  ];
+  const ass = buildTitlesAss(items, OPTS);
+  const line = dialogueLines(ass)[0];
+  assert.ok(line.includes("TitleCallout"), "uses TitleCallout style");
+  assert.ok(line.includes("\\an7"), "callout anchors top-left");
+  assert.ok(line.includes("New feature"), "contains label text");
+});
+
 test("title ASS times carry rounded centiseconds across second/minute/hour boundaries", () => {
   const ass = buildTitlesAss(
     [
