@@ -3,6 +3,7 @@
 import {
   type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
   type RefObject,
   useEffect,
   useRef,
@@ -36,25 +37,31 @@ interface TranscriptWord {
 }
 
 interface EditorTranscriptPanelProps {
+  activeMatchRange?: readonly [number, number] | null;
   curSample: number;
   inBroll: (word: TranscriptWord) => boolean;
   inZoom: (word: TranscriptWord) => boolean;
+  matchRanges?: ReadonlyArray<readonly [number, number]>;
   onCutSelection: (range?: readonly [number, number] | null) => void;
   onRestoreSelection: (range?: readonly [number, number] | null) => void;
   onSelectRange: (range: readonly [number, number] | null) => void;
   onTextEdit: (text: string) => void;
+  search?: ReactNode;
   selRange: readonly [number, number] | null;
   words: TranscriptWord[];
 }
 
 export function EditorTranscriptPanel({
+  activeMatchRange,
   curSample,
   inBroll,
   inZoom,
+  matchRanges,
   onCutSelection,
   onRestoreSelection,
   onSelectRange,
   onTextEdit,
+  search,
   selRange,
   words,
 }: EditorTranscriptPanelProps) {
@@ -64,6 +71,10 @@ export function EditorTranscriptPanel({
   const cutCount = words.filter((word) => word.deleted).length;
   const paragraphs = transcriptParagraphs(words);
   const selection = selectedWordStats(words, selRange);
+  const matchedWordIndices = rangeIndexSet(matchRanges);
+  const activeMatchIndices = rangeIndexSet(
+    activeMatchRange ? [activeMatchRange] : undefined
+  );
 
   useEffect(() => {
     setEditorMounted(true);
@@ -181,6 +192,10 @@ export function EditorTranscriptPanel({
           </div>
         </header>
 
+        {search ? (
+          <div className="mx-auto mb-3 w-full max-w-[80ch]">{search}</div>
+        ) : null}
+
         {selection.total > 0 ? (
           <TranscriptSelectionToolbar
             copySelection={copySelection}
@@ -232,6 +247,8 @@ export function EditorTranscriptPanel({
                     inBroll={inBroll(word)}
                     index={index}
                     inZoom={inZoom(word)}
+                    isActiveMatch={activeMatchIndices.has(index)}
+                    isMatch={matchedWordIndices.has(index)}
                     isSelected={
                       selRange != null &&
                       index >= selRange[0] &&
@@ -427,6 +444,8 @@ function TranscriptWordButton({
   inBroll,
   inZoom,
   index,
+  isActiveMatch,
+  isMatch,
   isSelected,
   onSelect,
   word,
@@ -435,6 +454,8 @@ function TranscriptWordButton({
   inBroll: boolean;
   inZoom: boolean;
   index: number;
+  isActiveMatch: boolean;
+  isMatch: boolean;
   isSelected: boolean;
   onSelect: () => void;
   word: TranscriptWord;
@@ -451,8 +472,13 @@ function TranscriptWordButton({
         inBroll &&
           "underline decoration-2 decoration-border underline-offset-4",
         inZoom && "bg-muted hover:bg-muted/80",
+        isMatch && "bg-primary/10",
+        isActiveMatch && "bg-primary/15 ring-1 ring-primary/40 ring-inset",
         isSelected && "bg-accent ring-1 ring-ring/40 ring-inset"
       )}
+      data-search-match={
+        isMatch ? (isActiveMatch ? "active" : "true") : undefined
+      }
       data-word-index={index}
       onDoubleClick={onSelect}
       onMouseDown={(event) => {
@@ -525,6 +551,20 @@ function shouldIgnoreTranscriptShortcut(
     target instanceof HTMLSelectElement ||
     target.isContentEditable
   );
+}
+
+// Expand inclusive [lo, hi] word-index ranges into a Set for O(1) lookups while
+// rendering match highlights.
+function rangeIndexSet(
+  ranges?: ReadonlyArray<readonly [number, number]>
+): Set<number> {
+  const set = new Set<number>();
+  for (const [lo, hi] of ranges ?? []) {
+    for (let i = lo; i <= hi; i++) {
+      set.add(i);
+    }
+  }
+  return set;
 }
 
 function transcriptParagraphs(words: TranscriptWord[]) {

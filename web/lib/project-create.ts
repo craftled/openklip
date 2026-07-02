@@ -12,19 +12,62 @@ interface IngestJobView {
   status: "running" | "done" | "error";
 }
 
+export interface ProjectCreateOptions {
+  /** Re-ingest an existing slug (wipes the project dir). Server: ?force=1. */
+  force?: boolean;
+}
+
+// A 409 from POST /api/projects: the slug already has a project and
+// re-ingesting would wipe it. Callers catch this to offer an explicit
+// overwrite confirmation; it must never be retried with force automatically.
+export class ProjectExistsError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ProjectExistsError";
+  }
+}
+
 const POLL_MS = 700;
 
+// The route sends two kinds of 409: code "exists" (project already on disk;
+// the caller may offer a destructive replace) and code "in-flight" (an ingest
+// for this slug is still running; replacing after it finishes would wipe the
+// just-created project, so it must fail plainly). Only "exists" maps to
+// ProjectExistsError. An older server without `code` is treated as "exists"
+// only when its message says so.
+function conflictOffersOverwrite(data: {
+  code?: string;
+  error?: string;
+}): boolean {
+  if (data.code !== undefined) {
+    return data.code === "exists";
+  }
+  return /already exists/.test(data.error ?? "");
+}
+
 // Upload a video, then poll its ingest job to completion, reporting progress.
-// Resolves with the created slug. A 409 (project already exists) throws so the
-// dialog can offer a force re-ingest.
+// Resolves with the created slug. A 409 (project already exists) throws
+// ProjectExistsError so the caller can confirm an overwrite and re-invoke
+// with { force: true }.
 export async function createProjectFromVideo(
   file: File,
-  onProgress?: (p: IngestProgressView) => void
+  onProgress?: (p: IngestProgressView) => void,
+  options?: ProjectCreateOptions
 ): Promise<string> {
   const fd = new FormData();
   fd.append("file", file);
-  const res = await fetch("/api/projects", { method: "POST", body: fd });
-  const data = (await res.json()) as { error?: string; jobId?: string };
+  const url = options?.force ? "/api/projects?force=1" : "/api/projects";
+  const res = await fetch(url, { method: "POST", body: fd });
+  const data = (await res.json()) as {
+    code?: string;
+    error?: string;
+    jobId?: string;
+  };
+  if (res.status === 409 && conflictOffersOverwrite(data)) {
+    throw new ProjectExistsError(
+      data.error ?? "A project for this video already exists"
+    );
+  }
   if (!(res.ok && data.jobId)) {
     throw new Error(data.error ?? `Create project failed (${res.status})`);
   }

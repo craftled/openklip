@@ -51,6 +51,40 @@ test("export route returns 400 for a non-numeric height", async () => {
   });
 });
 
+test("export route returns 400 for an unknown compression preset", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const res = await POST(exportRequest({ compression: "ultra" }), ctx(slug));
+    assert.equal(res.status, 400);
+  });
+});
+
+test("export route returns 400 for a negative fps", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const res = await POST(exportRequest({ fps: -1 }), ctx(slug));
+    assert.equal(res.status, 400);
+  });
+});
+
+test("export route returns 400 for a fractional fps", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const res = await POST(exportRequest({ fps: 22.5 }), ctx(slug));
+    assert.equal(res.status, 400);
+  });
+});
+
+test("export route accepts compression and fps as body fields (404 for a missing project, not 400)", async () => {
+  await withTempProjectsRoot(async () => {
+    const res = await POST(
+      exportRequest({ compression: "web", fps: 24 }),
+      ctx("missing")
+    );
+    assert.equal(res.status, 404);
+  });
+});
+
 test("export route returns 400 when every word is cut", async () => {
   await withTempProjectsRoot(async ({ slug }) => {
     writeFixtureProject(

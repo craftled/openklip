@@ -4,6 +4,7 @@ import {
   AssemblySelectionSchema,
   BrollSchema,
   GraphicSchema,
+  MusicPlacementSchema,
   PhraseAnchorSchema,
   ProjectSchema,
   SAMPLE_RATE,
@@ -124,6 +125,67 @@ test("ProjectSchema defaults cut snapping off (backward-compat parse)", () => {
       crossfadeMs: 24,
     },
   });
+});
+
+// ── MILESTONE 4.1: music placement schema ────────────────────────────────────
+
+test("ProjectSchema defaults music to [] (backward-compat parse)", () => {
+  const project = ProjectSchema.parse({
+    version: 1,
+    slug: "no-music",
+    source: "/tmp/source.mp4",
+    proxy: "proxy.mp4",
+    sampleRate: SAMPLE_RATE,
+    fps: 30,
+    width: 1920,
+    height: 1080,
+    durationSamples: SAMPLE_RATE,
+    words: [],
+  });
+  assert.deepEqual(project.music, []);
+});
+
+test("MusicPlacementSchema fills defaults (srcIn 0, gain 1, fades 0, trim)", () => {
+  const m = MusicPlacementSchema.parse({
+    id: "m1",
+    assetId: "bed",
+    startSample: 0,
+    endSample: 2 * SAMPLE_RATE,
+  });
+  assert.equal(m.srcInSample, 0);
+  assert.equal(m.gain, 1);
+  assert.equal(m.fadeInSec, 0);
+  assert.equal(m.fadeOutSec, 0);
+  assert.equal(m.mode, "trim");
+});
+
+test("ProjectSchema round-trips a fully specified music placement", () => {
+  const placement = {
+    id: "m2",
+    assetId: "bed",
+    startSample: SAMPLE_RATE,
+    endSample: 3 * SAMPLE_RATE,
+    srcInSample: 24_000,
+    gain: 0.4,
+    fadeInSec: 1,
+    fadeOutSec: 2,
+    mode: "loop" as const,
+    note: "score under the intro",
+  };
+  const project = ProjectSchema.parse({
+    version: 1,
+    slug: "with-music",
+    source: "/tmp/source.mp4",
+    proxy: "proxy.mp4",
+    sampleRate: SAMPLE_RATE,
+    fps: 30,
+    width: 1920,
+    height: 1080,
+    durationSamples: 4 * SAMPLE_RATE,
+    words: [],
+    music: [placement],
+  });
+  assert.deepEqual(project.music, [placement]);
 });
 
 test("ProjectSchema round-trips VAD cut snap settings", () => {

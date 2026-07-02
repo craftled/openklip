@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { join } from "node:path";
 import { test } from "node:test";
-import { addTitle } from "../src/actions.ts";
+import { addMusic, addTitle } from "../src/actions.ts";
 import { runOverlays } from "../src/cli-query.ts";
+import { SAMPLE_RATE } from "../src/edl.ts";
 import {
   makeProject,
   withTempProjectsRoot,
@@ -247,4 +248,27 @@ test("runOverlays json output includes the note key", () => {
   addTitle(p, { fromSec: 0, toSec: 2, text: "Hook", note: "why this line" });
   const out = runOverlays(p, { json: true });
   assert.match(out, /"note"/);
+});
+
+test("runOverlays human output lists music placements", () => {
+  const p = makeProject();
+  p.assets.push({
+    id: "bed",
+    kind: "music",
+    name: "bed.mp3",
+    src: "/tmp/bed.mp3",
+    proxy: "working/assets/bed.aac",
+    durationSamples: 30 * SAMPLE_RATE,
+  });
+  addMusic(p, {
+    assetId: "bed",
+    fromSec: 1,
+    toSec: 4,
+    gain: 0.4,
+    mode: "loop",
+    note: "score",
+  });
+  const out = runOverlays(p, { json: false });
+  assert.match(out, /music \(1\):/);
+  assert.match(out, /asset bed {2}1\.000s-4\.000s {2}gain 0\.4 {2}loop: score/);
 });

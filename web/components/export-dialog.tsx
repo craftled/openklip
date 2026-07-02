@@ -1,12 +1,19 @@
 "use client";
 
+import type { ExportCompression } from "@engine/exporter";
+import { type ReactElement, type ReactNode, useMemo, useState } from "react";
 import {
-  type ComponentType,
-  type ReactElement,
-  type ReactNode,
-  useMemo,
-  useState,
-} from "react";
+  COMPRESSION_COPY,
+  type ExportDestination,
+  ExportOptionsForm,
+  type ExportResolution,
+} from "@/components/export-options-form";
+
+export type {
+  ExportDestination,
+  ExportResolution,
+} from "@/components/export-options-form";
+
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -19,36 +26,14 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import {
-  APP_ICON_CLASS,
-  Aperture,
-  Copy,
-  Download,
-  Film,
-  Scan,
-  Spline,
-  Upload,
-  Video,
-} from "@/lib/icon";
+import { Download } from "@/lib/icon";
 import { cn } from "@/lib/utils";
-
-export type ExportResolution = "720" | "1080" | "4k";
-export type ExportCompression = "studio" | "social" | "web" | "web-low";
-export type ExportDestination = "file" | "clipboard";
 
 export interface ExportDialogOptions {
   compression: ExportCompression;
   destination: ExportDestination;
-  frameRate: number;
+  /** "source" keeps the source frame rate; a number requests that rate. */
+  frameRate: number | "source";
   maxHeight?: number;
   resolution: ExportResolution;
 }
@@ -62,48 +47,6 @@ interface ExportDialogProps {
   sourceFps: number;
   sourceHeight: number;
   sourceWidth: number;
-}
-
-const COMPRESSION_COPY: Record<
-  ExportCompression,
-  { label: string; description: string; mbps: number; speedFactor: number }
-> = {
-  studio: {
-    label: "Studio",
-    description:
-      "Highest quality for archival or further editing. Larger files and slower encodes.",
-    mbps: 8,
-    speedFactor: 1.35,
-  },
-  social: {
-    label: "Social Media",
-    description:
-      "Good for sharing on social media. Compression is noticeable on close inspection. Platforms may recompress further. Quality does not impact export speed.",
-    mbps: 4,
-    speedFactor: 1,
-  },
-  web: {
-    label: "Web",
-    description:
-      "Balanced size for web playback and embeds. Smaller files with visible compression on detail.",
-    mbps: 2.5,
-    speedFactor: 0.85,
-  },
-  "web-low": {
-    label: "Web (Low)",
-    description:
-      "Smallest files for quick previews or slow connections. Soft detail and more visible artifacts.",
-    mbps: 1.2,
-    speedFactor: 0.7,
-  },
-};
-
-const FRAME_RATES = [24, 25, 30, 48, 60] as const;
-
-function firstToggleValue(
-  value: string | readonly string[]
-): string | undefined {
-  return typeof value === "string" ? value : value[0];
 }
 
 function outputDimensions(
@@ -149,21 +92,6 @@ function formatDurationEstimate(sec: number): string {
   return rem > 0 ? `${min}m ${rem}s` : `${min} minutes`;
 }
 
-function ExportOptionLabel({
-  icon: Icon,
-  label,
-}: {
-  icon: ComponentType<{ className?: string }>;
-  label: string;
-}) {
-  return (
-    <div className="mb-2 flex items-center gap-2 font-medium text-sm">
-      <Icon className={APP_ICON_CLASS} />
-      {label}
-    </div>
-  );
-}
-
 export function ExportDialog({
   children,
   defaultResolution,
@@ -178,8 +106,9 @@ export function ExportDialog({
   const [resolution, setResolution] = useState<ExportResolution>(
     () => defaultResolution ?? (sourceHeight > 1080 ? "1080" : "4k")
   );
-  const compression: ExportCompression = "social";
-  const frameRate = String(Math.round(sourceFps));
+  const [compression, setCompression] = useState<ExportCompression>("social");
+  // "source" or a stringified frame rate; mapped to number | "source" on export.
+  const [frameRate, setFrameRate] = useState<string>("source");
   const destination: ExportDestination = "file";
 
   const dims = useMemo(
@@ -201,7 +130,7 @@ export function ExportDialog({
     await onExport({
       compression,
       destination,
-      frameRate: Number(frameRate),
+      frameRate: frameRate === "source" ? "source" : Number(frameRate),
       maxHeight: maxHeightForResolution(resolution),
       resolution,
     });
@@ -222,115 +151,17 @@ export function ExportDialog({
           </AlertDialogDescription>
         </AlertDialogHeader>
 
-        <div className="grid gap-5 sm:grid-cols-2">
-          <div>
-            <ExportOptionLabel icon={Video} label="Format" />
-            <ToggleGroup
-              className="w-full"
-              disabled
-              value={["mp4"]}
-              variant="outline"
-            >
-              <ToggleGroupItem className="flex-1" value="mp4">
-                MP4
-              </ToggleGroupItem>
-              <ToggleGroupItem className="flex-1 opacity-50" value="gif">
-                GIF
-              </ToggleGroupItem>
-            </ToggleGroup>
-          </div>
-
-          <div className="opacity-60">
-            <ExportOptionLabel icon={Aperture} label="Frame rate" />
-            <Select disabled value={frameRate}>
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  {FRAME_RATES.map((fps) => (
-                    <SelectItem key={fps} value={String(fps)}>
-                      {fps} FPS
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-            <p className="mt-1.5 text-muted-foreground text-xs">
-              Exports at source frame rate. Custom rates coming soon.
-            </p>
-          </div>
-
-          <div>
-            <ExportOptionLabel icon={Scan} label="Resolution" />
-            <ToggleGroup
-              className="w-full"
-              onValueChange={(value) => {
-                const resolutionValue = firstToggleValue(value);
-                if (resolutionValue) {
-                  setResolution(resolutionValue as ExportResolution);
-                }
-              }}
-              value={[resolution]}
-              variant="outline"
-            >
-              <ToggleGroupItem className="flex-1" value="720">
-                720p
-              </ToggleGroupItem>
-              <ToggleGroupItem className="flex-1" value="1080">
-                1080p
-              </ToggleGroupItem>
-              <ToggleGroupItem className="flex-1" value="4k">
-                4K
-              </ToggleGroupItem>
-            </ToggleGroup>
-            <p className="mt-1.5 text-muted-foreground text-xs tabular-nums">
-              {dims.width}px × {dims.height}px
-            </p>
-          </div>
-
-          <div className="opacity-60">
-            <ExportOptionLabel icon={Spline} label="Compression" />
-            <ToggleGroup
-              className="w-full flex-wrap"
-              disabled
-              value={[compression]}
-              variant="outline"
-            >
-              <ToggleGroupItem value="studio">Studio</ToggleGroupItem>
-              <ToggleGroupItem value="social">Social Media</ToggleGroupItem>
-              <ToggleGroupItem value="web">Web</ToggleGroupItem>
-              <ToggleGroupItem value="web-low">Web (Low)</ToggleGroupItem>
-            </ToggleGroup>
-            <p className="mt-2 text-muted-foreground text-xs leading-relaxed">
-              Compression presets coming soon. Exports use the default encoder
-              settings.
-            </p>
-          </div>
-        </div>
-
-        <div className="opacity-60">
-          <ExportOptionLabel icon={Film} label="Export to" />
-          <ToggleGroup
-            className="w-full sm:max-w-xs"
-            disabled
-            value={[destination]}
-            variant="outline"
-          >
-            <ToggleGroupItem className="flex-1 gap-2" value="file">
-              <Upload data-icon="inline-start" />
-              File
-            </ToggleGroupItem>
-            <ToggleGroupItem
-              className="flex-1 gap-2 opacity-50"
-              disabled
-              value="clipboard"
-            >
-              <Copy data-icon="inline-start" />
-              Clipboard
-            </ToggleGroupItem>
-          </ToggleGroup>
-        </div>
+        <ExportOptionsForm
+          compression={compression}
+          destination={destination}
+          dims={dims}
+          frameRate={frameRate}
+          onCompressionChange={setCompression}
+          onFrameRateChange={setFrameRate}
+          onResolutionChange={setResolution}
+          resolution={resolution}
+          sourceFps={sourceFps}
+        />
 
         <AlertDialogFooter className="items-end gap-3 sm:justify-between">
           <p className="text-muted-foreground text-xs sm:max-w-[55%] sm:text-left">

@@ -43,6 +43,7 @@ import type { ProjectHoverContext } from "@/lib/project-context";
 import {
   createProjectFromVideo,
   type IngestProgressView,
+  type ProjectCreateOptions,
 } from "@/lib/project-create";
 import type { ProjectListing } from "@/lib/project-list";
 import { deleteProjectApi } from "@/lib/projects-client";
@@ -121,8 +122,11 @@ export function AgentSidebar({
   );
 
   const onCreateProject = useCallback(
-    (file: File, onProgress: (p: IngestProgressView) => void) =>
-      createProjectFromVideo(file, onProgress),
+    (
+      file: File,
+      onProgress: (p: IngestProgressView) => void,
+      options?: ProjectCreateOptions
+    ) => createProjectFromVideo(file, onProgress, options),
     []
   );
 

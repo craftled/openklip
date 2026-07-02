@@ -14,6 +14,7 @@ import {
   type Filter,
   type Graphic,
   type Motion,
+  type MusicPlacement,
   type PhraseAnchor,
   type Project,
   SAMPLE_RATE,
@@ -201,6 +202,7 @@ export function removeAsset(project: Project, assetId: string): boolean {
   }
   project.broll = project.broll.filter((b) => b.assetId !== assetId);
   project.stills = (project.stills ?? []).filter((s) => s.assetId !== assetId);
+  project.music = (project.music ?? []).filter((m) => m.assetId !== assetId);
   return true;
 }
 
@@ -270,6 +272,202 @@ export function updateBroll(
   item.startSample = Math.round(fromSec * SAMPLE_RATE);
   item.endSample = Math.round(endSec * SAMPLE_RATE);
   item.srcInSample = Math.round(srcInSec * SAMPLE_RATE);
+  patchNote(item, patch.note);
+  return item;
+}
+
+// Shared validation + clamping for music placements (add and patch use the
+// same rules, mirroring the addBroll/updateBroll pair). Bounds live HERE, not
+// in the registry Zod schemas: gain 0-2, fades 0-10 s, span clamped to the
+// project end always, and in trim mode also to the audio remaining after the
+// source in-point (loop mode repeats the asset to cover the whole span).
+function resolveMusicSpan(
+  project: Project,
+  input: {
+    assetId: string;
+    fadeInSec: number;
+    fadeOutSec: number;
+    fromSec: number;
+    gain: number;
+    mode: MusicPlacement["mode"];
+    srcInSec: number;
+    toSec: number;
+  }
+): { endSample: number; srcInSample: number; startSample: number } {
+  const { assetId, fromSec, toSec, srcInSec, gain, fadeInSec, fadeOutSec } =
+    input;
+  if (
+    ![fromSec, toSec, srcInSec, gain, fadeInSec, fadeOutSec].every(
+      Number.isFinite
+    )
+  ) {
+    throw new Error("music timing/gain values must be finite numbers");
+  }
+  if (fromSec < 0 || toSec < 0 || srcInSec < 0) {
+    throw new Error("music timing values must be non-negative");
+  }
+  if (gain < 0 || gain > 2) {
+    throw new Error("music gain must be between 0 and 2");
+  }
+  if (fadeInSec < 0 || fadeInSec > 10 || fadeOutSec < 0 || fadeOutSec > 10) {
+    throw new Error("music fades must be between 0 and 10 seconds");
+  }
+  const asset = project.assets.find((a) => a.id === assetId);
+  if (!asset) {
+    const known = project.assets.map((a) => a.id).join(", ") || "(none)";
+    throw new Error(`unknown asset "${assetId}". Registered assets: ${known}`);
+  }
+  if (asset.kind !== "music") {
+    throw new Error(
+      `asset "${assetId}" is ${asset.kind}; music placements require kind music`
+    );
+  }
+  if (toSec <= fromSec) {
+    throw new Error(
+      `music span is empty: toSec (${toSec}) must be greater than fromSec (${fromSec})`
+    );
+  }
+  const projectDurationSec = project.durationSamples / SAMPLE_RATE;
+  const assetDurationSec = asset.durationSamples / SAMPLE_RATE;
+  if (fromSec >= projectDurationSec) {
+    throw new Error("music span starts after the project ends");
+  }
+  if (input.mode === "trim" && srcInSec >= assetDurationSec) {
+    throw new Error("music source in-point starts after the asset ends");
+  }
+  const endSec = Math.min(
+    toSec,
+    projectDurationSec,
+    input.mode === "trim"
+      ? fromSec + (assetDurationSec - srcInSec)
+      : Number.POSITIVE_INFINITY
+  );
+  if (endSec <= fromSec) {
+    throw new Error("music span is empty after clamping to media duration");
+  }
+  return {
+    startSample: Math.round(fromSec * SAMPLE_RATE),
+    endSample: Math.round(endSec * SAMPLE_RATE),
+    srcInSample: Math.round(srcInSec * SAMPLE_RATE),
+  };
+}
+
+// Place background music from a registered music asset under the voice over a
+// span of the source timeline. Converts seconds to samples on the 48 kHz grid.
+export function addMusic(
+  project: Project,
+  input: {
+    assetId: string;
+    fromSec: number;
+    toSec: number;
+    gain?: number;
+    fadeInSec?: number;
+    fadeOutSec?: number;
+    srcInSec?: number;
+    mode?: MusicPlacement["mode"];
+    note?: string;
+  }
+): MusicPlacement {
+  const {
+    assetId,
+    fromSec,
+    toSec,
+    gain = 1,
+    fadeInSec = 0,
+    fadeOutSec = 0,
+    srcInSec = 0,
+    mode = "trim",
+    note,
+  } = input;
+  const span = resolveMusicSpan(project, {
+    assetId,
+    fromSec,
+    toSec,
+    srcInSec,
+    gain,
+    fadeInSec,
+    fadeOutSec,
+    mode,
+  });
+  const item: MusicPlacement = {
+    id: `m${Date.now()}`,
+    assetId,
+    startSample: span.startSample,
+    endSample: span.endSample,
+    srcInSample: span.srcInSample,
+    gain,
+    fadeInSec,
+    fadeOutSec,
+    mode,
+    ...(note === undefined ? {} : { note }),
+  };
+  if (!project.music) {
+    project.music = [];
+  }
+  project.music.push(item);
+  return item;
+}
+
+// Remove a music placement by id. Returns whether one was removed.
+export function removeMusic(project: Project, id: string): boolean {
+  const music = project.music ?? [];
+  const before = music.length;
+  project.music = music.filter((m) => m.id !== id);
+  return project.music.length < before;
+}
+
+function findMusic(project: Project, id: string): MusicPlacement {
+  const item = (project.music ?? []).find((m) => m.id === id);
+  if (!item) {
+    throw new Error(`unknown music placement "${id}"`);
+  }
+  return item;
+}
+
+// Patch an existing music placement. Omitted fields are unchanged; the merged
+// result is revalidated against the same bounds addMusic enforces.
+export function updateMusic(
+  project: Project,
+  id: string,
+  patch: {
+    assetId?: string;
+    fromSec?: number;
+    toSec?: number;
+    gain?: number;
+    fadeInSec?: number;
+    fadeOutSec?: number;
+    srcInSec?: number;
+    mode?: MusicPlacement["mode"];
+    note?: string;
+  }
+): MusicPlacement {
+  const item = findMusic(project, id);
+  const assetId = patch.assetId ?? item.assetId;
+  const fromSec = patch.fromSec ?? item.startSample / SAMPLE_RATE;
+  const toSec = patch.toSec ?? item.endSample / SAMPLE_RATE;
+  const srcInSec = patch.srcInSec ?? item.srcInSample / SAMPLE_RATE;
+  const gain = patch.gain ?? item.gain;
+  const fadeInSec = patch.fadeInSec ?? item.fadeInSec;
+  const fadeOutSec = patch.fadeOutSec ?? item.fadeOutSec;
+  const mode = patch.mode ?? item.mode;
+  const span = resolveMusicSpan(project, {
+    assetId,
+    fromSec,
+    toSec,
+    srcInSec,
+    gain,
+    fadeInSec,
+    fadeOutSec,
+    mode,
+  });
+  item.assetId = assetId;
+  item.startSample = span.startSample;
+  item.endSample = span.endSample;
+  item.srcInSample = span.srcInSample;
+  item.gain = gain;
+  item.fadeInSec = fadeInSec;
+  item.fadeOutSec = fadeOutSec;
+  item.mode = mode;
   patchNote(item, patch.note);
   return item;
 }

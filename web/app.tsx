@@ -1,6 +1,10 @@
 "use client";
 
-import type { ColorAdjust, Filter } from "@engine/edl";
+import type {
+  ColorAdjust,
+  Project as EngineProject,
+  Filter,
+} from "@engine/edl";
 import { FILTER_OPTIONS, filterLabel } from "@engine/filter";
 import { validateProductAnnouncementSpec } from "@engine/product-announcement";
 import {
@@ -40,10 +44,18 @@ import {
 import { FilterControls } from "@/components/filter-controls";
 import { FindFillerButton } from "@/components/find-filler-button";
 import type { GraphicItem } from "@/components/graphic-overlay";
+import { HistoryPanel } from "@/components/history-panel";
+import {
+  DEFAULT_MUSIC_BED_SEC,
+  type MusicPlacementPatch,
+  type MusicPlacementView,
+  MusicSectionControls,
+} from "@/components/music-controls";
 import { OverlaySortable } from "@/components/overlay-sortable";
 import { PLAYER_SPEEDS, PlayerControls } from "@/components/player-controls";
 import { PreviewOverlays } from "@/components/preview-overlays";
 import { SettingsView } from "@/components/settings/settings-view";
+import { TranscriptSearch } from "@/components/transcript-search";
 import { Button } from "@/components/ui/button";
 import {
   Collapsible,
@@ -121,6 +133,13 @@ import {
   Type,
   ZoomIn,
 } from "@/lib/icon";
+import { isModKeyOnly, isTypingTarget } from "@/lib/keyboard-shortcuts";
+import { musicPreviewTime } from "@/lib/music-preview";
+import {
+  type PhraseSearchMatch,
+  type PhraseSearchMode,
+  phraseSearchMatches,
+} from "@/lib/phrase-search";
 import {
   clampLoopRegion,
   ORIENTATION_LABEL,
@@ -138,6 +157,7 @@ import {
   subscribeColorScheme,
 } from "@/lib/theme-preferences";
 import { exportPromiseMessages } from "@/lib/toast-notifications";
+import { firstToggleValue } from "@/lib/toggle-value";
 import {
   reconcileTranscriptText,
   setWordRangeDeleted,
@@ -155,6 +175,7 @@ import {
   saveZooms,
 } from "../app/actions.ts";
 import { type CaptionWord, groupCaptions } from "../src/captions.ts";
+import { reanchorProject } from "../src/reanchor.ts";
 import { type ZoomWindow, zoomFactorAtSec } from "../src/zoom-ramp.ts";
 import { CutScheduler, type Range } from "./scheduler.ts";
 
@@ -215,6 +236,7 @@ interface Project {
   look?: { vignette: boolean; filter?: Filter; color?: ColorAdjust };
   mediaVersion?: number;
   motion?: { speed?: number };
+  music?: MusicPlacementView[];
   padMs: number;
   sampleRate: number;
   slug: string;
@@ -243,12 +265,6 @@ const CHAT_WIDTH_WITH_CONFIG = 360;
 
 function firstSliderValue(value: number | readonly number[]): number {
   return typeof value === "number" ? value : value[0];
-}
-
-function firstToggleValue(
-  value: string | readonly string[]
-): string | undefined {
-  return typeof value === "string" ? value : value[0];
 }
 
 function survivingRanges(project: Project): Range[] {
@@ -324,6 +340,40 @@ function sourceAtOutput(ranges: Range[], outSec: number): number {
 const fmt = (s: number): string =>
   `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 
+// reanchorOverlay mutates overlays and their anchors in place, so every overlay
+// list is cloned before the optimistic client-side reanchor below: React state
+// must never alias objects that are about to be mutated.
+function cloneAnchoredOverlays<T extends object>(list: readonly T[]): T[] {
+  return list.map((item) => {
+    const anchor = (item as { anchor?: { phrase: string } }).anchor;
+    return anchor ? { ...item, anchor: { ...anchor } } : { ...item };
+  });
+}
+
+// Optimistic mirror of the server-side cut/cut-text registry actions: flip
+// `deleted` on the affected words, then re-resolve phrase-anchored overlays
+// with the SAME engine reanchorProject the registry runs, so the preview and
+// the saved project agree before the save round-trip lands.
+function reanchoredWordUpdate(
+  prev: Project,
+  ids: ReadonlySet<string>,
+  deleted: boolean
+): Project {
+  const next: Project = {
+    ...prev,
+    words: prev.words.map((w) => (ids.has(w.id) ? { ...w, deleted } : w)),
+    broll: cloneAnchoredOverlays(prev.broll),
+    titles: cloneAnchoredOverlays(prev.titles),
+    zooms: cloneAnchoredOverlays(prev.zooms),
+    stills: prev.stills ? cloneAnchoredOverlays(prev.stills) : prev.stills,
+    graphics: prev.graphics
+      ? cloneAnchoredOverlays(prev.graphics)
+      : prev.graphics,
+  };
+  reanchorProject(next as unknown as EngineProject);
+  return next;
+}
+
 import type { EditorChatsSnapshot } from "../app/lib/editor-chats.ts";
 
 export function App({
@@ -375,17 +425,29 @@ export function App({
   const [timelineOpen, setTimelineOpen] = useState(false);
   const [cinema, setCinema] = useState(false);
   const [previewMuted, setPreviewMuted] = useState(false);
+  const [musicMuted, setMusicMuted] = useState(false);
   const [previewRate, setPreviewRate] = useState(1);
   const [previewPip, setPreviewPip] = useState(false);
   const [selAnchor, setSelAnchor] = useState<number | null>(null);
   const [selFocus, setSelFocus] = useState<number | null>(null);
   const [selected, setSelected] = useState<Selected>(null);
+  // Transcript phrase search (Milestone 3.1): query, kept/cut scope, optional
+  // cut rationale, and which match is active (seek target / highlight).
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchMode, setSearchMode] = useState<PhraseSearchMode>("kept");
+  const [searchNote, setSearchNote] = useState("");
+  const [activeMatchIndex, setActiveMatchIndex] = useState<number | null>(null);
+  const transcriptSearchInputRef = useRef<HTMLInputElement>(null);
+  const searchShortcutLabel = useModShortcut("f");
   const [chosenAsset, setChosenAsset] = useState(
     initialProject.assets?.find((a) => (a.kind ?? "broll") === "broll")?.id ??
       ""
   );
   const [chosenStillAsset, setChosenStillAsset] = useState(
     initialProject.assets?.find((a) => a.kind === "still")?.id ?? ""
+  );
+  const [chosenMusicAsset, setChosenMusicAsset] = useState(
+    initialProject.assets?.find((a) => a.kind === "music")?.id ?? ""
   );
   const [titleText, setTitleText] = useState("");
   const [titlePos, setTitlePos] = useState<"lower" | "center" | "hero">(
@@ -422,6 +484,7 @@ export function App({
   }, [colorScheme]);
   const videoRef = useRef<HTMLVideoElement>(null);
   const brollRef = useRef<HTMLVideoElement>(null);
+  const musicRef = useRef<HTMLAudioElement>(null);
   const schedRef = useRef<CutScheduler | null>(null);
   const projectRef = useRef<Project | null>(null);
   const saveChainRef = useRef<Promise<void>>(Promise.resolve());
@@ -470,8 +533,12 @@ export function App({
       if (nextBroll && !update.assets.some((a) => a.id === chosenAsset)) {
         setChosenAsset(nextBroll.id);
       }
+      const nextMusic = update.assets.find((a) => a.kind === "music");
+      if (nextMusic && !update.assets.some((a) => a.id === chosenMusicAsset)) {
+        setChosenMusicAsset(nextMusic.id);
+      }
     },
-    [chosenAsset]
+    [chosenAsset, chosenMusicAsset]
   );
   const keptDuration = ranges.reduce((a, r) => a + (r.endSec - r.startSec), 0);
   const sr = project?.sampleRate ?? 48_000;
@@ -519,6 +586,13 @@ export function App({
     () => project?.assets.filter((a) => a.kind === "still") ?? [],
     [project?.assets]
   );
+  const musicAssets = useMemo(
+    () => project?.assets.filter((a) => a.kind === "music") ?? [],
+    [project?.assets]
+  );
+  const activeMusic = project?.music?.find(
+    (m) => curSample >= m.startSample && curSample < m.endSample
+  );
 
   useEffect(() => {
     const v = brollRef.current;
@@ -549,6 +623,69 @@ export function App({
       v.pause();
     }
   }, [activeBroll, curSample, playing, sr]);
+
+  // Music bed under the voice (brollRef sibling pattern): a hidden <audio>
+  // follows the active placement. Its desired position is CONTINUOUS on the
+  // output timeline (cuts collapse; the bed never restarts), matching the
+  // exporter's one-window-per-placement semantics. Preview fades are skipped;
+  // the export is the source of truth for fades.
+  useEffect(() => {
+    const el = musicRef.current;
+    if (!el) {
+      return;
+    }
+    if (!activeMusic) {
+      if (!el.paused) {
+        el.pause();
+      }
+      return;
+    }
+    const url = `/media/asset/${activeMusic.assetId}?v=${projectRef.current?.mediaVersion ?? 0}`;
+    if (el.getAttribute("src") !== url) {
+      el.src = url;
+    }
+    const asset = projectRef.current?.assets.find(
+      (a) => a.id === activeMusic.assetId
+    );
+    const want = musicPreviewTime({
+      assetDurationSec: (asset?.durationSamples ?? 0) / sr,
+      curSec: curSample / sr,
+      placement: {
+        mode: activeMusic.mode,
+        srcInSec: activeMusic.srcInSample / sr,
+        startSec: activeMusic.startSample / sr,
+      },
+      ranges,
+    });
+    if (Number.isFinite(want) && Math.abs(el.currentTime - want) > 0.25) {
+      el.currentTime = want;
+    }
+    // Match the video element's rate; a slower/faster bed would drift past the
+    // 0.25s reseek guard several times a second and stutter with seeks.
+    if (el.playbackRate !== previewRate) {
+      el.playbackRate = previewRate;
+    }
+    // The master mute silences the whole preview, music bed included; the
+    // music-only toggle just drops the bed.
+    el.volume = musicMuted || previewMuted ? 0 : Math.min(1, activeMusic.gain);
+    if (playing && el.paused) {
+      void el.play().catch(() => {
+        // Playback can be rejected when the browser blocks autoplay.
+      });
+    }
+    if (!(playing || el.paused)) {
+      el.pause();
+    }
+  }, [
+    activeMusic,
+    curSample,
+    musicMuted,
+    playing,
+    previewMuted,
+    previewRate,
+    ranges,
+    sr,
+  ]);
 
   const enqueueSave = useCallback((task: () => Promise<ActionResult>) => {
     const run = saveChainRef.current
@@ -791,6 +928,131 @@ export function App({
     setProject({ ...project, stills });
     enqueueSave(() => saveStills(project.slug, stills));
   };
+
+  // Music placement dispatches through the music-add/music-set/music-rm
+  // registry actions (history logs them) with optimistic setProject; the add
+  // reconciles the optimistic row with the server-assigned id and clamps.
+  const addMusicPlacement = () => {
+    if (!chosenMusicAsset) {
+      return;
+    }
+    const durationSec = project.durationSamples / project.sampleRate;
+    const fromSec = curSec;
+    const toSec = Math.min(curSec + DEFAULT_MUSIC_BED_SEC, durationSec);
+    if (toSec - fromSec <= 0.05) {
+      return;
+    }
+    const optimisticId = `m${Date.now()}`;
+    const item: MusicPlacementView = {
+      id: optimisticId,
+      assetId: chosenMusicAsset,
+      startSample: Math.round(fromSec * sr),
+      endSample: Math.round(toSec * sr),
+      srcInSample: 0,
+      gain: 1,
+      fadeInSec: 0,
+      fadeOutSec: 0,
+      mode: "trim",
+    };
+    setProject((prev) => ({ ...prev, music: [...(prev.music ?? []), item] }));
+    enqueueSave(async () => {
+      const r = await runGuiAction(project.slug, "music-add", {
+        assetId: item.assetId,
+        fromSec,
+        toSec,
+      });
+      if (r.ok) {
+        const saved = r.data.result as MusicPlacementView;
+        setProject((prev) => ({
+          ...prev,
+          music: (prev.music ?? []).map((m) =>
+            m.id === optimisticId ? { ...m, ...saved } : m
+          ),
+        }));
+      }
+      return r;
+    });
+  };
+  const patchMusicPlacement = (id: string, rawPatch: MusicPlacementPatch) => {
+    const current = (project.music ?? []).find((m) => m.id === id);
+    if (!current) {
+      return;
+    }
+    // Clamp to the bounds the server's resolveMusicSpan (src/actions.ts)
+    // enforces; an out-of-range value would otherwise throw server-side and
+    // strand a diverged optimistic state behind an error toast.
+    const clamp = (n: number, min: number, max: number) =>
+      Math.max(min, Math.min(max, n));
+    const durationSec = project.durationSamples / project.sampleRate;
+    const patch: MusicPlacementPatch = {
+      ...rawPatch,
+      ...(rawPatch.fromSec === undefined
+        ? {}
+        : { fromSec: clamp(rawPatch.fromSec, 0, durationSec) }),
+      ...(rawPatch.toSec === undefined
+        ? {}
+        : { toSec: clamp(rawPatch.toSec, 0, durationSec) }),
+      ...(rawPatch.gain === undefined
+        ? {}
+        : { gain: clamp(rawPatch.gain, 0, 2) }),
+      ...(rawPatch.fadeInSec === undefined
+        ? {}
+        : { fadeInSec: clamp(rawPatch.fadeInSec, 0, 10) }),
+      ...(rawPatch.fadeOutSec === undefined
+        ? {}
+        : { fadeOutSec: clamp(rawPatch.fadeOutSec, 0, 10) }),
+    };
+    const nextFromSec = patch.fromSec ?? current.startSample / sr;
+    const nextToSec = patch.toSec ?? current.endSample / sr;
+    if (nextToSec <= nextFromSec) {
+      return;
+    }
+    const music = (project.music ?? []).map((m) => {
+      if (m.id !== id) {
+        return m;
+      }
+      return {
+        ...m,
+        ...(patch.fromSec === undefined
+          ? {}
+          : { startSample: Math.round(patch.fromSec * sr) }),
+        ...(patch.toSec === undefined
+          ? {}
+          : { endSample: Math.round(patch.toSec * sr) }),
+        ...(patch.gain === undefined ? {} : { gain: patch.gain }),
+        ...(patch.fadeInSec === undefined
+          ? {}
+          : { fadeInSec: patch.fadeInSec }),
+        ...(patch.fadeOutSec === undefined
+          ? {}
+          : { fadeOutSec: patch.fadeOutSec }),
+        ...(patch.mode === undefined ? {} : { mode: patch.mode }),
+      };
+    });
+    setProject({ ...project, music });
+    enqueueSave(async () => {
+      const r = await runGuiAction(project.slug, "music-set", { id, ...patch });
+      if (r.ok) {
+        // Reconcile like the add path: the server's resolveMusicSpan clamps
+        // trim-mode spans to the ASSET remainder (the client only clamps to
+        // the project duration), so the saved placement can differ from the
+        // optimistic row.
+        const saved = r.data.result as MusicPlacementView;
+        setProject((prev) => ({
+          ...prev,
+          music: (prev.music ?? []).map((m) =>
+            m.id === id ? { ...m, ...saved } : m
+          ),
+        }));
+      }
+      return r;
+    });
+  };
+  const removeMusicPlacement = (id: string) => {
+    const music = (project.music ?? []).filter((m) => m.id !== id);
+    setProject({ ...project, music });
+    enqueueSave(() => runGuiAction(project.slug, "music-rm", { id }));
+  };
   const onClipTiming = useCallback(
     (
       kind: TimelineClipKind,
@@ -1019,6 +1281,124 @@ export function App({
     [playing]
   );
 
+  // ── Transcript phrase search + batch cuts (Milestone 3.1). Matching runs
+  // through the SAME engine phrase matcher the CLI uses (phraseSearchMatches
+  // wraps findPhraseRuns), so UI spans are identical to `openklip cut --text`.
+  const searchMatches = useMemo(
+    () =>
+      phraseSearchMatches({ words: project.words }, searchQuery, {
+        mode: searchMode,
+      }),
+    [project.words, searchQuery, searchMode]
+  );
+  const activeSearchIndex =
+    activeMatchIndex != null && activeMatchIndex < searchMatches.length
+      ? activeMatchIndex
+      : null;
+  const activeSearchRange =
+    activeSearchIndex == null ? null : searchMatches[activeSearchIndex].range;
+  const searchMatchRanges = useMemo(
+    () => searchMatches.map((m) => m.range),
+    [searchMatches]
+  );
+  const changeSearchQuery = useCallback((query: string) => {
+    setSearchQuery(query);
+    setActiveMatchIndex(null);
+  }, []);
+  const changeSearchMode = useCallback((mode: PhraseSearchMode) => {
+    setSearchMode(mode);
+    setActiveMatchIndex(null);
+  }, []);
+  const clearTranscriptSearch = useCallback(() => {
+    setSearchQuery("");
+    setActiveMatchIndex(null);
+  }, []);
+  const seekSearchMatch = useCallback(
+    (match: PhraseSearchMatch, index: number) => {
+      setActiveMatchIndex(index);
+      onSeek(match.fromSec);
+    },
+    [onSeek]
+  );
+  const seekNextSearchMatch = useCallback(() => {
+    if (searchMatches.length === 0) {
+      return;
+    }
+    const next =
+      activeSearchIndex == null
+        ? 0
+        : (activeSearchIndex + 1) % searchMatches.length;
+    setActiveMatchIndex(next);
+    onSeek(searchMatches[next].fromSec);
+  }, [activeSearchIndex, onSeek, searchMatches]);
+  const selectSearchMatch = useCallback(
+    (match: PhraseSearchMatch, index: number) => {
+      setActiveMatchIndex(index);
+      selectTranscriptRange(match.range);
+    },
+    [selectTranscriptRange]
+  );
+  // Cut the first (or every) matched run: optimistic word deletion + reanchor,
+  // then persist the EXACT ids through the registry cut action (history logs
+  // it). Persisting the phrase (cut-text) instead would let the server
+  // re-resolve matches at save time and cut a different occurrence than the
+  // one shown optimistically, e.g. on a double-clicked "Cut first" or after
+  // an external agent edit; explicit ids keep the UI and project.json in
+  // lockstep, matching how restore already works.
+  const cutSearchMatches = useCallback(
+    (all: boolean) => {
+      const phrase = searchQuery.trim();
+      const targets = all ? searchMatches : searchMatches.slice(0, 1);
+      if (!phrase || targets.length === 0) {
+        return;
+      }
+      const ids = targets.flatMap((m) => m.ids);
+      const note = searchNote.trim();
+      setProject((prev) => reanchoredWordUpdate(prev, new Set(ids), true));
+      setActiveMatchIndex(null);
+      enqueueSave(() =>
+        runGuiAction(project.slug, "cut", {
+          ids,
+          deleted: true,
+          note: note === "" ? undefined : note,
+        })
+      );
+    },
+    [enqueueSave, project.slug, searchMatches, searchNote, searchQuery]
+  );
+  // Restore matched runs found among cut words (cut-mode search).
+  const restoreSearchMatches = useCallback(
+    (all: boolean) => {
+      const targets = all ? searchMatches : searchMatches.slice(0, 1);
+      const ids = targets.flatMap((m) => m.ids);
+      if (ids.length === 0) {
+        return;
+      }
+      setProject((prev) => reanchoredWordUpdate(prev, new Set(ids), false));
+      setActiveMatchIndex(null);
+      enqueueSave(() =>
+        runGuiAction(project.slug, "cut", { ids, deleted: false })
+      );
+    },
+    [enqueueSave, project.slug, searchMatches]
+  );
+  // Mod+F focuses the transcript search input (skipped while typing elsewhere).
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!isModKeyOnly(event) || event.key.toLowerCase() !== "f") {
+        return;
+      }
+      if (isTypingTarget(event.target)) {
+        return;
+      }
+      event.preventDefault();
+      transcriptSearchInputRef.current?.focus();
+      transcriptSearchInputRef.current?.select();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
   const togglePreviewMute = useCallback(() => {
     const v = videoRef.current;
     if (!v) {
@@ -1026,6 +1406,10 @@ export function App({
     }
     v.muted = !v.muted;
     setPreviewMuted(v.muted);
+  }, []);
+
+  const toggleMusicMute = useCallback(() => {
+    setMusicMuted((muted) => !muted);
   }, []);
 
   const cyclePreviewRate = useCallback(() => {
@@ -1120,7 +1504,12 @@ export function App({
           if (saveErrorRef.current) {
             throw new Error(saveErrorRef.current);
           }
-          const r = await exportProject(project.slug, maxHeight);
+          const r = await exportProject(project.slug, {
+            compression: options?.compression,
+            fps:
+              options?.frameRate === "source" ? undefined : options?.frameRate,
+            maxHeight,
+          });
           if (!r.ok) {
             throw new Error(r.error);
           }
@@ -1412,6 +1801,18 @@ export function App({
           label: a.name,
         })),
     [project.assets, sr]
+  );
+  const timelinePlacedMusic = useMemo(
+    () =>
+      (project.music ?? []).map((m) => ({
+        id: m.id,
+        startSample: m.startSample,
+        endSample: m.endSample,
+        startSec: m.startSample / sr,
+        endSec: m.endSample / sr,
+        label: assetName(m.assetId),
+      })),
+    [project.assets, project.music, sr]
   );
   const timelineLibraryStills = useMemo(
     () =>
@@ -1962,6 +2363,28 @@ export function App({
               </p>
             </div>
           )}
+          <div className="group-data-[collapsible=icon]:hidden">
+            <Section title="Music">
+              <MusicSectionControls
+                assetName={assetName}
+                assets={musicAssets.map((a) => ({ id: a.id, name: a.name }))}
+                chosenAssetId={
+                  musicAssets.some((a) => a.id === chosenMusicAsset)
+                    ? chosenMusicAsset
+                    : ""
+                }
+                onAdd={addMusicPlacement}
+                onChooseAsset={setChosenMusicAsset}
+                onPatch={patchMusicPlacement}
+                onRemove={removeMusicPlacement}
+                placements={project.music ?? []}
+                sampleRate={sr}
+              />
+            </Section>
+            <Section title="History">
+              <HistoryPanel slug={project.slug} />
+            </Section>
+          </div>
         </SidebarContent>
       </div>
     </div>
@@ -2187,6 +2610,7 @@ export function App({
                                 graphics={timelineGraphics}
                                 libraryMusic={timelineMusic}
                                 libraryStills={timelineLibraryStills}
+                                music={timelinePlacedMusic}
                                 onClipTiming={onClipTiming}
                                 onSeek={onSeek}
                                 onSelect={onTimelineSelect}
@@ -2244,6 +2668,12 @@ export function App({
                               playsInline
                               ref={brollRef}
                             />
+                            {/* biome-ignore lint/a11y/useMediaCaption: hidden music bed for preview; the transcript is the caption source */}
+                            <audio
+                              className="hidden"
+                              playsInline
+                              ref={musicRef}
+                            />
                             {vignetteOn && (
                               <div
                                 className="pointer-events-none absolute inset-0 z-[2]"
@@ -2274,6 +2704,7 @@ export function App({
                               current={outPos}
                               duration={keptDuration}
                               fullscreenLabel="Open cinema player"
+                              musicMuted={musicMuted}
                               muted={previewMuted}
                               onCycleSpeed={cyclePreviewRate}
                               onFullscreen={() => setCinema(true)}
@@ -2285,6 +2716,11 @@ export function App({
                               }
                               onToggleCaptions={() =>
                                 toggleCaptions(!captionsOn)
+                              }
+                              onToggleMusicMute={
+                                (project.music?.length ?? 0) > 0
+                                  ? toggleMusicMute
+                                  : undefined
                               }
                               onToggleMute={togglePreviewMute}
                               onTogglePip={togglePreviewPip}
@@ -2414,13 +2850,35 @@ export function App({
 
                       <div className="flex min-h-0 flex-1 flex-col">
                         <EditorTranscriptPanel
+                          activeMatchRange={activeSearchRange}
                           curSample={curSample}
                           inBroll={inBroll}
                           inZoom={inZoom}
+                          matchRanges={searchMatchRanges}
                           onCutSelection={cutSelection}
                           onRestoreSelection={restoreSelection}
                           onSelectRange={selectTranscriptRange}
                           onTextEdit={reconcileTranscriptEdit}
+                          search={
+                            <TranscriptSearch
+                              activeMatchIndex={activeSearchIndex}
+                              matches={searchMatches}
+                              mode={searchMode}
+                              note={searchNote}
+                              onCutMatches={cutSearchMatches}
+                              onModeChange={changeSearchMode}
+                              onNoteChange={setSearchNote}
+                              onQueryChange={changeSearchQuery}
+                              onRestoreMatches={restoreSearchMatches}
+                              onSearchClear={clearTranscriptSearch}
+                              onSeekMatch={seekSearchMatch}
+                              onSeekNextMatch={seekNextSearchMatch}
+                              onSelectMatch={selectSearchMatch}
+                              query={searchQuery}
+                              searchInputRef={transcriptSearchInputRef}
+                              shortcutLabel={searchShortcutLabel}
+                            />
+                          }
                           selRange={selRange}
                           words={project.words}
                         />

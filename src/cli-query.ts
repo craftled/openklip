@@ -137,6 +137,12 @@ export function runOverlays(
       `  ${s.id}  asset ${s.assetId}  ${s.fromSec.toFixed(3)}s-${s.toSec.toFixed(3)}s${noteSuffix(s.note)}`
     );
   }
+  lines.push(`music (${overlays.music.length}):`);
+  for (const m of overlays.music) {
+    lines.push(
+      `  ${m.id}  asset ${m.assetId}  ${m.fromSec.toFixed(3)}s-${m.toSec.toFixed(3)}s  gain ${m.gain}  ${m.mode}${noteSuffix(m.note)}`
+    );
+  }
   lines.push(`graphics (${overlays.graphics.length}):`);
   for (const g of overlays.graphics) {
     const label =

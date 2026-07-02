@@ -14,6 +14,7 @@ import {
   supportsToolEditing,
 } from "@engine/agent-driver";
 import { analyzeAssets, assetCardLines } from "@engine/asset-cards";
+import type { Project } from "@engine/edl";
 import { projectsRoot } from "@engine/paths";
 import { loadProject, mutateProject } from "@engine/projectStore";
 import { cwdPath } from "@engine/repo-paths";
@@ -50,21 +51,25 @@ export async function suggestFillerCuts(
     // concurrent suggestions on the same project can't both load the same
     // baseline and clobber each other's cuts. Chats use a separate lock, so
     // chat writes stay responsive while this runs.
-    const cutWords = await mutateProject(slug, async (project) => {
-      const { ids } = await runFillerAgent(
-        project.words.map((w) => ({ id: w.id, text: w.text })),
-        { agent }
-      );
-      const set = new Set(ids);
-      const cut: Array<{ id: string; text: string }> = [];
-      for (const w of project.words) {
-        if (set.has(w.id) && !w.deleted) {
-          w.deleted = true;
-          cut.push({ id: w.id, text: w.text });
+    const cutWords = await mutateProject(
+      slug,
+      async (project) => {
+        const { ids } = await runFillerAgent(
+          project.words.map((w) => ({ id: w.id, text: w.text })),
+          { agent }
+        );
+        const set = new Set(ids);
+        const cut: Array<{ id: string; text: string }> = [];
+        for (const w of project.words) {
+          if (set.has(w.id) && !w.deleted) {
+            w.deleted = true;
+            cut.push({ id: w.id, text: w.text });
+          }
         }
-      }
-      return cut;
-    });
+        return cut;
+      },
+      { action: "filler-cuts", actor: "agent", input: { agent } }
+    );
     return { ok: true, cut: cutWords.length, words: cutWords };
   } catch (e) {
     return { ok: false, error: (e as Error).message };
@@ -94,7 +99,19 @@ export async function analyzeProjectAssets(
     const res = await analyzeAssets(
       slug,
       { agent },
-      { loadProject, mutateProject }
+      {
+        loadProject,
+        // Attribute the asset-card write to the agent in the action history.
+        mutateProject: <T>(
+          s: string,
+          fn: (project: Project) => T | Promise<T>
+        ) =>
+          mutateProject(s, fn, {
+            action: "asset-cards",
+            actor: "agent",
+            input: { agent },
+          }),
+      }
     );
     const sceneLogged = await analyzeProjectSceneLog(slug, agent);
     return {
@@ -123,11 +140,15 @@ async function analyzeProjectSceneLog(
   if (!log) {
     return false;
   }
-  await mutateProject(slug, (proj) => {
-    if (!proj.sceneLog) {
-      proj.sceneLog = log;
-    }
-  });
+  await mutateProject(
+    slug,
+    (proj) => {
+      if (!proj.sceneLog) {
+        proj.sceneLog = log;
+      }
+    },
+    { action: "scene-log", actor: "agent", input: { agent } }
+  );
   return true;
 }
 

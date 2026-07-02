@@ -546,6 +546,9 @@ export async function runClaudeEdit(
           env: {
             OPENKLIP_PROJECTS_ROOT: opts.projectsRoot,
             OPENKLIP_SLUG: opts.slug,
+            // Chat edits run through the user's agent CLI, so the action
+            // history should attribute them to "agent", not raw "mcp".
+            OPENKLIP_ACTOR: "agent",
           },
         },
       },

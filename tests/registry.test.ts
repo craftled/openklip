@@ -43,6 +43,14 @@ function makeProject(): Project {
         proxy: "assets/still-1.png",
         durationSamples: sec(0),
       },
+      {
+        id: "music-1",
+        kind: "music",
+        name: "bed.mp3",
+        src: "/tmp/bed.mp3",
+        proxy: "assets/music-1.aac",
+        durationSamples: sec(10),
+      },
     ],
     broll: [],
     titles: [],
@@ -68,6 +76,9 @@ const EXPECTED = [
   "broll-add",
   "broll-set",
   "broll-rm",
+  "music-add",
+  "music-set",
+  "music-rm",
   "still-add",
   "still-set",
   "still-rm",
@@ -166,6 +177,83 @@ test("broll-add: rejects NaN seconds (schema owns the shape)", () => {
     })
   );
   assert.equal(p.broll.length, 0);
+});
+
+// ── MILESTONE 4.1: music placement through the registry ─────────────────────
+
+test("music-add: valid input mutates project and returns the placement", () => {
+  const p = makeProject();
+  const item = runAction("music-add", p, {
+    assetId: "music-1",
+    fromSec: 1,
+    toSec: 3,
+    gain: 0.5,
+  }) as { id: string; assetId: string; gain: number; mode: string };
+  assert.equal(p.music?.length, 1);
+  assert.equal(item.assetId, "music-1");
+  assert.equal(item.gain, 0.5);
+  assert.equal(item.mode, "trim");
+  assert.match(item.id, /^m/);
+});
+
+test("music-add: rejects out-of-range gain (primitive owns the bound)", () => {
+  const p = makeProject();
+  assert.throws(() =>
+    runAction("music-add", p, {
+      assetId: "music-1",
+      fromSec: 0,
+      toSec: 2,
+      gain: 5,
+    })
+  );
+  assert.equal(p.music?.length ?? 0, 0);
+});
+
+test("music-set: patches gain and mode through the registry", () => {
+  const p = makeProject();
+  const added = runAction("music-add", p, {
+    assetId: "music-1",
+    fromSec: 0,
+    toSec: 2,
+  }) as { id: string };
+  const updated = runAction("music-set", p, {
+    id: added.id,
+    gain: 0.3,
+    mode: "loop",
+  }) as { gain: number; mode: string };
+  assert.equal(updated.gain, 0.3);
+  assert.equal(updated.mode, "loop");
+  assert.equal(p.music?.[0].gain, 0.3);
+});
+
+test("music-rm: removes by id and reports removed:false on unknown id", () => {
+  const p = makeProject();
+  const added = runAction("music-add", p, {
+    assetId: "music-1",
+    fromSec: 0,
+    toSec: 2,
+  }) as { id: string };
+  const missing = runAction("music-rm", p, { id: "nope" }) as {
+    removed: boolean;
+  };
+  assert.equal(missing.removed, false);
+  const removed = runAction("music-rm", p, { id: added.id }) as {
+    removed: boolean;
+  };
+  assert.equal(removed.removed, true);
+  assert.equal(p.music?.length, 0);
+});
+
+test("music-add manifest is exposed to mcp with fade and mode fields", () => {
+  const entry = actionManifest("mcp").find((m) => m.name === "music-add");
+  assert.ok(entry, "music-add not exposed to mcp");
+  assert.equal(entry?.inputSchema.type, "object");
+  assert.ok(entry?.inputSchema.properties.gain, "gain missing from schema");
+  assert.ok(
+    entry?.inputSchema.properties.fadeInSec,
+    "fadeInSec missing from schema"
+  );
+  assert.ok(entry?.inputSchema.properties.mode, "mode missing from schema");
 });
 
 test("zoom-add: rejects out-of-range scale (primitive owns the bound)", () => {
@@ -436,6 +524,16 @@ test("reanchor: cut-text of an anchored phrase marks the overlay stale", () => {
   runAction("reanchor", p, {});
   runAction("cut-text", p, { phrase: "word2" });
   assert.equal(p.titles?.[0].anchor?.stale, true);
+});
+
+// ── MILESTONE 3.1: UI phrase search and batch cuts ───────────────────────────
+
+test("cut-text is exposed to the GUI surface", () => {
+  const gui = actionManifest("gui");
+  assert.ok(
+    gui.some((m) => m.name === "cut-text"),
+    "cut-text missing from gui manifest"
+  );
 });
 
 test("reanchor manifest is exposed to mcp with an optional id", () => {

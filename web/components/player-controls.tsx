@@ -6,6 +6,8 @@ import {
   Captions,
   Maximize,
   Minimize,
+  Music,
+  MusicOff,
   Pause,
   PictureInPicture2,
   Play,
@@ -61,6 +63,7 @@ interface PlayerControlsProps {
   duration: number;
   fullscreenActive?: boolean;
   fullscreenLabel?: string;
+  musicMuted?: boolean;
   muted: boolean;
   onCycleSpeed: () => void;
   onFullscreen: () => void;
@@ -68,6 +71,7 @@ interface PlayerControlsProps {
   /** Seek to a fraction (0–1) of the duration. */
   onSeekFraction: (frac: number) => void;
   onToggleCaptions: () => void;
+  onToggleMusicMute?: () => void;
   onToggleMute: () => void;
   onTogglePip?: () => void;
   pipOn?: boolean;
@@ -90,12 +94,14 @@ export function PlayerControls({
   duration,
   fullscreenActive,
   fullscreenLabel,
+  musicMuted,
   muted,
   onCycleSpeed,
   onFullscreen,
   onPlayToggle,
   onSeekFraction,
   onToggleCaptions,
+  onToggleMusicMute,
   onToggleMute,
   onTogglePip,
   pipOn,
@@ -203,6 +209,24 @@ export function PlayerControls({
       <CtrlButton label={muted ? "Unmute" : "Mute"} onClick={onToggleMute}>
         {muted || volume === 0 ? <VolumeX /> : <Volume2 />}
       </CtrlButton>
+
+      {onToggleMusicMute && (
+        <Button
+          aria-label={musicMuted ? "Unmute music" : "Mute music"}
+          aria-pressed={musicMuted}
+          className={cn(
+            "size-7 shrink-0 rounded-full text-white/75 fine-hover:hover:bg-white/10 fine-hover:hover:text-white active:scale-[0.97]",
+            musicMuted && "text-white/40"
+          )}
+          data-music-mute
+          onClick={onToggleMusicMute}
+          size="icon-sm"
+          type="button"
+          variant="ghost"
+        >
+          {musicMuted ? <MusicOff /> : <Music />}
+        </Button>
+      )}
 
       <span className={cn(TRANSPORT_NUM, "text-white")}>
         {fmtClock(current)}

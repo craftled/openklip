@@ -13,8 +13,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { projectsRoot, slugFromVideo } from "./paths.ts";
 import { listProjects } from "./projectStore.ts";
-
-const VIDEO_EXT = new Set([".mp4", ".mov", ".m4v", ".webm", ".mkv", ".avi"]);
+import { isSupportedVideoFilename } from "./video-formats.ts";
 
 export interface InboxVideo {
   /** Filename of the loose video in the projects root. */
@@ -36,9 +35,7 @@ export function listInboxVideos(
     if (name.startsWith(".")) {
       continue;
     }
-    const dot = name.lastIndexOf(".");
-    const ext = dot >= 0 ? name.slice(dot).toLowerCase() : "";
-    if (!VIDEO_EXT.has(ext)) {
+    if (!isSupportedVideoFilename(name)) {
       continue;
     }
     const slug = slugFromVideo(name);

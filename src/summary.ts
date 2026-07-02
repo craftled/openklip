@@ -13,6 +13,7 @@ export interface ProjectSummary {
   deleted: number;
   kept: number;
   keptDurationSec: number;
+  musicCount: number;
   titleCount: number;
   words: number;
   zoomCount: number;
@@ -33,6 +34,7 @@ export function summarize(project: Project): ProjectSummary {
     kept: project.words.length - deleted,
     cuts: ranges.length,
     brollCount: project.broll.length,
+    musicCount: project.music?.length ?? 0,
     titleCount: project.titles?.length ?? 0,
     zoomCount: project.zooms?.length ?? 0,
     assetCount: project.assets.length,

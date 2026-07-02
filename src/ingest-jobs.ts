@@ -26,6 +26,25 @@ export function isSlugInFlight(slug: string): boolean {
   return inFlightSlugs.has(slug);
 }
 
+// Atomically claim a slug before any await point. The upload route has
+// several awaits (form parsing, temp writes) between checking the slug and
+// starting the job; two same-name uploads could both pass a bare
+// isSlugInFlight check inside that window and race two ingests over the same
+// project dir. Reserving synchronously closes the gap: exactly one caller
+// wins. Release with releaseIngestSlug on early-error paths; a started job
+// releases via startIngestJob's finally.
+export function reserveIngestSlug(slug: string): boolean {
+  if (inFlightSlugs.has(slug)) {
+    return false;
+  }
+  inFlightSlugs.add(slug);
+  return true;
+}
+
+export function releaseIngestSlug(slug: string): void {
+  inFlightSlugs.delete(slug);
+}
+
 export function getIngestJob(id: string): IngestJob | undefined {
   return jobs.get(id);
 }
