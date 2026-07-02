@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.13.0.0 - 2026-07-02
+
+The cut and sound quality release: OpenKlip drafts now sound edited, not just cut. A Cleanup panel finds leftover filler words and dead-air pauses from real audio analysis and applies them with one click (agents get the same report as a tool); cut boundaries can snap to nearby silence with short crossfades so edits stop clicking; and music beds duck under speech while the whole mix normalizes to a loudness target.
+
+### Added
+- **Cleanup review**: deterministic filler detection (isolated "um"/"uh" style tokens are safe to auto-apply; phrases like "you know" are flagged for review) plus dead-air detection from the project's own audio (silences inside kept ranges), with risk levels, estimated time saved, and overlay-collision warnings. Review and apply per candidate or all-safe in the Config panel's Cleanup section, from `openklip cleanup <slug> [--json] [--apply-safe]`, or as the `cleanup_report` agent tool. Applying is idempotent: candidates you have already applied do not come back.
+- **Silence-snapped cuts with seam crossfades**: the existing cut-snap setting now works. With snap enabled, cut edges move onto detected silence (up to a configurable shift), and exports join cuts with short equal-power crossfades clamped so total duration exactly matches the plain cut. Preview, export, CLI, and agent tools all compute the same snapped ranges.
+- **Music ducking, loudness, and voice highpass**: per-project audio settings (Config panel Audio section, `openklip audio`, and the `audio` action) duck music under speech via sidechain compression, normalize export loudness to a LUFS target, and optionally high-pass the voice. All applied at export; captions in the UI say so honestly.
+- **Dead-air spans**: explicit source-time spans removable from kept ranges (`dead-air-add`/`dead-air-rm` actions, coalesced and capped at the store layer).
+- **Transcript correction parity**: `word-text` action and `openklip word-text` let agents and the CLI fix a misheard word the way the editor already could; the first correction preserves the original text.
+
+### Fixed
+- **Caption robustness**: captions are matched to output ranges by overlap, so a snapped or dead-air-shifted boundary can no longer silently drop a caption whose audio still plays.
+- **Loudness sample rate**: loudness normalization pins the export back to 48 kHz (single-pass loudnorm otherwise upsamples the file to 96 kHz).
+- **Crossfade safety**: per-seam fades clamp to what both sides can afford and fall back to a click-free butt join, so a very short kept range can never produce silent or truncated audio.
+- **Assembly analysis freshness**: multi-take assembly regenerates the project's analysis audio from the assembled source, so snap and cleanup can never run against the previous recording.
+- **Analysis cache integrity**: the audio-analysis cache validates its shape on read, recomputes when analysis options change, and survives concurrent writers.
+
+### Changed
+- **Version**: bumped OpenKlip to `0.13.0.0`.
+
 ## 0.12.0.0 - 2026-07-02
 
 The Beta gate release: done-for-you agent drafts. Write a short brief for a project and every agent request follows it; watch the agent work step by step in a live task panel with a cancel button that actually stops the run; and turn one prompt into a finished draft with the make-a-draft playbook: cuts, captions, a title, b-roll or stills, a music bed, an export, and a self-check, all in one go.
