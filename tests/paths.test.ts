@@ -34,6 +34,8 @@ test("projectPaths uses the layered input/working/output layout", () => {
     assert.ok(p.assets.endsWith("projects/demo/assets"));
     assert.ok(p.assetProxies.endsWith("projects/demo/working/assets"));
     assert.ok(p.chats.endsWith("projects/demo/working/chats.json"));
+    assert.ok(p.brief.endsWith("projects/demo/brief.md"));
+    assert.ok(p.tasks.endsWith("projects/demo/working/tasks.json"));
     assert.ok(p.working.endsWith("projects/demo/working"));
     // Rendered output lives under output/.
     assert.ok(p.out.endsWith("projects/demo/output/out.mp4"));

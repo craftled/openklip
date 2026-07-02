@@ -302,7 +302,9 @@ export function AgentChatProvider({
         let reply: string;
         let edited = false;
         if (agentUsable) {
-          const res = await chatWithAgent(activeSlug, agent, trimmed);
+          const res = await chatWithAgent(activeSlug, agent, trimmed, {
+            threadId,
+          });
           if (res.ok) {
             reply = res.text;
             edited = res.edited;

@@ -7,6 +7,7 @@ import { assembleFromSelection, ingestTake, listTakes } from "./assembly.ts";
 import { analyzeAssets } from "./asset-cards.ts";
 import { registerAsset } from "./assets.ts";
 import { applyBrand, loadBrand } from "./brands.ts";
+import { loadBrief, saveBrief } from "./brief.ts";
 import {
   runOverlays,
   runRanges,
@@ -169,6 +170,10 @@ Look & captions
   openklip template list                 list edit templates (templates/*/skill.md)
   openklip template show <id>            print a template skill file
   openklip template set <slug> <id>      attach a template to a project
+  openklip brief <slug>                  print the project brief (brief.md)
+  openklip brief <slug> --set <text...>  replace the brief with the given text
+  openklip brief <slug> --file <path>    replace the brief with a file's content
+                                       (empty text clears the brief)
 
 Multi-take assembly
   openklip take-add <slug> <video>   ingest an alternate take into takes/<id>/
@@ -1783,6 +1788,42 @@ try {
       throw new Error(
         "usage: openklip template list | show <id> | set <slug> <id>"
       );
+    }
+    case "brief": {
+      const slug = rest[0];
+      if (!slug) {
+        throw new Error(
+          "usage: openklip brief <slug> [--set <text...> | --file <path>]"
+        );
+      }
+      const setIndex = rest.indexOf("--set");
+      const filePath = flagValue(rest, "--file");
+      let newText: string | undefined;
+      let source = "";
+      if (setIndex !== -1) {
+        newText = rest.slice(setIndex + 1).join(" ");
+      } else if (filePath) {
+        newText = await Bun.file(filePath).text();
+        source = ` from ${filePath}`;
+      }
+      if (newText !== undefined) {
+        await saveBrief(slug, newText);
+        console.log(
+          newText.trim()
+            ? `brief saved for ${slug}${source} (${newText.trim().length} chars)`
+            : `brief cleared for ${slug}`
+        );
+        break;
+      }
+      const brief = await loadBrief(slug);
+      if (!brief) {
+        console.log(
+          `no brief.md yet for ${slug}. Run: openklip brief ${slug} --set "..."`
+        );
+        break;
+      }
+      console.log(brief);
+      break;
     }
     case "reorder": {
       if (!(rest[0] && rest[1] && rest[2] && rest[3] !== undefined)) {

@@ -1,6 +1,7 @@
 "use server";
 
 import { existsSync } from "node:fs";
+import { loadBrief, saveBrief as saveBriefFile } from "@engine/brief";
 import type { ColorAdjust, Cuts, Filter, Motion } from "@engine/edl";
 import type { ExportCompression } from "@engine/exporter";
 import { projectPaths } from "@engine/paths";
@@ -115,6 +116,31 @@ export async function saveMotion(
       input: body,
     });
     return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+// Project brief (brief.md): free-form context text, not a project.json field,
+// so this bypasses mutateProject and writes the file directly (src/brief.ts).
+export async function saveBrief(
+  slug: string,
+  text: string
+): Promise<ActionResult> {
+  try {
+    await saveBriefFile(slug, text);
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function loadBriefAction(
+  slug: string
+): Promise<ActionResult<{ brief: string | null }>> {
+  try {
+    const brief = await loadBrief(slug);
+    return { ok: true, data: { brief: brief ?? null } };
   } catch (e) {
     return fail(e);
   }

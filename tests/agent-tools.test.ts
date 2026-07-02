@@ -2,6 +2,11 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { readActionLog } from "../src/action-log.ts";
 import {
+  createAgentTask,
+  getAgentTask,
+  resetAgentTaskIdSequenceForTests,
+} from "../src/agent-tasks.ts";
+import {
   agentToolManifest,
   agentToolNames,
   callAgentTool,
@@ -302,4 +307,205 @@ test("export tool schema accepts compression and fps and rejects bad values", ()
     tool.schema.safeParse({ slug: "demo", maxHeight: 4321 }).success,
     false
   );
+});
+
+// ── PROJECT BRIEF: brief_get / brief_set (brief.md, not a project.json field) ─
+
+test("brief_set then brief_get round-trip through callAgentTool", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const setResult = (await callAgentTool("brief_set", {
+      slug,
+      text: "Audience: founders. Goal: explain the launch.",
+    })) as { saved: boolean; chars: number };
+    assert.equal(setResult.saved, true);
+    assert.equal(
+      setResult.chars,
+      "Audience: founders. Goal: explain the launch.".length
+    );
+    const got = (await callAgentTool("brief_get", { slug })) as {
+      brief: string | null;
+    };
+    assert.equal(got.brief, "Audience: founders. Goal: explain the launch.");
+  });
+});
+
+test("brief_get on a project with no brief returns null", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const got = (await callAgentTool("brief_get", { slug })) as {
+      brief: string | null;
+    };
+    assert.equal(got.brief, null);
+  });
+});
+
+test("brief_set rejects text over the zod max", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    await assert.rejects(
+      () => callAgentTool("brief_set", { slug, text: "x".repeat(20_001) }),
+      /invalid input/i
+    );
+  });
+});
+
+test("brief_set appends a brief-set entry to the action history", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    await callAgentTool("brief_set", { slug, text: "Tone: playful." });
+    const entries = await readActionLog(slug);
+    const entry = entries.find((e) => e.action === "brief-set");
+    assert.ok(entry, "brief-set history entry missing");
+    // brief.md is not part of the EDL, so the revision does not move.
+    assert.equal(entry?.revisionBefore, entry?.revisionAfter);
+    assert.match(entry?.input ?? "", /chars/);
+  });
+});
+
+// ── AGENT TASK PROGRESS TOOLS: task_step / task_complete ────────────────────
+
+function withTaskId<T>(taskId: string, fn: () => Promise<T>): Promise<T> {
+  const prev = process.env.OPENKLIP_TASK_ID;
+  process.env.OPENKLIP_TASK_ID = taskId;
+  return fn().finally(() => {
+    if (prev === undefined) {
+      delete process.env.OPENKLIP_TASK_ID;
+    } else {
+      process.env.OPENKLIP_TASK_ID = prev;
+    }
+  });
+}
+
+test("task_step updates the active task when OPENKLIP_TASK_ID is set", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    resetAgentTaskIdSequenceForTests();
+    writeFixtureProject(slug, makeProject({ slug }));
+    const task = await createAgentTask(slug, { request: "Do work" });
+
+    await withTaskId(task.id, async () => {
+      const result = (await callAgentTool("task_step", {
+        slug,
+        title: "Scanning transcript",
+        note: "found 3 candidates",
+      })) as {
+        task: {
+          steps: Array<{ title: string; status: string; note?: string }>;
+        };
+      };
+      assert.equal(result.task.steps.length, 1);
+      assert.equal(result.task.steps[0]?.title, "Scanning transcript");
+      assert.equal(result.task.steps[0]?.status, "running");
+      assert.equal(result.task.steps[0]?.note, "found 3 candidates");
+    });
+
+    const stored = await getAgentTask(slug, task.id);
+    assert.equal(stored?.steps.length, 1);
+  });
+});
+
+test("task_step without OPENKLIP_TASK_ID set fails with a clear message", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const prev = process.env.OPENKLIP_TASK_ID;
+    delete process.env.OPENKLIP_TASK_ID;
+    try {
+      await assert.rejects(
+        () => callAgentTool("task_step", { slug, title: "x" }),
+        /no active task for this session/i
+      );
+    } finally {
+      if (prev === undefined) {
+        delete process.env.OPENKLIP_TASK_ID;
+      } else {
+        process.env.OPENKLIP_TASK_ID = prev;
+      }
+    }
+  });
+});
+
+test("task_complete blocked without a question is a validation error", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    resetAgentTaskIdSequenceForTests();
+    writeFixtureProject(slug, makeProject({ slug }));
+    const task = await createAgentTask(slug, { request: "Do work" });
+
+    await withTaskId(task.id, async () => {
+      await assert.rejects(
+        () => callAgentTool("task_complete", { slug, outcome: "blocked" }),
+        /question/i
+      );
+    });
+  });
+});
+
+test("task_complete partial stores remaining work and stays completed", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    resetAgentTaskIdSequenceForTests();
+    writeFixtureProject(slug, makeProject({ slug }));
+    const task = await createAgentTask(slug, { request: "Do work" });
+
+    await withTaskId(task.id, async () => {
+      const result = (await callAgentTool("task_complete", {
+        slug,
+        outcome: "partial",
+        summary: "Cut filler",
+        remaining: ["Add b-roll"],
+      })) as { task: { status: string; remaining?: string[] } };
+      assert.equal(result.task.status, "completed");
+      assert.deepEqual(result.task.remaining, ["Add b-roll"]);
+    });
+  });
+});
+
+test("task_step with a MISSING task id fails with not found/already finished", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    await withTaskId("no-such-task-id", async () => {
+      await assert.rejects(
+        () => callAgentTool("task_step", { slug, title: "x" }),
+        /not found|already finished/i
+      );
+    });
+  });
+});
+
+test("task_complete with a MISSING task id fails with not found", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    await withTaskId("no-such-task-id", async () => {
+      await assert.rejects(
+        () => callAgentTool("task_complete", { slug, outcome: "completed" }),
+        /not found|already finished/i
+      );
+    });
+  });
+});
+
+test("task_complete called twice: the second (terminal) call is a no-op, not an error", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    resetAgentTaskIdSequenceForTests();
+    writeFixtureProject(slug, makeProject({ slug }));
+    const task = await createAgentTask(slug, { request: "Do work" });
+
+    await withTaskId(task.id, async () => {
+      const first = (await callAgentTool("task_complete", {
+        slug,
+        outcome: "completed",
+        summary: "first summary",
+      })) as { task: { status: string; summary?: string } };
+      assert.equal(first.task.status, "completed");
+      assert.equal(first.task.summary, "first summary");
+
+      // completeAgentTask is a terminal-safe no-op: the second call
+      // succeeds (does not throw) but the ORIGINAL outcome wins.
+      const second = (await callAgentTool("task_complete", {
+        slug,
+        outcome: "completed",
+        summary: "second summary",
+      })) as { task: { status: string; summary?: string } };
+      assert.equal(second.task.status, "completed");
+      assert.equal(second.task.summary, "first summary");
+    });
+  });
 });

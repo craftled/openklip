@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import { useAgentChat } from "@/components/agent-chat-context";
 import { AgentPromptInput } from "@/components/agent-prompt-input";
 import { ChatMarkdown } from "@/components/chat-markdown";
+import { TaskProgressPanel } from "@/components/task-progress-panel";
 import {
   Attachment,
   AttachmentAction,
@@ -461,7 +462,8 @@ export function AgentChatPanel({
           </MessageScroller>
         </MessageScrollerProvider>
 
-        <div className="shrink-0 border-border border-t px-6 py-4">
+        <div className="flex shrink-0 flex-col gap-3 border-border border-t px-6 py-4">
+          <TaskProgressPanel running={isRunning} slug={slug} />
           <AgentPromptInput
             activeSlug={activeSlug}
             chatsLoading={chatsLoading}

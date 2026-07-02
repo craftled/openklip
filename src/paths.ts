@@ -55,8 +55,9 @@ export function projectDir(slug: string): string {
 // Layered project layout. `project.json` (the edit) stays at the project root;
 // user originals live in assets/; everything derived lives under working/
 // (proxy, transcript, audio, frames, asset proxies) and rendered output under
-// output/. Two working/ files are NOT derived and must never be regenerated:
-// chats.json (agent threads) and actions.jsonl (append-only action history).
+// output/. Three working/ files are NOT derived and must never be
+// regenerated: chats.json (agent threads), actions.jsonl (append-only action
+// history), and tasks.json (agent task-progress store).
 // Proxy paths in project.json are relative to dir
 // (e.g. "working/assets/b1.mp4"); user sources use "assets/track.mp3".
 export function projectPaths(slug: string) {
@@ -68,6 +69,9 @@ export function projectPaths(slug: string) {
     working,
     output,
     project: join(dir, "project.json"),
+    /** Free-form project context (audience, goal, tone, assets) : human-editable,
+     * not derived, lives next to project.json at the project root. */
+    brief: join(dir, "brief.md"),
     transcript: join(working, "transcript.json"),
     proxy: join(working, "proxy.mp4"),
     audioRaw: join(working, "audio16k.f32"),
@@ -77,6 +81,8 @@ export function projectPaths(slug: string) {
     /** Generated asset proxies (ffmpeg output). */
     assetProxies: join(working, "assets"),
     chats: join(working, "chats.json"),
+    /** Agent task-progress store: mutates in place (see src/agent-tasks.ts). */
+    tasks: join(working, "tasks.json"),
     /** Append-only action history: one JSON entry per line. */
     actionsLog: join(working, "actions.jsonl"),
     out: join(output, "out.mp4"),

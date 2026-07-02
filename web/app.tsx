@@ -23,6 +23,7 @@ import { AgentChatProvider } from "@/components/agent-chat-context";
 import { AgentChatPanel } from "@/components/agent-chat-panel";
 import { AgentSidebar } from "@/components/agent-sidebar";
 import { withAssetKind } from "@/components/asset-bin";
+import { BriefEditor } from "@/components/brief-editor";
 import {
   CHAT_WIDTH_DEFAULT,
   ChatResizeHandle,
@@ -167,6 +168,7 @@ import type { ActionResult } from "../app/actions.ts";
 import {
   exportProject,
   runGuiAction,
+  saveBrief,
   saveBroll,
   saveLook,
   saveProjectEdits,
@@ -226,6 +228,7 @@ interface StillItem {
 }
 interface Project {
   assets: Asset[];
+  brief?: string | null;
   broll: BrollItem[];
   captions?: { enabled: boolean; maxWords?: number };
   dirPath: string;
@@ -2364,6 +2367,20 @@ export function App({
             </div>
           )}
           <div className="group-data-[collapsible=icon]:hidden">
+            <Section title="Brief">
+              <BriefEditor
+                initialBrief={project.brief ?? ""}
+                onSave={async (text) => {
+                  const r = await saveBrief(project.slug, text);
+                  if (r.ok) {
+                    setProject((prev) => ({ ...prev, brief: text }));
+                    return { ok: true };
+                  }
+                  return { ok: false, error: r.error };
+                }}
+                slug={project.slug}
+              />
+            </Section>
             <Section title="Music">
               <MusicSectionControls
                 assetName={assetName}

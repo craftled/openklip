@@ -13,7 +13,13 @@ import {
   runFillerAgent,
   supportsToolEditing,
 } from "@engine/agent-driver";
+import {
+  completeAgentTask,
+  createAgentTask,
+  getAgentTask,
+} from "@engine/agent-tasks";
 import { analyzeAssets, assetCardLines } from "@engine/asset-cards";
+import { loadBrief } from "@engine/brief";
 import type { Project } from "@engine/edl";
 import { projectsRoot } from "@engine/paths";
 import { loadProject, mutateProject } from "@engine/projectStore";
@@ -180,28 +186,74 @@ export type ChatReply =
 export async function chatWithAgent(
   slug: string,
   agent: string,
-  message: string
+  message: string,
+  opts?: { threadId?: string }
 ): Promise<ChatReply> {
   try {
     const project = await loadProject(slug);
     const assetCards = assetCardLines(project.assets);
     const sceneLog = sceneLogLines(project.sceneLog);
+    const brief = await loadBrief(slug);
     if (supportsToolEditing(agent)) {
+      // Every tool-editing run gets a visible agent task: the run reports its
+      // own progress via task_step / task_complete (id threaded through the
+      // MCP env), and the finally-style fallbacks below keep the task honest
+      // when the agent exits without signaling completion.
+      const task = await createAgentTask(slug, {
+        request: message,
+        ...(opts?.threadId ? { chatId: opts.threadId } : {}),
+      });
       const prompt = buildEditPrompt(
         {
           words: project.words,
           template: project.template,
           assetCards,
           sceneLog,
+          brief,
         },
         slug,
-        message
+        message,
+        { taskProgress: true }
       );
-      const { text } = await runClaudeEdit(prompt, {
-        agent,
-        slug,
-        projectsRoot: projectsRoot(),
-        mcpServerPath: cwdPath("src", "mcp-server.ts"),
+      let text: string;
+      try {
+        ({ text } = await runClaudeEdit(prompt, {
+          agent,
+          slug,
+          projectsRoot: projectsRoot(),
+          mcpServerPath: cwdPath("src", "mcp-server.ts"),
+          taskId: task.id,
+          // Draft workflows legitimately run long (cut + overlays + music +
+          // export + whisper verify); a tight budget kills them mid-verify.
+          // The task panel's cancel button is the user's control, so err long.
+          timeoutMs: 900_000,
+        }));
+      } catch (e) {
+        // A user cancel kills the process tree, which surfaces here as a
+        // spawn failure ("claude failed (exit 143): no output"). Check the
+        // stored status FIRST: when the task is already cancelled, reply
+        // with a friendly line instead of the raw error, and skip
+        // completeAgentTask entirely (its terminal no-op would preserve the
+        // cancelled status anyway, but there is nothing to record).
+        const current = await getAgentTask(slug, task.id);
+        if (current?.status === "cancelled") {
+          return {
+            ok: true,
+            edited: true,
+            text: "Cancelled. Edits made before the cancel are still applied.",
+          };
+        }
+        // completeAgentTask is a no-op on terminal tasks, so an
+        // agent-reported blocked/failed state wins over this fallback.
+        await completeAgentTask(slug, task.id, {
+          kind: "failed",
+          error: (e as Error).message,
+        });
+        throw e;
+      }
+      await completeAgentTask(slug, task.id, {
+        kind: "completed",
+        summary: text.trim().slice(0, 500) || undefined,
       });
       return { ok: true, edited: true, text: text.trim() || "(done)" };
     }
@@ -211,6 +263,7 @@ export async function chatWithAgent(
         template: project.template,
         assetCards,
         sceneLog,
+        brief,
       },
       message
     );

@@ -1,5 +1,6 @@
 import { describe, expect, mock, test } from "bun:test";
 import { loadEditorProject } from "../app/lib/project-data.ts";
+import { saveBrief } from "../src/brief.ts";
 import { defaultFixtureOrphan } from "./helpers/assetFixture.ts";
 import {
   makeProject,
@@ -26,6 +27,23 @@ describe("loadEditorProject", () => {
 
       const loaded = await loadEditorProject(slug);
       expect(loaded.assets).toHaveLength(0);
+    });
+  });
+
+  test("returns the brief text when brief.md exists", async () => {
+    await withTempProjectsRoot(async ({ slug }) => {
+      writeFixtureProject(slug, makeProject({ slug }));
+      await saveBrief(slug, "Audience: founders. Goal: ship the demo.");
+      const loaded = await loadEditorProject(slug);
+      expect(loaded.brief).toBe("Audience: founders. Goal: ship the demo.");
+    });
+  });
+
+  test("returns brief null when brief.md is absent", async () => {
+    await withTempProjectsRoot(async ({ slug }) => {
+      writeFixtureProject(slug, makeProject({ slug }));
+      const loaded = await loadEditorProject(slug);
+      expect(loaded.brief).toBeNull();
     });
   });
 

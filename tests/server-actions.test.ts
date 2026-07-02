@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   exportProject,
+  loadBriefAction,
   revealProjectFolder,
   runGuiAction,
+  saveBrief,
   saveBroll,
   saveLook,
   saveProjectEdits,
@@ -373,6 +375,52 @@ test("saveProjectEdits records an edit-words history entry", async () => {
     assert.equal(entries.length, 1);
     assert.equal(entries[0].action, "edit-words");
     assert.equal(entries[0].actor, "human");
+  });
+});
+
+// ── PROJECT BRIEF: saveBrief / loadBriefAction server actions ───────────────
+
+test("saveBrief server action round-trips through loadBriefAction", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const saved = await saveBrief(
+      slug,
+      "Audience: founders. Goal: ship the demo."
+    );
+    assert.equal(saved.ok, true);
+    const loaded = await loadBriefAction(slug);
+    assert.equal(loaded.ok, true);
+    if (loaded.ok) {
+      assert.equal(
+        loaded.data.brief,
+        "Audience: founders. Goal: ship the demo."
+      );
+    }
+  });
+});
+
+test("saveBrief with empty text clears the brief", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    await saveBrief(slug, "Some content");
+    const cleared = await saveBrief(slug, "   ");
+    assert.equal(cleared.ok, true);
+    const loaded = await loadBriefAction(slug);
+    assert.equal(loaded.ok, true);
+    if (loaded.ok) {
+      assert.equal(loaded.data.brief, null);
+    }
+  });
+});
+
+test("loadBriefAction on a project with no brief.md returns ok with brief null", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const loaded = await loadBriefAction(slug);
+    assert.equal(loaded.ok, true);
+    if (loaded.ok) {
+      assert.equal(loaded.data.brief, null);
+    }
   });
 });
 
