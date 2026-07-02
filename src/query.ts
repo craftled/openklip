@@ -1,5 +1,6 @@
 import { summarize } from "./actions.ts";
 import type { SilenceSpan } from "./audio-analysis-core.ts";
+import { DEFAULT_CAPTION_STYLE } from "./caption-styles.ts";
 import {
   type CutSnap,
   CutsSchema,
@@ -109,7 +110,7 @@ export interface OverlayViews {
 }
 
 export interface ProjectStatusJson {
-  captions: { enabled: boolean; maxWords: number };
+  captions: { enabled: boolean; maxWords: number; style: string };
   cuts: { snap: CutSnap };
   keptDurationSec: number;
   look: { vignette: boolean; filter: Filter; lut?: string };
@@ -327,6 +328,7 @@ export function projectStatus(
     captions: {
       enabled: project.captions.enabled,
       maxWords: project.captions.maxWords ?? 6,
+      style: project.captions.style ?? DEFAULT_CAPTION_STYLE,
     },
     cuts: {
       snap: cuts.snap,

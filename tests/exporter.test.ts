@@ -256,7 +256,7 @@ function noteGuardFixture(withNotes: boolean): Project {
     height: 1080,
     durationSamples: s(6),
     padMs: 0,
-    captions: { enabled: true, maxWords: 6 },
+    captions: { enabled: true, maxWords: 6, style: "boxed" },
     assets: [
       {
         id: "broll-1",
@@ -1104,7 +1104,7 @@ test("exportCut applies the requested fps and compression (smoke)", {
         width: 320,
         height: 240,
         durationSamples: 2 * SAMPLE_RATE,
-        captions: { enabled: false, maxWords: 6 },
+        captions: { enabled: false, maxWords: 6, style: "boxed" },
         words: [
           {
             id: "w0",
@@ -1204,7 +1204,7 @@ test("exportCut mixes a placed music bed under the voice (smoke)", {
         width: 320,
         height: 240,
         durationSamples: 4 * SAMPLE_RATE,
-        captions: { enabled: false, maxWords: 6 },
+        captions: { enabled: false, maxWords: 6, style: "boxed" },
         assets: [
           {
             id: "bed",
@@ -1313,7 +1313,7 @@ test("exportCut: audio.snapped is true when snap is enabled and a matching analy
         width: 320,
         height: 240,
         durationSamples: 2 * SAMPLE_RATE,
-        captions: { enabled: false, maxWords: 6 },
+        captions: { enabled: false, maxWords: 6, style: "boxed" },
         cuts: {
           snap: {
             enabled: true,
@@ -1409,7 +1409,7 @@ test("exportCut: audio.snapped is false when snap is enabled but analysis is una
         width: 320,
         height: 240,
         durationSamples: 2 * SAMPLE_RATE,
-        captions: { enabled: false, maxWords: 6 },
+        captions: { enabled: false, maxWords: 6, style: "boxed" },
         cuts: {
           snap: {
             enabled: true,
@@ -1539,7 +1539,7 @@ test("exportCut: seam crossfade preserves duration within 20ms of the plain asel
       height: 240,
       durationSamples: 4 * SAMPLE_RATE,
       padMs: 0,
-      captions: { enabled: false, maxWords: 6 },
+      captions: { enabled: false, maxWords: 6, style: "boxed" },
       words,
     });
 
@@ -1649,7 +1649,7 @@ test("exportCut: seam crossfade survives a 30ms range (d clamps; duration and au
       height: 240,
       durationSamples: 4 * SAMPLE_RATE,
       padMs: 0,
-      captions: { enabled: false, maxWords: 6 },
+      captions: { enabled: false, maxWords: 6, style: "boxed" },
       words,
     });
 
@@ -1748,7 +1748,7 @@ test("exportCut: ducking on succeeds and reaches the encoder with a music bed pr
         width: 320,
         height: 240,
         durationSamples: 4 * SAMPLE_RATE,
-        captions: { enabled: false, maxWords: 6 },
+        captions: { enabled: false, maxWords: 6, style: "boxed" },
         assets: [
           {
             id: "bed",
@@ -1842,7 +1842,7 @@ test("exportCut: loudness normalization on succeeds with one audio stream (smoke
         width: 320,
         height: 240,
         durationSamples: 2 * SAMPLE_RATE,
-        captions: { enabled: false, maxWords: 6 },
+        captions: { enabled: false, maxWords: 6, style: "boxed" },
         audio: {
           ducking: {
             enabled: false,

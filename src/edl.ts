@@ -4,6 +4,7 @@ import {
   snapRanges,
   subtractDeadAir,
 } from "./audio-analysis-core.ts";
+import { CAPTION_STYLE_IDS, DEFAULT_CAPTION_STYLE } from "./caption-styles.ts";
 import {
   ProductAnnouncementCatalogSchema,
   ProductAnnouncementSpecSchema,
@@ -436,8 +437,18 @@ export const ProjectSchema = z
       .object({
         enabled: z.boolean().default(true),
         maxWords: z.number().int().positive().default(6),
+        /**
+         * Caption look preset (src/caption-styles.ts is the source of
+         * truth). READ-side tolerance: an unknown/invalid value (e.g. a
+         * project.json written by a newer build, or a hand-edited value)
+         * must not brick the whole project on load, so this falls back to
+         * the default instead of throwing. The WRITER side stays strict:
+         * the captions-style registry action schema (src/registry.ts) still
+         * rejects invalid ids.
+         */
+        style: z.enum(CAPTION_STYLE_IDS).catch(DEFAULT_CAPTION_STYLE),
       })
-      .default({ enabled: true, maxWords: 6 }),
+      .default({ enabled: true, maxWords: 6, style: DEFAULT_CAPTION_STYLE }),
     assets: z.array(AssetSchema).default([]),
     broll: z.array(BrollSchema).default([]),
     look: z

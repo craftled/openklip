@@ -26,7 +26,7 @@ function makeProject(overrides: Partial<Project> = {}): Project {
     height: 1080,
     durationSamples: sec(6),
     padMs: 0,
-    captions: { enabled: true, maxWords: 6 },
+    captions: { enabled: true, maxWords: 6, style: "boxed" },
     assets: [
       {
         id: "broll-1",
@@ -335,6 +335,7 @@ test("projectStatus returns agent-friendly JSON shape", () => {
   assert.ok(Array.isArray(s.overlays.broll));
   assert.equal(s.look.vignette, false);
   assert.equal(s.captions.enabled, true);
+  assert.equal(s.captions.style, "boxed");
 });
 
 test("grepTranscript match times use word sample boundaries", () => {

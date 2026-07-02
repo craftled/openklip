@@ -1,8 +1,14 @@
 #!/usr/bin/env bun
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { readActionLog } from "./action-log.ts";
 import { summarize } from "./actions.ts";
-import { agentToolManifest, agentToolTable } from "./agent-tools.ts";
+import { listAgentTasks } from "./agent-tasks.ts";
+import {
+  AGENT_TASK_STATUSES,
+  agentToolManifest,
+  agentToolTable,
+} from "./agent-tools.ts";
 import { assembleFromSelection, ingestTake, listTakes } from "./assembly.ts";
 import { analyzeAssets } from "./asset-cards.ts";
 import { registerAsset } from "./assets.ts";
@@ -11,6 +17,7 @@ import type { SilenceSpan } from "./audio-analysis-core.ts";
 import { applyBrand, loadBrand } from "./brands.ts";
 import { loadBrief, saveBrief } from "./brief.ts";
 import { logBriefSet } from "./brief-log.ts";
+import { isCaptionStyleId, listCaptionStyles } from "./caption-styles.ts";
 import {
   cleanupReport,
   fillerOnlyCleanupReport,
@@ -61,6 +68,7 @@ import { projectPaths } from "./paths.ts";
 import { PRODUCT_ANNOUNCEMENT_CATALOG } from "./product-announcement.ts";
 import {
   latestProject,
+  listHistorySnapshotRevisions,
   listProjects,
   mutateProject,
   loadProject as storeLoadProject,
@@ -175,6 +183,7 @@ Overlays
 Look & captions
   openklip captions <slug> <on|off>    toggle burned captions for export
   openklip captions-max <slug> <n>       words per caption line (1-12)
+  openklip captions-style <slug> <style> caption look preset (boxed|clean|karaoke|bold-caps|minimal)
   openklip look <slug> vignette <on|off> toggle vignette
   openklip look <slug> color [--temp n] [--tint n] [--bright n] [--contrast n] [--sat n] | --reset
   openklip audio <slug>                  print current export audio quality settings
@@ -218,6 +227,13 @@ Review & export
   openklip revert <slug> --task <id> revert every change made by one agent task
   openklip revert <slug> --last      undo the most recent logged edit
                                        --force   proceed even if a later, unrelated edit is discarded
+  openklip history <slug>            action history log (newest first) and revertible revisions
+                                       --limit <n>       max entries (default 50, max 200)
+                                       --task <id>       only entries from one agent task
+                                       --action <name>   only entries with this action name
+  openklip tasks <slug>              agent task records (newest first)
+                                       --limit <n>       max tasks (default 20, max 100)
+                                       --status <status> pending|running|blocked|failed|completed|cancelled
 
 Diagnostics
   openklip doctor [slug]             check ffmpeg, whisper, and project health
@@ -1328,6 +1344,23 @@ try {
       console.log(`captions max words: ${project.captions.maxWords}`);
       break;
     }
+    case "captions-style": {
+      const validIds = listCaptionStyles()
+        .map((s) => s.id)
+        .join(", ");
+      const usage = `usage: openklip captions-style <slug> <style>\nvalid styles: ${validIds}`;
+      if (!(rest[0] && rest[1])) {
+        throw new Error(usage);
+      }
+      if (!isCaptionStyleId(rest[1])) {
+        throw new Error(`unknown style "${rest[1]}"\n${usage}`);
+      }
+      const { project } = await runLoggedAction(rest[0], "captions-style", {
+        style: rest[1],
+      });
+      console.log(`captions style: ${project.captions.style}`);
+      break;
+    }
     case "look": {
       const filterUsage = `openklip look <slug> filter <${FILTER_NAMES.join("|")}>`;
       if (!(rest[0] && rest[1] && rest[2])) {
@@ -2128,6 +2161,112 @@ try {
       });
       console.log(
         `reverted ${slug} to revision ${restoredTo} (new revision ${revision})`
+      );
+      break;
+    }
+    case "history": {
+      if (!rest[0]) {
+        throw new Error(
+          "usage: openklip history <slug> [--limit N] [--task <id>] [--action <name>]"
+        );
+      }
+      const historySlug = rest[0];
+      const limitRaw = flagValue(rest, "--limit");
+      const limit = limitRaw === undefined ? 50 : Number(limitRaw);
+      if (!Number.isInteger(limit) || limit < 1 || limit > 200) {
+        throw new Error("--limit must be an integer between 1 and 200");
+      }
+      const taskFilter = flagValue(rest, "--task");
+      const actionFilter = flagValue(rest, "--action");
+      const allEntries = await readActionLog(historySlug);
+      let entries = allEntries;
+      if (taskFilter !== undefined) {
+        entries = entries.filter((e) => e.taskId === taskFilter);
+      }
+      if (actionFilter !== undefined) {
+        entries = entries.filter((e) => e.action === actionFilter);
+      }
+      const filteredOutAll = entries.length === 0;
+      entries = entries.slice(0, limit);
+      const snapshotRevisions = listHistorySnapshotRevisions(historySlug);
+      if (entries.length === 0) {
+        // Distinguish "genuinely no history" from "a filter matched
+        // nothing" (Finding 6): the latter is a common false-empty read
+        // that shouldn't look identical to an empty project.
+        if (filteredOutAll && allEntries.length > 0) {
+          const activeFilters = [
+            taskFilter === undefined ? undefined : `--task=${taskFilter}`,
+            actionFilter === undefined ? undefined : `--action=${actionFilter}`,
+          ].filter((f): f is string => f !== undefined);
+          console.log(
+            `no history entries match the filter (${activeFilters.join(", ")}) for ${historySlug}.`
+          );
+        } else {
+          console.log(`no history for ${historySlug}.`);
+        }
+        break;
+      }
+      for (const e of entries) {
+        console.log(
+          `${e.action.padEnd(16)}  rev ${e.revisionBefore}->${e.revisionAfter}  ${e.actor}${e.taskId ? `  task ${e.taskId}` : ""}  ${new Date(e.at).toISOString()}`
+        );
+      }
+      console.log(
+        `\n${entries.length} entr${entries.length === 1 ? "y" : "ies"}`
+      );
+      console.log(
+        `snapshot revisions: ${snapshotRevisions.length > 0 ? snapshotRevisions.join(", ") : "(none)"}`
+      );
+      break;
+    }
+    case "tasks": {
+      if (!rest[0]) {
+        throw new Error(
+          "usage: openklip tasks <slug> [--limit N] [--status <status>]"
+        );
+      }
+      const tasksSlug = rest[0];
+      const limitRaw = flagValue(rest, "--limit");
+      const limit = limitRaw === undefined ? 20 : Number(limitRaw);
+      if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+        throw new Error("--limit must be an integer between 1 and 100");
+      }
+      const statusFilter = flagValue(rest, "--status");
+      if (
+        statusFilter !== undefined &&
+        !(AGENT_TASK_STATUSES as readonly string[]).includes(statusFilter)
+      ) {
+        throw new Error(
+          `--status must be one of: ${AGENT_TASK_STATUSES.join(", ")}`
+        );
+      }
+      const tasks = await listAgentTasks(tasksSlug, {
+        limit: statusFilter === undefined ? limit : Number.MAX_SAFE_INTEGER,
+      });
+      const filtered = (
+        statusFilter === undefined
+          ? tasks
+          : tasks.filter((t) => t.status === statusFilter)
+      ).slice(0, limit);
+      if (filtered.length === 0) {
+        // Distinguish "genuinely no tasks" from "a --status filter matched
+        // nothing" (Finding 6), same as the history command above.
+        if (statusFilter !== undefined && tasks.length > 0) {
+          console.log(
+            `no tasks match the filter (--status=${statusFilter}) for ${tasksSlug}.`
+          );
+        } else {
+          console.log(`no tasks for ${tasksSlug}.`);
+        }
+        break;
+      }
+      for (const t of filtered) {
+        console.log(
+          `${t.id}  ${t.status.padEnd(10)}  ${new Date(t.startedAt).toISOString()}  ${t.request.slice(0, 60)}`
+        );
+      }
+      console.log(
+        `\n${filtered.length} task${filtered.length === 1 ? "" : "s"}`
       );
       break;
     }

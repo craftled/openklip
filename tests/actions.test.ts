@@ -18,6 +18,7 @@ import {
   restoreAll,
   setAudio,
   setCaptionMaxWords,
+  setCaptionStyle,
   setCaptions,
   setLook,
   setPadMs,
@@ -46,7 +47,7 @@ function makeProject(): Project {
     height: 1080,
     durationSamples: sec(6),
     padMs: 0, // no padding so range math stays exact
-    captions: { enabled: true, maxWords: 6 },
+    captions: { enabled: true, maxWords: 6, style: "boxed" },
     assets: [
       {
         id: "broll-1",
@@ -357,6 +358,30 @@ test("setCaptionMaxWords clamps to 1-12", () => {
   assert.equal(p.captions.maxWords, 12);
   setCaptionMaxWords(p, 0);
   assert.equal(p.captions.maxWords, 1);
+});
+
+test("setCaptionStyle sets captions.style to a valid preset id", () => {
+  const p = makeProject();
+  setCaptionStyle(p, "karaoke");
+  assert.equal(p.captions.style, "karaoke");
+  assert.equal(p.captions.maxWords, 6); // untouched
+});
+
+test("setCaptionStyle throws a clear error listing valid ids for an unknown style", () => {
+  const p = makeProject();
+  assert.throws(
+    () => setCaptionStyle(p, "not-a-style"),
+    (err: unknown) => {
+      assert.ok(err instanceof Error);
+      assert.match(err.message, /boxed/);
+      assert.match(err.message, /clean/);
+      assert.match(err.message, /karaoke/);
+      assert.match(err.message, /bold-caps/);
+      assert.match(err.message, /minimal/);
+      return true;
+    }
+  );
+  assert.equal(p.captions.style, "boxed"); // unchanged
 });
 
 test("setPadMs clamps to 0-500", () => {

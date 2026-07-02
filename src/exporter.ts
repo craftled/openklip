@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { mkdir, rename, unlink } from "node:fs/promises";
 import { isAbsolute, join } from "node:path";
 import { loadAudioAnalysis } from "./audio-analysis.ts";
+import { captionStyle } from "./caption-styles.ts";
 import {
   buildAss,
   captionPlacementForSpan,
@@ -973,6 +974,7 @@ export async function exportCut(
           height: outH,
           placement: (_group, span) =>
             captionPlacementForSpan(span.startSec, span.endSec, titleSpans),
+          style: captionStyle(project.captions?.style),
           width: outW,
         })
       );

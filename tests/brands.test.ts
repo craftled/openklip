@@ -20,7 +20,7 @@ test("brandPath rejects traversal in the brand name", () => {
 
 test("applyBrand overrides only the fields the brand specifies", () => {
   const project = makeProject({
-    captions: { enabled: true, maxWords: 6 },
+    captions: { enabled: true, maxWords: 6, style: "boxed" },
     look: { vignette: false },
     padMs: 50,
   });

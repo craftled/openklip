@@ -25,7 +25,7 @@ function makeProject(): Project {
     height: 1080,
     durationSamples: sec(6),
     padMs: 0,
-    captions: { enabled: true, maxWords: 6 },
+    captions: { enabled: true, maxWords: 6, style: "boxed" },
     assets: [
       {
         id: "broll-1",
@@ -95,6 +95,7 @@ const EXPECTED = [
   "graphic-rm",
   "captions",
   "captions-max",
+  "captions-style",
   "pad",
   "cuts-snap",
   "dead-air-add",
@@ -348,6 +349,23 @@ test("word-text: rejects empty text (primitive owns the bound)", () => {
 test("word-text: rejects an unknown word id", () => {
   const p = makeProject();
   assert.throws(() => runAction("word-text", p, { id: "nope", text: "hi" }));
+});
+
+test("captions-style: sets a valid preset id and surfaces to cli/gui/mcp", () => {
+  const p = makeProject();
+  const action = getAction("captions-style");
+  assert.ok(action);
+  assert.deepEqual(action?.surfaces, ["cli", "gui", "mcp"]);
+  const result = runAction("captions-style", p, { style: "clean" }) as {
+    style: string;
+  };
+  assert.equal(result.style, "clean");
+  assert.equal(p.captions.style, "clean");
+});
+
+test("captions-style: rejects an unknown style id", () => {
+  const p = makeProject();
+  assert.throws(() => runAction("captions-style", p, { style: "not-a-style" }));
 });
 
 test("reorder: restacks within a track", () => {

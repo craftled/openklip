@@ -18,7 +18,7 @@ function makeProject(overrides: Partial<Project> = {}): Project {
     height: 1080,
     durationSamples: sec(10),
     padMs: 0,
-    captions: { enabled: true, maxWords: 6 },
+    captions: { enabled: true, maxWords: 6, style: "boxed" },
     assets: [],
     broll: [],
     look: { vignette: false },

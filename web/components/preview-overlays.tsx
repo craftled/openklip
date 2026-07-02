@@ -1,7 +1,9 @@
 "use client";
 
+import { captionStyle } from "@engine/caption-styles";
 import type { CaptionGroup } from "../../src/captions.ts";
 import { cn } from "../lib/utils";
+import { CaptionLine } from "./caption-line";
 import { type GraphicItem, GraphicOverlay } from "./graphic-overlay";
 import { HeroTitleOverlay } from "./hero-title-overlay";
 import { JsonRenderGraphicOverlay } from "./json-render-graphic-overlay";
@@ -16,6 +18,8 @@ export interface OverlayTitleItem {
 
 interface PreviewOverlaysProps {
   captionGroups: CaptionGroup[];
+  /** project.captions?.style; undefined/unknown falls back to the default preset. */
+  captionStyleId?: string;
   captionsOn: boolean;
   curSample: number;
   graphics: GraphicItem[];
@@ -30,6 +34,7 @@ interface PreviewOverlaysProps {
 export function PreviewOverlays({
   captionGroups,
   captionsOn,
+  captionStyleId,
   curSample,
   graphics,
   sampleRate,
@@ -95,28 +100,12 @@ export function PreviewOverlays({
         </div>
       )}
       {activeGroup && !heroTitle && (
-        <div
-          className={cn(
-            "pointer-events-none absolute inset-x-0 z-[3] flex justify-center",
-            captionsRaised ? "bottom-[28%]" : "bottom-[9%]"
-          )}
-        >
-          <div className="max-w-[82%] rounded-md bg-black/55 px-3.5 py-1.5 text-center font-medium text-[clamp(15px,2.3vw,30px)] text-white leading-tight backdrop-blur">
-            {activeGroup.words.map((w, i) => {
-              const next =
-                activeGroup.words[i + 1]?.startSec ?? activeGroup.endSec;
-              const on = curSec >= w.startSec - 0.02 && curSec < next;
-              return (
-                <span
-                  className={cn(on ? "text-white" : "text-white/70")}
-                  key={`${w.text}-${i}`}
-                >
-                  {w.text}{" "}
-                </span>
-              );
-            })}
-          </div>
-        </div>
+        <CaptionLine
+          curSec={curSec}
+          group={activeGroup}
+          raised={captionsRaised}
+          styleDef={captionStyle(captionStyleId)}
+        />
       )}
     </>
   );

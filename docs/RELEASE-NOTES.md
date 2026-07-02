@@ -2,7 +2,25 @@
 
 Use these bodies when publishing releases. Each section matches a tag in `CHANGELOG.md` without duplicating the full changelog. **Known gaps:** always link to [TODO.md](../TODO.md#known-limitations); do not duplicate the list here.
 
-Publishing status checked on 2026-07-02: GitHub releases are published through `v0.10.0.1`. `v0.11.0.0`, `v0.12.0.0`, `v0.13.0.0`, and `v0.14.0.0` were still unpublished as of this morning and are being published today (2026-07-02) from the prepared bodies below, in order. `v0.14.1.0` is prepared below for publication after them.
+Publishing status checked on 2026-07-02: GitHub releases are published through `v0.14.1.0`. `v0.15.0.0` is prepared below for publication next.
+
+---
+
+## v0.15.0.0
+
+**Caption style presets: five named looks shared by preview and export, plus agent tools to query action history and past task ids.**
+
+### Highlights
+- **Caption style presets**: `boxed`, `clean`, `karaoke`, `bold-caps`, and `minimal`, defined once in `src/caption-styles.ts` and rendered identically by the cinema preview and the ASS export burn-in. A "Caption style" picker in the Config sidebar switches presets live; `openklip captions-style <slug> <style>` and the `captions-style` action (cli/gui/mcp) do the same from the terminal or an agent. Unknown or missing style ids fall back to `boxed` on read, so older or newer projects never fail to load.
+- **Portrait caption clipping fix**: export now wraps long caption lines (`WrapStyle: 0`) instead of letting them run off-frame, most visible in portrait/narrow exports.
+- **Agent history and task query tools**: MCP `history_list` / `task_list` and CLI `openklip history` / `openklip tasks` let an agent read action history and past task records instead of only being able to revert blind. `templates/revise-draft/skill.md` uses them to find the task that produced a draft before reverting it.
+- Current codebase verification: 1187 tests.
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations) for the current list. Caption presets are v1: fixed definitions, Arial only, no custom fonts or per-project colors yet.
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#01500---2026-07-02)
 
 ---
 

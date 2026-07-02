@@ -91,6 +91,62 @@ test("GraphicSchema rejects an invalid track", () => {
   );
 });
 
+test("ProjectSchema defaults captions.style to 'boxed' (backward-compat parse)", () => {
+  const project = ProjectSchema.parse({
+    version: 1,
+    slug: "no-caption-style",
+    source: "/tmp/source.mp4",
+    proxy: "proxy.mp4",
+    sampleRate: SAMPLE_RATE,
+    fps: 30,
+    width: 1920,
+    height: 1080,
+    durationSamples: SAMPLE_RATE,
+    words: [],
+  });
+  assert.equal(project.captions.style, "boxed");
+});
+
+// Finding 3: an unknown captions.style id used to THROW here, which meant a
+// project.json with a preset id this checkout doesn't know (e.g. written by
+// a newer build, or hand-edited) bricked the whole project on load. The
+// READ-side schema now tolerates this and falls back to the default
+// instead; the WRITER side (captions-style registry action) stays strict,
+// see tests/registry.test.ts "captions-style: rejects an unknown style id".
+test("ProjectSchema falls back an unknown captions.style id to the default instead of throwing", () => {
+  const project = ProjectSchema.parse({
+    version: 1,
+    slug: "bad-caption-style",
+    source: "/tmp/source.mp4",
+    proxy: "proxy.mp4",
+    sampleRate: SAMPLE_RATE,
+    fps: 30,
+    width: 1920,
+    height: 1080,
+    durationSamples: SAMPLE_RATE,
+    words: [],
+    captions: { style: "not-a-style" },
+  });
+  assert.equal(project.captions.style, "boxed");
+});
+
+test("ProjectSchema round-trips a chosen captions.style", () => {
+  const project = ProjectSchema.parse({
+    version: 1,
+    slug: "with-caption-style",
+    source: "/tmp/source.mp4",
+    proxy: "proxy.mp4",
+    sampleRate: SAMPLE_RATE,
+    fps: 30,
+    width: 1920,
+    height: 1080,
+    durationSamples: SAMPLE_RATE,
+    words: [],
+    captions: { style: "karaoke" },
+  });
+  assert.equal(project.captions.style, "karaoke");
+});
+
 test("ProjectSchema defaults graphics to [] (backward-compat parse)", () => {
   const project = ProjectSchema.parse({
     version: 1,

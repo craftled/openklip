@@ -57,3 +57,49 @@ test("loadProject then a logged mutateProject edit round-trips an unknown top-le
     assert.equal(onDisk.padMs, 75);
   });
 });
+
+// Finding 3: an unknown/invalid captions.style value must not brick the
+// whole project on load (e.g. a project.json written by a newer build with
+// a preset id this checkout doesn't know, or a hand-edited value). The
+// READ-side schema must fall back to the default instead of throwing; the
+// WRITER side (the captions-style registry action) stays strict, see
+// tests/registry.test.ts "captions-style: rejects an unknown style id".
+
+test("loadProject resolves captions.style to the default when the key is missing entirely", async () => {
+  await withTempProjectsRoot(async ({ slug, root }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const fp = join(root, "projects", slug, "project.json");
+    const raw = JSON.parse(readFileSync(fp, "utf8"));
+    raw.captions.style = undefined;
+    writeFileSync(fp, JSON.stringify(raw, null, 2));
+
+    const loaded = await loadProject(slug);
+    assert.equal(loaded.captions.style, "boxed");
+  });
+});
+
+test("loadProject resolves an unknown captions.style value to the default instead of throwing", async () => {
+  await withTempProjectsRoot(async ({ slug, root }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const fp = join(root, "projects", slug, "project.json");
+    const raw = JSON.parse(readFileSync(fp, "utf8"));
+    raw.captions.style = "not-a-real-id";
+    writeFileSync(fp, JSON.stringify(raw, null, 2));
+
+    const loaded = await loadProject(slug);
+    assert.equal(loaded.captions.style, "boxed");
+  });
+});
+
+test("loadProject preserves a valid non-default captions.style value", async () => {
+  await withTempProjectsRoot(async ({ slug, root }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const fp = join(root, "projects", slug, "project.json");
+    const raw = JSON.parse(readFileSync(fp, "utf8"));
+    raw.captions.style = "karaoke";
+    writeFileSync(fp, JSON.stringify(raw, null, 2));
+
+    const loaded = await loadProject(slug);
+    assert.equal(loaded.captions.style, "karaoke");
+  });
+});
