@@ -19,10 +19,12 @@ Each project lives as plain files under `projects/<slug>/` in a layered layout. 
 ```
 projects/<slug>/
   project.json            the EDL - the edit itself (the only file you edit)
+  brief.md                optional project brief: audience, goal, tone,
+                          must-use assets, avoid list, target length, formats
   assets/                 user originals (flat): drop b-roll, music, stills here
   working/                derived media + scratch: proxy.mp4, transcript.json,
                           audio16k.f32, frames/, asset proxies, chats.json,
-                          actions.jsonl…
+                          actions.jsonl, tasks.json…
   output/out.mp4          the rendered export
 ```
 
@@ -36,7 +38,9 @@ Optional `template` field on `project.json` points at a template id (e.g. `talki
 
 **`project.json` IS the edit.** It holds every transcribed word with a `deleted` flag, b-roll overlays, still (Ken Burns) overlays, push-in zooms, title cards, graphics (HTML/CSS template overlays), music placements, captions settings, and look flags. Everything under `working/` and `output/` is regenerated from it. The GUI editor and these CLI commands both read and write this same file; they are **equivalent (parity)**. Edit it through the CLI; the browser editor will show the same result, and vice-versa.
 
-**Action history.** Every registry mutation (GUI, CLI, MCP) appends one entry to `working/actions.jsonl`: an append-only log with action name, actor (`human|agent|cli|mcp`), truncated input/result summaries, timestamp, and the `project.json` `revision` counter before and after (bumped inside the write lock). Read it via `GET /api/projects/<slug>/history` or the History section in the Config panel. Set `OPENKLIP_ACTOR` in the environment to attribute GUI-spawned agent edits as `agent`. Non-registry CLI mutations (asset registration, template set, assembly, brand) do not log yet.
+**Action history.** Every registry mutation (GUI, CLI, MCP) appends one entry to `working/actions.jsonl`: an append-only log with action name, actor (`human|agent|cli|mcp`), truncated input/result summaries, timestamp, and the `project.json` `revision` counter before and after (bumped inside the write lock). Read it via `GET /api/projects/<slug>/history` or the History section in the Config panel. Set `OPENKLIP_ACTOR` in the environment to attribute GUI-spawned agent edits as `agent`. Non-registry CLI mutations (asset registration, template set, assembly, brand) do not log yet. Brief edits are not logged here either.
+
+**Agent tasks.** Every tool-calling chat edit gets a visible, persisted task in `working/tasks.json` (`src/agent-tasks.ts`): id, request, status (`pending|running|blocked|failed|completed|cancelled`), a step list with per-step status and notes, and start/complete timestamps. The running agent reports its own progress with the `task_step` and `task_complete` MCP tools, which resolve the active task from the `OPENKLIP_TASK_ID` environment variable set on the spawned process, never from tool input, so an agent can only touch the one task it was spawned for. The chat panel's task progress card polls `GET /api/projects/<slug>/tasks` every 2 seconds while a task is running; its cancel button `POST`s `{ action: "cancel", taskId }` to the same route, which best-effort kills the live process and marks the task cancelled. Tool-calling edit runs get a 900-second budget (`runClaudeEdit`'s `timeoutMs`) so a full draft (cuts, overlays, music, export, verify) doesn't get killed mid-run; a run that exits without calling `task_complete` is finalized as failed (with a distinct timeout message) or completed as a fallback.
 
 Time is integer audio samples at 48 kHz. The CLI takes seconds where a human number is natural (overlay spans) and converts for you.
 
@@ -47,6 +51,7 @@ Time is integer audio samples at 48 kHz. The CLI takes seconds where a human num
 | List projects | `openklip list` |
 | Ingest a video | `openklip ingest <video> [--force]` |
 | Open editor | `openklip serve [slug]` (alias `dev`) |
+| Read / write the project brief | `openklip brief <slug> [--set <text...> \| --file <path>]` |
 | Read transcript (full) | `openklip transcript <slug>` |
 | Grep transcript | `openklip transcript grep`, `span`, `phrase` |
 | Review edit (JSON) | `openklip status <slug> --json`, `ranges`, `overlays` |
@@ -100,6 +105,9 @@ Run as `bun run src/cli.ts <command>` (or the `openklip` bin).
 | `openklip list` | List all projects, most recent first. |
 | `openklip assets <slug>` | List registered b-roll assets with ids and durations. |
 | `openklip analyze <slug> [--agent <model>]` | One "understand my media" pass: fan out one subagent per un-described asset (b-roll, stills) to write an "asset card", and (if absent) one subagent over the main video's ingest frames to write a `sceneLog` on `project.json` (what is on screen, b-roll opportunities). Idempotent: only missing work runs. |
+| `openklip brief <slug>` | Print the project brief (`brief.md`), or a hint if none exists yet. |
+| `openklip brief <slug> --set <text...>` | Replace the brief with the given text (empty text clears it). |
+| `openklip brief <slug> --file <path>` | Replace the brief with a file's content. |
 
 ### Transcript (read)
 
@@ -227,6 +235,8 @@ All MCP tools route through `src/agent-tools.ts` → `mutateProject` / `runActio
 | Query | `list_projects`, `transcript_grep`, `transcript_phrase`, `scene_log`, `project_status`, `project_overlays`, … | `openklip transcript grep`, `status --json`, `overlays --json` |
 | Mutate | `cut`, `cut-text`, `broll-add`, `title-set`, … | `openklip cut`, `broll-add`, … |
 | Phrase compose | `title-add-phrase`, `zoom-add-phrase`, `broll-add-phrase` | `openklip title-add-phrase`, … |
+| Brief | `brief_get`, `brief_set` | `openklip brief`, `openklip brief --set` |
+| Agent task progress | `task_step`, `task_complete` | no CLI equivalent: scoped to the running agent's own task via `OPENKLIP_TASK_ID` |
 | Render | `export` | `openklip export` |
 
 **Inspect the manifest:** `openklip tools --json --surface mcp`
