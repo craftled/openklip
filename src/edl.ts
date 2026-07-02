@@ -116,6 +116,16 @@ export type Asset = z.infer<typeof AssetSchema>;
 export const BrollDisplaySchema = z.enum(["cover", "pip"]);
 export type BrollDisplay = z.infer<typeof BrollDisplaySchema>;
 
+// How the b-roll clip's soundtrack mixes with the voice at export.
+export const BrollAudioModeSchema = z.enum([
+  "silent",
+  "broll",
+  "mix",
+  "duck-voice",
+  "duck-broll",
+]);
+export type BrollAudioMode = z.infer<typeof BrollAudioModeSchema>;
+
 export const BrollSchema = z.object({
   id: z.string(),
   assetId: z.string(),
@@ -123,6 +133,7 @@ export const BrollSchema = z.object({
   endSample: z.number().int().nonnegative(),
   srcInSample: z.number().int().nonnegative().default(0),
   display: BrollDisplaySchema.default("cover"),
+  audioMode: BrollAudioModeSchema.default("silent"),
   note: z.string().optional(),
   anchor: PhraseAnchorSchema.optional(),
 });

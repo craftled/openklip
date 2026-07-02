@@ -2,6 +2,12 @@ import { existsSync } from "node:fs";
 import { mkdir, rename, unlink } from "node:fs/promises";
 import { isAbsolute, join } from "node:path";
 import { loadAudioAnalysis } from "./audio-analysis.ts";
+import {
+  type BrollAudioFilterGraph,
+  buildBrollAudioFilterGraph,
+  buildBrollAudioMixParts,
+  hasBrollAudio,
+} from "./broll-audio.ts";
 import { buildBrollOverlayFilters } from "./broll-display.ts";
 import { captionStyle } from "./caption-styles.ts";
 import {
@@ -204,6 +210,7 @@ function escapeAssPath(p: string): string {
 }
 
 export interface BrollPlan {
+  audioMode: Broll["audioMode"];
   display: BrollDisplay;
   inputIndex: number;
   outEnd: number;
@@ -231,6 +238,7 @@ export function planBrollForRanges(input: {
       continue;
     }
     plans.push({
+      audioMode: input.broll.audioMode ?? "silent",
       display: input.broll.display ?? "cover",
       inputIndex: input.firstInputIndex + plans.length,
       outStart: sourceToOutputSec(segmentStart, input.ranges),
@@ -555,6 +563,8 @@ function duckRatioFor(amountDb: number): number {
 export interface AudioFilterOpts {
   /** project.audio; ducking/loudness/highpass all default to off/absent. */
   audio?: Audio;
+  /** B-roll audio chains keyed to the same `-i` indices as the video overlays. */
+  brollAudio?: BrollAudioFilterGraph;
   /**
    * Export-invocation-only loudness override (explicit option or a platform
    * preset's targetLufs). When set, loudnorm runs at this target for this
@@ -584,6 +594,14 @@ export function buildAudioParts(
   const ranges = opts.ranges ?? [];
   const snap = opts.snap;
   const audio = opts.audio;
+  const brollAudio = opts.brollAudio ?? {
+    duckBroll: false,
+    duckVoice: false,
+    filterParts: [],
+    mixInputLabels: [],
+    replaceWindows: [],
+  };
+  const hasBrollAudioMix = hasBrollAudio(brollAudio);
   const hasMusic = music.mixInputLabels.length > 0;
   const ducking = Boolean(audio?.ducking?.enabled) && hasMusic;
   const loudnessOverride = opts.loudnessTargetLufs;
@@ -596,7 +614,7 @@ export function buildAudioParts(
   // write directly to [aout] and stay byte-identical to the historical
   // zero-music, zero-settings line (both the zero-music and with-music pins
   // depend on this exact label choice; see the byte-parity tests).
-  const isTerminalVoice = !(hasMusic || loudness);
+  const isTerminalVoice = !(hasMusic || loudness || hasBrollAudioMix);
   const voiceLabel = isTerminalVoice ? "aout" : "avoice";
 
   if (useSeams) {
@@ -626,11 +644,22 @@ export function buildAudioParts(
     );
   }
 
+  parts.push(...brollAudio.filterParts);
+
+  let mixedLabel = voiceLabel;
+  if (hasBrollAudioMix) {
+    const brollOutLabel = hasMusic || loudness || ducking ? "abmix" : "aout";
+    parts.push(
+      ...buildBrollAudioMixParts(voiceLabel, brollAudio, brollOutLabel)
+    );
+    mixedLabel = brollOutLabel;
+  }
+
   if (hasMusic) {
     parts.push(...music.filterParts);
   }
 
-  let mixedLabel = voiceLabel;
+  const musicMixLabel = mixedLabel;
   if (hasMusic && ducking) {
     const mmixLabel =
       music.mixInputLabels.length === 1 ? music.mixInputLabels[0] : "mmix";
@@ -639,10 +668,7 @@ export function buildAudioParts(
         `${music.mixInputLabels.map((l) => `[${l}]`).join("")}amix=inputs=${music.mixInputLabels.length}:duration=first:normalize=0[mmix]`
       );
     }
-    // hasMusic && ducking guarantees voiceLabel is "avoice" (isTerminalVoice
-    // is false whenever hasMusic is true), so this is the same label - spelled
-    // via the variable for clarity that the split source is THE voice stage.
-    parts.push(`[${voiceLabel}]asplit=2[avmain][avsc]`);
+    parts.push(`[${musicMixLabel}]asplit=2[avmain][avsc]`);
     const duck = (audio as Audio).ducking;
     const ratio = duckRatioFor(duck.amountDb);
     parts.push(
@@ -656,7 +682,7 @@ export function buildAudioParts(
   } else if (hasMusic) {
     const finalLabel = loudness ? "apreln" : "aout";
     parts.push(
-      `[${voiceLabel}]${music.mixInputLabels.map((l) => `[${l}]`).join("")}amix=inputs=${1 + music.mixInputLabels.length}:duration=first:normalize=0[${finalLabel}]`
+      `[${musicMixLabel}]${music.mixInputLabels.map((l) => `[${l}]`).join("")}amix=inputs=${1 + music.mixInputLabels.length}:duration=first:normalize=0[${finalLabel}]`
     );
     mixedLabel = finalLabel;
   }
@@ -1174,11 +1200,21 @@ export async function exportCut(
       ? project.audio.loudness.targetLufs
       : undefined);
   const audioLoudness = effectiveLoudnessTarget !== undefined;
+  const brollAudioGraph = buildBrollAudioFilterGraph(
+    plans.map((pl) => ({
+      audioMode: pl.audioMode,
+      inputIndex: pl.inputIndex,
+      outEnd: pl.outEnd,
+      outStart: pl.outStart,
+      srcInSec: pl.srcInSec,
+    }))
+  );
   parts.push(
     ...buildAudioParts(selectExpr, musicGraph, {
       ranges,
       snap: project.cuts.snap,
       audio: project.audio,
+      brollAudio: brollAudioGraph,
       loudnessTargetLufs: resolved.loudnessTargetLufs,
     })
   );

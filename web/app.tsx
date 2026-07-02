@@ -149,6 +149,7 @@ import {
   Sun,
   Trash2,
   Type,
+  Volume2,
   ZoomIn,
 } from "@/lib/icon";
 import { isModKeyOnly, isTypingTarget } from "@/lib/keyboard-shortcuts";
@@ -215,6 +216,7 @@ interface Asset {
 }
 interface BrollItem {
   assetId: string;
+  audioMode?: "broll" | "duck-broll" | "duck-voice" | "mix" | "silent";
   display?: "cover" | "pip";
   endSample: number;
   id: string;
@@ -1971,6 +1973,20 @@ export function App({
               value: (selBroll.display ?? "cover") === "pip" ? "PiP" : "Cover",
             },
             {
+              icon: Volume2,
+              label: "Audio",
+              value:
+                selBroll.audioMode === "broll"
+                  ? "B-roll only"
+                  : selBroll.audioMode === "mix"
+                    ? "Mix"
+                    : selBroll.audioMode === "duck-voice"
+                      ? "Duck voice"
+                      : selBroll.audioMode === "duck-broll"
+                        ? "Duck b-roll"
+                        : "Silent",
+            },
+            {
               icon: Clock3,
               label: "Starts",
               value: fmt(selBroll.startSample / sr),
@@ -2389,6 +2405,43 @@ export function App({
                         PiP
                       </ToggleGroupItem>
                     </ToggleGroup>
+                  </Section>
+                  <Section title="Audio">
+                    <Select
+                      onValueChange={(v) => {
+                        if (
+                          v === "silent" ||
+                          v === "broll" ||
+                          v === "mix" ||
+                          v === "duck-voice" ||
+                          v === "duck-broll"
+                        ) {
+                          updateBroll(selBroll.id, { audioMode: v });
+                        }
+                      }}
+                      value={selBroll.audioMode ?? "silent"}
+                    >
+                      <SelectTrigger className="w-full" size="sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectItem value="silent">
+                            Silent (voice only)
+                          </SelectItem>
+                          <SelectItem value="broll">
+                            B-roll audio only
+                          </SelectItem>
+                          <SelectItem value="mix">Mix with voice</SelectItem>
+                          <SelectItem value="duck-voice">
+                            Duck voice under b-roll
+                          </SelectItem>
+                          <SelectItem value="duck-broll">
+                            Duck b-roll under voice
+                          </SelectItem>
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
                   </Section>
                   <Section title="Source">
                     <Select

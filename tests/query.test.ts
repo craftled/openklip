@@ -248,6 +248,7 @@ test("listOverlays returns structured b-roll titles zooms stills", () => {
   assert.equal(o.broll.length, 1);
   assert.equal(o.broll[0].assetId, "broll-1");
   assert.equal(o.broll[0].display, "cover");
+  assert.equal(o.broll[0].audioMode, "silent");
   assert.equal(o.titles[0].text, "Hook");
   assert.equal(o.zooms[0].scale, 1.2);
   assert.equal(o.stills.length, 0);
@@ -263,6 +264,18 @@ test("listOverlays includes b-roll display mode", () => {
   });
   const o = listOverlays(p);
   assert.equal(o.broll[0].display, "pip");
+});
+
+test("listOverlays includes b-roll audio mode", () => {
+  const p = makeProject();
+  addBroll(p, {
+    assetId: "broll-1",
+    fromSec: 0,
+    toSec: 2,
+    audioMode: "duck-voice",
+  });
+  const o = listOverlays(p);
+  assert.equal(o.broll[0].audioMode, "duck-voice");
 });
 
 test("listOverlays includes music placements with seconds, gain, and mode", () => {

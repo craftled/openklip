@@ -522,6 +522,18 @@ test("broll-add: carries display pip onto the overlay", () => {
   assert.equal(p.broll[0]?.display, "pip");
 });
 
+test("broll-add: carries audioMode mix onto the overlay", () => {
+  const p = makeProject();
+  const item = runAction("broll-add", p, {
+    assetId: "broll-1",
+    fromSec: 0,
+    toSec: 2,
+    audioMode: "mix",
+  }) as { audioMode: string };
+  assert.equal(item.audioMode, "mix");
+  assert.equal(p.broll[0]?.audioMode, "mix");
+});
+
 test("broll-add: carries an optional note onto the overlay", () => {
   const p = makeProject();
   runAction("broll-add", p, {
