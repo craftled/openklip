@@ -1,5 +1,6 @@
 "use client";
 
+import type { Keyframe } from "@engine/keyframes";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   applyGraphicFrame,
@@ -16,6 +17,7 @@ export interface GraphicItem {
   catalog?: string;
   endSample: number;
   id: string;
+  keyframes?: Keyframe[];
   params: Record<string, string | number | boolean>;
   spec?: unknown;
   startSample: number;
