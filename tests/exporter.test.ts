@@ -41,6 +41,7 @@ import {
   fpsFilterFor,
   GIF_MAX_DURATION_SEC,
   GIF_MAX_FPS,
+  GIF_MAX_WIDTH_OVERRIDE_CEILING_PX,
   GIF_MAX_WIDTH_PX,
   graphicWindowDurationSamples,
   type MusicFilterGraph,
@@ -1331,6 +1332,35 @@ test("clampGifDimensions clamps fps independently of width (width already under 
   assert.equal(result.fps, GIF_MAX_FPS);
 });
 
+// ── clampGifDimensions maxWidth override (TODO.md: "no user-facing control
+// to customize these ceilings") ─────────────────────────────────────────────
+
+test("clampGifDimensions overrides the width ceiling only when maxWidth is explicitly given", () => {
+  const overridden = clampGifDimensions({
+    fps: 10,
+    height: 1080,
+    width: 1920,
+    maxWidth: 1280,
+  });
+  assert.equal(overridden.width, 1280);
+  // 1920x1080 is 16:9; same aspect-preserving math as the default-ceiling
+  // cases above, applied against the override instead of GIF_MAX_WIDTH_PX.
+  assert.equal(overridden.height, 720);
+
+  const defaulted = clampGifDimensions({ fps: 10, height: 1080, width: 1920 });
+  assert.equal(defaulted.width, GIF_MAX_WIDTH_PX);
+});
+
+test("clampGifDimensions clamps an oversized maxWidth override down to the hard ceiling", () => {
+  const result = clampGifDimensions({
+    fps: 10,
+    height: 2160,
+    width: 3840,
+    maxWidth: 999_999,
+  });
+  assert.equal(result.width, GIF_MAX_WIDTH_OVERRIDE_CEILING_PX);
+});
+
 // ── format: "gif" (skip-gated real-ffmpeg smokes) ───────────────────────────
 // The gif conversion is a second pass run AFTER the existing mp4 pipeline
 // finishes unchanged, so these smokes both prove the gif path works and
@@ -1558,6 +1588,89 @@ test("exportCut with format: gif clamps a high-resolution export down to the wid
     assert.ok(
       probed.width <= GIF_MAX_WIDTH_PX,
       `expected gif pixel width <= ${GIF_MAX_WIDTH_PX}, got ${probed.width}`
+    );
+  });
+});
+
+test("exportCut with format: gif and an explicit gifMaxWidth override produces a wider gif than the default cap (smoke)", {
+  skip: FFMPEG_OK ? false : "ffmpeg binary unavailable",
+}, async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    const p = projectPaths(slug);
+    const src = join(p.dir, "source.mp4");
+    await run(
+      FFMPEG,
+      [
+        "-y",
+        "-f",
+        "lavfi",
+        "-i",
+        "testsrc=duration=2:size=1280x720:rate=15",
+        "-f",
+        "lavfi",
+        "-i",
+        "sine=frequency=440:duration=2",
+        "-c:v",
+        "libx264",
+        "-pix_fmt",
+        "yuv420p",
+        "-c:a",
+        "aac",
+        "-shortest",
+        src,
+      ],
+      "ffmpeg(export-gif-max-width-override-clip)"
+    );
+    // fps 15 (== GIF_MAX_FPS) so only width is under test here; a 30fps
+    // source would also trip the (unrelated) fps cap and make `capped` true
+    // for a reason that has nothing to do with gifMaxWidth.
+    writeFixtureProject(
+      slug,
+      makeProject({
+        slug,
+        source: src,
+        fps: 15,
+        width: 1280,
+        height: 720,
+        durationSamples: 2 * SAMPLE_RATE,
+        captions: { enabled: false, maxWords: 6, style: "boxed" },
+        words: [
+          {
+            id: "w0",
+            text: "Hello",
+            startSample: 0,
+            endSample: SAMPLE_RATE,
+            deleted: false,
+          },
+          {
+            id: "w1",
+            text: "world",
+            startSample: SAMPLE_RATE,
+            endSample: 2 * SAMPLE_RATE,
+            deleted: false,
+          },
+        ],
+      })
+    );
+
+    const result = await exportCut(slug, { format: "gif", gifMaxWidth: 1280 });
+    assert.equal(result.format, "gif");
+    assert.ok(result.gif, "ExportResult.gif should be present for gif exports");
+    // 1280 is exactly the override, and the source width also is, so nothing
+    // needs clamping this time: capped is false, unlike the default-ceiling
+    // smoke above which clamps the same 1280x720 source down to 960.
+    assert.equal(result.gif?.capped, false);
+    assert.equal(result.gif?.width, 1280);
+    assert.ok(
+      GIF_MAX_WIDTH_PX < 1280,
+      "sanity: the override must exceed the default ceiling for this test to be meaningful"
+    );
+
+    const probed = await probe(result.out);
+    assert.equal(
+      probed.width,
+      1280,
+      `expected the overridden gif pixel width of 1280, got ${probed.width}`
     );
   });
 });
@@ -2733,6 +2846,101 @@ test("CLI export --format with no following value errors", async () => {
   await withTempProjectsRoot(async ({ slug }) => {
     writeFixtureProject(slug, makeProject({ slug }));
     const result = await runCli(["export", slug, "--format"]);
+    assert.notEqual(result.code, 0);
+  });
+});
+
+// ── CLI: --gif-max-width flag (mirrors the --format CLI tests above) ───────
+
+test("CLI export --gif-max-width overrides the default GIF width ceiling (smoke)", {
+  skip: FFMPEG_OK ? false : "ffmpeg binary unavailable",
+}, async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    const p = projectPaths(slug);
+    const src = join(p.dir, "source.mp4");
+    await run(
+      FFMPEG,
+      [
+        "-y",
+        "-f",
+        "lavfi",
+        "-i",
+        "testsrc=duration=2:size=1280x720:rate=15",
+        "-f",
+        "lavfi",
+        "-i",
+        "sine=frequency=440:duration=2",
+        "-c:v",
+        "libx264",
+        "-pix_fmt",
+        "yuv420p",
+        "-c:a",
+        "aac",
+        "-shortest",
+        src,
+      ],
+      "ffmpeg(cli-export-gif-max-width-clip)"
+    );
+    // 1280x720 at 15fps (== GIF_MAX_FPS, so fps is never the reason for a
+    // "gif capped" note): without the width override this would clamp to
+    // 960/540 (see the "clamps a high-resolution export" smoke above); the
+    // override raises the ceiling so 1280 survives untouched.
+    writeFixtureProject(
+      slug,
+      makeProject({
+        slug,
+        source: src,
+        fps: 15,
+        width: 1280,
+        height: 720,
+        durationSamples: 2 * SAMPLE_RATE,
+        captions: { enabled: false, maxWords: 6, style: "boxed" },
+        words: [
+          {
+            id: "w0",
+            text: "Hello",
+            startSample: 0,
+            endSample: SAMPLE_RATE,
+            deleted: false,
+          },
+          {
+            id: "w1",
+            text: "world",
+            startSample: SAMPLE_RATE,
+            endSample: 2 * SAMPLE_RATE,
+            deleted: false,
+          },
+        ],
+      })
+    );
+
+    const result = await runCli([
+      "export",
+      slug,
+      "--format",
+      "gif",
+      "--gif-max-width",
+      "1280",
+    ]);
+    assert.equal(result.code, 0, result.out);
+    assert.doesNotMatch(result.out, /gif capped/);
+    assert.match(result.out, /\.gif/);
+  });
+});
+
+test("CLI export --gif-max-width above 1920 errors and states the ceiling", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const result = await runCli(["export", slug, "--gif-max-width", "5000"]);
+    assert.notEqual(result.code, 0);
+    assert.match(result.out, /--gif-max-width must be at most 1920/);
+  });
+});
+
+test("CLI export --gif-max-width with no following value errors", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const result = await runCli(["export", slug, "--gif-max-width"]);
     assert.notEqual(result.code, 0);
   });
 });

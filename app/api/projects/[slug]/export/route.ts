@@ -5,6 +5,7 @@ import {
   EXPORT_COMPRESSIONS,
   EXPORT_FORMATS,
   exportCut,
+  GIF_MAX_WIDTH_OVERRIDE_CEILING_PX,
 } from "@engine/exporter";
 import { assertValidSlug, projectPaths } from "@engine/paths";
 import { loadProject } from "@engine/projectStore";
@@ -22,11 +23,13 @@ interface RouteParams {
 // `--height` flag (max output height); `compression` and `fps` mirror
 // `--compression` / `--fps`; `format` mirrors `--format` ("mp4" default,
 // "gif" converts the rendered mp4 to a sibling .gif and drops the audio
-// track); `platform` mirrors `--platform` (fills any of the above left
-// unset; explicit fields always win); `loudnessTargetLufs` overrides
-// project.audio.loudness for this export only (never mutates the project)
-// and shares the AudioSchema's -30..-10 LUFS bound. Everything else stays
-// project-driven.
+// track); `gifMaxWidth` mirrors `--gif-max-width` (overrides the GIF's own
+// default 960px width ceiling for this export only, ignored for mp4, capped
+// at GIF_MAX_WIDTH_OVERRIDE_CEILING_PX); `platform` mirrors `--platform`
+// (fills any of the above left unset; explicit fields always win);
+// `loudnessTargetLufs` overrides project.audio.loudness for this export only
+// (never mutates the project) and shares the AudioSchema's -30..-10 LUFS
+// bound. Everything else stays project-driven.
 const ExportRequestSchema = z
   .object({
     aspect: z.enum(["source", "16:9", "9:16", "1:1"]).optional(),
@@ -40,6 +43,12 @@ const ExportRequestSchema = z
       .optional(),
     format: z.enum(EXPORT_FORMATS).optional(),
     fps: z.number().int().min(1).max(120).optional(),
+    gifMaxWidth: z
+      .number()
+      .int()
+      .positive()
+      .max(GIF_MAX_WIDTH_OVERRIDE_CEILING_PX)
+      .optional(),
     height: z.number().int().positive().max(4320).optional(),
     loudnessTargetLufs: z.number().min(-30).max(-10).optional(),
     platform: z.enum(EXPORT_PLATFORM_IDS).optional(),
@@ -110,6 +119,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
       crop: parsed.data.crop,
       format: parsed.data.format,
       fps: parsed.data.fps,
+      gifMaxWidth: parsed.data.gifMaxWidth,
       loudnessTargetLufs: parsed.data.loudnessTargetLufs,
       maxHeight: parsed.data.height,
       platform: parsed.data.platform,

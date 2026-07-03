@@ -125,6 +125,16 @@ export type ExportFormat = (typeof EXPORT_FORMATS)[number];
 // same rate scripts/record-demo-gif.sh already uses for the README demo.
 export const GIF_MAX_WIDTH_PX = 960;
 export const GIF_MAX_FPS = 15;
+// GIF_MAX_WIDTH_OVERRIDE_CEILING_PX (1920): TODO.md's known limitation ("no
+// user-facing control to customize these ceilings") is addressed via
+// ExportOptions.gifMaxWidth, but an unbounded override would let a caller
+// request e.g. gifMaxWidth: 999999 and produce a multi-GB file. This is the
+// hard ceiling ANY gifMaxWidth override clamps to, regardless of caller
+// (CLI/route/action/MCP all validate against it too, but this is the
+// store-layer clamp that protects exportCut even if a surface's own check is
+// bypassed). 1920 (Full HD) is a generous "still shareable" upper bound, well
+// above the 960px default, while remaining far short of an unbounded value.
+export const GIF_MAX_WIDTH_OVERRIDE_CEILING_PX = 1920;
 // GIF_MAX_DURATION_SEC (300 = 5 minutes): even a small-pixel, low-fps GIF of
 // a very long clip is still an enormous frame count, and a multi-minute
 // palettegen/paletteuse pass is a poor experience with no progress feedback.
@@ -139,17 +149,29 @@ export const GIF_MAX_DURATION_SEC = 300;
  * capped, height is derived with the same round-to-nearest-even convention
  * resolveExportDimensions (export-aspect.ts) already uses elsewhere in this
  * file, so the GIF keeps the export's aspect ratio.
+ *
+ * `maxWidth` overrides GIF_MAX_WIDTH_PX for this export only (see
+ * ExportOptions.gifMaxWidth); omitted, it falls back to the default ceiling.
+ * Either way the effective ceiling is itself clamped to
+ * GIF_MAX_WIDTH_OVERRIDE_CEILING_PX (and never below 1px), so an out-of-range
+ * override cannot produce an unbounded GIF even if a caller bypasses the
+ * bounds each surface (CLI/route/action/MCP) enforces before reaching here.
  */
 export function clampGifDimensions(input: {
   fps: number;
   height: number;
+  maxWidth?: number;
   width: number;
 }): { fps: number; height: number; width: number } {
   const fps = Math.min(input.fps, GIF_MAX_FPS);
-  if (input.width <= GIF_MAX_WIDTH_PX) {
+  const maxWidth = Math.min(
+    Math.max(input.maxWidth ?? GIF_MAX_WIDTH_PX, 1),
+    GIF_MAX_WIDTH_OVERRIDE_CEILING_PX
+  );
+  if (input.width <= maxWidth) {
     return { fps, height: input.height, width: input.width };
   }
-  const width = GIF_MAX_WIDTH_PX;
+  const width = maxWidth;
   const height = Math.max(
     2,
     Math.round((input.height * width) / input.width / 2) * 2
@@ -166,6 +188,15 @@ export interface ExportOptions {
   /** Output container; default "mp4". "gif" has no audio track. */
   format?: ExportFormat;
   fps?: number; // output frame rate; default = rounded source rate
+  /**
+   * Overrides GIF_MAX_WIDTH_PX (960) for this export's GIF-specific second
+   * pass only; ignored for format "mp4". Clamped to
+   * GIF_MAX_WIDTH_OVERRIDE_CEILING_PX (1920) regardless of the value
+   * requested; omitted, the export uses the GIF_MAX_WIDTH_PX default.
+   * Bounds are enforced by each surface (CLI/route/action/MCP) before this,
+   * matching how fps/maxHeight bounds are enforced today.
+   */
+  gifMaxWidth?: number;
   /**
    * Export-invocation-only loudness normalization target (LUFS, -30..-10).
    * Applies loudnorm at this target for THIS export regardless of the
@@ -1590,7 +1621,12 @@ export async function exportCut(
       : undefined;
   const gifDims =
     effectiveFormat === "gif"
-      ? clampGifDimensions({ fps: outFps, height: outH, width: outW })
+      ? clampGifDimensions({
+          fps: outFps,
+          height: outH,
+          maxWidth: resolved.gifMaxWidth,
+          width: outW,
+        })
       : undefined;
   let finalOut = destOut;
   try {

@@ -18,7 +18,12 @@ import { logBriefSet } from "./brief-log.ts";
 import { cleanupReport, fillerOnlyCleanupReport } from "./cleanup.ts";
 import { type Project, samplesToSec } from "./edl.ts";
 import { EXPORT_PLATFORM_IDS } from "./export-platforms.ts";
-import { EXPORT_COMPRESSIONS, EXPORT_FORMATS, exportCut } from "./exporter.ts";
+import {
+  EXPORT_COMPRESSIONS,
+  EXPORT_FORMATS,
+  exportCut,
+  GIF_MAX_WIDTH_OVERRIDE_CEILING_PX,
+} from "./exporter.ts";
 import { listGraphics } from "./graphics.ts";
 import { listLuts } from "./lut.ts";
 import {
@@ -765,6 +770,15 @@ const queryTools: AgentToolDef[] = [
         .enum(EXPORT_FORMATS)
         .optional()
         .describe("Output container; default mp4 (gif has no audio track)"),
+      gifMaxWidth: z
+        .number()
+        .int()
+        .positive()
+        .max(GIF_MAX_WIDTH_OVERRIDE_CEILING_PX)
+        .optional()
+        .describe(
+          "Overrides the default 960px GIF width ceiling for this export only (format: gif); ignored for mp4"
+        ),
       crop: z
         .object({
           focusX: z.number().min(0).max(1).optional(),
@@ -803,6 +817,7 @@ const queryTools: AgentToolDef[] = [
       crop,
       format,
       fps,
+      gifMaxWidth,
       platform,
       loudnessTargetLufs,
     }) =>
@@ -812,6 +827,7 @@ const queryTools: AgentToolDef[] = [
         crop,
         format,
         fps,
+        gifMaxWidth,
         loudnessTargetLufs,
         maxHeight,
         platform,

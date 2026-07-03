@@ -248,6 +248,7 @@ export async function exportProject(
     crop?: { focusX?: number; focusY?: number; scale?: number };
     format?: ExportFormat;
     fps?: number;
+    gifMaxWidth?: number;
     loudnessTargetLufs?: number;
     maxHeight?: number;
     platform?: ExportPlatformId;
@@ -271,9 +272,12 @@ export async function exportProject(
   }>
 > {
   try {
-    const { EXPORT_COMPRESSIONS, EXPORT_FORMATS, exportCut } = await import(
-      "@engine/exporter"
-    );
+    const {
+      EXPORT_COMPRESSIONS,
+      EXPORT_FORMATS,
+      exportCut,
+      GIF_MAX_WIDTH_OVERRIDE_CEILING_PX,
+    } = await import("@engine/exporter");
     // Server actions are network-reachable: enforce the same bounds the HTTP
     // route and MCP tool do before any export work, instead of trusting the
     // caller (an unchecked fps would land verbatim in the filtergraph).
@@ -283,6 +287,7 @@ export async function exportProject(
       crop,
       format,
       fps,
+      gifMaxWidth,
       loudnessTargetLufs,
       maxHeight,
       platform,
@@ -320,6 +325,18 @@ export async function exportProject(
     ) {
       throw new Error("maxHeight must be an integer between 1 and 4320");
     }
+    if (
+      gifMaxWidth !== undefined &&
+      !(
+        Number.isInteger(gifMaxWidth) &&
+        gifMaxWidth >= 1 &&
+        gifMaxWidth <= GIF_MAX_WIDTH_OVERRIDE_CEILING_PX
+      )
+    ) {
+      throw new Error(
+        `gifMaxWidth must be an integer between 1 and ${GIF_MAX_WIDTH_OVERRIDE_CEILING_PX}`
+      );
+    }
     if (platform !== undefined && !isExportPlatformId(platform)) {
       throw new Error(
         `unknown export platform "${platform}" (expected one of: ${EXPORT_PLATFORM_IDS.join(", ")})`
@@ -341,6 +358,7 @@ export async function exportProject(
       crop,
       format,
       fps,
+      gifMaxWidth,
       loudnessTargetLufs,
       maxHeight,
       platform,
