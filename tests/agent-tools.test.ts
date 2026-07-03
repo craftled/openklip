@@ -1169,3 +1169,102 @@ test("task_list respects limit and filters by status", async () => {
     assert.equal(completedOnly.tasks[0].status, "completed");
   });
 });
+
+test("task_list filters tasks by actor", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    resetAgentTaskIdSequenceForTests();
+    writeFixtureProject(slug, makeProject({ slug }));
+    const prev = process.env.OPENKLIP_ACTOR;
+    let first: Awaited<ReturnType<typeof createAgentTask>>;
+    try {
+      process.env.OPENKLIP_ACTOR = "agent";
+      first = await createAgentTask(slug, { request: "Agent-created task" });
+      process.env.OPENKLIP_ACTOR = "human";
+      await createAgentTask(slug, { request: "Human-created task" });
+    } finally {
+      if (prev === undefined) {
+        delete process.env.OPENKLIP_ACTOR;
+      } else {
+        process.env.OPENKLIP_ACTOR = prev;
+      }
+    }
+
+    const result = (await callAgentTool("task_list", {
+      slug,
+      actor: "agent",
+    })) as { tasks: Array<{ id: string; actor?: string }> };
+    assert.equal(result.tasks.length, 1);
+    assert.equal(result.tasks[0].id, first.id);
+    assert.equal(result.tasks[0].actor, "agent");
+  });
+});
+
+test("task_list combines actor with status filters using AND semantics", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    resetAgentTaskIdSequenceForTests();
+    writeFixtureProject(slug, makeProject({ slug }));
+    const prev = process.env.OPENKLIP_ACTOR;
+    let agentCompleted: Awaited<ReturnType<typeof createAgentTask>>;
+    try {
+      // Two agent-created tasks (only one completed) and one human-created,
+      // completed task: --status alone would match two, --actor alone would
+      // match two. Only combining both narrows to exactly one, proving the
+      // actor filter is actually applied (not a no-op).
+      process.env.OPENKLIP_ACTOR = "agent";
+      agentCompleted = await createAgentTask(slug, {
+        request: "Agent task, completed",
+      });
+      await withTaskId(agentCompleted.id, async () => {
+        await callAgentTool("task_complete", { slug, outcome: "completed" });
+      });
+      await createAgentTask(slug, { request: "Agent task, running" });
+      process.env.OPENKLIP_ACTOR = "human";
+      const humanCompleted = await createAgentTask(slug, {
+        request: "Human task, completed",
+      });
+      await withTaskId(humanCompleted.id, async () => {
+        await callAgentTool("task_complete", { slug, outcome: "completed" });
+      });
+    } finally {
+      if (prev === undefined) {
+        delete process.env.OPENKLIP_ACTOR;
+      } else {
+        process.env.OPENKLIP_ACTOR = prev;
+      }
+    }
+
+    const result = (await callAgentTool("task_list", {
+      slug,
+      actor: "agent",
+      status: "completed",
+    })) as { tasks: Array<{ id: string; actor?: string; status: string }> };
+    assert.equal(result.tasks.length, 1);
+    assert.equal(result.tasks[0].id, agentCompleted.id);
+    assert.equal(result.tasks[0].actor, "agent");
+    assert.equal(result.tasks[0].status, "completed");
+  });
+});
+
+test("task_list actor filter matching nothing returns an empty array, not an error", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    resetAgentTaskIdSequenceForTests();
+    writeFixtureProject(slug, makeProject({ slug }));
+    const prev = process.env.OPENKLIP_ACTOR;
+    try {
+      process.env.OPENKLIP_ACTOR = "agent";
+      await createAgentTask(slug, { request: "Agent-created task" });
+    } finally {
+      if (prev === undefined) {
+        delete process.env.OPENKLIP_ACTOR;
+      } else {
+        process.env.OPENKLIP_ACTOR = prev;
+      }
+    }
+
+    const result = (await callAgentTool("task_list", {
+      slug,
+      actor: "human",
+    })) as { tasks: unknown[] };
+    assert.deepEqual(result.tasks, []);
+  });
+});

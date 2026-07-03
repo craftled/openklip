@@ -2,6 +2,7 @@
 // future task-progress panel) can share the exact same shape as the server
 // engine without dragging node:fs into the browser bundle. Import types from
 // HERE; src/agent-tasks.ts re-exports only the types. Pattern: action-log-entry.ts.
+import type { Actor } from "./action-log-entry.ts";
 
 /** Overall lifecycle state of one agent run. */
 export type AgentTaskStatus =
@@ -20,6 +21,11 @@ export interface AgentTaskStep {
 }
 
 export interface AgentTask {
+  /** Who created this task: same Actor union as ActionLogEntry. Optional so
+   * tasks created before this field existed still pass the shape guard;
+   * absent on read means "unknown" (a pre-existing task, never filterable
+   * by actor). Set once at creation, never mutated afterward. */
+  actor?: Actor;
   /** Set when status === "blocked": the question the agent is waiting on. */
   blockedQuestion?: string;
   chatId?: string;
@@ -58,6 +64,16 @@ const STEP_STATUSES: readonly AgentTaskStepStatus[] = [
   "failed",
 ];
 
+// Every Actor member (mirrors HISTORY_ACTORS in src/agent-tools.ts): a task's
+// actor is "who created it", which could in principle be any surface.
+const TASK_ACTORS: readonly Actor[] = [
+  "human",
+  "agent",
+  "cli",
+  "mcp",
+  "system",
+];
+
 // Shape guards for untrusted input: both the panel (an untrusted HTTP
 // response) and the store (an on-disk tasks.json a human or a bad write
 // could have malformed) need the exact same validation, so it lives here
@@ -94,6 +110,9 @@ export function isAgentTask(value: unknown): value is AgentTask {
     return false;
   }
   if (row.chatId !== undefined && typeof row.chatId !== "string") {
+    return false;
+  }
+  if (row.actor !== undefined && !TASK_ACTORS.includes(row.actor as Actor)) {
     return false;
   }
   if (!TASK_STATUSES.includes(row.status as AgentTaskStatus)) {
