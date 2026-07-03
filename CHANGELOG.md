@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.34.0.0 - 2026-07-03
+
+Browser upload for multi-take ingest, closing the last CLI-only gap in the Takes panel.
+
+### Added
+- **Take upload from the browser** (`app/api/projects/[slug]/takes/route.ts`, `web/lib/take-create.ts`, `web/components/takes-panel.tsx`): the Takes panel gained an "Add take" control (file-picker button + optional label input, no drag-drop since the panel lives in a narrow sidebar column that would conflict with the transcript word-click surface above it). Ingesting a new take was previously CLI-only (`openklip take-add`); this closes that gap by reusing the existing whole-project-upload infrastructure as-is: `startIngestJob`/`getIngestJob` (`src/ingest-jobs.ts`) and the generic `/api/projects/ingest/[jobId]` poll route. Two correctness fixes landed alongside it: a composite job key (`${slug}/takes/${id}`) is passed to `startIngestJob` instead of the bare project slug, so a take upload in progress can no longer make the shared `inFlightSlugs` registry mistake it for an in-flight whole-project ingest of the same slug (which would wrongly 409-reject a legitimate concurrent whole-project re-ingest); and the route copies the uploaded video into the project's durable `takes/` directory before calling `ingestTake`, rather than letting `ingestTake` record the temp upload path as the take's `source` (the same class of fix `persistUploadedSource` already applies on the whole-project upload path). Progress reporting stays spinner-only ("Ingesting take…"), not phase-by-phase, since `ingestTake` (`src/assembly.ts`) has no `onProgress` parameter; and an id/label collision with an existing take silently overwrites it, matching the existing CLI `take-add` behavior rather than adding a new GUI-only confirmation dialog.
+
+### Changed
+- **Version**: bumped OpenKlip to `0.34.0.0`.
+
 ## 0.33.0.1 - 2026-07-03
 
 Three narrow fixes: CLI `--actor` enum validation, a GIF export cap override GUI control, and a GUI History panel truncation-warning fix.
