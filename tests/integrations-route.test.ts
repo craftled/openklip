@@ -31,6 +31,19 @@ function jsonRequest(body: unknown): Request {
   });
 }
 
+function deleteRequest(provider?: string): Request {
+  const url = provider
+    ? `http://localhost/api/integrations?provider=${provider}`
+    : "http://localhost/api/integrations";
+  return new Request(url, { method: "DELETE" });
+}
+
+const EMPTY_PROVIDER = {
+  hasApiKey: false,
+  keyPreview: null,
+  updatedAt: null,
+};
+
 describe("/api/integrations", () => {
   test("saves and clears ElevenLabs status without returning the key", async () => {
     await withTempRepo(async () => {
@@ -42,6 +55,7 @@ describe("/api/integrations", () => {
           keyPreview: expect.any(String),
           updatedAt: expect.any(String),
         },
+        reve: EMPTY_PROVIDER,
       });
 
       const status = GET();
@@ -51,16 +65,14 @@ describe("/api/integrations", () => {
           keyPreview: expect.any(String),
           updatedAt: expect.any(String),
         },
+        reve: EMPTY_PROVIDER,
       });
 
-      const cleared = DELETE();
+      const cleared = DELETE(deleteRequest());
       expect(cleared.status).toBe(200);
       expect(await cleared.json()).toEqual({
-        elevenLabs: {
-          hasApiKey: false,
-          keyPreview: null,
-          updatedAt: null,
-        },
+        elevenLabs: EMPTY_PROVIDER,
+        reve: EMPTY_PROVIDER,
       });
     });
   });
@@ -138,6 +150,66 @@ describe("/api/integrations", () => {
           voices: ["Tomas voice"],
         },
       });
+    });
+  });
+
+  test("saves, tests, and clears the Reve key independently", async () => {
+    await withTempRepo(async () => {
+      const seenAuth: string[] = [];
+      globalThis.fetch = (async (input, init) => {
+        await Promise.resolve();
+        expect(String(input)).toBe("https://api.reve.com/v1/image/create");
+        seenAuth.push(new Headers(init?.headers).get("authorization") ?? "");
+        // Valid key: schema-valid but out-of-range probe → 400, not billed.
+        return Response.json(
+          { error_code: "INVALID_PARAMETER_VALUE" },
+          {
+            status: 400,
+          }
+        );
+      }) as typeof fetch;
+
+      const saved = await PUT(jsonRequest({ reveApiKey: "reve-secret" }));
+      expect(await saved.json()).toEqual({
+        elevenLabs: EMPTY_PROVIDER,
+        reve: {
+          hasApiKey: true,
+          keyPreview: expect.any(String),
+          updatedAt: expect.any(String),
+        },
+      });
+
+      const tested = await POST(jsonRequest({ provider: "reve" }));
+      const testJson = await tested.json();
+      expect(testJson.reve.ok).toBe(true);
+      expect(seenAuth).toEqual(["Bearer reve-secret"]);
+
+      const cleared = DELETE(deleteRequest("reve"));
+      expect(await cleared.json()).toEqual({
+        elevenLabs: EMPTY_PROVIDER,
+        reve: EMPTY_PROVIDER,
+      });
+    });
+  });
+
+  test("reports an invalid Reve key as rejected", async () => {
+    await withTempRepo(async () => {
+      globalThis.fetch = (async () => {
+        await Promise.resolve();
+        return Response.json(
+          { error_code: "PARTNER_API_TOKEN_INVALID" },
+          {
+            status: 401,
+          }
+        );
+      }) as typeof fetch;
+
+      const tested = await POST(
+        jsonRequest({ provider: "reve", reveApiKey: "bad-key" })
+      );
+      const testJson = await tested.json();
+      expect(testJson.reve.ok).toBe(false);
+      expect(testJson.reve.status).toBe(401);
     });
   });
 });
