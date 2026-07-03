@@ -196,7 +196,7 @@ function AgentPromptInputInner({
       skills={skills}
     >
       <PromptInput
-        className="rounded-lg"
+        className="min-w-0 rounded-lg"
         inputGroupClassName="items-stretch overflow-visible"
         onSubmit={onSubmit}
       >
@@ -239,7 +239,10 @@ function AgentPromptInputInner({
               ref={uploadInputRef}
               type="file"
             />
-            <ProjectFolderButton slug={slug} />
+            <ProjectFolderButton
+              className="min-w-0 max-w-[5.5rem] shrink"
+              slug={slug}
+            />
             <DropdownMenu
               onOpenChange={setSkillsOpen}
               open={skillsOpen && !slashMenu.menuOpen}
@@ -251,9 +254,7 @@ function AgentPromptInputInner({
                     tooltip="Browse edit skills"
                   >
                     <Sparkles data-icon="inline-start" />
-                    <span className="sr-only sm:not-sr-only sm:inline">
-                      Skills
-                    </span>
+                    <span className="sr-only">Skills</span>
                   </PromptInputButton>
                 }
               />
@@ -279,7 +280,10 @@ function AgentPromptInputInner({
               }}
               value={agent}
             >
-              <PromptInputSelectTrigger className="max-w-[11rem]" size="sm">
+              <PromptInputSelectTrigger
+                className="min-w-0 max-w-[8.5rem]"
+                size="sm"
+              >
                 <AgentModelTriggerValue value={agent} />
               </PromptInputSelectTrigger>
               <PromptInputSelectContent className="w-72">
