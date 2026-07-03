@@ -8,6 +8,7 @@ import {
   AGENT_TASK_STATUSES,
   agentToolManifest,
   agentToolTable,
+  HISTORY_ACTORS,
 } from "./agent-tools.ts";
 import { assembleFromSelection, ingestTake, listTakes } from "./assembly.ts";
 import { analyzeAssets } from "./asset-cards.ts";
@@ -2719,6 +2720,12 @@ try {
       const taskFilter = flagValue(rest, "--task");
       const actionFilter = flagValue(rest, "--action");
       const actorFilter = flagValue(rest, "--actor");
+      if (
+        actorFilter !== undefined &&
+        !(HISTORY_ACTORS as readonly string[]).includes(actorFilter)
+      ) {
+        throw new Error(`--actor must be one of: ${HISTORY_ACTORS.join(", ")}`);
+      }
       const allEntries = await readActionLog(historySlug);
       let entries = allEntries;
       if (taskFilter !== undefined) {
@@ -2786,6 +2793,12 @@ try {
         );
       }
       const actorFilter = flagValue(rest, "--actor");
+      if (
+        actorFilter !== undefined &&
+        !(HISTORY_ACTORS as readonly string[]).includes(actorFilter)
+      ) {
+        throw new Error(`--actor must be one of: ${HISTORY_ACTORS.join(", ")}`);
+      }
       const tasks = await listAgentTasks(tasksSlug, {
         limit:
           statusFilter === undefined && actorFilter === undefined

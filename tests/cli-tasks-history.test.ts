@@ -246,6 +246,89 @@ test("CLI history: an --actor filter matching nothing prints a distinct filtered
   });
 });
 
+// ── --actor must be validated against the same enum MCP already uses ──
+
+test("CLI history rejects an unknown --actor value with a non-zero exit and a clear error", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+
+    const r = await runCli(["history", slug, "--actor", "bogus"]);
+    assert.notEqual(r.code, 0);
+    assert.match(r.out, /--actor/);
+    assert.match(r.out, /human/);
+    assert.match(r.out, /agent/);
+    assert.match(r.out, /cli/);
+    assert.match(r.out, /mcp/);
+    assert.match(r.out, /system/);
+  });
+});
+
+test("CLI tasks rejects an unknown --actor value with a non-zero exit and a clear error", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    await createAgentTask(slug, { request: "do something" });
+
+    const r = await runCli(["tasks", slug, "--actor", "bogus"]);
+    assert.notEqual(r.code, 0);
+    assert.match(r.out, /--actor/);
+    assert.match(r.out, /human/);
+    assert.match(r.out, /agent/);
+    assert.match(r.out, /cli/);
+    assert.match(r.out, /mcp/);
+    assert.match(r.out, /system/);
+  });
+});
+
+test("CLI history accepts a valid --actor value (human) and filters normally", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    await mutateProject(
+      slug,
+      (p) => {
+        p.padMs = 10;
+      },
+      { action: "pad", actor: "human", input: { padMs: 10 } }
+    );
+    await mutateProject(
+      slug,
+      (p) => {
+        p.padMs = 20;
+      },
+      { action: "pad", actor: "agent", input: { padMs: 20 } }
+    );
+
+    const r = await runCli(["history", slug, "--actor", "human"]);
+    assert.equal(r.code, 0, r.out);
+    assert.match(r.out, /1 entry/);
+    assert.match(r.out, /human/);
+  });
+});
+
+test("CLI tasks accepts a valid --actor value (cli) and filters normally", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const prev = process.env.OPENKLIP_ACTOR;
+    let cliTask: Awaited<ReturnType<typeof createAgentTask>>;
+    try {
+      process.env.OPENKLIP_ACTOR = "cli";
+      cliTask = await createAgentTask(slug, { request: "cli request" });
+      process.env.OPENKLIP_ACTOR = "human";
+      await createAgentTask(slug, { request: "human request" });
+    } finally {
+      if (prev === undefined) {
+        delete process.env.OPENKLIP_ACTOR;
+      } else {
+        process.env.OPENKLIP_ACTOR = prev;
+      }
+    }
+
+    const r = await runCli(["tasks", slug, "--actor", "cli"]);
+    assert.equal(r.code, 0, r.out);
+    assert.match(r.out, new RegExp(cliTask.id));
+    assert.match(r.out, /1 task/);
+  });
+});
+
 test("CLI history: combining --actor with --task and --action narrows correctly", async () => {
   await withTempProjectsRoot(async ({ slug }) => {
     writeFixtureProject(slug, makeProject({ slug }));
