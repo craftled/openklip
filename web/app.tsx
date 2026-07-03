@@ -3192,7 +3192,7 @@ export function App({
               keyboardShortcut={false}
               style={
                 {
-                  "--sidebar-width": `${chatWidth}px`,
+                  "--sidebar-width": `${visibleChatWidth}px`,
                   "--sidebar-width-icon": "3.25rem",
                 } as CSSProperties
               }
@@ -3222,8 +3222,8 @@ export function App({
                       <div className="min-w-0">
                         <div className="font-medium text-sm">Editor</div>
                         <div className="truncate text-muted-foreground text-xs">
-                          {ranges.length} cuts · {fmt(keptDuration)} /{" "}
-                          {fmt(fullDur)}
+                          {ranges.length} {ranges.length === 1 ? "cut" : "cuts"}{" "}
+                          · {fmt(keptDuration)} / {fmt(fullDur)}
                         </div>
                       </div>
                       <div className="ml-auto flex items-center gap-2">
@@ -3688,7 +3688,7 @@ export function App({
               {settingsOpen ? null : (
                 <>
                   <aside
-                    className="relative hidden min-h-0 shrink-0 border-border border-l bg-background xl:flex"
+                    className="relative hidden min-h-0 min-w-0 shrink-0 overflow-hidden border-border border-l bg-background xl:flex"
                     style={{ width: visibleChatWidth }}
                   >
                     <ChatResizeHandle
