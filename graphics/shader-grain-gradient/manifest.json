@@ -1,0 +1,20 @@
+{
+  "id": "shader-grain-gradient",
+  "name": "Shader Grain Gradient",
+  "kind": "rich",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "params": {
+    "colors": {
+      "type": "string",
+      "default": "#090f1f, #c084fc, #67e8f9, #818cf8",
+      "label": "Colors (comma-separated hex)"
+    },
+    "speed": { "type": "number", "default": 1, "label": "Speed" },
+    "scale": { "type": "number", "default": 1, "label": "Scale" },
+    "shape": { "type": "string", "default": "wave", "label": "Shape" },
+    "noise": { "type": "number", "default": 0.25, "label": "Noise" },
+    "intensity": { "type": "number", "default": 0.4, "label": "Intensity" }
+  }
+}

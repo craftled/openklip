@@ -119,7 +119,10 @@ export async function renderHeadlessAlpha(
       headless: true,
       args: [
         "--no-sandbox",
-        "--disable-gpu",
+        "--ignore-gpu-blocklist",
+        "--enable-webgl",
+        "--use-angle=swiftshader",
+        "--enable-unsafe-swiftshader",
         "--hide-scrollbars",
         "--force-color-profile=srgb",
       ],

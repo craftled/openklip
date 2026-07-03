@@ -1,0 +1,19 @@
+{
+  "id": "shader-mesh-gradient",
+  "name": "Shader Mesh Gradient",
+  "kind": "rich",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "params": {
+    "colors": {
+      "type": "string",
+      "default": "#c084fc, #67e8f9, #818cf8",
+      "label": "Colors (comma-separated hex)"
+    },
+    "speed": { "type": "number", "default": 1, "label": "Speed" },
+    "scale": { "type": "number", "default": 1, "label": "Scale" },
+    "distortion": { "type": "number", "default": 0.35, "label": "Distortion" },
+    "swirl": { "type": "number", "default": 0.2, "label": "Swirl" }
+  }
+}
