@@ -187,15 +187,14 @@ function AgentPromptInputInner({
   };
 
   return (
-    <div className="relative w-full min-w-0">
-      <AgentSkillsMenu
-        highlightedIndex={slashMenu.highlightedIndex}
-        onHighlight={slashMenu.setHighlightedIndex}
-        onSelect={selectSkill}
-        open={slashMenu.menuOpen}
-        query={slashMenu.slashQuery}
-        skills={skills}
-      />
+    <AgentSkillsMenu
+      highlightedIndex={slashMenu.highlightedIndex}
+      onHighlight={slashMenu.setHighlightedIndex}
+      onSelect={selectSkill}
+      open={slashMenu.menuOpen}
+      query={slashMenu.slashQuery}
+      skills={skills}
+    >
       <PromptInput
         className="min-w-0 rounded-lg"
         inputGroupClassName="items-stretch overflow-visible"
@@ -318,7 +317,7 @@ function AgentPromptInputInner({
           />
         </PromptInputFooter>
       </PromptInput>
-    </div>
+    </AgentSkillsMenu>
   );
 }
 

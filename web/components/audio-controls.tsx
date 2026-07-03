@@ -8,6 +8,14 @@ import {
   THIN_SLIDER,
 } from "@/components/slider-primitives";
 import { Field, FieldLabel } from "@/components/ui/field";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 
@@ -203,21 +211,26 @@ export function AudioControls({
               <FieldLabel className="text-muted-foreground text-xs">
                 Loudness mode
               </FieldLabel>
-              <select
-                className="h-7 rounded-md border border-input bg-background px-2 text-xs"
-                disabled={applying}
-                onChange={(e) =>
-                  onPatchAudio({
-                    loudness: {
-                      mode: e.target.value as "single" | "two-pass",
-                    },
-                  })
-                }
+              <Select
+                onValueChange={(value) => {
+                  if (value === "single" || value === "two-pass") {
+                    onPatchAudio({
+                      loudness: { mode: value },
+                    });
+                  }
+                }}
                 value={audio.loudness.mode ?? "single"}
               >
-                <option value="single">Single pass</option>
-                <option value="two-pass">Two pass (exact)</option>
-              </select>
+                <SelectTrigger className="w-full" disabled={applying} size="sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="single">Single pass</SelectItem>
+                    <SelectItem value="two-pass">Two pass (exact)</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
             </Field>
           </>
         ) : null}

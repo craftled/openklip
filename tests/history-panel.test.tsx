@@ -786,7 +786,8 @@ test("HistoryFilterControls renders an actor, action, and task filter control", 
   assert.match(html, /Filter by actor/i);
   assert.match(html, /Filter by action/i);
   assert.match(html, /Filter by task/i);
-  assert.match(html, /task-1/);
+  assert.match(html, /role="combobox"/);
+  assert.match(html, /aria-label="Filter by task"/);
 });
 
 test("HistoryFilterControls shows 'Clear filters' only when a filter is active", () => {

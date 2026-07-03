@@ -242,7 +242,7 @@ export function EditorTranscriptPanel({
           <div
             aria-label="Transcript editor"
             aria-multiline="true"
-            className="mx-auto w-full max-w-[80ch] rounded-md text-left text-foreground text-sm leading-7 tracking-normal outline-none selection:bg-primary/20 focus-visible:ring-3 focus-visible:ring-ring/30 sm:text-[0.95rem]"
+            className="mx-auto w-full max-w-[80ch] rounded-md text-left text-foreground text-sm leading-7 tracking-normal outline-none selection:bg-primary/20 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 sm:text-[0.95rem]"
             contentEditable={editorMounted ? true : undefined}
             onBlur={commitEditedText}
             onKeyDown={onEditorKeyDown}

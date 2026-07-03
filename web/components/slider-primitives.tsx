@@ -19,11 +19,21 @@ export function clampNumber(
   min: number,
   max: number
 ): number | null {
-  const n = Number(raw);
+  const normalized = raw.trim().replace(",", ".");
+  const n = Number(normalized);
   if (!Number.isFinite(n)) {
     return null;
   }
   return Math.max(min, Math.min(max, n));
+}
+
+/** Always dot-decimal, independent of browser locale. */
+export function formatDotDecimal(value: number): string {
+  return value.toLocaleString("en-US", {
+    maximumFractionDigits: 10,
+    minimumFractionDigits: 0,
+    useGrouping: false,
+  });
 }
 
 export const THIN_SLIDER =
@@ -38,7 +48,7 @@ export function CommitNumberInput({
   max,
   min,
   onCommit,
-  step,
+  step: _step,
   value,
 }: {
   disabled?: boolean;
@@ -62,8 +72,8 @@ export function CommitNumberInput({
   return (
     <Input
       disabled={disabled}
-      max={max}
-      min={min}
+      inputMode="decimal"
+      lang="en-US"
       onBlur={commit}
       onChange={(e) => setDraft(e.target.value)}
       onKeyDown={(e) => {
@@ -71,9 +81,8 @@ export function CommitNumberInput({
           commit();
         }
       }}
-      step={step}
-      type="number"
-      value={draft ?? value}
+      type="text"
+      value={draft ?? formatDotDecimal(value)}
     />
   );
 }

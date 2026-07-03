@@ -112,7 +112,7 @@ export function ChatListItem({
     <SidebarMenuItem>
       {isRenaming ? (
         <Input
-          className="h-7 rounded-[min(var(--radius-md),12px)] border-border bg-background px-2 text-xs shadow-none focus-visible:ring-1"
+          className="h-7 rounded-[min(var(--radius-md),12px)] border-border bg-background px-2 text-xs shadow-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
           onBlur={commitRename}
           onChange={(e) => setDraftTitle(e.target.value)}
           onKeyDown={onRenameKeyDown}

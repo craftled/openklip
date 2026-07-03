@@ -9,6 +9,15 @@ import type { RevertTarget } from "@engine/revert";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Field, FieldLabel } from "@/components/ui/field";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toastRevertFailed, toastRevertSucceeded } from "@/lib/app-toast";
 import { RotateCcw } from "@/lib/icon";
 import { relativeTimeAgo } from "@/lib/relative-time";
@@ -128,9 +137,6 @@ export function distinctTaskIds(entries: ActionLogEntry[]): string[] {
   ).sort();
 }
 
-const FILTER_SELECT_CLASS =
-  "h-6 max-w-32 rounded-sm border border-input bg-transparent px-1 text-[11px] text-foreground";
-
 const FILTER_LABEL_CLASS =
   "flex items-center gap-1 text-[11px] text-muted-foreground";
 
@@ -148,22 +154,31 @@ function FilterSelect({
   value: string;
 }) {
   return (
-    <label className={FILTER_LABEL_CLASS}>
-      {label}
-      <select
-        aria-label={ariaLabel}
-        className={FILTER_SELECT_CLASS}
-        onChange={(e) => onChange(e.target.value)}
-        value={value}
+    <Field className={FILTER_LABEL_CLASS} orientation="horizontal">
+      <FieldLabel className="text-[11px]">{label}</FieldLabel>
+      <Select
+        onValueChange={(next) => onChange(next === "all" ? "" : (next ?? ""))}
+        value={value || "all"}
       >
-        <option value="">All</option>
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
-      </select>
-    </label>
+        <SelectTrigger
+          aria-label={ariaLabel}
+          className="h-6 max-w-32 rounded-sm px-1 text-[11px]"
+          size="sm"
+        >
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectGroup>
+            <SelectItem value="all">All</SelectItem>
+            {options.map((option) => (
+              <SelectItem key={option} value={option}>
+                {option}
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        </SelectContent>
+      </Select>
+    </Field>
   );
 }
 
