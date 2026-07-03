@@ -13,6 +13,8 @@ export const KEYFRAME_EASINGS: Keyframe["easing"][] = [
   "easeOut",
   "easeInOut",
   "spring",
+  "backOut",
+  "anticipate",
 ];
 
 export function keyframePositionFraction(
