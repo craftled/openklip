@@ -375,6 +375,9 @@ function mergeAudioPatch(current: Audio | undefined, patch: AudioPatch): Audio {
     voiceHighpass: patch.voiceHighpass
       ? { ...base.voiceHighpass, ...patch.voiceHighpass }
       : base.voiceHighpass,
+    deEsser: patch.deEsser
+      ? { ...base.deEsser, ...patch.deEsser }
+      : base.deEsser,
   };
 }
 

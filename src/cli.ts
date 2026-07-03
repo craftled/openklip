@@ -220,6 +220,7 @@ Look & captions
                         [--loudness-mode single|two-pass]
                         [--noise-reduction on|off] [--noise-strength <1-97>]
                         [--highpass on|off] [--highpass-hz <40-200>]
+                        [--deess on|off] [--deess-intensity <0-1>]
   openklip pad <slug> <ms>               cut boundary padding (0-500 ms)
   openklip brand <slug> <name>           apply a brand preset (look defaults)
   openklip template list                 list edit templates (templates/*/skill.md)
@@ -1678,7 +1679,7 @@ try {
     case "audio": {
       if (!rest[0]) {
         throw new Error(
-          "usage: openklip audio <slug> [--duck on|off] [--duck-amount <db>] [--duck-attack <ms>] [--duck-release <ms>] [--loudness on|off] [--loudness-target <lufs>] [--loudness-mode single|two-pass] [--noise-reduction on|off] [--noise-strength <n>] [--highpass on|off] [--highpass-hz <n>]"
+          "usage: openklip audio <slug> [--duck on|off] [--duck-amount <db>] [--duck-attack <ms>] [--duck-release <ms>] [--loudness on|off] [--loudness-target <lufs>] [--loudness-mode single|two-pass] [--noise-reduction on|off] [--noise-strength <n>] [--highpass on|off] [--highpass-hz <n>] [--deess on|off] [--deess-intensity <n>]"
         );
       }
       const slug = rest[0];
@@ -1693,6 +1694,8 @@ try {
       const noiseStrength = flagNumber(rest, "--noise-strength");
       const highpass = flagValue(rest, "--highpass");
       const highpassHz = flagNumber(rest, "--highpass-hz");
+      const deess = flagValue(rest, "--deess");
+      const deessIntensity = flagNumber(rest, "--deess-intensity");
 
       const input: {
         ducking?: {
@@ -1708,6 +1711,7 @@ try {
         };
         noiseReduction?: { enabled?: boolean; nr?: number };
         voiceHighpass?: { enabled?: boolean; hz?: number };
+        deEsser?: { enabled?: boolean; intensity?: number };
       } = {};
       if (
         duck !== undefined ||
@@ -1776,6 +1780,18 @@ try {
           input.voiceHighpass.hz = highpassHz;
         }
       }
+      if (deess !== undefined || deessIntensity !== undefined) {
+        input.deEsser = {};
+        if (deess !== undefined) {
+          input.deEsser.enabled = parseOnOff(
+            deess,
+            "openklip audio <slug> --deess"
+          );
+        }
+        if (deessIntensity !== undefined) {
+          input.deEsser.intensity = deessIntensity;
+        }
+      }
 
       const project =
         Object.keys(input).length === 0
@@ -1783,7 +1799,7 @@ try {
           : (await runLoggedAction(slug, "audio", input)).project;
       const a = project.audio;
       console.log(
-        `audio: duck ${a.ducking.enabled ? "on" : "off"} (${a.ducking.amountDb}dB, attack ${a.ducking.attackMs}ms, release ${a.ducking.releaseMs}ms), loudness ${a.loudness.enabled ? "on" : "off"} (${a.loudness.targetLufs} LUFS, ${a.loudness.mode}), noise ${a.noiseReduction.enabled ? "on" : "off"} (nr ${a.noiseReduction.nr}), highpass ${a.voiceHighpass.enabled ? "on" : "off"} (${a.voiceHighpass.hz}Hz)`
+        `audio: duck ${a.ducking.enabled ? "on" : "off"} (${a.ducking.amountDb}dB, attack ${a.ducking.attackMs}ms, release ${a.ducking.releaseMs}ms), loudness ${a.loudness.enabled ? "on" : "off"} (${a.loudness.targetLufs} LUFS, ${a.loudness.mode}), noise ${a.noiseReduction.enabled ? "on" : "off"} (nr ${a.noiseReduction.nr}), highpass ${a.voiceHighpass.enabled ? "on" : "off"} (${a.voiceHighpass.hz}Hz), deess ${a.deEsser.enabled ? "on" : "off"} (intensity ${a.deEsser.intensity})`
       );
       break;
     }

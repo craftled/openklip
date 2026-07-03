@@ -488,12 +488,30 @@ export const AudioSchema = z
         hz: z.number().min(40).max(200).default(80),
       })
       .default({ enabled: false, hz: 80 }),
+    /**
+     * De-essing on the voice bus (ffmpeg deesser). Only `intensity` (the
+     * filter's `i` option, 0-1) is exposed, matching noiseReduction's
+     * single-knob minimalism; `f` (frequency) and `s` (output mode) are
+     * hardcoded to the filter's own defaults (f=0.5, s=o/output) rather than
+     * surfaced as user controls.
+     */
+    deEsser: z
+      .object({
+        enabled: z.boolean().default(false),
+        // ffmpeg's own default for `i` is 0 (off), but our `enabled` flag
+        // already gates whether the filter runs; once a user turns it on,
+        // default to the filter's `m` (max deessing) default of 0.5 as a
+        // sane starting intensity.
+        intensity: z.number().min(0).max(1).default(0.5),
+      })
+      .default({ enabled: false, intensity: 0.5 }),
   })
   .default({
     ducking: { enabled: false, amountDb: 12, attackMs: 25, releaseMs: 250 },
     loudness: { enabled: false, targetLufs: -16, mode: "single" as const },
     noiseReduction: { enabled: false, nr: 12 },
     voiceHighpass: { enabled: false, hz: 80 },
+    deEsser: { enabled: false, intensity: 0.5 },
   });
 export type Audio = z.infer<typeof AudioSchema>;
 

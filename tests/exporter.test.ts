@@ -47,6 +47,7 @@ import {
   planMusicWindows,
   resolveOutputFps,
   shouldUseSeamedVoice,
+  voiceAffixes,
 } from "../src/exporter.ts";
 import { FFMPEG, FFPROBE, probe, run } from "../src/ffmpeg.ts";
 import { projectPaths } from "../src/paths.ts";
@@ -2160,6 +2161,86 @@ test("exportCut: loudness normalization on succeeds with one audio stream (smoke
   });
 });
 
+test("exportCut: de-essing on runs the deesser filter and reaches the encoder (smoke)", {
+  skip: FFMPEG_OK ? false : "ffmpeg binary unavailable",
+}, async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    const p = projectPaths(slug);
+    const src = join(p.dir, "source.mp4");
+    await run(
+      FFMPEG,
+      [
+        "-y",
+        "-f",
+        "lavfi",
+        "-i",
+        "color=c=green:s=320x240:r=30:d=2",
+        "-f",
+        "lavfi",
+        "-i",
+        "sine=frequency=440:duration=2",
+        "-c:v",
+        "libx264",
+        "-pix_fmt",
+        "yuv420p",
+        "-c:a",
+        "aac",
+        "-shortest",
+        src,
+      ],
+      "ffmpeg(deess-smoke-source)"
+    );
+    writeFixtureProject(
+      slug,
+      makeProject({
+        slug,
+        source: src,
+        fps: 30,
+        width: 320,
+        height: 240,
+        durationSamples: 2 * SAMPLE_RATE,
+        captions: { enabled: false, maxWords: 6, style: "boxed" },
+        audio: {
+          ducking: {
+            enabled: false,
+            amountDb: 12,
+            attackMs: 25,
+            releaseMs: 250,
+          },
+          loudness: { enabled: false, targetLufs: -16 },
+          voiceHighpass: { enabled: false, hz: 80 },
+          deEsser: { enabled: true, intensity: 0.7 },
+        },
+        words: [
+          {
+            id: "w0",
+            text: "Hello",
+            startSample: 0,
+            endSample: SAMPLE_RATE,
+            deleted: false,
+          },
+          {
+            id: "w1",
+            text: "world",
+            startSample: SAMPLE_RATE,
+            endSample: 2 * SAMPLE_RATE,
+            deleted: false,
+          },
+        ],
+      })
+    );
+
+    // Not a full audible-difference assertion: this proves the deesser
+    // filter is syntactically valid and ffmpeg accepts the whole chain
+    // end to end (exportCut throws if ffmpeg exits nonzero).
+    const result = await exportCut(slug);
+    assert.ok(existsSync(p.out), "out.mp4 missing");
+    const probed = await probeOut(p.out);
+    assert.equal(probed.audioStreamCount, 1);
+    assert.equal(result.format, "mp4");
+  });
+});
+
 // ── Export platform presets: one resolution point at the top of exportCut ──
 
 function platformSmokeProject(slug: string, src: string) {
@@ -2822,4 +2903,140 @@ test("buildSeamedVoiceParts: noiseReduction appended after highpass in segment p
     result.filterParts[1].startsWith("[0:a]highpass=f=80,afftdn=nr=10,atrim="),
     `Expected highpass,afftdn prefix, got: ${result.filterParts[1]}`
   );
+});
+
+// ── De-essing filter chain ──────────────────────────────────────────────────
+
+test("voiceAffixes: de-essing enabled appends deesser after highpass and noise reduction", () => {
+  const audio: Audio = AudioSchema.parse({
+    voiceHighpass: { enabled: true, hz: 80 },
+    noiseReduction: { enabled: true, nr: 10 },
+    deEsser: { enabled: true, intensity: 0.7 },
+  });
+  assert.deepEqual(voiceAffixes(audio), {
+    highpassSuffix: ",highpass=f=80",
+    noiseSuffix: ",afftdn=nr=10",
+    deesserSuffix: ",deesser=i=0.7",
+  });
+});
+
+test("voiceAffixes: de-essing disabled produces no deesser fragment", () => {
+  const audio: Audio = AudioSchema.parse({
+    deEsser: { enabled: false, intensity: 0.7 },
+  });
+  assert.equal(voiceAffixes(audio).deesserSuffix, "");
+});
+
+test("voiceAffixes: de-essing alone with no highpass or noise reduction", () => {
+  const audio: Audio = AudioSchema.parse({
+    deEsser: { enabled: true, intensity: 0.5 },
+  });
+  assert.deepEqual(voiceAffixes(audio), {
+    highpassSuffix: "",
+    noiseSuffix: "",
+    deesserSuffix: ",deesser=i=0.5",
+  });
+});
+
+test("buildAudioParts: deEsser appended after highpass and noiseReduction in plain aselect path", () => {
+  const expr = "between(t,0.000000,2.000000)";
+  const zeroMusic: MusicFilterGraph = {
+    filterParts: [],
+    inputArgs: [],
+    mixInputLabels: [],
+  };
+  const audio: Audio = AudioSchema.parse({
+    voiceHighpass: { enabled: true, hz: 80 },
+    noiseReduction: { enabled: true, nr: 10 },
+    deEsser: { enabled: true, intensity: 0.6 },
+  });
+  const parts = buildAudioParts(expr, zeroMusic, { audio });
+  assert.deepEqual(parts, [
+    `[0:a]aselect='${expr}',asetpts=N/SR/TB,highpass=f=80,afftdn=nr=10,deesser=i=0.6[aout]`,
+  ]);
+});
+
+test("buildAudioParts: deEsser disabled leaves aselect path byte-identical", () => {
+  const expr = "between(t,0.000000,2.000000)";
+  const zeroMusic: MusicFilterGraph = {
+    filterParts: [],
+    inputArgs: [],
+    mixInputLabels: [],
+  };
+  const audio: Audio = AudioSchema.parse({
+    deEsser: { enabled: false },
+  });
+  assert.deepEqual(buildAudioParts(expr, zeroMusic, { audio }), [
+    `[0:a]aselect='${expr}',asetpts=N/SR/TB[aout]`,
+  ]);
+});
+
+test("buildAudioParts: segmentMode applies deesser on concat path", () => {
+  const expr = "between(t,0.000000,2.000000)";
+  const zeroMusic: MusicFilterGraph = {
+    filterParts: [],
+    inputArgs: [],
+    mixInputLabels: [],
+  };
+  const audio: Audio = AudioSchema.parse({
+    deEsser: { enabled: true, intensity: 0.4 },
+  });
+  const parts = buildAudioParts(expr, zeroMusic, {
+    audio,
+    segmentMode: true,
+    segmentRangeCount: 1,
+  });
+  assert.match(parts[0], /deesser=i=0\.4/);
+});
+
+test("buildSeamedVoiceParts: deesser appended after highpass and noiseReduction in segment prefix", () => {
+  const ranges: Range[] = [
+    { startSec: 0, endSec: 2 },
+    { startSec: 3, endSec: 5 },
+  ];
+  const result = buildSeamedVoiceParts(ranges, {
+    crossfadeMs: 24,
+    highpassHz: 80,
+    noiseNr: 10,
+    deesserIntensity: 0.6,
+  });
+  assert.ok(
+    result.filterParts[0].startsWith(
+      "[0:a]highpass=f=80,afftdn=nr=10,deesser=i=0.6,atrim="
+    ),
+    `Expected highpass,afftdn,deesser prefix, got: ${result.filterParts[0]}`
+  );
+  assert.ok(
+    result.filterParts[1].startsWith(
+      "[0:a]highpass=f=80,afftdn=nr=10,deesser=i=0.6,atrim="
+    ),
+    `Expected highpass,afftdn,deesser prefix, got: ${result.filterParts[1]}`
+  );
+});
+
+test("buildSeamedVoiceParts: deesser alone with no highpass or noiseNr", () => {
+  const ranges: Range[] = [
+    { startSec: 0, endSec: 2 },
+    { startSec: 3, endSec: 5 },
+  ];
+  const result = buildSeamedVoiceParts(ranges, {
+    crossfadeMs: 24,
+    deesserIntensity: 0.5,
+  });
+  assert.ok(
+    result.filterParts[0].startsWith("[0:a]deesser=i=0.5,atrim="),
+    `Expected deesser-only prefix, got: ${result.filterParts[0]}`
+  );
+});
+
+test("buildSeamedVoiceParts: deesser disabled (intensity 0) is a no-op, matching the 0-disables convention", () => {
+  const ranges: Range[] = [
+    { startSec: 0, endSec: 2 },
+    { startSec: 3, endSec: 5 },
+  ];
+  const result = buildSeamedVoiceParts(ranges, {
+    crossfadeMs: 24,
+    deesserIntensity: 0,
+  });
+  assert.ok(result.filterParts[0].startsWith("[0:a]atrim="));
 });

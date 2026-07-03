@@ -295,6 +295,7 @@ test("ProjectSchema defaults audio off (backward-compat parse)", () => {
     loudness: { enabled: false, targetLufs: -16, mode: "single" },
     noiseReduction: { enabled: false, nr: 12 },
     voiceHighpass: { enabled: false, hz: 80 },
+    deEsser: { enabled: false, intensity: 0.5 },
   });
 });
 
@@ -321,6 +322,7 @@ test("ProjectSchema round-trips fully specified audio settings", () => {
     loudness: { enabled: true, targetLufs: -14, mode: "single" },
     noiseReduction: { enabled: false, nr: 12 },
     voiceHighpass: { enabled: true, hz: 100 },
+    deEsser: { enabled: false, intensity: 0.5 },
   });
 });
 
@@ -328,6 +330,8 @@ test("AudioSchema rejects out-of-range values (Motion/CutSnap precedent: bounds 
   assert.throws(() => AudioSchema.parse({ ducking: { amountDb: 999 } }));
   assert.throws(() => AudioSchema.parse({ loudness: { targetLufs: 5 } }));
   assert.throws(() => AudioSchema.parse({ voiceHighpass: { hz: 1 } }));
+  assert.throws(() => AudioSchema.parse({ deEsser: { intensity: 1.5 } }));
+  assert.throws(() => AudioSchema.parse({ deEsser: { intensity: -0.1 } }));
 });
 
 test("ProjectSchema parses a project that already has graphics", () => {

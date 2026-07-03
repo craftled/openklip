@@ -670,6 +670,17 @@ export const actions: ActionDef[] = [
           hz: z.number().optional(),
         })
         .optional(),
+      // Unlike its siblings above, intensity is bounded here too (not just
+      // shape-only): 0-1 is an unambiguous, non-domain-specific range, so
+      // the MCP boundary rejects an obviously invalid value outright.
+      // setAudio still re-clamps on write regardless (defense in depth for
+      // the CLI and any other direct caller).
+      deEsser: z
+        .object({
+          enabled: z.boolean().optional(),
+          intensity: z.number().min(0).max(1).optional(),
+        })
+        .optional(),
     }),
     run: (p, i) => {
       setAudio(p, i);

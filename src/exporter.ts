@@ -453,6 +453,7 @@ export function buildMusicFilterParts(
 export function voiceAffixes(audio?: Audio): {
   highpassSuffix: string;
   noiseSuffix: string;
+  deesserSuffix: string;
 } {
   const highpassHz = audio?.voiceHighpass?.enabled
     ? audio.voiceHighpass.hz
@@ -462,12 +463,25 @@ export function voiceAffixes(audio?: Audio): {
   const noiseSuffix = audio?.noiseReduction?.enabled
     ? `,afftdn=nr=${audio.noiseReduction.nr}`
     : "";
-  return { highpassSuffix, noiseSuffix };
+  // De-essing runs last: highpass removes rumble, afftdn cleans broadband
+  // noise, and only then does the deesser work on the already-cleaned
+  // signal. `f` (frequency) and `s` (output mode) are hardcoded to the
+  // filter's own defaults (0.5, o) rather than exposed as user knobs.
+  const deesserIntensity = audio?.deEsser?.enabled
+    ? audio.deEsser.intensity
+    : undefined;
+  const deesserSuffix =
+    deesserIntensity && deesserIntensity > 0
+      ? `,deesser=i=${deesserIntensity}`
+      : "";
+  return { highpassSuffix, noiseSuffix, deesserSuffix };
 }
 
 export interface SeamedVoiceOpts {
   /** cuts.snap.crossfadeMs (0-100ms schema range). */
   crossfadeMs: number;
+  /** audio.deEsser.intensity when de-essing is enabled. */
+  deesserIntensity?: number;
   /** audio.voiceHighpass.hz, present only when the highpass is enabled. */
   highpassHz?: number;
   /** audio.noiseReduction.nr when noise reduction is enabled. */
@@ -526,12 +540,18 @@ export function buildSeamedVoiceParts(
 ): SeamedVoiceResult {
   const hp = opts.highpassHz;
   const noiseNr = opts.noiseNr;
+  const deesserIntensity = opts.deesserIntensity;
   const affixParts: string[] = [];
   if (hp && hp > 0) {
     affixParts.push(`highpass=f=${hp}`);
   }
   if (noiseNr && noiseNr > 0) {
     affixParts.push(`afftdn=nr=${noiseNr}`);
+  }
+  // Same order as voiceAffixes: highpass, then noise reduction, then
+  // de-essing last so it works on the already-cleaned signal.
+  if (deesserIntensity && deesserIntensity > 0) {
+    affixParts.push(`deesser=i=${deesserIntensity}`);
   }
   const prefix = affixParts.length > 0 ? `${affixParts.join(",")},` : "";
   const BUTT_FADE_SEC = 0.008;
@@ -703,12 +723,13 @@ export function buildAudioParts(
         rangeCount: opts.segmentRangeCount,
         highpassSuffix: affixes.highpassSuffix,
         noiseSuffix: affixes.noiseSuffix,
+        deesserSuffix: affixes.deesserSuffix,
         outputLabel: voiceLabel,
       })
     );
   } else if (useSeams) {
-    // Seam highpass is threaded through buildSeamedVoiceParts's own option
-    // (applied before each atrim, ahead of the crossfades).
+    // Seam highpass/noise/deesser are threaded through buildSeamedVoiceParts's
+    // own options (applied before each atrim, ahead of the crossfades).
     const seam = buildSeamedVoiceParts(ranges, {
       crossfadeMs: (snap as CutSnap).crossfadeMs,
       highpassHz: audio?.voiceHighpass?.enabled
@@ -717,11 +738,14 @@ export function buildAudioParts(
       noiseNr: audio?.noiseReduction?.enabled
         ? audio.noiseReduction.nr
         : undefined,
+      deesserIntensity: audio?.deEsser?.enabled
+        ? audio.deEsser.intensity
+        : undefined,
     });
     parts.push(...seam.filterParts, `[${seam.outLabel}]anull[${voiceLabel}]`);
   } else {
     parts.push(
-      `[0:a]aselect='${selectExpr}',asetpts=N/SR/TB${affixes.highpassSuffix}${affixes.noiseSuffix}[${voiceLabel}]`
+      `[0:a]aselect='${selectExpr}',asetpts=N/SR/TB${affixes.highpassSuffix}${affixes.noiseSuffix}${affixes.deesserSuffix}[${voiceLabel}]`
     );
   }
 
