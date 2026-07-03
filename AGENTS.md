@@ -104,6 +104,7 @@ Time is integer audio samples at 48 kHz. The CLI takes seconds where a human num
 | Export MP4 | `openklip export <slug>` |
 | Set export aspect and reframe crop | `openklip export-set <slug> [--aspect source\|16:9\|9:16\|1:1] [--crop-mode manual\|scene\|vision] [--crop-focus-x <0-1>] [--crop-focus-y <0-1>] [--crop-scale <1-3>]` |
 | Enrich sceneLog with macOS Vision face focus | `openklip vision-focus <slug>` (darwin only) |
+| List / detect LLM highlight clip candidates | `openklip highlights <slug> [--json]`, `openklip highlights-detect <slug> [--agent] [--max-clips] [--target-sec]` |
 | Export with a platform preset | `openklip export <slug> --platform youtube\|youtube-4k\|x\|linkedin\|shorts [--loudness <lufs>]` |
 | Verify rendered cut | `openklip verify <slug>` |
 | Post-export packaging (HyperFrames) | `openklip package <slug> <pass>` |

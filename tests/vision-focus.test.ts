@@ -13,6 +13,21 @@ test("parseVisionFocusOutput reads focus JSON", () => {
   );
 });
 
+test("parseVisionFocusOutput reads saliency source and ocr text", () => {
+  assert.deepEqual(
+    parseVisionFocusOutput(
+      '{"focusX":0.55,"focusY":0.62,"confidence":0.7,"source":"saliency","ocrText":["Subscribe"]}'
+    ),
+    {
+      focusX: 0.55,
+      focusY: 0.62,
+      confidence: 0.7,
+      source: "saliency",
+      ocrText: ["Subscribe"],
+    }
+  );
+});
+
 test("parseVisionFocusOutput returns null on no face", () => {
   assert.equal(parseVisionFocusOutput('{"error":"no face"}'), null);
 });

@@ -204,6 +204,7 @@ import type { ActionResult } from "../app/actions.ts";
 import {
   exportProject,
   runGuiAction,
+  runVisionFocus,
   saveBrief,
   saveBroll,
   saveLook,
@@ -424,10 +425,12 @@ export function App({
   initialChats,
   initialProject,
   projects,
+  visionFocusAvailable = false,
 }: {
   initialChats: EditorChatsSnapshot;
   initialProject: Project;
   projects: ProjectListing[];
+  visionFocusAvailable?: boolean;
 }) {
   const router = useRouter();
   const [project, setProject] = useState<Project>(initialProject);
@@ -1403,6 +1406,29 @@ export function App({
     },
     [enqueueSave, project.slug]
   );
+  const [applyingVision, setApplyingVision] = useState(false);
+  const onRunVisionFocus = useCallback(async () => {
+    setApplyingVision(true);
+    try {
+      const r = await runVisionFocus(project.slug);
+      if (!r.ok) {
+        setSaveError(r.error);
+        return;
+      }
+      setProject((prev) => ({
+        ...prev,
+        ...(r.data.project as unknown as Project),
+        brief: prev.brief,
+        dirPath: prev.dirPath,
+        mediaVersion: prev.mediaVersion,
+        silences: prev.silences,
+      }));
+      patchExport({ cropMode: "scene" });
+      router.refresh();
+    } finally {
+      setApplyingVision(false);
+    }
+  }, [patchExport, project.slug, router]);
   const changeOrientation = useCallback(
     (next: Orientation) => {
       setOrientation(next);
@@ -2867,9 +2893,12 @@ export function App({
               <Section title="Reframe">
                 <ReframeControls
                   applying={pendingSaves > 0}
+                  applyingVision={applyingVision}
                   exportSettings={exportSettings}
                   hasSceneLog={Boolean(project.sceneLog)}
                   onPatchExport={patchExport}
+                  onRunVisionFocus={onRunVisionFocus}
+                  visionFocusAvailable={visionFocusAvailable}
                 />
               </Section>
               <Section title="Timing">

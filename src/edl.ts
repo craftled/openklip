@@ -339,6 +339,27 @@ export const SceneLogSchema = z.object({
 });
 export type SceneLog = z.infer<typeof SceneLogSchema>;
 
+// LLM-detected short-form clip candidates for a long edit (highlight reels).
+export const HighlightClipSchema = z.object({
+  id: z.string(),
+  fromSec: z.number().nonnegative(),
+  toSec: z.number().nonnegative(),
+  /** Short label for the clip (hook or chapter title). */
+  title: z.string(),
+  /** Why this span works as a standalone short. */
+  reason: z.string().optional(),
+  /** Model confidence 0-1 when provided. */
+  score: z.number().min(0).max(1).optional(),
+});
+export type HighlightClip = z.infer<typeof HighlightClipSchema>;
+
+export const HighlightsSchema = z.object({
+  clips: z.array(HighlightClipSchema).default([]),
+  analyzedAt: z.string(),
+  agent: z.string().optional(),
+});
+export type Highlights = z.infer<typeof HighlightsSchema>;
+
 // Global animation "feel": the deck's anim.tsx applied to OpenKlip. A handful of
 // knobs drive every overlay entrance, so "make it snappier" is a one-number
 // change. `speed` scales all durations (higher = shorter = snappier).
@@ -533,6 +554,8 @@ export const ProjectSchema = z
     template: z.string().optional(),
     /** Subagent visual scene log of the main video (absent until analyzed). */
     sceneLog: SceneLogSchema.optional(),
+    /** LLM highlight clip candidates for short-form extraction. */
+    highlights: HighlightsSchema.optional(),
     /** F3: provenance of a multi-take assembly (absent for single-source projects). */
     assembly: AssemblyProvenanceSchema.optional(),
     /** Global animation feel for overlay entrances. */

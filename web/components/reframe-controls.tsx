@@ -69,16 +69,22 @@ export interface ExportPatch {
 
 export interface ReframeControlsProps {
   applying?: boolean;
+  applyingVision?: boolean;
   exportSettings: ExportSettings;
   hasSceneLog?: boolean;
   onPatchExport: (patch: ExportPatch) => void;
+  onRunVisionFocus?: () => void | Promise<void>;
+  visionFocusAvailable?: boolean;
 }
 
 export function ReframeControls({
   applying = false,
+  applyingVision = false,
   exportSettings,
   hasSceneLog = false,
   onPatchExport,
+  onRunVisionFocus,
+  visionFocusAvailable = false,
 }: ReframeControlsProps) {
   const crop = exportSettings.crop;
   const cropMode = exportSettings.cropMode ?? "manual";
@@ -88,6 +94,21 @@ export function ReframeControls({
 
   return (
     <div className="flex flex-col gap-2" data-reframe-section>
+      {visionFocusAvailable && onRunVisionFocus && (
+        <div className="flex items-center gap-2 pb-1">
+          <button
+            className="rounded-md border px-2 py-0.5 text-xs transition-colors hover:bg-muted disabled:opacity-50"
+            disabled={applying || applyingVision}
+            onClick={() => onRunVisionFocus()}
+            type="button"
+          >
+            {applyingVision ? "Running Vision…" : "Vision focus"}
+          </button>
+          <span className="text-muted-foreground text-xs">
+            Face/saliency detection on ingest frames (macOS).
+          </span>
+        </div>
+      )}
       {hasSceneLog && (
         <div className="flex items-center gap-2 pb-1">
           <span className="text-muted-foreground text-xs">Crop mode</span>

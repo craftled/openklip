@@ -120,6 +120,10 @@ export interface ProjectStatusJson {
     cropMode: "manual" | "scene" | "vision";
   };
   keptDurationSec: number;
+  highlights?: {
+    analyzedAt: string;
+    clipCount: number;
+  };
   look: { vignette: boolean; filter: Filter; lut?: string };
   overlays: OverlayViews;
   padMs: number;
@@ -356,6 +360,14 @@ export function projectStatus(
       },
       cropMode: project.export?.cropMode ?? "manual",
     },
+    ...(project.highlights
+      ? {
+          highlights: {
+            clipCount: project.highlights.clips.length,
+            analyzedAt: project.highlights.analyzedAt,
+          },
+        }
+      : {}),
     overlays: listOverlays(project),
   };
 }

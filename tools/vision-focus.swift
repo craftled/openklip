@@ -1,6 +1,5 @@
 #!/usr/bin/env swift
-// macOS Vision sidecar: detect the largest face in a JPEG/PNG and print
-// normalized focus coords for OpenKlip reframe (focusX left-right, focusY top-bottom).
+// macOS Vision sidecar: face or saliency focus + optional on-frame OCR text.
 import Foundation
 import Vision
 import ImageIO
@@ -9,6 +8,8 @@ struct FocusOut: Codable {
   let focusX: Double
   let focusY: Double
   let confidence: Double
+  let source: String
+  let ocrText: [String]?
 }
 
 func loadCGImage(path: String) -> CGImage? {
@@ -19,7 +20,16 @@ func loadCGImage(path: String) -> CGImage? {
   return CGImageSourceCreateImageAtIndex(source, 0, nil)
 }
 
-func detectFaceFocus(cgImage: CGImage) -> FocusOut? {
+func centerFromBox(_ box: CGRect) -> (x: Double, y: Double) {
+  let centerX = box.minX + box.width / 2
+  let centerYFromTop = 1.0 - (box.minY + box.height / 2)
+  return (
+    min(1, max(0, centerX)),
+    min(1, max(0, centerYFromTop))
+  )
+}
+
+func detectFaceFocus(cgImage: CGImage) -> (FocusOut)? {
   let request = VNDetectFaceRectanglesRequest()
   let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
   do {
@@ -27,23 +37,98 @@ func detectFaceFocus(cgImage: CGImage) -> FocusOut? {
   } catch {
     return nil
   }
-  guard let faces = request.results as? [VNFaceObservation], !faces.isEmpty else {
+  guard let faces = request.results, !faces.isEmpty else {
     return nil
   }
-  // Largest face by bounding-box area (talking-head priority).
   let best = faces.max(by: { a, b in
     let aa = a.boundingBox.width * a.boundingBox.height
     let bb = b.boundingBox.width * b.boundingBox.height
     return aa < bb
   })!
-  let box = best.boundingBox
-  let centerX = box.minX + box.width / 2
-  // Vision uses bottom-left origin; OpenKlip focusY is top-down.
-  let centerYFromTop = 1.0 - (box.minY + box.height / 2)
+  let (x, y) = centerFromBox(best.boundingBox)
   return FocusOut(
-    focusX: min(1, max(0, centerX)),
-    focusY: min(1, max(0, centerYFromTop)),
-    confidence: Double(best.confidence)
+    focusX: x,
+    focusY: y,
+    confidence: Double(best.confidence),
+    source: "face",
+    ocrText: nil
+  )
+}
+
+func detectSaliencyFocus(cgImage: CGImage) -> FocusOut? {
+  let request = VNGenerateAttentionBasedSaliencyImageRequest()
+  let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+  do {
+    try handler.perform([request])
+  } catch {
+    return nil
+  }
+  guard let obs = request.results?.first as? VNSaliencyImageObservation else {
+    return nil
+  }
+  let objects = obs.salientObjects ?? []
+  guard !objects.isEmpty else {
+    return nil
+  }
+  let best = objects.max(by: { a, b in
+    let aa = a.boundingBox.width * a.boundingBox.height
+    let bb = b.boundingBox.width * b.boundingBox.height
+    return aa < bb
+  })!
+  let (x, y) = centerFromBox(best.boundingBox)
+  return FocusOut(
+    focusX: x,
+    focusY: y,
+    confidence: Double(best.confidence),
+    source: "saliency",
+    ocrText: nil
+  )
+}
+
+func recognizeText(cgImage: CGImage) -> [String] {
+  let request = VNRecognizeTextRequest()
+  request.recognitionLevel = .accurate
+  request.usesLanguageCorrection = true
+  let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+  do {
+    try handler.perform([request])
+  } catch {
+    return []
+  }
+  guard let results = request.results else {
+    return []
+  }
+  var lines: [String] = []
+  for obs in results {
+    guard let top = obs.topCandidates(1).first else { continue }
+    let text = top.string.trimmingCharacters(in: .whitespacesAndNewlines)
+    if !text.isEmpty {
+      lines.append(text)
+    }
+  }
+  return Array(lines.prefix(8))
+}
+
+func detectFocus(cgImage: CGImage) -> FocusOut? {
+  let ocr = recognizeText(cgImage: cgImage)
+  if let faceOrSal = detectFaceFocus(cgImage: cgImage) ?? detectSaliencyFocus(cgImage: cgImage) {
+    return FocusOut(
+      focusX: faceOrSal.focusX,
+      focusY: faceOrSal.focusY,
+      confidence: faceOrSal.confidence,
+      source: faceOrSal.source,
+      ocrText: ocr.isEmpty ? nil : ocr
+    )
+  }
+  if ocr.isEmpty {
+    return nil
+  }
+  return FocusOut(
+    focusX: 0.5,
+    focusY: 0.5,
+    confidence: 0.4,
+    source: "ocr",
+    ocrText: ocr
   )
 }
 
@@ -58,9 +143,9 @@ guard let image = loadCGImage(path: path) else {
   exit(1)
 }
 
-if let focus = detectFaceFocus(cgImage: image) {
+if let focus = detectFocus(cgImage: image) {
   let data = try! JSONEncoder().encode(focus)
   print(String(data: data, encoding: .utf8)!)
 } else {
-  print("{\"error\":\"no face\"}")
+  print("{\"error\":\"no focus\"}")
 }

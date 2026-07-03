@@ -119,14 +119,14 @@ Preview cuts get a Glimm WebGL sweep in the browser. Exported MP4s can use VAD-s
 
 - [x] VAD snap-to-silence + equal-power crossfade at cut boundaries on export (tighten the ~100 ms-loose Whisper word boundaries; declick the seam). Preview stays unsnapped-audio/uncrossfaded; snap resolution is a 20ms window, not sample-accurate. See Completed.
 - [x] Filler-word / dead-air auto-removal beyond the previous "Find filler" agent action (Descript-style batch pipeline with safe/review risk grading). See Completed.
-- [ ] LLM highlight detection (long video → short clips).
+- [x] LLM highlight detection (long video → short clips): `src/highlights.ts`, `openklip highlights` / `highlights-detect`, MCP `highlights_list`, `project.highlights` on `project.json`.
 
 ### Shorts (9:16)
 
 - [x] Manual vertical/square export reframe: `project.export` aspect (`source`, `16:9`, `9:16`, `1:1`) and crop (focus X/Y, zoom) shared by preview and ffmpeg export; `shorts` platform preset; GUI Reframe controls and orientation toggle persist aspect.
 - [x] Scene crop mode (`cropMode: scene`): when `openklip analyze` has written a `sceneLog`, export-set in scene mode derives crop focus from speaker spans; segments may carry `focusX`/`focusY` (face center, 0-1) from scene analysis.
 - [x] Face/saliency auto-crop beyond scene-log focus coords (Vision sidecar, per-frame bbox): `tools/vision-focus.swift`, `openklip vision-focus`, `cropMode: vision`, `agent-make-short` enrichment on macOS.
-- [ ] Optional macOS Apple Vision sidecar for saliency-based reframe + OCR.
+- [x] Optional macOS Apple Vision sidecar for saliency-based reframe + OCR: face → saliency fallback, `VNRecognizeText` OCR text in sidecar JSON; GUI Vision focus button.
 - [ ] OpenCLIP semantic b-roll matching (deferred - heavy dependency).
 
 ### Agent

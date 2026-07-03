@@ -18,3 +18,20 @@ test("ReframeControls renders focus and zoom sliders", () => {
   assert.match(html, /Zoom/);
   assert.match(html, /data-reframe-section/);
 });
+
+test("ReframeControls shows Vision focus button when available", () => {
+  const html = renderToStaticMarkup(
+    <ReframeControls
+      exportSettings={{
+        aspect: "9:16",
+        crop: { focusX: 0.5, focusY: 0.5, scale: 1 },
+        cropMode: "scene",
+      }}
+      hasSceneLog
+      onPatchExport={() => undefined}
+      onRunVisionFocus={() => undefined}
+      visionFocusAvailable
+    />
+  );
+  assert.match(html, /Vision focus/);
+});

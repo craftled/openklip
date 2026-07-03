@@ -368,3 +368,28 @@ export async function revealProjectFolder(slug: string): Promise<ActionResult> {
     return fail(e);
   }
 }
+
+export async function runVisionFocus(
+  slug: string
+): Promise<
+  ActionResult<{ project: Project; segmentsUpdated: number }>
+> {
+  try {
+    const { enrichSceneLogWithVisionFocus, visionFocusAvailable } =
+      await import("@engine/vision-focus");
+    if (!visionFocusAvailable()) {
+      throw new Error(
+        "Vision focus requires macOS with tools/vision-focus.swift"
+      );
+    }
+    const segmentsUpdated = await mutateProject(
+      slug,
+      async (project) => enrichSceneLogWithVisionFocus(slug, project),
+      { action: "vision-focus", actor: "human" }
+    );
+    const project = await loadProject(slug);
+    return { ok: true, data: { project, segmentsUpdated } };
+  } catch (e) {
+    return fail(e);
+  }
+}

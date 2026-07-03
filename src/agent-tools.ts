@@ -297,6 +297,16 @@ const queryTools: AgentToolDef[] = [
     },
   }),
   defineQueryTool({
+    name: "highlights_list",
+    summary:
+      "LLM-detected short-form clip candidates (fromSec, toSec, title, score).",
+    schema: z.object({ slug }),
+    run: async ({ slug: projectSlug }) => {
+      const project = await loadProject(projectSlug);
+      return { highlights: project.highlights ?? null };
+    },
+  }),
+  defineQueryTool({
     name: "project_status",
     summary: "Agent-friendly edit summary (words, ranges, overlays, look).",
     schema: z.object({ slug }),

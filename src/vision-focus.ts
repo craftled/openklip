@@ -13,6 +13,8 @@ export interface VisionFocusSample {
   confidence: number;
   focusX: number;
   focusY: number;
+  ocrText?: string[];
+  source?: "face" | "ocr" | "saliency";
 }
 
 const SWIFT_SRC = repoPath("tools", "vision-focus.swift");
@@ -51,6 +53,8 @@ export function parseVisionFocusOutput(raw: string): VisionFocusSample | null {
     const focusX = obj.focusX;
     const focusY = obj.focusY;
     const confidence = obj.confidence;
+    const source = obj.source;
+    const ocrText = obj.ocrText;
     if (
       typeof focusX !== "number" ||
       typeof focusY !== "number" ||
@@ -59,6 +63,15 @@ export function parseVisionFocusOutput(raw: string): VisionFocusSample | null {
     ) {
       return null;
     }
+    const parsedSource =
+      source === "face" || source === "saliency" || source === "ocr"
+        ? source
+        : undefined;
+    const parsedOcr = Array.isArray(ocrText)
+      ? ocrText.filter(
+          (t): t is string => typeof t === "string" && t.length > 0
+        )
+      : undefined;
     return {
       focusX: Math.min(1, Math.max(0, focusX)),
       focusY: Math.min(1, Math.max(0, focusY)),
@@ -66,6 +79,8 @@ export function parseVisionFocusOutput(raw: string): VisionFocusSample | null {
         typeof confidence === "number" && Number.isFinite(confidence)
           ? confidence
           : 1,
+      ...(parsedSource ? { source: parsedSource } : {}),
+      ...(parsedOcr && parsedOcr.length > 0 ? { ocrText: parsedOcr } : {}),
     };
   } catch {
     return null;

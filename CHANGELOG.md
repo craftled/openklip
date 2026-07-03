@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.25.0.0 - 2026-07-03
+
+LLM highlight detection, Vision saliency/OCR, and GUI Vision focus.
+
+### Added
+- **LLM highlight detection** (`src/highlights.ts`): `openklip highlights <slug>` lists clip candidates; `openklip highlights-detect <slug>` runs an LLM over the timed transcript and stores `project.highlights`. MCP `highlights_list`; `project_status` reports clip count when present.
+- **Vision saliency + OCR**: `tools/vision-focus.swift` falls back from face to attention saliency and attaches on-frame OCR text in the JSON sidecar (`source: face|saliency|ocr`).
+- **GUI Vision focus**: Reframe controls show a macOS-only "Vision focus" button (`runVisionFocus` server action) that enriches speaker sceneLog segments and switches to scene crop mode.
+
+### Changed
+- **Version**: bumped OpenKlip to `0.25.0.0`.
+
 ## 0.24.0.0 - 2026-07-03
 
 macOS Vision face detection for vertical reframe focus.

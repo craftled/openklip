@@ -25,6 +25,7 @@ export default async function Page({ searchParams }: Props) {
       initialProject={project}
       key={project.slug}
       projects={projects}
+      visionFocusAvailable={process.platform === "darwin"}
     />
   );
 }

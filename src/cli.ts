@@ -62,6 +62,7 @@ import {
 } from "./exporter.ts";
 import { FFMPEG, FFPROBE } from "./ffmpeg.ts";
 import { FILTER_NAMES, isFilter } from "./filter.ts";
+import { detectHighlights, highlightClipLines } from "./highlights.ts";
 import { ingest } from "./ingest.ts";
 import { loadIngesters } from "./ingesters.ts";
 import { listLuts, lutPath } from "./lut.ts";
@@ -245,6 +246,11 @@ Review & export
                                        --crop-focus-y <0-1>  vertical pan
                                        --crop-scale <1-3>    zoom into source before crop
   openklip vision-focus <slug>         enrich sceneLog speaker segments with macOS Vision face focus (darwin only)
+  openklip highlights <slug> [--json]   list LLM highlight clip candidates
+  openklip highlights-detect <slug>      detect short-form clip candidates with an LLM
+                                       --agent <model>   (default claude-opus-4-8)
+                                       --max-clips <n>   (default 5)
+                                       --target-sec <n>  target clip length (default 45)
   openklip export <slug>             render the current cut to out.mp4
                                        --height <px>  max output height (e.g. 1080)
                                        --fps <n>      output frame rate, integer 1-120 (default: source)
@@ -1979,6 +1985,61 @@ try {
         { action: "vision-focus", actor: "cli" }
       );
       console.log(`vision-focus: updated ${updated} speaker segment(s)`);
+      break;
+    }
+    case "highlights": {
+      if (!rest[0]) {
+        throw new Error("usage: openklip highlights <slug> [--json]");
+      }
+      const slug = rest[0];
+      const asJson = rest.includes("--json");
+      const project = await loadProject(slug);
+      const highlights = project.highlights;
+      if (!highlights || highlights.clips.length === 0) {
+        console.log(
+          "no highlight clips yet. Run: openklip highlights-detect <slug>"
+        );
+        break;
+      }
+      if (asJson) {
+        console.log(JSON.stringify(highlights, null, 2));
+        break;
+      }
+      console.log(highlightClipLines(highlights));
+      console.log(
+        `\n${highlights.clips.length} clip(s)  analyzed ${highlights.analyzedAt}`
+      );
+      break;
+    }
+    case "highlights-detect": {
+      if (!rest[0]) {
+        throw new Error(
+          "usage: openklip highlights-detect <slug> [--agent <model>] [--max-clips <n>] [--target-sec <n>]"
+        );
+      }
+      const slug = rest[0];
+      const agent = flagValue(rest, "--agent") ?? "claude-opus-4-8";
+      const maxClips = flagNumber(rest, "--max-clips") ?? 5;
+      const targetSec = flagNumber(rest, "--target-sec") ?? 45;
+      const project = await loadProject(slug);
+      console.log(`[highlights] detecting with ${agent}...`);
+      const highlights = await detectHighlights(project, {
+        agent,
+        maxClips,
+        targetClipSec: targetSec,
+      });
+      if (!highlights) {
+        throw new Error("highlight detection failed (no valid clips returned)");
+      }
+      await mutateProject(
+        slug,
+        (p) => {
+          p.highlights = highlights;
+        },
+        { action: "highlights-detect", actor: "cli" }
+      );
+      console.log(highlightClipLines(highlights));
+      console.log(`\n[highlights] saved ${highlights.clips.length} clip(s)`);
       break;
     }
     case "export-set": {

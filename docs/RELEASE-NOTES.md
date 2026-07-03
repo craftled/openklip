@@ -2,7 +2,25 @@
 
 Use these bodies when publishing releases. Each section matches a tag in `CHANGELOG.md` without duplicating the full changelog. **Known gaps:** always link to [TODO.md](../TODO.md#known-limitations); do not duplicate the list here.
 
-Publishing status checked on 2026-07-03 (`gh release list`): GitHub releases are published through `v0.24.0.0`.
+Publishing status checked on 2026-07-03 (`gh release list`): GitHub releases are published through `v0.24.0.0`. `v0.25.0.0` is prepared below for publication next.
+
+---
+
+## v0.25.0.0
+
+**LLM highlight detection, Vision saliency/OCR, and GUI Vision focus.**
+
+### Highlights
+- **Highlight clips**: `openklip highlights-detect` finds short-form clip spans from the timed transcript; MCP `highlights_list` reads them back.
+- **Vision saliency + OCR**: face detection falls back to attention saliency; OCR text rides in the sidecar JSON for on-screen labels.
+- **GUI**: macOS Reframe panel gets a one-click Vision focus button.
+- Current codebase verification: 1334 tests.
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations) for the current list. Highlight detection requires an external LLM agent; OpenCLIP semantic b-roll matching is still deferred.
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#02500---2026-07-03)
 
 ---
 
