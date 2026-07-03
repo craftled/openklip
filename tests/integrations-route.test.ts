@@ -56,7 +56,7 @@ describe("/api/integrations", () => {
       expect(await cleared.json()).toEqual({
         elevenLabs: {
           hasApiKey: false,
-          updatedAt: expect.any(String),
+          updatedAt: null,
         },
       });
     });

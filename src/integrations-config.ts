@@ -104,10 +104,7 @@ export function setElevenLabsApiKey(apiKey: string): IntegrationStatus {
 
 export function clearElevenLabsApiKey(): IntegrationStatus {
   const config = loadConfig();
-  if (config.elevenLabs) {
-    delete config.elevenLabs.apiKey;
-    config.elevenLabs.updatedAt = new Date().toISOString();
-  }
+  delete config.elevenLabs;
   saveConfig(config);
   return readIntegrationsStatus();
 }
