@@ -101,6 +101,7 @@ import {
 } from "@/components/reframe-controls";
 import { SafeAreaGuides } from "@/components/safe-area-guides";
 import { SettingsView } from "@/components/settings/settings-view";
+import { TakesPanel } from "@/components/takes-panel";
 import { TranscriptSearch } from "@/components/transcript-search";
 import { Button } from "@/components/ui/button";
 import {
@@ -3079,6 +3080,9 @@ export function App({
                 onDetect={onDetectHighlights}
                 onSeekClip={(c) => onSeek(c.fromSec)}
               />
+            </Section>
+            <Section title="Takes">
+              <TakesPanel onAssembled={onHistoryReverted} slug={project.slug} />
             </Section>
             <Section title="Music">
               <MusicSectionControls

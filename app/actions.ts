@@ -1,6 +1,7 @@
 "use server";
 
 import { existsSync } from "node:fs";
+import { assembleFromSelection, listTakes, loadTake } from "@engine/assembly";
 import { loadBrief, saveBrief as saveBriefFile } from "@engine/brief";
 import { logBriefSet } from "@engine/brief-log";
 import type {
@@ -10,6 +11,7 @@ import type {
   Filter,
   Motion,
   Project,
+  Take,
 } from "@engine/edl";
 import {
   EXPORT_PLATFORM_IDS,
@@ -463,6 +465,67 @@ export async function runHighlightsDetect(
     );
     const updated = await loadProject(slug);
     return { ok: true, data: { project: updated, highlights } };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+// ── Multi-take assembly GUI browser ─────────────────────────────────────────
+// Read/select-and-splice only: ingesting a NEW take stays CLI-only
+// (`openklip take-add`), matching src/cli.ts and the MCP tool surface
+// (list_takes/take_transcript/assemble all wrap src/assembly.ts the same way
+// these three do; there is deliberately no ingest-a-take GUI action here).
+
+export async function listTakesAction(
+  slug: string
+): Promise<ActionResult<{ takes: Take[] }>> {
+  try {
+    const takes = await listTakes(slug);
+    return { ok: true, data: { takes } };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function loadTakeAction(
+  slug: string,
+  takeId: string
+): Promise<ActionResult<{ take: Take }>> {
+  try {
+    const take = await loadTake(slug, takeId);
+    return { ok: true, data: { take } };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function assembleFromSelectionAction(
+  slug: string,
+  selection: {
+    segments: Array<{
+      takeId: string;
+      startWordId: string;
+      endWordId: string;
+      note?: string;
+    }>;
+    padMs?: number;
+  },
+  opts?: { force?: boolean }
+): Promise<
+  ActionResult<{
+    durationSec: number;
+    project: Project;
+    segments: number;
+    words: number;
+  }>
+> {
+  try {
+    const result = await assembleFromSelection(slug, selection, {
+      force: opts?.force,
+      actor: "human",
+    });
+    const project = await loadProject(slug);
+    return { ok: true, data: { ...result, project } };
   } catch (e) {
     return fail(e);
   }
