@@ -1051,6 +1051,82 @@ test("history_list on a project with no history returns empty entries and snapsh
   });
 });
 
+test("history_list filters entries by actor", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const prev = process.env.OPENKLIP_ACTOR;
+    try {
+      process.env.OPENKLIP_ACTOR = "agent";
+      await callAgentTool("cut", { slug, ids: ["w0"], deleted: true });
+      process.env.OPENKLIP_ACTOR = "human";
+      await callAgentTool("cut", { slug, ids: ["w1"], deleted: true });
+    } finally {
+      if (prev === undefined) {
+        delete process.env.OPENKLIP_ACTOR;
+      } else {
+        process.env.OPENKLIP_ACTOR = prev;
+      }
+    }
+
+    const result = (await callAgentTool("history_list", {
+      slug,
+      actor: "agent",
+    })) as { entries: Array<{ actor: string }> };
+    assert.equal(result.entries.length, 1);
+    assert.equal(result.entries[0].actor, "agent");
+  });
+});
+
+test("history_list combines actor with task and action filters using AND semantics", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const prev = process.env.OPENKLIP_ACTOR;
+    try {
+      // Same task id and action, different actors, so that --task + --action
+      // alone would still match two entries. Only adding --actor narrows to
+      // one, proving the actor filter is actually applied (not a no-op).
+      await withTaskId("task-actor-1", async () => {
+        process.env.OPENKLIP_ACTOR = "agent";
+        await callAgentTool("cut", { slug, ids: ["w0"], deleted: true });
+        process.env.OPENKLIP_ACTOR = "human";
+        await callAgentTool("cut", { slug, ids: ["w1"], deleted: true });
+      });
+    } finally {
+      if (prev === undefined) {
+        delete process.env.OPENKLIP_ACTOR;
+      } else {
+        process.env.OPENKLIP_ACTOR = prev;
+      }
+    }
+
+    const result = (await callAgentTool("history_list", {
+      slug,
+      actor: "agent",
+      task: "task-actor-1",
+      action: "cut",
+    })) as {
+      entries: Array<{ action: string; taskId?: string; actor: string }>;
+    };
+    assert.equal(result.entries.length, 1);
+    assert.equal(result.entries[0].action, "cut");
+    assert.equal(result.entries[0].taskId, "task-actor-1");
+    assert.equal(result.entries[0].actor, "agent");
+  });
+});
+
+test("history_list actor filter matching nothing returns empty entries", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    await callAgentTool("cut", { slug, ids: ["w0"], deleted: true });
+
+    const result = (await callAgentTool("history_list", {
+      slug,
+      actor: "human",
+    })) as { entries: unknown[] };
+    assert.deepEqual(result.entries, []);
+  });
+});
+
 test("task_list returns tasks newest-first", async () => {
   await withTempProjectsRoot(async ({ slug }) => {
     resetAgentTaskIdSequenceForTests();
