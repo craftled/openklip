@@ -1,4 +1,4 @@
-import type { Range as TimelineRange } from "../src/edl.ts";
+import type { CutTransition, Range as TimelineRange } from "../src/edl.ts";
 import {
   findPlayingRangeIndex,
   nextRangeIndex,
@@ -11,6 +11,13 @@ export type Range = TimelineRange;
 
 const AUDIO_MUTE_RAMP_SEC = 0.012;
 const AUDIO_RESUME_FADE_MS = 10;
+// Matches the CutTransitionSchema default in src/edl.ts (a hard cut, no
+// sweep) so a caller that does not supply getTransition sees the exact same
+// behavior as before this feature existed.
+const DEFAULT_CUT_TRANSITION: CutTransition = {
+  type: "none",
+  durationMs: 500,
+};
 
 // Plays only the surviving ranges of the source proxy back to back. Because the
 // proxy is all-intra, the currentTime jump at each cut boundary is a fast seek.
@@ -19,6 +26,7 @@ const AUDIO_RESUME_FADE_MS = 10;
 export class CutScheduler {
   private video: HTMLVideoElement;
   private getRanges: () => TimelineRange[];
+  private getTransition?: () => CutTransition;
   private raf = 0;
   private idx = 0;
   private playing = false;
@@ -26,10 +34,19 @@ export class CutScheduler {
   private gain?: GainNode;
   onTick?: (sourceSec: number) => void;
   onEnd?: () => void;
+  /** Fires when playback auto-advances past a kept-range boundary (not on a
+   * manual seek/scrub via seek()), so a caller can play a decorative sweep
+   * overlay matching project.look.transition. */
+  onCutBoundary?: (transition: CutTransition) => void;
 
-  constructor(video: HTMLVideoElement, getRanges: () => TimelineRange[]) {
+  constructor(
+    video: HTMLVideoElement,
+    getRanges: () => TimelineRange[],
+    getTransition?: () => CutTransition
+  ) {
     this.video = video;
     this.getRanges = getRanges;
+    this.getTransition = getTransition;
   }
 
   private ensureAudio(): void {
@@ -151,6 +168,7 @@ export class CutScheduler {
   }
 
   private jumpToRange(range: TimelineRange): void {
+    this.onCutBoundary?.(this.getTransition?.() ?? DEFAULT_CUT_TRANSITION);
     this.video.currentTime = range.startSec;
     this.primeRangeAudio(range, AUDIO_RESUME_FADE_MS);
     this.onTick?.(this.video.currentTime);

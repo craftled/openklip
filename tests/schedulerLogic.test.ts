@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  cutTransitionSweepPlan,
   findPlayingRangeIndex,
   nextRangeIndex,
   playbackStartIndex,
@@ -44,4 +45,57 @@ test("rangeBoundaryAudioDelaySec schedules boundary mutes at media rate", () => 
     130
   );
   assert.equal(rangeBoundaryAudioDelaySec(13.47, 13.46, 1), 0);
+});
+
+test("cutTransitionSweepPlan returns null for type none regardless of reducedMotion", () => {
+  assert.equal(
+    cutTransitionSweepPlan({ type: "none", durationMs: 500 }, false),
+    null
+  );
+  assert.equal(
+    cutTransitionSweepPlan({ type: "none", durationMs: 500 }, true),
+    null
+  );
+});
+
+test("cutTransitionSweepPlan builds a crossfade plan when motion is allowed", () => {
+  const plan = cutTransitionSweepPlan(
+    { type: "crossfade", durationMs: 800 },
+    false
+  );
+  assert.ok(plan);
+  assert.equal(plan.type, "crossfade");
+  assert.equal(plan.sweepMs, 800);
+  assert.ok(plan.outroMs > 0);
+  assert.ok(plan.outroMs <= 800);
+});
+
+test("cutTransitionSweepPlan returns null when reduced motion is requested", () => {
+  assert.equal(
+    cutTransitionSweepPlan({ type: "crossfade", durationMs: 800 }, true),
+    null
+  );
+  assert.equal(
+    cutTransitionSweepPlan({ type: "dip", durationMs: 500 }, true),
+    null
+  );
+});
+
+test("cutTransitionSweepPlan honors the minimum and maximum duration bounds", () => {
+  const minPlan = cutTransitionSweepPlan(
+    { type: "dip", durationMs: 50 },
+    false
+  );
+  assert.ok(minPlan);
+  assert.equal(minPlan.type, "dip");
+  assert.equal(minPlan.sweepMs, 50);
+  assert.ok(minPlan.outroMs > 0);
+
+  const maxPlan = cutTransitionSweepPlan(
+    { type: "dip", durationMs: 2000 },
+    false
+  );
+  assert.ok(maxPlan);
+  assert.equal(maxPlan.sweepMs, 2000);
+  assert.ok(maxPlan.outroMs > 0);
 });
