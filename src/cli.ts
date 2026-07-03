@@ -220,6 +220,7 @@ Look & captions
                         [--loudness-mode single|two-pass]
                         [--noise-reduction on|off] [--noise-strength <1-97>]
                         [--highpass on|off] [--highpass-hz <40-200>]
+                        [--deess on|off] [--deess-intensity <0-1>]
   openklip pad <slug> <ms>               cut boundary padding (0-500 ms)
   openklip brand <slug> <name>           apply a brand preset (look defaults)
   openklip template list                 list edit templates (templates/*/skill.md)
@@ -281,6 +282,7 @@ Review & export
                                        --limit <n>       max entries (default 50, max 200)
                                        --task <id>       only entries from one agent task
                                        --action <name>   only entries with this action name
+                                       --actor <name>    only entries logged by this actor (human|agent|cli|mcp|system)
   openklip tasks <slug>              agent task records (newest first)
                                        --limit <n>       max tasks (default 20, max 100)
                                        --status <status> pending|running|blocked|failed|completed|cancelled
@@ -1678,7 +1680,7 @@ try {
     case "audio": {
       if (!rest[0]) {
         throw new Error(
-          "usage: openklip audio <slug> [--duck on|off] [--duck-amount <db>] [--duck-attack <ms>] [--duck-release <ms>] [--loudness on|off] [--loudness-target <lufs>] [--loudness-mode single|two-pass] [--noise-reduction on|off] [--noise-strength <n>] [--highpass on|off] [--highpass-hz <n>]"
+          "usage: openklip audio <slug> [--duck on|off] [--duck-amount <db>] [--duck-attack <ms>] [--duck-release <ms>] [--loudness on|off] [--loudness-target <lufs>] [--loudness-mode single|two-pass] [--noise-reduction on|off] [--noise-strength <n>] [--highpass on|off] [--highpass-hz <n>] [--deess on|off] [--deess-intensity <n>]"
         );
       }
       const slug = rest[0];
@@ -1693,6 +1695,8 @@ try {
       const noiseStrength = flagNumber(rest, "--noise-strength");
       const highpass = flagValue(rest, "--highpass");
       const highpassHz = flagNumber(rest, "--highpass-hz");
+      const deess = flagValue(rest, "--deess");
+      const deessIntensity = flagNumber(rest, "--deess-intensity");
 
       const input: {
         ducking?: {
@@ -1708,6 +1712,7 @@ try {
         };
         noiseReduction?: { enabled?: boolean; nr?: number };
         voiceHighpass?: { enabled?: boolean; hz?: number };
+        deEsser?: { enabled?: boolean; intensity?: number };
       } = {};
       if (
         duck !== undefined ||
@@ -1776,6 +1781,18 @@ try {
           input.voiceHighpass.hz = highpassHz;
         }
       }
+      if (deess !== undefined || deessIntensity !== undefined) {
+        input.deEsser = {};
+        if (deess !== undefined) {
+          input.deEsser.enabled = parseOnOff(
+            deess,
+            "openklip audio <slug> --deess"
+          );
+        }
+        if (deessIntensity !== undefined) {
+          input.deEsser.intensity = deessIntensity;
+        }
+      }
 
       const project =
         Object.keys(input).length === 0
@@ -1783,7 +1800,7 @@ try {
           : (await runLoggedAction(slug, "audio", input)).project;
       const a = project.audio;
       console.log(
-        `audio: duck ${a.ducking.enabled ? "on" : "off"} (${a.ducking.amountDb}dB, attack ${a.ducking.attackMs}ms, release ${a.ducking.releaseMs}ms), loudness ${a.loudness.enabled ? "on" : "off"} (${a.loudness.targetLufs} LUFS, ${a.loudness.mode}), noise ${a.noiseReduction.enabled ? "on" : "off"} (nr ${a.noiseReduction.nr}), highpass ${a.voiceHighpass.enabled ? "on" : "off"} (${a.voiceHighpass.hz}Hz)`
+        `audio: duck ${a.ducking.enabled ? "on" : "off"} (${a.ducking.amountDb}dB, attack ${a.ducking.attackMs}ms, release ${a.ducking.releaseMs}ms), loudness ${a.loudness.enabled ? "on" : "off"} (${a.loudness.targetLufs} LUFS, ${a.loudness.mode}), noise ${a.noiseReduction.enabled ? "on" : "off"} (nr ${a.noiseReduction.nr}), highpass ${a.voiceHighpass.enabled ? "on" : "off"} (${a.voiceHighpass.hz}Hz), deess ${a.deEsser.enabled ? "on" : "off"} (intensity ${a.deEsser.intensity})`
       );
       break;
     }
@@ -2386,8 +2403,11 @@ try {
           : "not supported for this export";
         return `, transition ${t.type} requested but not applied (${reasonLabel})`;
       })();
+      const gifCapNote = r.gif?.capped
+        ? `, gif capped at ${r.gif.width}px/${r.gif.fps}fps`
+        : "";
       console.log(
-        `exported ${r.ranges} ranges, ${r.durationSec.toFixed(1)}s (${r.height}p, ${r.fps}fps, ${r.compression}${formatNote}${platformNote}${loudnessNote}${transitionNote}, music ${r.music}) -> ${r.out}`
+        `exported ${r.ranges} ranges, ${r.durationSec.toFixed(1)}s (${r.height}p, ${r.fps}fps, ${r.compression}${formatNote}${platformNote}${loudnessNote}${transitionNote}${gifCapNote}, music ${r.music}) -> ${r.out}`
       );
       break;
     }
@@ -2666,7 +2686,7 @@ try {
     case "history": {
       if (!rest[0]) {
         throw new Error(
-          "usage: openklip history <slug> [--limit N] [--task <id>] [--action <name>]"
+          "usage: openklip history <slug> [--limit N] [--task <id>] [--action <name>] [--actor <name>]"
         );
       }
       const historySlug = rest[0];
@@ -2677,6 +2697,7 @@ try {
       }
       const taskFilter = flagValue(rest, "--task");
       const actionFilter = flagValue(rest, "--action");
+      const actorFilter = flagValue(rest, "--actor");
       const allEntries = await readActionLog(historySlug);
       let entries = allEntries;
       if (taskFilter !== undefined) {
@@ -2684,6 +2705,9 @@ try {
       }
       if (actionFilter !== undefined) {
         entries = entries.filter((e) => e.action === actionFilter);
+      }
+      if (actorFilter !== undefined) {
+        entries = entries.filter((e) => e.actor === actorFilter);
       }
       const filteredOutAll = entries.length === 0;
       entries = entries.slice(0, limit);
@@ -2696,6 +2720,7 @@ try {
           const activeFilters = [
             taskFilter === undefined ? undefined : `--task=${taskFilter}`,
             actionFilter === undefined ? undefined : `--action=${actionFilter}`,
+            actorFilter === undefined ? undefined : `--actor=${actorFilter}`,
           ].filter((f): f is string => f !== undefined);
           console.log(
             `no history entries match the filter (${activeFilters.join(", ")}) for ${historySlug}.`

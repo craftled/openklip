@@ -11,6 +11,7 @@ function audio(overrides: Partial<Audio> = {}): Audio {
     loudness: { enabled: false, targetLufs: -16, mode: "single" },
     noiseReduction: { enabled: false, nr: 12 },
     voiceHighpass: { enabled: false, hz: 80 },
+    deEsser: { enabled: false, intensity: 0.5 },
     ...overrides,
   };
 }
@@ -49,13 +50,14 @@ test("renders the section wrapper and one toggle per group", () => {
   assert.match(html, /data-audio-duck/);
   assert.match(html, /data-audio-loudness/);
   assert.match(html, /data-audio-noise/);
+  assert.match(html, /data-audio-deess/);
   assert.match(html, /data-snap-toggle/);
   // Base UI Switch renders a button with role="switch".
   const switchCount = html.split('role="switch"').length - 1;
   assert.equal(
     switchCount,
-    5,
-    "expected 5 toggles: duck, loudness, noise, highpass, snap"
+    6,
+    "expected 6 toggles: duck, loudness, noise, highpass, deess, snap"
   );
 });
 
@@ -83,7 +85,7 @@ test("applying disables all toggles and numeric controls", () => {
   });
   // Every switch is disabled (Base UI renders disabled buttons).
   const switchCount = html.split('role="switch"').length - 1;
-  assert.equal(switchCount, 5);
+  assert.equal(switchCount, 6);
   const enabledSwitches = html
     .split("<button")
     .filter((b) => b.includes('role="switch"') && !b.includes("disabled"));
@@ -123,6 +125,23 @@ test("enabled groups render their commit-on-release sliders and number inputs", 
   assert.match(html, /value="80"/);
   assert.match(html, /value="120"/);
   assert.match(html, /value="24"/);
+});
+
+test("de-essing group toggle and intensity slider render when enabled, with an honest caption", () => {
+  const html = render({
+    audio: audio({ deEsser: { enabled: true, intensity: 0.5 } }),
+  });
+  assert.match(html, /data-audio-deess/);
+  assert.match(html, /De-essing/);
+  assert.match(html, /value="0.5"/);
+  assert.match(html, /Tames harsh sibilants/);
+});
+
+test("de-essing group hides the intensity slider when disabled but keeps the toggle and caption", () => {
+  const html = render();
+  assert.match(html, /data-audio-deess/);
+  assert.doesNotMatch(html, /value="0.5"/);
+  assert.match(html, /Tames harsh sibilants/);
 });
 
 test("disabled groups hide their numeric controls but keep the toggle and caption", () => {

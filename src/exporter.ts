@@ -110,6 +110,53 @@ export const EXPORT_FORMATS = ["mp4", "gif"] as const;
 
 export type ExportFormat = (typeof EXPORT_FORMATS)[number];
 
+// GIF export caps (TODO.md known limitation: "no size or duration cap"). A
+// GIF's file size and encode time scale primarily with frame count (fps x
+// duration) and pixel count (width x height), so both are bounded here. The
+// mp4 pipeline (outW/outH/outFps above) is completely untouched by these
+// constants; they apply ONLY to the GIF-specific second pass.
+//
+// GIF_MAX_WIDTH_PX (960): the common "shareable GIF" ceiling (matches the
+// smaller 640px cap scripts/record-demo-gif.sh already uses for the README
+// demo, scaled up for a general-purpose export) - wide enough to stay
+// legible, narrow enough to keep a multi-second GIF in the low tens of MB.
+// GIF_MAX_FPS (15): halves (or more) the frame count versus a 30/60fps
+// source while staying smooth enough for palette-limited GIF playback; the
+// same rate scripts/record-demo-gif.sh already uses for the README demo.
+export const GIF_MAX_WIDTH_PX = 960;
+export const GIF_MAX_FPS = 15;
+// GIF_MAX_DURATION_SEC (300 = 5 minutes): even a small-pixel, low-fps GIF of
+// a very long clip is still an enormous frame count, and a multi-minute
+// palettegen/paletteuse pass is a poor experience with no progress feedback.
+// This is a hard ceiling on GIF exports specifically; mp4 export (the
+// default) has no such limit. 5 minutes is generous for a "shareable clip"
+// deliverable while still catching accidental whole-recording GIF exports.
+export const GIF_MAX_DURATION_SEC = 300;
+
+/**
+ * Clamp GIF-specific output width/fps down to the ceilings above. Passes
+ * values through unchanged when already at or under the cap. When width is
+ * capped, height is derived with the same round-to-nearest-even convention
+ * resolveExportDimensions (export-aspect.ts) already uses elsewhere in this
+ * file, so the GIF keeps the export's aspect ratio.
+ */
+export function clampGifDimensions(input: {
+  fps: number;
+  height: number;
+  width: number;
+}): { fps: number; height: number; width: number } {
+  const fps = Math.min(input.fps, GIF_MAX_FPS);
+  if (input.width <= GIF_MAX_WIDTH_PX) {
+    return { fps, height: input.height, width: input.width };
+  }
+  const width = GIF_MAX_WIDTH_PX;
+  const height = Math.max(
+    2,
+    Math.round((input.height * width) / input.width / 2) * 2
+  );
+  return { fps, height, width };
+}
+
 export interface ExportOptions {
   /** Output aspect for this export; defaults to project.export then platform. */
   aspect?: ExportAspect;
@@ -453,6 +500,7 @@ export function buildMusicFilterParts(
 export function voiceAffixes(audio?: Audio): {
   highpassSuffix: string;
   noiseSuffix: string;
+  deesserSuffix: string;
 } {
   const highpassHz = audio?.voiceHighpass?.enabled
     ? audio.voiceHighpass.hz
@@ -462,12 +510,25 @@ export function voiceAffixes(audio?: Audio): {
   const noiseSuffix = audio?.noiseReduction?.enabled
     ? `,afftdn=nr=${audio.noiseReduction.nr}`
     : "";
-  return { highpassSuffix, noiseSuffix };
+  // De-essing runs last: highpass removes rumble, afftdn cleans broadband
+  // noise, and only then does the deesser work on the already-cleaned
+  // signal. `f` (frequency) and `s` (output mode) are hardcoded to the
+  // filter's own defaults (0.5, o) rather than exposed as user knobs.
+  const deesserIntensity = audio?.deEsser?.enabled
+    ? audio.deEsser.intensity
+    : undefined;
+  const deesserSuffix =
+    deesserIntensity && deesserIntensity > 0
+      ? `,deesser=i=${deesserIntensity}`
+      : "";
+  return { highpassSuffix, noiseSuffix, deesserSuffix };
 }
 
 export interface SeamedVoiceOpts {
   /** cuts.snap.crossfadeMs (0-100ms schema range). */
   crossfadeMs: number;
+  /** audio.deEsser.intensity when de-essing is enabled. */
+  deesserIntensity?: number;
   /** audio.voiceHighpass.hz, present only when the highpass is enabled. */
   highpassHz?: number;
   /** audio.noiseReduction.nr when noise reduction is enabled. */
@@ -526,12 +587,18 @@ export function buildSeamedVoiceParts(
 ): SeamedVoiceResult {
   const hp = opts.highpassHz;
   const noiseNr = opts.noiseNr;
+  const deesserIntensity = opts.deesserIntensity;
   const affixParts: string[] = [];
   if (hp && hp > 0) {
     affixParts.push(`highpass=f=${hp}`);
   }
   if (noiseNr && noiseNr > 0) {
     affixParts.push(`afftdn=nr=${noiseNr}`);
+  }
+  // Same order as voiceAffixes: highpass, then noise reduction, then
+  // de-essing last so it works on the already-cleaned signal.
+  if (deesserIntensity && deesserIntensity > 0) {
+    affixParts.push(`deesser=i=${deesserIntensity}`);
   }
   const prefix = affixParts.length > 0 ? `${affixParts.join(",")},` : "";
   const BUTT_FADE_SEC = 0.008;
@@ -703,12 +770,13 @@ export function buildAudioParts(
         rangeCount: opts.segmentRangeCount,
         highpassSuffix: affixes.highpassSuffix,
         noiseSuffix: affixes.noiseSuffix,
+        deesserSuffix: affixes.deesserSuffix,
         outputLabel: voiceLabel,
       })
     );
   } else if (useSeams) {
-    // Seam highpass is threaded through buildSeamedVoiceParts's own option
-    // (applied before each atrim, ahead of the crossfades).
+    // Seam highpass/noise/deesser are threaded through buildSeamedVoiceParts's
+    // own options (applied before each atrim, ahead of the crossfades).
     const seam = buildSeamedVoiceParts(ranges, {
       crossfadeMs: (snap as CutSnap).crossfadeMs,
       highpassHz: audio?.voiceHighpass?.enabled
@@ -717,11 +785,14 @@ export function buildAudioParts(
       noiseNr: audio?.noiseReduction?.enabled
         ? audio.noiseReduction.nr
         : undefined,
+      deesserIntensity: audio?.deEsser?.enabled
+        ? audio.deEsser.intensity
+        : undefined,
     });
     parts.push(...seam.filterParts, `[${seam.outLabel}]anull[${voiceLabel}]`);
   } else {
     parts.push(
-      `[0:a]aselect='${selectExpr}',asetpts=N/SR/TB${affixes.highpassSuffix}${affixes.noiseSuffix}[${voiceLabel}]`
+      `[0:a]aselect='${selectExpr}',asetpts=N/SR/TB${affixes.highpassSuffix}${affixes.noiseSuffix}${affixes.deesserSuffix}[${voiceLabel}]`
     );
   }
 
@@ -817,6 +888,12 @@ export async function exportCut(
   compression: ExportCompression;
   /** Output container actually produced; "mp4" when format was left unset. */
   format: ExportFormat;
+  /** Present only when format is "gif": the width/height/fps actually used
+   * for the GIF-specific second pass (see GIF_MAX_WIDTH_PX/GIF_MAX_FPS).
+   * `capped` is true when these differ from the mp4's width/height/fps
+   * above because the export's chosen resolution/rate exceeded the GIF
+   * ceiling and was clamped down for this deliverable only. */
+  gif?: { capped: boolean; fps: number; height: number; width: number };
   /** Present only when a platform preset was used to resolve this export. */
   platform?: ExportPlatformId;
   /** The effective loudness target when normalization applied this export
@@ -879,6 +956,17 @@ export async function exportCut(
   );
   if (ranges.length === 0) {
     throw new Error("nothing to export (all words deleted)");
+  }
+  // GIF-only hard duration ceiling, checked before any ffmpeg pass runs (the
+  // mp4 pipeline below is unaffected: this only rejects when format is
+  // "gif"). See GIF_MAX_DURATION_SEC above for the reasoning.
+  if ((resolved.format ?? "mp4") === "gif") {
+    const keptDurationSec = totalDurationSec(ranges);
+    if (keptDurationSec > GIF_MAX_DURATION_SEC) {
+      throw new Error(
+        `gif export is capped at ${GIF_MAX_DURATION_SEC}s of kept duration (this cut keeps ${keptDurationSec.toFixed(1)}s); trim the cut or export as mp4 instead`
+      );
+    }
   }
   const sr = project.sampleRate;
   const sourceInput = chooseSourceInput({
@@ -1500,6 +1588,10 @@ export async function exportCut(
         ? `${destOut.slice(0, -4)}.gif`
         : `${destOut}.gif`
       : undefined;
+  const gifDims =
+    effectiveFormat === "gif"
+      ? clampGifDimensions({ fps: outFps, height: outH, width: outW })
+      : undefined;
   let finalOut = destOut;
   try {
     await run(
@@ -1533,10 +1625,12 @@ export async function exportCut(
     // the filter_complex/encode pipeline above never changes for format:
     // "gif", so an mp4 export (the default) is byte-for-byte unaffected by
     // this branch. Reuses the proven palettegen(stats_mode=diff)/paletteuse
-    // (dither=bayer) pattern from scripts/record-demo-gif.sh, adapted to this
-    // export's own resolved fps/width. GIFs have no audio track; the -vf output
-    // here has no audio map, so conversion naturally drops it.
-    if (effectiveFormat === "gif") {
+    // (dither=bayer) pattern from scripts/record-demo-gif.sh, but clamps its
+    // own width/height/fps down to GIF_MAX_WIDTH_PX/GIF_MAX_FPS regardless of
+    // what the mp4 above rendered at (outW/outH/outFps are untouched here).
+    // GIFs have no audio track; the -vf output here has no audio map, so
+    // conversion naturally drops it.
+    if (effectiveFormat === "gif" && gifDims) {
       await run(
         FFMPEG,
         [
@@ -1544,7 +1638,7 @@ export async function exportCut(
           "-i",
           tmpOut,
           "-vf",
-          `fps=${outFps},scale=${outW}:-1:flags=lanczos,split[s0][s1];[s0]palettegen=stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=3`,
+          `fps=${gifDims.fps},scale=${gifDims.width}:${gifDims.height}:flags=lanczos,split[s0][s1];[s0]palettegen=stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=3`,
           "-loop",
           "0",
           tmpGifOut,
@@ -1587,6 +1681,14 @@ export async function exportCut(
     fps: outFps,
     compression: resolved.compression ?? "social",
     format: effectiveFormat,
+    gif: gifDims
+      ? {
+          capped: gifDims.width !== outW || gifDims.fps !== outFps,
+          fps: gifDims.fps,
+          height: gifDims.height,
+          width: gifDims.width,
+        }
+      : undefined,
     platform: resolved.platform,
     loudnessTargetLufs: effectiveLoudnessTarget,
     audio: {

@@ -95,9 +95,10 @@ export function buildSegmentAudioConcatFilter(input: {
   outputLabel?: string;
   rangeCount: number;
   highpassSuffix?: string;
+  deesserSuffix?: string;
 }): string {
   const out = input.outputLabel ?? "avoice";
-  const suffix = `${input.highpassSuffix ?? ""}${input.noiseSuffix ?? ""}`;
+  const suffix = `${input.highpassSuffix ?? ""}${input.noiseSuffix ?? ""}${input.deesserSuffix ?? ""}`;
   if (input.rangeCount === 1) {
     return `[0:a]asetpts=PTS-STARTPTS${suffix}[${out}]`;
   }

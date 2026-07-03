@@ -40,6 +40,46 @@ export function playbackStartIndex(ranges: Range[], timeSec: number): number {
   return inside === -1 ? 0 : inside;
 }
 
+/**
+ * Maps a source-timeline second to cut-space (output) seconds: the amount of
+ * surviving material that plays before it. A source second inside a deleted
+ * gap reports the cut-space position of the previous kept range's end, since
+ * playback never actually visits the gap. Shared by every playhead-derived
+ * transport display (inline preview and cinema player alike) so cut-space
+ * math cannot drift between the two surfaces.
+ */
+export function outputPositionSec(ranges: Range[], sourceSec: number): number {
+  let cum = 0;
+  for (const r of ranges) {
+    if (sourceSec < r.startSec) {
+      return cum;
+    }
+    if (sourceSec <= r.endSec) {
+      return cum + (sourceSec - r.startSec);
+    }
+    cum += r.endSec - r.startSec;
+  }
+  return cum;
+}
+
+/** Inverse of outputPositionSec: maps a cut-space position back to source
+ * seconds. A cut-space position past the total kept duration clamps to the
+ * final range's end. */
+export function sourceSecForOutputPosition(
+  ranges: Range[],
+  outputSec: number
+): number {
+  let cum = 0;
+  for (const r of ranges) {
+    const len = r.endSec - r.startSec;
+    if (outputSec <= cum + len) {
+      return r.startSec + (outputSec - cum);
+    }
+    cum += len;
+  }
+  return ranges.at(-1)?.endSec ?? 0;
+}
+
 // Outro-to-sweep ratio for the preview cut-transition sweep overlay: the
 // post-traversal fade should feel quick relative to the sweep itself, not a
 // second act. 0.4 keeps it proportional; the floor (150ms) keeps very short

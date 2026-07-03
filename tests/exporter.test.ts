@@ -34,10 +34,14 @@ import {
   buildSeamedVoiceParts,
   chooseAssetInput,
   chooseSourceInput,
+  clampGifDimensions,
   type ExportCompression,
   encoderArgsFor,
   exportCut,
   fpsFilterFor,
+  GIF_MAX_DURATION_SEC,
+  GIF_MAX_FPS,
+  GIF_MAX_WIDTH_PX,
   graphicWindowDurationSamples,
   type MusicFilterGraph,
   parseExportFpsFlag,
@@ -47,6 +51,7 @@ import {
   planMusicWindows,
   resolveOutputFps,
   shouldUseSeamedVoice,
+  voiceAffixes,
 } from "../src/exporter.ts";
 import { FFMPEG, FFPROBE, probe, run } from "../src/ffmpeg.ts";
 import { projectPaths } from "../src/paths.ts";
@@ -1279,6 +1284,53 @@ test("exportCut applies the requested fps and compression (smoke)", {
   });
 });
 
+// ── clampGifDimensions (pure) ────────────────────────────────────────────────
+// GIF export has no size or duration cap (TODO.md known limitation): file
+// size and encode time scale with frame count (fps x duration) and pixel
+// count (width x height), so this clamps the GIF-only second pass down to a
+// sane ceiling regardless of the export's own resolved resolution/fps.
+
+test("clampGifDimensions passes an already-under-cap export through unchanged", () => {
+  const result = clampGifDimensions({ fps: 15, height: 360, width: 640 });
+  assert.deepEqual(result, { fps: 15, height: 360, width: 640 });
+});
+
+test("clampGifDimensions leaves width/height unchanged at exactly the ceiling", () => {
+  const result = clampGifDimensions({
+    fps: GIF_MAX_FPS,
+    height: 540,
+    width: GIF_MAX_WIDTH_PX,
+  });
+  assert.deepEqual(result, {
+    fps: GIF_MAX_FPS,
+    height: 540,
+    width: GIF_MAX_WIDTH_PX,
+  });
+});
+
+test("clampGifDimensions clamps a large export down to the ceiling, preserving aspect ratio", () => {
+  const result = clampGifDimensions({ fps: 60, height: 2160, width: 3840 });
+  assert.equal(result.width, GIF_MAX_WIDTH_PX);
+  assert.equal(result.fps, GIF_MAX_FPS);
+  // 3840x2160 is 16:9; GIF_MAX_WIDTH_PX (960) at 16:9 is 540.
+  assert.equal(result.height, 540);
+});
+
+test("clampGifDimensions clamps width independently of fps (fps already under cap)", () => {
+  const result = clampGifDimensions({ fps: 10, height: 1080, width: 1920 });
+  assert.equal(result.width, GIF_MAX_WIDTH_PX);
+  assert.equal(result.fps, 10);
+  // 1920x1080 is 16:9; same aspect-preserving math as above.
+  assert.equal(result.height, 540);
+});
+
+test("clampGifDimensions clamps fps independently of width (width already under cap)", () => {
+  const result = clampGifDimensions({ fps: 60, height: 240, width: 320 });
+  assert.equal(result.width, 320);
+  assert.equal(result.height, 240);
+  assert.equal(result.fps, GIF_MAX_FPS);
+});
+
 // ── format: "gif" (skip-gated real-ffmpeg smokes) ───────────────────────────
 // The gif conversion is a second pass run AFTER the existing mp4 pipeline
 // finishes unchanged, so these smokes both prove the gif path works and
@@ -1419,6 +1471,176 @@ test("exportCut with format omitted or 'mp4' is byte-for-byte unchanged (regress
     assert.ok(
       !existsSync(p.out.replace(/\.mp4$/i, ".gif")),
       "no stray .gif should exist"
+    );
+  });
+});
+
+test("exportCut with format: gif clamps a high-resolution export down to the width/fps ceiling (smoke)", {
+  skip: FFMPEG_OK ? false : "ffmpeg binary unavailable",
+}, async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    const p = projectPaths(slug);
+    const src = join(p.dir, "source.mp4");
+    await run(
+      FFMPEG,
+      [
+        "-y",
+        "-f",
+        "lavfi",
+        "-i",
+        "testsrc=duration=2:size=1280x720:rate=30",
+        "-f",
+        "lavfi",
+        "-i",
+        "sine=frequency=440:duration=2",
+        "-c:v",
+        "libx264",
+        "-pix_fmt",
+        "yuv420p",
+        "-c:a",
+        "aac",
+        "-shortest",
+        src,
+      ],
+      "ffmpeg(export-gif-cap-clip)"
+    );
+    writeFixtureProject(
+      slug,
+      makeProject({
+        slug,
+        source: src,
+        fps: 30,
+        width: 1280,
+        height: 720,
+        durationSamples: 2 * SAMPLE_RATE,
+        captions: { enabled: false, maxWords: 6, style: "boxed" },
+        words: [
+          {
+            id: "w0",
+            text: "Hello",
+            startSample: 0,
+            endSample: SAMPLE_RATE,
+            deleted: false,
+          },
+          {
+            id: "w1",
+            text: "world",
+            startSample: SAMPLE_RATE,
+            endSample: 2 * SAMPLE_RATE,
+            deleted: false,
+          },
+        ],
+      })
+    );
+
+    const result = await exportCut(slug, { format: "gif" });
+    assert.equal(result.format, "gif");
+    assert.ok(result.gif, "ExportResult.gif should be present for gif exports");
+    assert.equal(
+      result.gif?.capped,
+      true,
+      "1280x720 exceeds the GIF width ceiling, so capped should be true"
+    );
+    assert.ok(
+      (result.gif?.width ?? Number.POSITIVE_INFINITY) <= GIF_MAX_WIDTH_PX,
+      `ExportResult.gif.width should be <= ${GIF_MAX_WIDTH_PX}`
+    );
+    assert.ok(
+      (result.gif?.fps ?? Number.POSITIVE_INFINITY) <= GIF_MAX_FPS,
+      `ExportResult.gif.fps should be <= ${GIF_MAX_FPS}`
+    );
+    // The mp4-side fields stay at the export's actual resolved resolution;
+    // only the GIF's own second pass is clamped.
+    assert.equal(result.width, 1280);
+    assert.equal(result.fps, 30);
+
+    const probed = await probe(result.out);
+    assert.ok(
+      probed.width <= GIF_MAX_WIDTH_PX,
+      `expected gif pixel width <= ${GIF_MAX_WIDTH_PX}, got ${probed.width}`
+    );
+  });
+});
+
+test("exportCut with format: gif rejects a cut whose kept duration exceeds the 5-minute ceiling", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    const durationSec = GIF_MAX_DURATION_SEC + 5;
+    writeFixtureProject(
+      slug,
+      makeProject({
+        slug,
+        fps: 30,
+        width: 320,
+        height: 240,
+        durationSamples: durationSec * SAMPLE_RATE,
+        captions: { enabled: false, maxWords: 6, style: "boxed" },
+        words: [
+          {
+            id: "w0",
+            text: "long",
+            startSample: 0,
+            endSample: durationSec * SAMPLE_RATE,
+            deleted: false,
+          },
+        ],
+      })
+    );
+
+    // The ceiling is checked before any ffmpeg pass runs (and even before the
+    // source file is resolved), so this rejects fast without a real ffmpeg
+    // binary or a real (nonexistent-here) source video.
+    await assert.rejects(
+      () => exportCut(slug, { format: "gif" }),
+      /gif export is capped at 300s/
+    );
+  });
+});
+
+test("exportCut with format: mp4 succeeds on the same over-ceiling duration that gif rejects (smoke)", {
+  skip: FFMPEG_OK ? false : "ffmpeg binary unavailable",
+}, async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    const p = projectPaths(slug);
+    const src = join(p.dir, "source.mp4");
+    // Real source stays a short 2s clip (fast to encode); the DECLARED kept
+    // duration (durationSamples + a word spanning it) is what exceeds the
+    // gif-only ceiling. exportCut's select filter only ever plays back real
+    // decoded frames, so declaring a longer virtual duration than the actual
+    // source doesn't change what gets encoded, only what totalDurationSec
+    // (the same value the gif ceiling check reads) reports as kept.
+    const durationSec = GIF_MAX_DURATION_SEC + 5;
+    await writeGifSmokeSource(
+      src,
+      "ffmpeg(export-gif-duration-ceiling-mp4-clip)"
+    );
+    writeFixtureProject(
+      slug,
+      makeProject({
+        slug,
+        source: src,
+        fps: 30,
+        width: 320,
+        height: 240,
+        durationSamples: durationSec * SAMPLE_RATE,
+        captions: { enabled: false, maxWords: 6, style: "boxed" },
+        words: [
+          {
+            id: "w0",
+            text: "long",
+            startSample: 0,
+            endSample: durationSec * SAMPLE_RATE,
+            deleted: false,
+          },
+        ],
+      })
+    );
+
+    const result = await exportCut(slug, { format: "mp4" });
+    assert.equal(result.format, "mp4");
+    assert.ok(existsSync(result.out), "mp4 file should exist");
+    assert.ok(
+      result.durationSec > GIF_MAX_DURATION_SEC,
+      "this export's kept (declared) duration should genuinely exceed the gif-only ceiling"
     );
   });
 });
@@ -2160,6 +2382,86 @@ test("exportCut: loudness normalization on succeeds with one audio stream (smoke
   });
 });
 
+test("exportCut: de-essing on runs the deesser filter and reaches the encoder (smoke)", {
+  skip: FFMPEG_OK ? false : "ffmpeg binary unavailable",
+}, async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    const p = projectPaths(slug);
+    const src = join(p.dir, "source.mp4");
+    await run(
+      FFMPEG,
+      [
+        "-y",
+        "-f",
+        "lavfi",
+        "-i",
+        "color=c=green:s=320x240:r=30:d=2",
+        "-f",
+        "lavfi",
+        "-i",
+        "sine=frequency=440:duration=2",
+        "-c:v",
+        "libx264",
+        "-pix_fmt",
+        "yuv420p",
+        "-c:a",
+        "aac",
+        "-shortest",
+        src,
+      ],
+      "ffmpeg(deess-smoke-source)"
+    );
+    writeFixtureProject(
+      slug,
+      makeProject({
+        slug,
+        source: src,
+        fps: 30,
+        width: 320,
+        height: 240,
+        durationSamples: 2 * SAMPLE_RATE,
+        captions: { enabled: false, maxWords: 6, style: "boxed" },
+        audio: {
+          ducking: {
+            enabled: false,
+            amountDb: 12,
+            attackMs: 25,
+            releaseMs: 250,
+          },
+          loudness: { enabled: false, targetLufs: -16 },
+          voiceHighpass: { enabled: false, hz: 80 },
+          deEsser: { enabled: true, intensity: 0.7 },
+        },
+        words: [
+          {
+            id: "w0",
+            text: "Hello",
+            startSample: 0,
+            endSample: SAMPLE_RATE,
+            deleted: false,
+          },
+          {
+            id: "w1",
+            text: "world",
+            startSample: SAMPLE_RATE,
+            endSample: 2 * SAMPLE_RATE,
+            deleted: false,
+          },
+        ],
+      })
+    );
+
+    // Not a full audible-difference assertion: this proves the deesser
+    // filter is syntactically valid and ffmpeg accepts the whole chain
+    // end to end (exportCut throws if ffmpeg exits nonzero).
+    const result = await exportCut(slug);
+    assert.ok(existsSync(p.out), "out.mp4 missing");
+    const probed = await probeOut(p.out);
+    assert.equal(probed.audioStreamCount, 1);
+    assert.equal(result.format, "mp4");
+  });
+});
+
 // ── Export platform presets: one resolution point at the top of exportCut ──
 
 function platformSmokeProject(slug: string, src: string) {
@@ -2822,4 +3124,140 @@ test("buildSeamedVoiceParts: noiseReduction appended after highpass in segment p
     result.filterParts[1].startsWith("[0:a]highpass=f=80,afftdn=nr=10,atrim="),
     `Expected highpass,afftdn prefix, got: ${result.filterParts[1]}`
   );
+});
+
+// ── De-essing filter chain ──────────────────────────────────────────────────
+
+test("voiceAffixes: de-essing enabled appends deesser after highpass and noise reduction", () => {
+  const audio: Audio = AudioSchema.parse({
+    voiceHighpass: { enabled: true, hz: 80 },
+    noiseReduction: { enabled: true, nr: 10 },
+    deEsser: { enabled: true, intensity: 0.7 },
+  });
+  assert.deepEqual(voiceAffixes(audio), {
+    highpassSuffix: ",highpass=f=80",
+    noiseSuffix: ",afftdn=nr=10",
+    deesserSuffix: ",deesser=i=0.7",
+  });
+});
+
+test("voiceAffixes: de-essing disabled produces no deesser fragment", () => {
+  const audio: Audio = AudioSchema.parse({
+    deEsser: { enabled: false, intensity: 0.7 },
+  });
+  assert.equal(voiceAffixes(audio).deesserSuffix, "");
+});
+
+test("voiceAffixes: de-essing alone with no highpass or noise reduction", () => {
+  const audio: Audio = AudioSchema.parse({
+    deEsser: { enabled: true, intensity: 0.5 },
+  });
+  assert.deepEqual(voiceAffixes(audio), {
+    highpassSuffix: "",
+    noiseSuffix: "",
+    deesserSuffix: ",deesser=i=0.5",
+  });
+});
+
+test("buildAudioParts: deEsser appended after highpass and noiseReduction in plain aselect path", () => {
+  const expr = "between(t,0.000000,2.000000)";
+  const zeroMusic: MusicFilterGraph = {
+    filterParts: [],
+    inputArgs: [],
+    mixInputLabels: [],
+  };
+  const audio: Audio = AudioSchema.parse({
+    voiceHighpass: { enabled: true, hz: 80 },
+    noiseReduction: { enabled: true, nr: 10 },
+    deEsser: { enabled: true, intensity: 0.6 },
+  });
+  const parts = buildAudioParts(expr, zeroMusic, { audio });
+  assert.deepEqual(parts, [
+    `[0:a]aselect='${expr}',asetpts=N/SR/TB,highpass=f=80,afftdn=nr=10,deesser=i=0.6[aout]`,
+  ]);
+});
+
+test("buildAudioParts: deEsser disabled leaves aselect path byte-identical", () => {
+  const expr = "between(t,0.000000,2.000000)";
+  const zeroMusic: MusicFilterGraph = {
+    filterParts: [],
+    inputArgs: [],
+    mixInputLabels: [],
+  };
+  const audio: Audio = AudioSchema.parse({
+    deEsser: { enabled: false },
+  });
+  assert.deepEqual(buildAudioParts(expr, zeroMusic, { audio }), [
+    `[0:a]aselect='${expr}',asetpts=N/SR/TB[aout]`,
+  ]);
+});
+
+test("buildAudioParts: segmentMode applies deesser on concat path", () => {
+  const expr = "between(t,0.000000,2.000000)";
+  const zeroMusic: MusicFilterGraph = {
+    filterParts: [],
+    inputArgs: [],
+    mixInputLabels: [],
+  };
+  const audio: Audio = AudioSchema.parse({
+    deEsser: { enabled: true, intensity: 0.4 },
+  });
+  const parts = buildAudioParts(expr, zeroMusic, {
+    audio,
+    segmentMode: true,
+    segmentRangeCount: 1,
+  });
+  assert.match(parts[0], /deesser=i=0\.4/);
+});
+
+test("buildSeamedVoiceParts: deesser appended after highpass and noiseReduction in segment prefix", () => {
+  const ranges: Range[] = [
+    { startSec: 0, endSec: 2 },
+    { startSec: 3, endSec: 5 },
+  ];
+  const result = buildSeamedVoiceParts(ranges, {
+    crossfadeMs: 24,
+    highpassHz: 80,
+    noiseNr: 10,
+    deesserIntensity: 0.6,
+  });
+  assert.ok(
+    result.filterParts[0].startsWith(
+      "[0:a]highpass=f=80,afftdn=nr=10,deesser=i=0.6,atrim="
+    ),
+    `Expected highpass,afftdn,deesser prefix, got: ${result.filterParts[0]}`
+  );
+  assert.ok(
+    result.filterParts[1].startsWith(
+      "[0:a]highpass=f=80,afftdn=nr=10,deesser=i=0.6,atrim="
+    ),
+    `Expected highpass,afftdn,deesser prefix, got: ${result.filterParts[1]}`
+  );
+});
+
+test("buildSeamedVoiceParts: deesser alone with no highpass or noiseNr", () => {
+  const ranges: Range[] = [
+    { startSec: 0, endSec: 2 },
+    { startSec: 3, endSec: 5 },
+  ];
+  const result = buildSeamedVoiceParts(ranges, {
+    crossfadeMs: 24,
+    deesserIntensity: 0.5,
+  });
+  assert.ok(
+    result.filterParts[0].startsWith("[0:a]deesser=i=0.5,atrim="),
+    `Expected deesser-only prefix, got: ${result.filterParts[0]}`
+  );
+});
+
+test("buildSeamedVoiceParts: deesser disabled (intensity 0) is a no-op, matching the 0-disables convention", () => {
+  const ranges: Range[] = [
+    { startSec: 0, endSec: 2 },
+    { startSec: 3, endSec: 5 },
+  ];
+  const result = buildSeamedVoiceParts(ranges, {
+    crossfadeMs: 24,
+    deesserIntensity: 0,
+  });
+  assert.ok(result.filterParts[0].startsWith("[0:a]atrim="));
 });

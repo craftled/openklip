@@ -110,3 +110,102 @@ test("CLI history: a --task filter matching nothing prints a distinct filtered-e
     assert.match(r.out, /--task=no-such-task/);
   });
 });
+
+test("CLI history: --actor filters correctly", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    await mutateProject(
+      slug,
+      (p) => {
+        p.padMs = 10;
+      },
+      { action: "pad", actor: "human", input: { padMs: 10 } }
+    );
+    await mutateProject(
+      slug,
+      (p) => {
+        p.padMs = 20;
+      },
+      { action: "pad", actor: "agent", input: { padMs: 20 } }
+    );
+
+    const r = await runCli(["history", slug, "--actor", "agent"]);
+    assert.equal(r.code, 0, r.out);
+    assert.match(r.out, /1 entry/);
+    assert.match(r.out, /agent/);
+    assert.doesNotMatch(r.out, /\bhuman\b/);
+  });
+});
+
+test("CLI history: an --actor filter matching nothing prints a distinct filtered-empty message", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    await mutateProject(
+      slug,
+      (p) => {
+        p.padMs = 10;
+      },
+      { action: "pad", actor: "human", input: { padMs: 10 } }
+    );
+
+    const r = await runCli(["history", slug, "--actor", "agent"]);
+    assert.equal(r.code, 0, r.out);
+    assert.doesNotMatch(r.out, new RegExp(`no history for ${slug}\\.`));
+    assert.match(r.out, /no history entries match the filter/);
+    assert.match(r.out, /--actor=agent/);
+  });
+});
+
+test("CLI history: combining --actor with --task and --action narrows correctly", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    await mutateProject(
+      slug,
+      (p) => {
+        p.padMs = 10;
+      },
+      {
+        action: "pad",
+        actor: "agent",
+        taskId: "task-cli-actor",
+        input: { padMs: 10 },
+      }
+    );
+    // Same task id and action, different actor: --task + --action alone
+    // would still match two entries, so this proves --actor actually narrows
+    // further rather than being a no-op.
+    await mutateProject(
+      slug,
+      (p) => {
+        p.padMs = 20;
+      },
+      {
+        action: "pad",
+        actor: "human",
+        taskId: "task-cli-actor",
+        input: { padMs: 20 },
+      }
+    );
+    await mutateProject(
+      slug,
+      (p) => {
+        p.padMs = 30;
+      },
+      { action: "cut", actor: "agent", input: {} }
+    );
+
+    const r = await runCli([
+      "history",
+      slug,
+      "--actor",
+      "agent",
+      "--action",
+      "pad",
+      "--task",
+      "task-cli-actor",
+    ]);
+    assert.equal(r.code, 0, r.out);
+    assert.match(r.out, /1 entry/);
+    assert.match(r.out, /task task-cli-actor/);
+  });
+});

@@ -1427,6 +1427,7 @@ export function setAudio(
     loudness?: Partial<Audio["loudness"]>;
     noiseReduction?: Partial<Audio["noiseReduction"]>;
     voiceHighpass?: Partial<Audio["voiceHighpass"]>;
+    deEsser?: Partial<Audio["deEsser"]>;
   }
 ): Project {
   const current = AudioSchema.parse(project.audio ?? {});
@@ -1481,7 +1482,23 @@ export function setAudio(
         ),
       }
     : current.voiceHighpass;
-  project.audio = { ducking, loudness, noiseReduction, voiceHighpass };
+  const deEsser = input.deEsser
+    ? {
+        enabled: input.deEsser.enabled ?? current.deEsser.enabled,
+        intensity: clampNum(
+          input.deEsser.intensity ?? current.deEsser.intensity,
+          0,
+          1
+        ),
+      }
+    : current.deEsser;
+  project.audio = {
+    ducking,
+    loudness,
+    noiseReduction,
+    voiceHighpass,
+    deEsser,
+  };
   return project;
 }
 

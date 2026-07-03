@@ -102,6 +102,7 @@ function ToggleRow({
 }
 
 export interface AudioPatch {
+  deEsser?: Partial<Audio["deEsser"]>;
   ducking?: Partial<Audio["ducking"]>;
   loudness?: Partial<Audio["loudness"]>;
   noiseReduction?: Partial<Audio["noiseReduction"]>;
@@ -118,7 +119,8 @@ export interface AudioControlsProps {
 }
 
 // Presentational export audio quality controls for the Config panel: ducking,
-// loudness normalization, voice highpass, and cut-snap, each a toggle plus
+// loudness normalization, voice highpass, de-essing, and cut-snap, each a
+// toggle plus
 // its numeric fields (hidden while the toggle is off) and a one-line honest
 // caption. All state and behavior live in the caller (app.tsx), matching the
 // music-controls.tsx split. Bounds mirror src/edl.ts's AudioSchema/CutSnapSchema
@@ -273,6 +275,31 @@ export function AudioControls({
         ) : null}
         <p className="text-muted-foreground text-xs leading-relaxed">
           Applied at export; preview audio is unprocessed.
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-2" data-audio-deess>
+        <ToggleRow
+          checked={audio.deEsser.enabled}
+          disabled={applying}
+          htmlId="audio-deess-enabled"
+          label="De-essing"
+          onCheckedChange={(enabled) => onPatchAudio({ deEsser: { enabled } })}
+        />
+        {audio.deEsser.enabled ? (
+          <ControlRow
+            disabled={applying}
+            label="Intensity"
+            max={1}
+            min={0}
+            onCommit={(n) => onPatchAudio({ deEsser: { intensity: n } })}
+            step={0.05}
+            value={audio.deEsser.intensity}
+          />
+        ) : null}
+        <p className="text-muted-foreground text-xs leading-relaxed">
+          Tames harsh sibilants ("s", "sh" sounds) on the voice bus at export
+          only.
         </p>
       </div>
 

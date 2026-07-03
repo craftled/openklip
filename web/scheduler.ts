@@ -148,6 +148,21 @@ export class CutScheduler {
     this.resetGain();
   }
 
+  /**
+   * Tears down the scheduler's AudioContext. Callers whose video element
+   * outlives the app (the inline preview) never need this - the context
+   * lives for the page's lifetime. Callers whose video element is mounted
+   * and unmounted repeatedly (the cinema player, opened/closed via a toolbar
+   * button) must call this on unmount, or every open/close cycle leaks an
+   * AudioContext until the browser's concurrent-context limit is hit.
+   */
+  dispose(): void {
+    this.pause();
+    this.ctx?.close();
+    this.ctx = undefined;
+    this.gain = undefined;
+  }
+
   seek(sourceSec: number): void {
     const ranges = this.getRanges();
     const maxSec = this.video.duration || ranges.at(-1)?.endSec || sourceSec;

@@ -158,7 +158,7 @@ Legend: Full means the surface can achieve the same outcome. Partial means the s
 | Brand preset apply | Partial ingest/apply path not prominent in UI | Full: `brand` | Missing | Missing public route | CLI-only for now. |
 | Export MP4 | Full | Full | Full | Full: export route and server action | Good parity for height only. |
 | Export compression and frame rate | Full: export dialog | Full: `--compression`, `--fps` | Full: export tool inputs | Full: export route body | Shipped 2026-07-02. |
-| Export format (MP4/GIF) and destination (file/clipboard) | Full: export dialog toggles, both enabled | Full: `--format mp4\|gif` | Full: `format` input | Partial: route/`exportProject` accept `format`; destination is GUI-only and never reaches the server | Shipped 2026-07-03 (`src/exporter.ts`, `web/components/export-dialog.tsx`); CLI/MCP `--format`/`format` parity closed 2026-07-03 (v0.29.0.1). GIF has no audio and no size/duration cap; clipboard copies the output path only, not the video; destination has no CLI/MCP equivalent by design. |
+| Export format (MP4/GIF) and destination (file/clipboard) | Full: export dialog toggles, both enabled | Full: `--format mp4\|gif` | Full: `format` input | Partial: route/`exportProject` accept `format`; destination is GUI-only and never reaches the server | Shipped 2026-07-03 (`src/exporter.ts`, `web/components/export-dialog.tsx`); CLI/MCP `--format`/`format` parity closed 2026-07-03 (v0.29.0.1). GIF has no audio; size/duration cap shipped v0.32.0.0 (960px width / 15fps / 300s kept duration, no user-facing control to customize it); clipboard copies the output path only, not the video; destination has no CLI/MCP equivalent by design. |
 | Verify export | Full button | Full | Full | Partial server action path | Good CLI/MCP parity. |
 | Package post-export | Missing UI | Full: `package` | Missing | Missing | CLI-only optional feature. |
 | Multi-take add/list/transcript/assemble | Missing UI | Full | Full query/assemble tools | Missing public route | Strong agent feature, weak UI parity. |
@@ -187,7 +187,7 @@ Legend: Full means the surface can achieve the same outcome. Partial means the s
 | Exports | UI, CLI, MCP, API | File output, status, verify | Re-export overwrites | Manual file delete only | Needs presets, settings, history. |
 | Agent chats | UI/API | UI/API | UI/API rename/archive/append | UI/API | Not exposed to CLI/MCP as context or task log. |
 | Brief/context | UI, CLI, MCP | UI, CLI, MCP | CLI/MCP/UI save paths | File delete clears manually | `brief.md` shipped; CLI/GUI/MCP saves all history-log (2026-07-02). |
-| Action history | Append-only log on every user-facing mutation | History route + Config panel section; `openklip history` / MCP `history_list` (2026-07-02) | `openklip revert` / MCP `revert` / GUI History panel | Not applicable (append-only) | Task-level revert exists (2026-07-02); agent-facing history/task query tools added (2026-07-02, filter by task id or action name); still no actor filter, and no filter UI in the GUI panel. |
+| Action history | Append-only log on every user-facing mutation | History route + Config panel section; `openklip history` / MCP `history_list` (2026-07-02) | `openklip revert` / MCP `revert` / GUI History panel | Not applicable (append-only) | Task-level revert exists (2026-07-02); agent-facing history/task query tools added (2026-07-02, filter by task id or action name); actor filter added v0.32.0.0 (`--actor`/MCP `history_list` `actor`); still no filter UI in the GUI panel. |
 
 ### 0.3 Baseline audit conclusion
 
@@ -197,14 +197,14 @@ The biggest blockers to a capable agent-first editor are:
 
 1. Cross-surface parity holes remain: project create/delete, asset delete/register, inbox scan, analysis triggers, chat context, and task logs are not all available on UI, CLI, MCP, and HTTP.
 2. Manual correction gaps remain: music timeline drag-trim, richer title styles, and visual export transitions (b-roll PiP/split/audio modes shipped v0.17-0.18; caption style presets shipped 2026-07-02).
-3. Agent recovery gaps remain: resumable checkpoints and an actor filter on history (task-level revert and undo shipped 2026-07-02; agent-facing history/task query tools shipped 2026-07-02).
+3. Agent recovery gaps remain: resumable checkpoints (task-level revert and undo shipped 2026-07-02; agent-facing history/task query tools shipped 2026-07-02; actor filter on history shipped v0.32.0.0).
 4. Context gaps remain: style recipes, brand-kit ingestion, and script/document ingestion beyond the free-form project brief.
 5. Shorts and reframing shipped v0.21-0.25 (manual/scene/vision crop, highlights, make-short/make-highlights playbooks).
 6. Process safety: cross-process `project.json` advisory lock shipped v0.28.0.0; revision conflict detection and machine-readable errors remain open.
 
-2026-07-03 update: shorts track through v0.28.0.0 (reframe, highlights, safe-area guides, split export layout, segment seeking, two-pass loudnorm, noise reduction, file locking, demo GIF). Remaining gaps are deeper parity, recovery, de-essing, visual export transitions, and HTTP API surface.
+2026-07-03 update: shorts track through v0.28.0.0 (reframe, highlights, safe-area guides, split export layout, segment seeking, two-pass loudnorm, noise reduction, file locking, demo GIF). v0.32.0.0 closed the cinema player cut-skip bug, GIF export caps, de-essing, and the history actor filter. Remaining gaps are deeper cross-surface parity, agent recovery, and HTTP API surface.
 
-Recommended next code task: **de-essing or highlight-row export in GUI**. Visual overlay primitives and shorts infrastructure are in place; polish export verification and remaining audio cleanup next.
+Recommended next code task: **highlight-row export in GUI**. Visual overlay primitives and shorts infrastructure are in place; polish export verification and remaining manual-correction gaps (music timeline drag-trim, richer title styles) next.
 
 ## Milestone 1: Frictionless project intake
 
@@ -464,7 +464,7 @@ Goal: exported videos can sound polished without leaving OpenKlip.
 - [x] Add basic audio cleanup.
   - [x] Noise reduction option if feasible with ffmpeg filters. Verified 2026-07-03: `audio.noiseReduction` (`afftdn` on voice bus); CLI `--noise-reduction`, GUI toggle; `tests/exporter.test.ts`.
   - [x] High-pass voice filter. Verified 2026-07-02: `audio.voiceHighpass` (40-200Hz) prepends `highpass=f=<hz>` on both the seamed and plain voice paths; CLI `--highpass on|off --highpass-hz <n>`, UI toggle.
-  - [ ] De-esser or documented non-goal if too heavy. Not implemented; see TODO.md Known Limitations.
+  - [x] De-esser or documented non-goal if too heavy. Verified 2026-07-03: ffmpeg's bundled `deesser` filter runs on the voice bus (`project.audio.deEsser`, `enabled`/`intensity` 0-1 default 0.5), applied after highpass and noise reduction; CLI `--deess on|off --deess-intensity <0-1>`, MCP `audio` action, GUI Audio section toggle+slider; `tests/exporter.test.ts`, `tests/edl.test.ts`, `tests/actions.test.ts`, `tests/registry.test.ts`, `tests/cli-audio-deess.test.ts`, `tests/audio-controls.test.tsx`, and the wider `bun test` run (1504 tests, all green). Only `intensity` is exposed; the filter's `f`/`s` parameters are hardcoded, not user-configurable; see TODO.md Known Limitations.
   - Verification: audio filter tests and export smoke. Verified 2026-07-03: `tests/exporter.test.ts` pins highpass, afftdn, and loudnorm chains.
 
 ## Milestone 5: Rich manual timeline editing
@@ -797,7 +797,7 @@ Goal: match the core jobs people expect from a modern transcript-first editor.
   - [x] Music fades.
   - [x] Music ducking. Verified 2026-07-02: see Milestone 4.2.
   - [x] Loudness normalization. Verified 2026-07-03: single-pass default + optional two-pass mode.
-  - [x] Basic audio cleanup. Verified 2026-07-03: highpass + afftdn noise reduction; de-esser not implemented.
+  - [x] Basic audio cleanup. Verified 2026-07-03: highpass + afftdn noise reduction; de-esser shipped v0.32.0.0 (ffmpeg `deesser` filter, intensity 0-1).
 - [ ] Multi-take and composition.
   - [x] CLI multi-take assembly.
   - [ ] UI take browser.

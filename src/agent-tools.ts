@@ -66,6 +66,20 @@ export const AGENT_TASK_STATUSES = [
   "cancelled",
 ] as const satisfies readonly AgentTaskStatus[];
 
+// Mirrors Actor in src/action-log-entry.ts; kept as a local literal tuple
+// (rather than exporting a private array there) since z.enum needs a
+// compile-time tuple, not a string[]. Unlike action-log.ts's ACTORS (which
+// deliberately excludes "system", a value never set via OPENKLIP_ACTOR), this
+// list covers every Actor member so the history_list `actor` filter can match
+// any logged entry, including background-maintenance ones.
+export const HISTORY_ACTORS = [
+  "human",
+  "agent",
+  "cli",
+  "mcp",
+  "system",
+] as const satisfies readonly Actor[];
+
 export interface AgentToolDef {
   name: string;
   run: (input: unknown) => Promise<unknown>;
@@ -354,14 +368,23 @@ const queryTools: AgentToolDef[] = [
         .min(1)
         .optional()
         .describe("Filter to entries with this action name."),
+      actor: z
+        .enum(HISTORY_ACTORS)
+        .optional()
+        .describe(
+          "Filter to entries logged by this actor (human, agent, cli, mcp, or system)."
+        ),
     }),
-    run: async ({ slug: projectSlug, limit, task, action }) => {
+    run: async ({ slug: projectSlug, limit, task, action, actor }) => {
       let entries = await readActionLog(projectSlug);
       if (task !== undefined) {
         entries = entries.filter((e) => e.taskId === task);
       }
       if (action !== undefined) {
         entries = entries.filter((e) => e.action === action);
+      }
+      if (actor !== undefined) {
+        entries = entries.filter((e) => e.actor === actor);
       }
       return {
         entries: entries.slice(0, limit),

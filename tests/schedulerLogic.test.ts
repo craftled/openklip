@@ -4,9 +4,11 @@ import {
   cutTransitionSweepPlan,
   findPlayingRangeIndex,
   nextRangeIndex,
+  outputPositionSec,
   playbackStartIndex,
   rangeBoundaryAudioDelaySec,
   shouldJumpToNextRange,
+  sourceSecForOutputPosition,
 } from "../src/schedulerLogic.ts";
 
 const ranges = [
@@ -98,4 +100,38 @@ test("cutTransitionSweepPlan honors the minimum and maximum duration bounds", ()
   assert.ok(maxPlan);
   assert.equal(maxPlan.sweepMs, 2000);
   assert.ok(maxPlan.outroMs > 0);
+});
+
+test("outputPositionSec collapses deleted gaps into cut-space distance", () => {
+  assert.equal(outputPositionSec(ranges, 0), 0);
+  assert.equal(outputPositionSec(ranges, 1), 1);
+  assert.equal(outputPositionSec(ranges, 2), 2);
+  // A source second inside the deleted gap (2-5) reports the cut-space
+  // position of the end of the previous kept range, since nothing between
+  // ranges is ever actually played.
+  assert.equal(outputPositionSec(ranges, 3.5), 2);
+  assert.equal(outputPositionSec(ranges, 6), 3);
+  assert.equal(outputPositionSec(ranges, 7), 4);
+  // Past the final range: clamps to total kept duration.
+  assert.equal(outputPositionSec(ranges, 9), 4);
+});
+
+test("outputPositionSec returns 0 for an empty range list", () => {
+  assert.equal(outputPositionSec([], 5), 0);
+});
+
+test("sourceSecForOutputPosition is the inverse of outputPositionSec inside kept spans", () => {
+  assert.equal(sourceSecForOutputPosition(ranges, 0), 0);
+  assert.equal(sourceSecForOutputPosition(ranges, 1), 1);
+  assert.equal(sourceSecForOutputPosition(ranges, 2), 2);
+  assert.equal(sourceSecForOutputPosition(ranges, 3), 6);
+  assert.equal(sourceSecForOutputPosition(ranges, 4), 7);
+});
+
+test("sourceSecForOutputPosition clamps past the total kept duration to the last range end", () => {
+  assert.equal(sourceSecForOutputPosition(ranges, 10), 7);
+});
+
+test("sourceSecForOutputPosition returns 0 for an empty range list", () => {
+  assert.equal(sourceSecForOutputPosition([], 5), 0);
 });
