@@ -2,9 +2,9 @@ import { FFMPEG } from "./ffmpeg.ts";
 
 export interface LoudnormMeasured {
   input_i: string;
-  input_tp: string;
   input_lra: string;
   input_thresh: string;
+  input_tp: string;
   target_offset: string;
 }
 

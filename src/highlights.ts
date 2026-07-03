@@ -111,11 +111,12 @@ export function parseHighlights(
           continue;
         }
         const scoreRaw = num(row.score);
+        const reasonStr = str(row.reason);
         out.push({
           fromSec,
           toSec,
           title,
-          ...(str(row.reason) ? { reason: str(row.reason)! } : {}),
+          ...(reasonStr ? { reason: reasonStr } : {}),
           ...(scoreRaw === null
             ? {}
             : { score: Math.min(1, Math.max(0, scoreRaw)) }),

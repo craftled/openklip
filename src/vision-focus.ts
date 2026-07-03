@@ -7,7 +7,7 @@ import type { CropSuggestion } from "./auto-crop.ts";
 import type { ExportAspect, Project, SceneSegment } from "./edl.ts";
 import { run } from "./ffmpeg.ts";
 import { repoPath } from "./repo-paths.ts";
-import { frameTimeSec, listFrameSamples } from "./scene-log.ts";
+import { listFrameSamples } from "./scene-log.ts";
 
 export interface VisionFocusSample {
   confidence: number;
@@ -131,7 +131,7 @@ export async function detectFocusFromImage(
 /** Sample ingest frames and average face-center focus (darwin + frames only). */
 export async function suggestCropFromVision(
   slug: string,
-  project: Project,
+  _project: Project,
   aspect: ExportAspect,
   maxFrames = 8
 ): Promise<CropSuggestion | null> {
@@ -220,5 +220,3 @@ export async function enrichSceneLogWithVisionFocus(
   }
   return updated;
 }
-
-export { frameTimeSec };
