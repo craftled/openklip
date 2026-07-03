@@ -6,6 +6,7 @@ import {
   applyGraphicParams,
   graphicFrameAt,
 } from "@/lib/graphic-runtime";
+import type { Keyframe } from "../../src/keyframes.ts";
 
 // One active graphic overlay rendered live over the <video>, driven by the SAME
 // scheduler-derived sample position the export rasterizer uses. The composition
@@ -16,6 +17,7 @@ export interface GraphicItem {
   catalog?: string;
   endSample: number;
   id: string;
+  keyframes?: Keyframe[];
   params: Record<string, string | number | boolean>;
   spec?: unknown;
   startSample: number;
@@ -135,8 +137,20 @@ export function GraphicOverlay({
       sampleRate,
       comp.fps
     );
-    applyGraphicFrame(root, frame, durFrames, comp.height);
-  }, [comp, curSample, sampleRate, graphic.startSample, graphic.endSample]);
+    applyGraphicFrame(root, frame, durFrames, comp.height, {
+      width: comp.width,
+      height: comp.height,
+      keyframes: graphic.keyframes,
+      sampleOffset: curSample - graphic.startSample,
+    });
+  }, [
+    comp,
+    curSample,
+    sampleRate,
+    graphic.startSample,
+    graphic.endSample,
+    graphic.keyframes,
+  ]);
 
   if (!comp) {
     return null;

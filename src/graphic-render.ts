@@ -15,6 +15,7 @@ import { join } from "node:path";
 import { SAMPLE_RATE } from "./edl.ts";
 import type { GraphicManifest } from "./graphics.ts";
 import { graphicCompositionPath } from "./graphics.ts";
+import type { Keyframe } from "./keyframes.ts";
 import { buildTitlesAss, type TitleItem } from "./titles.ts";
 
 export interface RenderGraphicInput {
@@ -29,6 +30,8 @@ export interface RenderGraphicInput {
   // The overlay's UNIQUE id (g.id). Keys the emitted asset filename so two
   // overlays using the same template do not collide / race on one file.
   id: string;
+  // Optional per-overlay keyframe animation (sample offsets on the 48kHz grid).
+  keyframes?: Keyframe[];
   // Carries kind/width/height/fps; resolved by the caller via loadGraphicManifest.
   manifest: GraphicManifest;
   // Working dir to write the asset into (exporter passes p.working).
@@ -143,6 +146,7 @@ async function renderRichGraphic(
     await renderHeadlessAlpha({
       compositionHtml,
       params: input.params,
+      keyframes: input.keyframes,
       width: input.width,
       height: input.height,
       fps: input.fps,
