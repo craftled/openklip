@@ -531,6 +531,14 @@ const queryTools: AgentToolDef[] = [
     run: ({ id }) => ({ id, skill: loadTemplateSkill(id) }),
   }),
   defineQueryTool({
+    name: "load_skill",
+    summary:
+      "Load a skill's full procedure (markdown) by id when the user's request matches that skill. Read-only; does not change the project template.",
+    schema: z.object({ id: z.string().min(1) }),
+    surfaces: ["cli", "mcp"],
+    run: ({ id }) => ({ id, skill: loadTemplateSkill(id) }),
+  }),
+  defineQueryTool({
     name: "template_set",
     summary: "Attach a template id to project.json.",
     schema: z.object({ slug, id: z.string().min(1) }),

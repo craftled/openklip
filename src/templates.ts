@@ -29,19 +29,81 @@ export function templateSkillPath(id: string): string {
   return join(templateDir(id), "skill.md");
 }
 
-function parseSkillMeta(
+function stripQuotes(value: string): string {
+  if (
+    (value.startsWith('"') && value.endsWith('"') && value.length >= 2) ||
+    (value.startsWith("'") && value.endsWith("'") && value.length >= 2)
+  ) {
+    return value.slice(1, -1);
+  }
+  return value;
+}
+
+function parseFrontmatter(raw: string): {
+  description?: string;
+  label?: string;
+  name?: string;
+  rest: string;
+} | null {
+  if (!raw.startsWith("---\n") && raw !== "---") {
+    return null;
+  }
+  const lines = raw.split("\n");
+  if (lines[0] !== "---") {
+    return null;
+  }
+  let closingIndex = -1;
+  for (let i = 1; i < lines.length; i++) {
+    if (lines[i] === "---") {
+      closingIndex = i;
+      break;
+    }
+  }
+  if (closingIndex === -1) {
+    return null;
+  }
+  const fmLines = lines.slice(1, closingIndex);
+  const rest = lines.slice(closingIndex + 1).join("\n");
+  const result: { description?: string; label?: string; name?: string } = {};
+  for (const line of fmLines) {
+    const match = line.match(/^([A-Za-z_-]+):\s*(.*)$/);
+    if (!match) {
+      continue;
+    }
+    const key = match[1].trim();
+    const value = stripQuotes(match[2].trim());
+    if (key === "description") {
+      result.description = value;
+    } else if (key === "label") {
+      result.label = value;
+    } else if (key === "name") {
+      result.name = value;
+    }
+  }
+  return { ...result, rest };
+}
+
+export function parseSkillMeta(
   raw: string,
   id: string
 ): { label: string; description: string } {
-  const heading = raw.match(/^#\s+(.+)$/m);
-  const label = heading?.[1]?.trim() || id;
-  const body = raw
+  const frontmatter = parseFrontmatter(raw);
+  const body = frontmatter ? frontmatter.rest : raw;
+
+  const heading = body.match(/^#\s+(.+)$/m);
+  const headingLabel = heading?.[1]?.trim() || id;
+  // label wins over name when both are present in frontmatter
+  const label = frontmatter?.label ?? frontmatter?.name ?? headingLabel;
+
+  const bodyLine = body
     .replace(/^#\s+.+$/m, "")
     .trim()
     .split("\n")
     .map((line) => line.trim())
     .find((line) => line.length > 0 && !line.startsWith("#"));
-  return { label, description: body ?? "" };
+  const description = frontmatter?.description ?? bodyLine ?? "";
+
+  return { label, description };
 }
 
 export function listTemplates(): TemplateListing[] {
