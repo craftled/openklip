@@ -8,10 +8,15 @@ import {
   canRevertGroup,
   canRevertLast,
   crossesAssembleBoundary,
+  distinctActions,
+  distinctActors,
+  distinctTaskIds,
+  filterHistoryEntries,
   groupHasBriefSet,
   groupHistoryEntries,
   groupTouchesTruncationBoundary,
   HISTORY_PAGE_LIMIT,
+  HistoryFilterControls,
   HistoryList,
   historyEntryKey,
   newestAssembleIndex,
@@ -565,4 +570,166 @@ test("HistoryList disables a task revert with a 'history truncated' hint when th
     <HistoryList entries={entries} snapshotRevisions={snapshotRevisions} />
   );
   assert.match(html, /history truncated/i);
+});
+
+// ── History panel filter UI: actor/action/task, AND semantics, empty states ─
+
+const taskCut: ActionLogEntry = {
+  at: 10,
+  action: "cut",
+  actor: "agent",
+  revisionBefore: 2,
+  revisionAfter: 3,
+  taskId: "task-1",
+};
+
+const taskPad: ActionLogEntry = {
+  at: 20,
+  action: "pad",
+  actor: "agent",
+  revisionBefore: 1,
+  revisionAfter: 2,
+  taskId: "task-1",
+};
+
+const humanLook: ActionLogEntry = {
+  at: 30,
+  action: "look-vignette",
+  actor: "human",
+  revisionBefore: 0,
+  revisionAfter: 1,
+};
+
+test("filterHistoryEntries with no active filter returns every entry unchanged", () => {
+  const entries = [taskCut, taskPad, humanLook];
+  assert.deepEqual(filterHistoryEntries(entries, {}), entries);
+  assert.deepEqual(
+    filterHistoryEntries(entries, { actor: "", action: "", task: "" }),
+    entries
+  );
+  assert.deepEqual(
+    filterHistoryEntries(entries, {
+      actor: undefined,
+      action: undefined,
+      task: undefined,
+    }),
+    entries
+  );
+});
+
+test("filterHistoryEntries matches on a single dimension", () => {
+  const entries = [taskCut, taskPad, humanLook];
+  assert.deepEqual(filterHistoryEntries(entries, { actor: "human" }), [
+    humanLook,
+  ]);
+  assert.deepEqual(filterHistoryEntries(entries, { action: "cut" }), [taskCut]);
+  assert.deepEqual(filterHistoryEntries(entries, { task: "task-1" }), [
+    taskCut,
+    taskPad,
+  ]);
+});
+
+test("filterHistoryEntries combines actor, action, and task filters with AND semantics, not OR", () => {
+  const entries = [taskCut, taskPad, humanLook];
+  // Matches actor AND action AND task all at once: only taskCut qualifies.
+  assert.deepEqual(
+    filterHistoryEntries(entries, {
+      actor: "agent",
+      action: "cut",
+      task: "task-1",
+    }),
+    [taskCut]
+  );
+  // An OR-shaped implementation would wrongly include taskPad (agent, task-1)
+  // and humanLook (neither) alongside taskCut here.
+  assert.notDeepEqual(
+    filterHistoryEntries(entries, {
+      actor: "agent",
+      action: "cut",
+      task: "task-1",
+    }),
+    entries
+  );
+});
+
+test("filterHistoryEntries returns an empty array cleanly for a value present in the UI options but matching zero entries", () => {
+  const entries = [taskCut, taskPad, humanLook];
+  assert.deepEqual(filterHistoryEntries(entries, { actor: "mcp" }), []);
+  assert.deepEqual(
+    filterHistoryEntries(entries, { actor: "agent", action: "look-vignette" }),
+    []
+  );
+});
+
+test("distinctActors, distinctActions, and distinctTaskIds derive sorted unique values present in the loaded entries", () => {
+  const entries = [taskCut, taskPad, humanLook];
+  assert.deepEqual(distinctActors(entries), ["agent", "human"]);
+  assert.deepEqual(distinctActions(entries), ["cut", "look-vignette", "pad"]);
+  assert.deepEqual(distinctTaskIds(entries), ["task-1"]);
+  // No taskId anywhere: an empty option list, not a list of undefined.
+  assert.deepEqual(distinctTaskIds([humanLook]), []);
+});
+
+test("actorBadgeClass gives 'system' its own style distinct from mcp and the unknown-actor fallback", () => {
+  assert.notEqual(actorBadgeClass("system"), actorBadgeClass("mcp"));
+  assert.notEqual(actorBadgeClass("system"), actorBadgeClass("totally-bogus"));
+  assert.ok(actorBadgeClass("system").length > 0);
+});
+
+test("HistoryFilterControls renders an actor, action, and task filter control", () => {
+  const html = renderToStaticMarkup(
+    <HistoryFilterControls
+      actionOptions={["cut", "pad"]}
+      actorOptions={["agent", "human"]}
+      onChange={() => {
+        // no-op for a static render
+      }}
+      taskOptions={["task-1"]}
+      value={{ actor: "", action: "", task: "" }}
+    />
+  );
+  assert.match(html, /Filter by actor/i);
+  assert.match(html, /Filter by action/i);
+  assert.match(html, /Filter by task/i);
+  assert.match(html, /task-1/);
+});
+
+test("HistoryFilterControls shows 'Clear filters' only when a filter is active", () => {
+  const idle = renderToStaticMarkup(
+    <HistoryFilterControls
+      actionOptions={["cut"]}
+      actorOptions={["agent"]}
+      onChange={() => {
+        // no-op
+      }}
+      taskOptions={[]}
+      value={{ actor: "", action: "", task: "" }}
+    />
+  );
+  assert.doesNotMatch(idle, /Clear filters/);
+
+  const active = renderToStaticMarkup(
+    <HistoryFilterControls
+      actionOptions={["cut"]}
+      actorOptions={["agent"]}
+      onChange={() => {
+        // no-op
+      }}
+      taskOptions={[]}
+      value={{ actor: "agent", action: "", task: "" }}
+    />
+  );
+  assert.match(active, /Clear filters/);
+});
+
+test("HistoryList's 'no entries match the filter' empty state renders distinctly from 'no history at all'", () => {
+  const noHistory = renderToStaticMarkup(<HistoryList entries={[]} />);
+  assert.match(noHistory, /No actions yet/);
+  assert.doesNotMatch(noHistory, /match the current filters/i);
+
+  const filteredOut = renderToStaticMarkup(
+    <HistoryList entries={[]} unfilteredCount={3} />
+  );
+  assert.match(filteredOut, /match the current filters/i);
+  assert.doesNotMatch(filteredOut, /No actions yet/);
 });

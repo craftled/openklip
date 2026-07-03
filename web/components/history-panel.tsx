@@ -7,7 +7,7 @@ import {
 import type { Project } from "@engine/edl";
 import type { RevertTarget } from "@engine/revert";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { toastRevertFailed, toastRevertSucceeded } from "@/lib/app-toast";
 import { RotateCcw } from "@/lib/icon";
@@ -22,6 +22,10 @@ const ACTOR_BADGES: Record<string, string> = {
   agent: "bg-accent text-accent-foreground",
   cli: "bg-secondary text-secondary-foreground",
   mcp: "bg-muted text-muted-foreground",
+  // Background maintenance with no human/agent behind it (see Actor's doc
+  // comment in src/action-log-entry.ts): a dimmer, borderless tone so it
+  // doesn't compete with the four actor-driven badges above.
+  system: "bg-border/40 text-muted-foreground",
 };
 
 /** Badge classes for an actor; unknown actors fall back to the muted style. */
@@ -55,6 +59,163 @@ export function parseSnapshotRevisions(value: unknown): number[] {
 /** Positive snapshot cap from the history route, or undefined when absent. */
 export function parseMaxHistorySnapshots(value: unknown): number | undefined {
   return typeof value === "number" && value > 0 ? value : undefined;
+}
+
+// ── Filter UI: actor / action / task, client-side over the already-fetched
+// entries (the history route caps its response at HISTORY_PAGE_LIMIT, a
+// small bounded dataset, so filtering it in the browser needs no new route
+// query params or extra round-trip) ────────────────────────────────────────
+
+/** One filter criterion per dimension; an empty string or undefined means
+ * "no restriction" on that dimension. Mirrors the CLI's `openklip history
+ * --task/--action/--actor` and the `history_list` MCP tool's {task, action,
+ * actor}: all active criteria combine with AND, never OR. */
+export interface HistoryFilter {
+  action?: string;
+  actor?: string;
+  task?: string;
+}
+
+/** Entries matching every active criterion in `filter`. An empty/undefined
+ * filter value (on any dimension) leaves that dimension unrestricted; with
+ * no active criteria at all, every entry passes through unchanged. */
+export function filterHistoryEntries(
+  entries: ActionLogEntry[],
+  filter: HistoryFilter
+): ActionLogEntry[] {
+  return entries.filter((entry) => {
+    if (filter.actor && entry.actor !== filter.actor) {
+      return false;
+    }
+    if (filter.action && entry.action !== filter.action) {
+      return false;
+    }
+    if (filter.task && entry.taskId !== filter.task) {
+      return false;
+    }
+    return true;
+  });
+}
+
+/** Distinct actors actually present in the loaded entries, sorted. Options
+ * are sourced from the data itself rather than the full Actor union: an
+ * option that always yields zero results (an actor with no entries in the
+ * current view) would be confusing, not helpful. */
+export function distinctActors(entries: ActionLogEntry[]): string[] {
+  return Array.from(new Set(entries.map((e) => e.actor))).sort();
+}
+
+/** Distinct action names actually present in the loaded entries, sorted. */
+export function distinctActions(entries: ActionLogEntry[]): string[] {
+  return Array.from(new Set(entries.map((e) => e.action))).sort();
+}
+
+/** Distinct task ids actually present in the loaded entries, sorted. Entries
+ * with no taskId (most GUI/CLI edits) are excluded, not represented as an
+ * empty-string option. */
+export function distinctTaskIds(entries: ActionLogEntry[]): string[] {
+  return Array.from(
+    new Set(
+      entries
+        .map((e) => e.taskId)
+        .filter((id): id is string => id !== undefined)
+    )
+  ).sort();
+}
+
+const FILTER_SELECT_CLASS =
+  "h-6 max-w-32 rounded-sm border border-input bg-transparent px-1 text-[11px] text-foreground";
+
+const FILTER_LABEL_CLASS =
+  "flex items-center gap-1 text-[11px] text-muted-foreground";
+
+function FilterSelect({
+  ariaLabel,
+  label,
+  onChange,
+  options,
+  value,
+}: {
+  ariaLabel: string;
+  label: string;
+  onChange: (value: string) => void;
+  options: string[];
+  value: string;
+}) {
+  return (
+    <label className={FILTER_LABEL_CLASS}>
+      {label}
+      <select
+        aria-label={ariaLabel}
+        className={FILTER_SELECT_CLASS}
+        onChange={(e) => onChange(e.target.value)}
+        value={value}
+      >
+        <option value="">All</option>
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+/** Presentational actor/action/task filter row, controlled by the caller
+ * (HistoryPanel). Kept separate from HistoryPanel's fetch/state wiring so it
+ * can be rendered and asserted on directly, the same split this file already
+ * uses for HistoryList vs HistoryPanel. */
+export function HistoryFilterControls({
+  actionOptions,
+  actorOptions,
+  onChange,
+  taskOptions,
+  value,
+}: {
+  actionOptions: string[];
+  actorOptions: string[];
+  onChange: (next: HistoryFilter) => void;
+  taskOptions: string[];
+  value: HistoryFilter;
+}) {
+  const hasActiveFilter = Boolean(value.actor || value.action || value.task);
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <FilterSelect
+        ariaLabel="Filter by actor"
+        label="Actor"
+        onChange={(actor) => onChange({ ...value, actor })}
+        options={actorOptions}
+        value={value.actor ?? ""}
+      />
+      <FilterSelect
+        ariaLabel="Filter by action"
+        label="Action"
+        onChange={(action) => onChange({ ...value, action })}
+        options={actionOptions}
+        value={value.action ?? ""}
+      />
+      <FilterSelect
+        ariaLabel="Filter by task"
+        label="Task"
+        onChange={(task) => onChange({ ...value, task })}
+        options={taskOptions}
+        value={value.task ?? ""}
+      />
+      {hasActiveFilter ? (
+        <Button
+          className="h-6 rounded-sm px-2 text-[11px] text-muted-foreground"
+          onClick={() => onChange({ action: "", actor: "", task: "" })}
+          size="sm"
+          type="button"
+          variant="ghost"
+        >
+          Clear filters
+        </Button>
+      ) : null}
+    </div>
+  );
 }
 
 /** Confirm-state key for the header "Undo last edit" affordance. */
@@ -497,12 +658,26 @@ export function HistoryList({
   entries,
   now,
   snapshotRevisions,
+  unfilteredCount,
   ...controls
 }: {
   entries: ActionLogEntry[];
   now?: number;
+  // Count of entries before any client-side filter was applied. When given
+  // and greater than zero while `entries` (the filtered view) is empty, an
+  // active filter matched nothing: distinct from a genuinely empty history,
+  // matching the CLI's "no history entries match the filter" vs "no history
+  // for X" split (src/cli.ts's `history` command).
+  unfilteredCount?: number;
 } & RevertControls) {
   if (entries.length === 0) {
+    if (unfilteredCount !== undefined && unfilteredCount > 0) {
+      return (
+        <p className="text-muted-foreground text-xs">
+          No history entries match the current filters.
+        </p>
+      );
+    }
     return (
       <p className="text-muted-foreground text-xs">
         No actions yet. Edits from the GUI, CLI, and agents will appear here.
@@ -559,6 +734,11 @@ export function HistoryPanel({
   const [forceConfirmKey, setForceConfirmKey] = useState<string | null>(null);
   const [revertingKey, setRevertingKey] = useState<string | null>(null);
   const [pendingTarget, setPendingTarget] = useState<RevertTarget | null>(null);
+  const [filter, setFilter] = useState<HistoryFilter>({
+    action: "",
+    actor: "",
+    task: "",
+  });
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -654,6 +834,20 @@ export function HistoryPanel({
     setPendingTarget({ last: true });
   }, []);
 
+  // Filter options are always derived from the raw fetch (never the already-
+  // filtered view): narrowing by one dimension must not make the other
+  // dimensions' options disappear out from under the user.
+  const actorOptions = useMemo(() => distinctActors(entries), [entries]);
+  const actionOptions = useMemo(() => distinctActions(entries), [entries]);
+  const taskOptions = useMemo(() => distinctTaskIds(entries), [entries]);
+  const filteredEntries = useMemo(
+    () => filterHistoryEntries(entries, filter),
+    [entries, filter]
+  );
+
+  // Undo last edit always targets the true (unfiltered) history: a filtered
+  // view is a lens on the log, not a different log, so revert eligibility
+  // must not depend on which filter happens to be active.
   const undoLastEnabled = canRevertLast(entries, snapshotRevisions);
   const undoLastConfirming = confirmingKey === LAST_REVERT_KEY;
   const undoLastReverting = revertingKey === LAST_REVERT_KEY;
@@ -680,7 +874,8 @@ export function HistoryPanel({
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between gap-2">
         <span className="text-muted-foreground text-xs">
-          {entries.length} action{entries.length === 1 ? "" : "s"}
+          {filteredEntries.length} action
+          {filteredEntries.length === 1 ? "" : "s"}
         </span>
         <span className="flex shrink-0 items-center gap-1">
           {undoLastConfirming ? (
@@ -739,9 +934,16 @@ export function HistoryPanel({
           </Button>
         </span>
       </div>
+      <HistoryFilterControls
+        actionOptions={actionOptions}
+        actorOptions={actorOptions}
+        onChange={setFilter}
+        taskOptions={taskOptions}
+        value={filter}
+      />
       <HistoryList
         confirmingKey={confirmingKey}
-        entries={entries}
+        entries={filteredEntries}
         forceConfirmKey={forceConfirmKey}
         onCancel={cancelRevert}
         onConfirmForce={onConfirmForce}
@@ -750,6 +952,7 @@ export function HistoryPanel({
         onRequestRevert={onRequestRevert}
         revertingKey={revertingKey}
         snapshotRevisions={snapshotRevisions}
+        unfilteredCount={entries.length}
       />
       {entries.length > 0 && maxHistorySnapshots !== undefined ? (
         <p className="text-[11px] text-muted-foreground">
