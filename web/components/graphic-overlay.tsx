@@ -1,5 +1,6 @@
 "use client";
 
+import type { Keyframe } from "@engine/keyframes";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   applyGraphicFrame,
