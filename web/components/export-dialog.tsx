@@ -14,6 +14,8 @@ import {
   ExportOptionsForm,
   type ExportPlatformSelection,
   type ExportResolution,
+  GIF_MAX_WIDTH_CEILING_PX,
+  GIF_MAX_WIDTH_DEFAULT_PX,
   platformFormValues,
 } from "@/components/export-options-form";
 
@@ -46,10 +48,47 @@ export interface ExportDialogOptions {
   format: ExportFormat;
   /** "source" keeps the source frame rate; a number requests that rate. */
   frameRate: number | "source";
+  /** GIF-only override for GIF_MAX_WIDTH_PX (960); undefined uses the
+   * default. Never sent for mp4 (see resolveGifMaxWidthSubmission). */
+  gifMaxWidth?: number;
   maxHeight?: number;
   /** undefined when Manual is selected; otherwise the active preset id. */
   platform?: ExportPlatformId;
   resolution: ExportResolution;
+}
+
+/**
+ * Pure resolution of what gifMaxWidth to submit, extracted so the "what
+ * counts as noise" decision is testable without mounting the dialog (same
+ * rationale as buildExportOptions below). Resolves to undefined for a
+ * non-GIF format, empty input, or a value that matches the
+ * GIF_MAX_WIDTH_DEFAULT_PX (960) default (so the request doesn't carry a
+ * value identical to what omitting it would already produce); otherwise the
+ * value is clamped into [1, GIF_MAX_WIDTH_CEILING_PX] and returned. Zero and
+ * negative input clamp to 1 rather than being treated as empty: a user who
+ * explicitly typed "0" gets a deterministic in-range value, not a silent
+ * revert to the untouched default. This clamp is UX polish only; the real
+ * ceiling is enforced server-side in clampGifDimensions (src/exporter.ts).
+ */
+export function resolveGifMaxWidthSubmission(
+  rawValue: string | number | undefined,
+  format: ExportFormat
+): number | undefined {
+  if (format !== "gif") {
+    return;
+  }
+  if (rawValue === undefined || rawValue === "") {
+    return;
+  }
+  const parsed = typeof rawValue === "number" ? rawValue : Number(rawValue);
+  if (!Number.isFinite(parsed)) {
+    return;
+  }
+  const clamped = Math.min(
+    Math.max(Math.round(parsed), 1),
+    GIF_MAX_WIDTH_CEILING_PX
+  );
+  return clamped === GIF_MAX_WIDTH_DEFAULT_PX ? undefined : clamped;
 }
 
 /**
@@ -63,6 +102,7 @@ export function buildExportOptions(state: {
   format: ExportFormat;
   /** "source" or a stringified FRAME_RATES entry. */
   frameRate: string;
+  gifMaxWidth?: number;
   maxHeight?: number;
   platform: ExportPlatformSelection;
   resolution: ExportResolution;
@@ -73,6 +113,7 @@ export function buildExportOptions(state: {
     format: state.format,
     frameRate:
       state.frameRate === "source" ? "source" : Number(state.frameRate),
+    gifMaxWidth: resolveGifMaxWidthSubmission(state.gifMaxWidth, state.format),
     maxHeight: state.maxHeight,
     platform: state.platform === "manual" ? undefined : state.platform,
     resolution: state.resolution,
@@ -192,6 +233,10 @@ export function ExportDialog({
   const [platform, setPlatform] = useState<ExportPlatformSelection>("manual");
   const [format, setFormat] = useState<ExportFormat>("mp4");
   const [destination, setDestination] = useState<ExportDestination>("file");
+  // undefined means "use the GIF_MAX_WIDTH_DEFAULT_PX (960) default"; the
+  // form shows 960 as the fallback display value until the user commits an
+  // explicit override (see ExportOptionsForm's gifMaxWidth prop).
+  const [gifMaxWidth, setGifMaxWidth] = useState<number | undefined>(undefined);
 
   // Picking a platform chip sets the compression/fps/resolution controls to
   // the preset's defaults; the controls stay independently editable after
@@ -255,6 +300,7 @@ export function ExportDialog({
         destination,
         format,
         frameRate,
+        gifMaxWidth,
         maxHeight: activeMaxHeight,
         platform,
         resolution,
@@ -283,10 +329,12 @@ export function ExportDialog({
           dims={dims}
           format={format}
           frameRate={frameRate}
+          gifMaxWidth={gifMaxWidth}
           onCompressionChange={setCompression}
           onDestinationChange={setDestination}
           onFormatChange={setFormat}
           onFrameRateChange={setFrameRate}
+          onGifMaxWidthChange={setGifMaxWidth}
           onPlatformChange={handlePlatformChange}
           onResolutionChange={setResolution}
           platform={platform}

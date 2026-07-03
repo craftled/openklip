@@ -2033,6 +2033,7 @@ export function App({
           compression: options?.compression,
           format: options?.format,
           fps: options?.frameRate === "source" ? undefined : options?.frameRate,
+          gifMaxWidth: options?.gifMaxWidth,
           maxHeight,
           platform: options?.platform,
         });
