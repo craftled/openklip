@@ -58,12 +58,17 @@ function renderPanel(
 ): string {
   return renderToStaticMarkup(
     <TakesPanelView
+      addTakeBusy={false}
+      addTakeError={null}
+      addTakeLabel=""
       anchorWordId={null}
       assembleError={null}
       assembling={false}
       forceArmed={false}
       loadingTakes={false}
       loadingWords={false}
+      onAddTakeFile={noop}
+      onAddTakeLabelChange={noop}
       onAssemble={noop}
       onCancelForce={noop}
       onClickWord={noop}
@@ -168,4 +173,21 @@ test("force-overwrite confirmation renders when forceArmed is true instead of th
 test("assemble error renders when set", () => {
   const html = renderPanel({ assembleError: "boom" });
   assert.match(html, /boom/);
+});
+
+test("renders an Add take control with a file input", () => {
+  const html = renderPanel({});
+  assert.match(html, /data-takes-add/);
+  assert.match(html, /data-takes-add-file/);
+  assert.match(html, /type="file"/);
+});
+
+test("Add take shows a busy state while ingesting", () => {
+  const html = renderPanel({ addTakeBusy: true });
+  assert.match(html, /Ingesting take/);
+});
+
+test("Add take renders its own error separately from assembleError", () => {
+  const html = renderPanel({ addTakeError: "take upload failed" });
+  assert.match(html, /take upload failed/);
 });

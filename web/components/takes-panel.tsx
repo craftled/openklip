@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Check, Film, X } from "@/lib/icon";
+import { Check, Film, IconLoader, Upload, X } from "@/lib/icon";
+import { selectDroppedVideo } from "@/lib/project-intake";
+import { ingestTakeFromVideo } from "@/lib/take-create";
 import { resolveWordRange } from "@/lib/take-word-range";
 import { cn } from "@/lib/utils";
 import {
@@ -13,6 +15,7 @@ import {
   listTakesAction,
   loadTakeAction,
 } from "../../app/actions.ts";
+import { SUPPORTED_VIDEO_ACCEPT } from "../../src/video-formats.ts";
 
 const MAX_ROWS = 50;
 // assertProjectCanBeIngested's (src/ingest-guard.ts) exact wording for
@@ -97,12 +100,17 @@ function SegmentRow({
 }
 
 export interface TakesPanelViewProps {
+  addTakeBusy: boolean;
+  addTakeError: string | null;
+  addTakeLabel: string;
   anchorWordId: string | null;
   assembleError: string | null;
   assembling: boolean;
   forceArmed: boolean;
   loadingTakes: boolean;
   loadingWords: boolean;
+  onAddTakeFile: (file: File) => void;
+  onAddTakeLabelChange: (value: string) => void;
   onAssemble: () => void;
   onCancelForce: () => void;
   onClickWord: (wordId: string) => void;
@@ -114,17 +122,89 @@ export interface TakesPanelViewProps {
   takes: Take[];
 }
 
+/** Upload a new take's source video. A plain file-input button (no
+ * drag/drop): the panel already lives in a narrow sidebar column where a
+ * drop target would fight with the transcript/word click surface above it. */
+function AddTakeControl({
+  busy,
+  error,
+  label,
+  onFile,
+  onLabelChange,
+}: {
+  busy: boolean;
+  error: string | null;
+  label: string;
+  onFile: (file: File) => void;
+  onLabelChange: (value: string) => void;
+}) {
+  return (
+    <div
+      className="flex flex-col gap-1.5 rounded-md border border-dashed p-2"
+      data-takes-add
+    >
+      <div className="flex items-center gap-1.5">
+        <label
+          className={cn(
+            "inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-md border px-2 py-1 text-xs hover:bg-muted/50",
+            busy && "pointer-events-none opacity-60"
+          )}
+        >
+          {busy ? (
+            <IconLoader
+              aria-hidden
+              className="size-3.5 shrink-0 animate-spin"
+            />
+          ) : (
+            <Upload aria-hidden className="size-3.5 shrink-0" />
+          )}
+          <span>{busy ? "Ingesting take…" : "Add take"}</span>
+          <input
+            accept={SUPPORTED_VIDEO_ACCEPT}
+            className="hidden"
+            data-takes-add-file
+            disabled={busy}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = "";
+              if (file) {
+                onFile(file);
+              }
+            }}
+            type="file"
+          />
+        </label>
+        <input
+          className="min-w-0 flex-1 rounded-md border bg-transparent px-2 py-1 text-xs"
+          data-takes-add-label
+          disabled={busy}
+          onChange={(e) => onLabelChange(e.target.value)}
+          placeholder="Label (optional)"
+          type="text"
+          value={label}
+        />
+      </div>
+      {error ? <p className="text-destructive text-xs">{error}</p> : null}
+    </div>
+  );
+}
+
 /** Pure, prop-driven render (mirrors HistoryList/HistoryPanel's split in
  * web/components/history-panel.tsx): all state and server-action calls live
  * in TakesPanel below, so this piece stays fully testable with
  * renderToStaticMarkup. */
 export function TakesPanelView({
+  addTakeBusy,
+  addTakeError,
+  addTakeLabel,
   anchorWordId,
   assembleError,
   assembling,
   forceArmed,
   loadingTakes,
   loadingWords,
+  onAddTakeFile,
+  onAddTakeLabelChange,
   onAssemble,
   onCancelForce,
   onClickWord,
@@ -142,6 +222,14 @@ export function TakesPanelView({
 
   return (
     <div className="flex flex-col gap-2" data-takes-panel>
+      <AddTakeControl
+        busy={addTakeBusy}
+        error={addTakeError}
+        label={addTakeLabel}
+        onFile={onAddTakeFile}
+        onLabelChange={onAddTakeLabelChange}
+      />
+
       {takes.length === 0 ? (
         <p className="text-muted-foreground text-xs" data-takes-empty>
           {loadingTakes
@@ -289,6 +377,9 @@ export function TakesPanel({ onAssembled, slug }: TakesPanelProps) {
   const [assembling, setAssembling] = useState(false);
   const [forceArmed, setForceArmed] = useState(false);
   const [assembleError, setAssembleError] = useState<string | null>(null);
+  const [addTakeBusy, setAddTakeBusy] = useState(false);
+  const [addTakeError, setAddTakeError] = useState<string | null>(null);
+  const [addTakeLabel, setAddTakeLabel] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -306,6 +397,45 @@ export function TakesPanel({ onAssembled, slug }: TakesPanelProps) {
       cancelled = true;
     };
   }, [slug]);
+
+  // Reload the take list after a successful add, without flashing the
+  // initial "Loading takes…" empty state over an already-populated list.
+  const reloadTakes = useCallback(async () => {
+    const result = await listTakesAction(slug);
+    if (result.ok) {
+      setTakes(result.data.takes);
+    }
+  }, [slug]);
+
+  const onAddTakeFile = useCallback(
+    (file: File) => {
+      const picked = selectDroppedVideo([file]);
+      if ("error" in picked) {
+        setAddTakeError(picked.error);
+        return;
+      }
+      setAddTakeError(null);
+      setAddTakeBusy(true);
+      void ingestTakeFromVideo(slug, picked.file, {
+        label: addTakeLabel.trim() || undefined,
+      })
+        .then(async () => {
+          setAddTakeLabel("");
+          await reloadTakes();
+        })
+        .catch((e: unknown) => {
+          setAddTakeError((e as Error).message);
+        })
+        .finally(() => {
+          setAddTakeBusy(false);
+        });
+    },
+    [addTakeLabel, reloadTakes, slug]
+  );
+
+  const onAddTakeLabelChange = useCallback((value: string) => {
+    setAddTakeLabel(value);
+  }, []);
 
   const onSelectTake = useCallback(
     (takeId: string) => {
@@ -388,12 +518,17 @@ export function TakesPanel({ onAssembled, slug }: TakesPanelProps) {
 
   return (
     <TakesPanelView
+      addTakeBusy={addTakeBusy}
+      addTakeError={addTakeError}
+      addTakeLabel={addTakeLabel}
       anchorWordId={anchorWordId}
       assembleError={assembleError}
       assembling={assembling}
       forceArmed={forceArmed}
       loadingTakes={loadingTakes}
       loadingWords={loadingWords}
+      onAddTakeFile={onAddTakeFile}
+      onAddTakeLabelChange={onAddTakeLabelChange}
       onAssemble={() => void onAssemble()}
       onCancelForce={onCancelForce}
       onClickWord={onClickWord}

@@ -471,10 +471,16 @@ export async function runHighlightsDetect(
 }
 
 // ── Multi-take assembly GUI browser ─────────────────────────────────────────
-// Read/select-and-splice only: ingesting a NEW take stays CLI-only
-// (`openklip take-add`), matching src/cli.ts and the MCP tool surface
-// (list_takes/take_transcript/assemble all wrap src/assembly.ts the same way
-// these three do; there is deliberately no ingest-a-take GUI action here).
+// Read and select-and-splice actions live here as server actions. Ingesting a
+// NEW take from the browser (web/components/takes-panel.tsx's "Add take"
+// control) does NOT go through a server action: it needs the same
+// upload-then-poll-a-background-job shape as the whole-project upload
+// (web/lib/project-create.ts), so it POSTs to
+// app/api/projects/[slug]/takes/route.ts and polls the shared
+// /api/projects/ingest/[jobId] route via web/lib/take-create.ts instead.
+// `openklip take-add` and the MCP tool surface still wrap src/assembly.ts's
+// ingestTake the same way list_takes/take_transcript/assemble wrap the
+// functions below.
 
 export async function listTakesAction(
   slug: string
