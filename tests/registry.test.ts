@@ -323,8 +323,17 @@ test("audio: stores export audio quality settings, clamped, in project JSON", ()
     loudness: { enabled: true, targetLufs: -14, mode: "single" },
     noiseReduction: { enabled: false, nr: 12 },
     voiceHighpass: { enabled: false, hz: 80 },
+    deEsser: { enabled: false, intensity: 0.5 },
   });
   assert.deepEqual(p.audio, r.audio);
+});
+
+test("audio: deEsser rejects an out-of-range intensity at the MCP boundary before setAudio runs", () => {
+  const p = makeProject();
+  assert.throws(() =>
+    runAction("audio", p, { deEsser: { enabled: true, intensity: 1.5 } })
+  );
+  assert.throws(() => runAction("audio", p, { deEsser: { intensity: -0.2 } }));
 });
 
 test("export-set: stores aspect and crop, clamped, in project JSON", () => {

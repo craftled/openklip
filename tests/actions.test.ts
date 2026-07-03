@@ -450,6 +450,18 @@ test("setAudio leaves untouched subobjects intact", () => {
   assert.deepEqual(p.audio.voiceHighpass, { enabled: false, hz: 80 });
 });
 
+test("setAudio clamps deEsser intensity into [0,1] on write", () => {
+  const p = makeProject();
+  setAudio(p, { deEsser: { enabled: true, intensity: 1.5 } });
+  assert.equal(p.audio.deEsser.enabled, true);
+  assert.equal(p.audio.deEsser.intensity, 1);
+
+  setAudio(p, { deEsser: { intensity: -0.2 } });
+  assert.equal(p.audio.deEsser.intensity, 0);
+  // Untouched sibling stays as its schema default.
+  assert.equal(p.audio.deEsser.enabled, true);
+});
+
 test("setLook toggles vignette", () => {
   const p = makeProject();
   setLook(p, { vignette: true });
