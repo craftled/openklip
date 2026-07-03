@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { mkdir, rename, unlink } from "node:fs/promises";
-import { isAbsolute, join } from "node:path";
+import { dirname, isAbsolute, join } from "node:path";
 import { loadAudioAnalysis } from "./audio-analysis.ts";
 import {
   type BrollAudioFilterGraph,
@@ -28,6 +28,7 @@ import {
   type ExportCrop,
   ExportSettingsSchema,
   effectiveRanges,
+  intersectRangesWithSpan,
   type MusicPlacement,
   ProjectSchema,
   type Range,
@@ -96,12 +97,16 @@ export interface ExportOptions {
    */
   loudnessTargetLufs?: number;
   maxHeight?: number; // e.g. 1080 -> downscale output (and speed up filtering/encode)
+  /** Final output path; defaults to output/out.mp4. */
+  outPath?: string;
   /**
    * Destination preset (see export-platforms.ts) that fills any of the
    * fields above left unset by the caller. Explicit fields always win over
    * the platform's defaults; resolved once at the top of exportCut.
    */
   platform?: ExportPlatformId;
+  /** Source-time window for a partial export (e.g. one highlight clip). */
+  sourceSpan?: { fromSec: number; toSec: number };
 }
 
 // libx264 args per compression preset. Pure so tests pin the mapping; CRF must
@@ -773,7 +778,14 @@ export async function exportCut(
         .then((a) => a.silences)
         .catch(() => undefined)
     : undefined;
-  const ranges = effectiveRanges(project, silences);
+  let ranges = effectiveRanges(project, silences);
+  if (opts.sourceSpan) {
+    ranges = intersectRangesWithSpan(
+      ranges,
+      opts.sourceSpan.fromSec,
+      opts.sourceSpan.toSec
+    );
+  }
   // F10: matches effectiveRanges' own snap gate (project.cuts.snap.enabled &&
   // mode "vad" && silences && silences.length > 0), so `snapped` cannot
   // report true for an analysis that loaded but found nothing to snap onto
@@ -1278,6 +1290,8 @@ export async function exportCut(
   // ffmpeg writing p.out in place means a GUI export racing an agent export
   // corrupts the file both are writing. The tmp name KEEPS the .mp4
   // extension so ffmpeg still infers the mp4 container from it.
+  const destOut = opts.outPath ?? p.out;
+  await mkdir(dirname(destOut), { recursive: true });
   const tmpOut = join(p.output, `.out-tmp-${process.pid}-${Date.now()}.mp4`);
   try {
     await run(
@@ -1306,7 +1320,7 @@ export async function exportCut(
       ],
       "ffmpeg(export)"
     );
-    await rename(tmpOut, p.out);
+    await rename(tmpOut, destOut);
   } catch (e) {
     try {
       await unlink(tmpOut);
@@ -1317,7 +1331,7 @@ export async function exportCut(
   }
 
   return {
-    out: p.out,
+    out: destOut,
     durationSec: totalDurationSec(ranges),
     ranges: ranges.length,
     captions: captionsOn && assPath !== null,

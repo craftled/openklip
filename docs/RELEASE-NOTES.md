@@ -2,7 +2,25 @@
 
 Use these bodies when publishing releases. Each section matches a tag in `CHANGELOG.md` without duplicating the full changelog. **Known gaps:** always link to [TODO.md](../TODO.md#known-limitations); do not duplicate the list here.
 
-Publishing status checked on 2026-07-03 (`gh release list`): GitHub releases are published through `v0.25.0.0`.
+Publishing status checked on 2026-07-03 (`gh release list`): GitHub releases are published through `v0.25.0.0`. `v0.26.0.0` is prepared below for publication next.
+
+---
+
+## v0.26.0.0
+
+**Multi-clip highlight export and Highlights GUI panel.**
+
+### Highlights
+- **`openklip export-highlight`**: renders one or all stored clips to `output/highlights/{id}.mp4` via `sourceSpan` (no word cuts on `project.json`).
+- **`bun run agent-make-highlights`**: batch export with the `shorts` preset.
+- **GUI**: Config **Highlights** section lists candidates, seeks on click, **Detect clips** runs LLM detection.
+- Current codebase verification: 1348 tests.
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations). Per-clip verify still targets `output/out.mp4` only; GUI has no per-row Export button yet.
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#02600---2026-07-03)
 
 ---
 

@@ -393,3 +393,34 @@ export async function runVisionFocus(
     return fail(e);
   }
 }
+
+export async function runHighlightsDetect(
+  slug: string,
+  opts?: { maxClips?: number; targetClipSec?: number }
+): Promise<
+  ActionResult<{ project: Project; highlights: NonNullable<Project["highlights"]> }>
+> {
+  try {
+    const project = await loadProject(slug);
+    const { detectHighlights } = await import("@engine/highlights");
+    const highlights = await detectHighlights(project, {
+      agent: "claude-opus-4-8",
+      maxClips: opts?.maxClips ?? 5,
+      targetClipSec: opts?.targetClipSec ?? 45,
+    });
+    if (!highlights) {
+      throw new Error("highlight detection failed (no valid clips returned)");
+    }
+    await mutateProject(
+      slug,
+      (p) => {
+        p.highlights = highlights;
+      },
+      { action: "highlights-detect", actor: "human" }
+    );
+    const updated = await loadProject(slug);
+    return { ok: true, data: { project: updated, highlights } };
+  } catch (e) {
+    return fail(e);
+  }
+}

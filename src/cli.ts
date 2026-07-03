@@ -62,6 +62,7 @@ import {
 } from "./exporter.ts";
 import { FFMPEG, FFPROBE } from "./ffmpeg.ts";
 import { FILTER_NAMES, isFilter } from "./filter.ts";
+import { exportAllHighlights, exportHighlight } from "./highlight-export.ts";
 import { detectHighlights, highlightClipLines } from "./highlights.ts";
 import { ingest } from "./ingest.ts";
 import { loadIngesters } from "./ingesters.ts";
@@ -258,6 +259,9 @@ Review & export
                                        --platform <id>  destination preset (youtube|youtube-4k|x|linkedin|shorts); fills gaps only, explicit flags win
                                        --aspect <id>  output aspect for this export only (overrides project.export)
                                        --crop-focus-x/--crop-focus-y/--crop-scale  one-off reframe overrides
+  openklip export-highlight <slug> <h1|all>
+                                     export one or all highlight clips to output/highlights/
+                                       --platform <id>  destination preset (default: project settings)
   openklip revert <slug> --to <rev>  restore an earlier logged revision
   openklip revert <slug> --task <id> revert every change made by one agent task
   openklip revert <slug> --last      undo the most recent logged edit
@@ -2203,6 +2207,41 @@ try {
       console.log(
         `exported ${r.ranges} ranges, ${r.durationSec.toFixed(1)}s (${r.height}p, ${r.fps}fps, ${r.compression}${platformNote}${loudnessNote}, music ${r.music}) -> ${r.out}`
       );
+      break;
+    }
+    case "export-highlight": {
+      if (!(rest[0] && rest[1])) {
+        throw new Error(
+          "usage: openklip export-highlight <slug> <h1|all> [--platform <id>]"
+        );
+      }
+      const slug = rest[0];
+      const target = rest[1];
+      let platform: ExportPlatformId | undefined;
+      if (rest.includes("--platform")) {
+        const platformRaw = flagValue(rest, "--platform");
+        if (platformRaw === undefined || !isExportPlatformId(platformRaw)) {
+          throw new Error(
+            `unknown export platform "${platformRaw ?? ""}" (expected one of: ${EXPORT_PLATFORM_IDS.join(", ")})`
+          );
+        }
+        platform = platformRaw;
+      }
+      const exportOpts = platform ? { platform } : {};
+      if (target === "all") {
+        const { exported } = await exportAllHighlights(slug, exportOpts);
+        for (const row of exported) {
+          console.log(
+            `exported highlight ${row.id}: ${row.durationSec.toFixed(1)}s -> ${row.out}`
+          );
+        }
+        console.log(`exported ${exported.length} highlight clip(s)`);
+      } else {
+        const r = await exportHighlight(slug, target, exportOpts);
+        console.log(
+          `exported highlight ${target}: ${r.durationSec.toFixed(1)}s (${r.height}p, ${r.fps}fps) -> ${r.out}`
+        );
+      }
       break;
     }
     case "verify": {

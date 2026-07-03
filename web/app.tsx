@@ -9,6 +9,7 @@ import type {
   ColorAdjust,
   CropMode,
   CutSnap,
+  Highlights,
   Project as EngineProject,
   ExportAspect,
   ExportSettings,
@@ -73,6 +74,7 @@ import {
 import { FilterControls } from "@/components/filter-controls";
 import { FindFillerButton } from "@/components/find-filler-button";
 import type { GraphicItem } from "@/components/graphic-overlay";
+import { HighlightsPanel } from "@/components/highlights-panel";
 import { HistoryPanel } from "@/components/history-panel";
 import {
   DEFAULT_MUSIC_BED_SEC,
@@ -204,6 +206,7 @@ import type { ActionResult } from "../app/actions.ts";
 import {
   exportProject,
   runGuiAction,
+  runHighlightsDetect,
   runVisionFocus,
   saveBrief,
   saveBroll,
@@ -284,6 +287,7 @@ interface Project {
   fps: number;
   graphics?: GraphicItem[];
   height: number;
+  highlights?: Highlights;
   look?: { vignette: boolean; filter?: Filter; color?: ColorAdjust };
   mediaVersion?: number;
   motion?: { speed?: number };
@@ -1429,6 +1433,28 @@ export function App({
       setApplyingVision(false);
     }
   }, [patchExport, project.slug, router]);
+  const [detectingHighlights, setDetectingHighlights] = useState(false);
+  const onDetectHighlights = useCallback(async () => {
+    setDetectingHighlights(true);
+    try {
+      const r = await runHighlightsDetect(project.slug);
+      if (!r.ok) {
+        setSaveError(r.error);
+        return;
+      }
+      setProject((prev) => ({
+        ...prev,
+        ...(r.data.project as unknown as Project),
+        brief: prev.brief,
+        dirPath: prev.dirPath,
+        mediaVersion: prev.mediaVersion,
+        silences: prev.silences,
+      }));
+      router.refresh();
+    } finally {
+      setDetectingHighlights(false);
+    }
+  }, [project.slug, router]);
   const changeOrientation = useCallback(
     (next: Orientation) => {
       setOrientation(next);
@@ -2940,6 +2966,15 @@ export function App({
                 onApply={applyCleanupCandidate}
                 onApplyAllSafe={applyAllSafeCleanup}
                 report={cleanupReportView}
+              />
+            </Section>
+            <Section title="Highlights">
+              <HighlightsPanel
+                applying={pendingSaves > 0}
+                detecting={detectingHighlights}
+                highlights={project.highlights}
+                onDetect={onDetectHighlights}
+                onSeekClip={(c) => onSeek(c.fromSec)}
               />
             </Section>
             <Section title="Music">

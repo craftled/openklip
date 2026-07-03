@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.26.0.0 - 2026-07-03
+
+Multi-clip highlight export and Highlights GUI panel.
+
+### Added
+- **Multi-clip export**: `exportCut` accepts `sourceSpan` and `outPath`; clips render to `output/highlights/{id}.mp4` without mutating `project.json`.
+- **CLI**: `openklip export-highlight <slug> <h1|all> [--platform shorts]`.
+- **`bun run agent-make-highlights`**: exports every stored highlight with the shorts preset (`--ids`, `--dry-run`, `--skip-export`, `--skip-verify`).
+- **GUI Highlights panel**: Config section lists clip candidates, seeks preview on row click, **Detect clips** runs LLM highlight detection (`runHighlightsDetect` server action).
+
+### Changed
+- **Version**: bumped OpenKlip to `0.26.0.0`.
+
 ## 0.25.0.0 - 2026-07-03
 
 LLM highlight detection, Vision saliency/OCR, and GUI Vision focus.

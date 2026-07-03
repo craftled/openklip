@@ -29,7 +29,7 @@ For each clip you will export:
 4. **Export**: `openklip export <slug> --platform shorts` (or the export MCP tool with `platform: "shorts"`).
 5. **Verify**: call verify; fix and re-export once if drift is reported.
 
-Rename or copy `output/out.mp4` before exporting the next clip if the user needs multiple files kept (OpenKlip overwrites `output/out.mp4` each export).
+Rename or copy `output/out.mp4` before exporting the next clip if the user needs multiple files kept (OpenKlip overwrites `output/out.mp4` each full-project export). Prefer `openklip export-highlight <slug> <id>` or `all`, which writes `output/highlights/{id}.mp4` without mutating the edit.
 
 ## 4. Restore for the next clip (multi-clip runs)
 

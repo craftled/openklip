@@ -105,6 +105,8 @@ Time is integer audio samples at 48 kHz. The CLI takes seconds where a human num
 | Set export aspect and reframe crop | `openklip export-set <slug> [--aspect source\|16:9\|9:16\|1:1] [--crop-mode manual\|scene\|vision] [--crop-focus-x <0-1>] [--crop-focus-y <0-1>] [--crop-scale <1-3>]` |
 | Enrich sceneLog with macOS Vision face focus | `openklip vision-focus <slug>` (darwin only) |
 | List / detect LLM highlight clip candidates | `openklip highlights <slug> [--json]`, `openklip highlights-detect <slug> [--agent] [--max-clips] [--target-sec]` |
+| Export one or all highlight clips | `openklip export-highlight <slug> <h1|all> [--platform shorts]` |
+| Export all highlights (agent script) | `bun run agent-make-highlights <slug> [--ids h1,h2] [--dry-run]` |
 | Run macOS Vision reframe (GUI) | Reframe panel **Vision focus** button (darwin server only) |
 | Export with a platform preset | `openklip export <slug> --platform youtube\|youtube-4k\|x\|linkedin\|shorts [--loudness <lufs>]` |
 | Verify rendered cut | `openklip verify <slug>` |
@@ -231,6 +233,7 @@ Workflow: `take-add` each recording, read `take_transcript <slug> <takeId>` to f
 | `openklip vision-focus <slug>` | On macOS, sample ingest frames with Apple Vision (face, saliency fallback, OCR text) and write `focusX`/`focusY` onto speaker `sceneLog` segments. GUI: Reframe **Vision focus** button. |
 | `openklip highlights <slug> [--json]` | List LLM highlight clip candidates stored on `project.highlights`. |
 | `openklip highlights-detect <slug>` | Run an LLM over the timed transcript to detect short-form clip spans. `--agent`, `--max-clips` (default 5), `--target-sec` (default 45). Persists `project.highlights`. |
+| `openklip export-highlight <slug> <h1|all>` | Export one or all highlight clips to `output/highlights/{id}.mp4` using `sourceSpan` (no word cuts). `--platform shorts` fills 9:16 export defaults. |
 | `openklip export <slug>` | Render the current cut to `out.mp4`. `--height 1080` for max output height, `--fps <n>` for output frame rate (1–120), `--compression studio\|social\|web\|web-low` for encoder preset (default `social`), `--platform youtube\|youtube-4k\|x\|linkedin\|shorts` for a named destination preset (fills any of aspect/compression/fps/height/loudness left unset by the flags above; explicit flags always win; `maxHeight` never upscales past the source), `--aspect <id>` and `--crop-focus-x`/`--crop-focus-y`/`--crop-scale` for one-off reframe overrides, `--loudness <lufs>` (-30..-10) to set or override the export's loudness normalization target for this export only (never mutates `project.audio.loudness`). |
 | `openklip verify <slug>` | The verify loop: re-transcribe `output/out.mp4` with the same Whisper path used at ingest and diff it against the EDL. Flags filler that survived, deleted words that leaked back in, and low kept-word coverage (clipped words). Exits non-zero on drift. Requires an export. Also the `verify` agent tool. |
 | `openklip doctor [slug]` | Health check: ffmpeg/ffprobe binaries, Whisper script, and (with a slug) the project's `project.json`, source/proxy media, and asset proxies. Exits non-zero if any check fails. Run it when the agent loop fails deep inside a subprocess. |

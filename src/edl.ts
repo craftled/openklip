@@ -578,6 +578,26 @@ export interface Range {
   startSec: number;
 }
 
+/** Clip kept ranges to a source-time window (export-only; no project mutation). */
+export function intersectRangesWithSpan(
+  ranges: Range[],
+  fromSec: number,
+  toSec: number
+): Range[] {
+  if (toSec <= fromSec) {
+    return [];
+  }
+  const out: Range[] = [];
+  for (const r of ranges) {
+    const startSec = Math.max(r.startSec, fromSec);
+    const endSec = Math.min(r.endSec, toSec);
+    if (endSec > startSec) {
+      out.push({ startSec, endSec });
+    }
+  }
+  return out;
+}
+
 export function samplesToSec(samples: number): number {
   return Math.round(samples) / SAMPLE_RATE;
 }

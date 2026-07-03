@@ -232,8 +232,8 @@ Single list of current gaps (code is truth). README and release notes point here
 
 ### Not implemented (see Roadmap / Pending)
 
-- Multi-clip export pipeline (one command exports every highlight to separate files; today each export overwrites `output/out.mp4`).
-- GUI for highlight candidates (list, preview seek, approve, export).
+- [x] Multi-clip highlight export: `openklip export-highlight`, `output/highlights/{id}.mp4`, `bun run agent-make-highlights` (`sourceSpan` on `exportCut`, no project mutation).
+- [x] GUI highlight candidates: Config **Highlights** panel (list, seek, Detect clips via `runHighlightsDetect`).
 - Per-platform caption safe areas and split-screen vertical layouts.
 - Noise reduction and de-essing (basic audio cleanup); two-pass loudness normalization for exact-target loudness.
 - OpenCLIP semantic b-roll matching.

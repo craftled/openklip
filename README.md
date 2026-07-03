@@ -69,7 +69,7 @@ Agent sidebar chats use `working/chats.json`, not `localStorage` (color scheme a
 
 ## What works today
 
-Verified against the current codebase (`VERSION` / `package.json` `0.25.0.0`, 1334 tests):
+Verified against the current codebase (`VERSION` / `package.json` `0.26.0.0`, 1348 tests):
 
 - **Ingest**: video → local transcript + preview proxy + `project.json` (`openklip ingest`; refuses re-ingest unless `--force`)
 - **Transcript editing**: click words to toggle `deleted`; `openklip cut` / `cut --text` / `restore` on CLI
@@ -88,7 +88,7 @@ Verified against the current codebase (`VERSION` / `package.json` `0.25.0.0`, 13
 - **Export platform presets**: Platform picker (GUI) and `--platform <id>` (CLI/MCP): `youtube`, `youtube-4k`, `x`, `linkedin`, and **`shorts`** (9:16 vertical, 30fps, 1920 height cap, -14 LUFS). Any control changed after picking a platform still wins; `--loudness <lufs>` overrides loudness for one export only
 - **Vertical reframe (Shorts)**: `project.export` stores aspect (`source`, `16:9`, `9:16`, `1:1`) and crop (focus X/Y, zoom 1-3) shared by preview and ffmpeg export; GUI Reframe controls, orientation toggle (16:9 / 9:16 / 1:1), Manual / Scene / Vision crop modes; `openklip export-set`, `openklip vision-focus` (macOS), `bun run agent-make-short`
 - **Vision reframe sidecar** (macOS): `tools/vision-focus.swift` detects face center, falls back to attention saliency, attaches on-frame OCR text; GUI **Vision focus** button in Reframe; enriches speaker `sceneLog` segments with `focusX`/`focusY`
-- **LLM highlight detection**: `openklip highlights-detect <slug>` finds short-form clip candidates from the timed transcript and stores `project.highlights`; `openklip highlights <slug> [--json]` lists them; MCP `highlights_list`; `project_status` reports clip count when present
+- **LLM highlight detection**: `openklip highlights-detect <slug>` finds short-form clip candidates; `openklip export-highlight <slug> all` renders each to `output/highlights/{id}.mp4`; GUI **Highlights** panel (detect, list, seek)
 - **Music placement**: place a registered music asset under the edit with gain, fades, source in-point, and trim/loop mode (`openklip music-add` / `music-set` / `music-rm`); Config panel Music section, placed-music timeline track, preview bed with a mute toggle, mixed into the export by ffmpeg
 - **Cleanup review**: deterministic filler-word detection (isolated disfluencies auto-safe; ambiguous words and phrases flagged review) plus dead-air detection from real audio analysis, with per-candidate risk and an "apply all safe" batch action; Cleanup section in the Config panel, `openklip cleanup <slug> [--json] [--apply-safe]`, MCP `cleanup_report`
 - **VAD snap + seam crossfades**: cut boundaries optionally snap onto detected silence (`cuts.snap`) and export joins the resulting seams with equal-power crossfades that reuse a few ms of removed audio to avoid clicks; wired through the exporter, preview scheduler, and every CLI/MCP range/status query so they all agree; Config panel Audio section, GUI/MCP `cuts-snap` action
@@ -125,7 +125,7 @@ End-to-end path from a long talking-head edit to a vertical short:
 2. **Find hooks** (optional): `openklip highlights-detect <slug>` stores LLM clip candidates on `project.highlights`.
 3. **Trim** (when needed): cut tangents/filler to target length; `make-short` warns above `--max-sec` but does not auto-cut.
 4. **Reframe**: `openklip vision-focus <slug>` on macOS (or GUI Vision focus button), then `export-set --aspect 9:16 --crop-mode scene`.
-5. **Export**: `openklip export --platform shorts` or `bun run agent-make-short <slug>` for the full loop.
+5. **Export**: `openklip export-highlight <slug> h1` or `all` (writes `output/highlights/h1.mp4`, …) or `bun run agent-make-highlights <slug>`
 6. **Verify**: `openklip verify <slug>`.
 
 See `templates/make-short/skill.md` (one short from an existing edit) and `templates/make-highlights/skill.md` (multiple clips from a long source).

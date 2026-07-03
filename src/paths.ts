@@ -90,6 +90,8 @@ export function projectPaths(slug: string) {
     /** Pre-mutation project.json snapshots, one per logged revision (rev-<n>.json). */
     historyDir: join(working, "history"),
     out: join(output, "out.mp4"),
+    /** Per-highlight short exports (export-highlight). */
+    highlightsDir: join(output, "highlights"),
     /** Multi-take ingest parking lot: takes/<id>/ (F3). */
     takes: join(dir, "takes"),
   };
