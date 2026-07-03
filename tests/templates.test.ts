@@ -23,20 +23,22 @@ test("loadTemplateSkill reads skill.md", () => {
   assert.equal(templateSkillPath("talking-head").endsWith("skill.md"), true);
 });
 
-test("listTemplates finds the make-draft, make-short, and revise-draft playbooks", () => {
+test("listTemplates finds the make-draft, make-short, make-highlights, and revise-draft playbooks", () => {
   const list = listTemplates();
   const makeDraft = list.find((t) => t.id === "make-draft");
   const makeShort = list.find((t) => t.id === "make-short");
+  const makeHighlights = list.find((t) => t.id === "make-highlights");
   const reviseDraft = list.find((t) => t.id === "revise-draft");
   assert.ok(makeDraft, "make-draft should be auto-listed from templates/");
   assert.equal(makeDraft?.label, "Make a draft");
   assert.ok(makeShort, "make-short should be auto-listed from templates/");
   assert.equal(makeShort?.label, "Make a short");
+  assert.ok(makeHighlights, "make-highlights should be auto-listed from templates/");
   assert.ok(reviseDraft, "revise-draft should be auto-listed from templates/");
   assert.equal(reviseDraft?.label, "Revise a draft");
 });
 
-test("loadTemplateSkill reads the make-draft, make-short, and revise-draft playbooks", () => {
+test("loadTemplateSkill reads the make-draft, make-short, make-highlights, and revise-draft playbooks", () => {
   const makeDraft = loadTemplateSkill("make-draft");
   assert.match(makeDraft, /task_complete/);
 
@@ -45,6 +47,10 @@ test("loadTemplateSkill reads the make-draft, make-short, and revise-draft playb
   assert.match(makeShort, /export-set/);
   assert.match(makeShort, /vision-focus/);
   assert.match(makeShort, /platform: "shorts"/);
+
+  const makeHighlights = loadTemplateSkill("make-highlights");
+  assert.match(makeHighlights, /highlights-detect/);
+  assert.match(makeHighlights, /highlights_list/);
 
   const reviseDraft = loadTemplateSkill("revise-draft");
   assert.match(reviseDraft, /task_complete/);

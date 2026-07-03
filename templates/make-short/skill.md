@@ -10,6 +10,7 @@ Derive a vertical short from an existing edit: trim to a tight runtime if needed
 ## 1. Understand the project
 
 - Call project_status, then brief_get. When a brief names a short-form target (for example 30 to 60 seconds, TikTok, Reels, Shorts), treat that as the length and format goal. Otherwise aim for roughly 30 to 90 seconds of kept runtime unless the user named a different cap.
+- When the kept runtime is much longer than the target, optionally run `openklip highlights-detect <slug>` (or call highlights_list) and trim to the best candidate span before reframing. For several clips from one long source, use the `make-highlights` playbook instead.
 - Read `export` from project_status (aspect and crop defaults). Use transcript_grep or transcript_span to see what the opening hook is; never dump the whole transcript.
 - If `keptDurationSec` is already within the target and the edit is essentially final, skip cutting and go straight to reframe + export.
 

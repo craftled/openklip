@@ -69,7 +69,7 @@ Agent sidebar chats use `working/chats.json`, not `localStorage` (color scheme a
 
 ## What works today
 
-Verified against the current codebase (`VERSION` / `package.json` `0.16.0.0`, 1243 tests):
+Verified against the current codebase (`VERSION` / `package.json` `0.25.0.0`, 1334 tests):
 
 - **Ingest**: video → local transcript + preview proxy + `project.json` (`openklip ingest`; refuses re-ingest unless `--force`)
 - **Transcript editing**: click words to toggle `deleted`; `openklip cut` / `cut --text` / `restore` on CLI
@@ -84,8 +84,11 @@ Verified against the current codebase (`VERSION` / `package.json` `0.16.0.0`, 12
 - **Captions**: preview overlay + ASS burn-in on export; five style presets (`boxed`, `clean`, `karaoke`, `bold-caps`, `minimal`) defined once and rendered identically by both (`openklip captions-style <slug> <style>`, Config panel picker); unknown/missing style ids fall back to `boxed` on load
 - **Assets**: register b-roll, music, stills; sidebar asset bin with upload + `assets/` folder sync; upload from chat `+`
 - **Overlays**: b-roll cover, Ken Burns stills, push-in zooms, title cards (lower / center / hero), vignette; phrase helpers (`*-add-phrase`) on CLI
-- **Export**: ffmpeg composes kept ranges + overlays + captions; GUI export dialog picks max height (720p / 1080p / 4K), compression preset (studio / social / web / web-low), and output frame rate (source / 24 / 25 / 30 / 48 / 60) with a live size/time estimate; same settings on CLI (`--height`, `--fps`, `--compression`), MCP, and the export API
-- **Export platform presets**: a Platform picker (GUI export dialog) and `--platform <id>` (CLI, `youtube` / `youtube-4k` / `x` / `linkedin`) set compression, frame rate, a source-capped resolution ceiling, and a loudness target together; any control changed after picking a platform still wins, and `--loudness <lufs>` overrides just the loudness target for that export without touching the saved project setting. Landscape-only for now; no vertical/9:16 presets yet
+- **Export**: ffmpeg composes kept ranges + overlays + captions; GUI export dialog picks max height (720p / 1080p / 4K), compression preset (studio / social / web / web-low), output frame rate (source / 24 / 25 / 30 / 48 / 60), and platform preset with a live size/time estimate; same settings on CLI (`--height`, `--fps`, `--compression`, `--platform`), MCP, and the export API
+- **Export platform presets**: Platform picker (GUI) and `--platform <id>` (CLI/MCP): `youtube`, `youtube-4k`, `x`, `linkedin`, and **`shorts`** (9:16 vertical, 30fps, 1920 height cap, -14 LUFS). Any control changed after picking a platform still wins; `--loudness <lufs>` overrides loudness for one export only
+- **Vertical reframe (Shorts)**: `project.export` stores aspect (`source`, `16:9`, `9:16`, `1:1`) and crop (focus X/Y, zoom 1-3) shared by preview and ffmpeg export; GUI Reframe controls, orientation toggle (16:9 / 9:16 / 1:1), Manual / Scene / Vision crop modes; `openklip export-set`, `openklip vision-focus` (macOS), `bun run agent-make-short`
+- **Vision reframe sidecar** (macOS): `tools/vision-focus.swift` detects face center, falls back to attention saliency, attaches on-frame OCR text; GUI **Vision focus** button in Reframe; enriches speaker `sceneLog` segments with `focusX`/`focusY`
+- **LLM highlight detection**: `openklip highlights-detect <slug>` finds short-form clip candidates from the timed transcript and stores `project.highlights`; `openklip highlights <slug> [--json]` lists them; MCP `highlights_list`; `project_status` reports clip count when present
 - **Music placement**: place a registered music asset under the edit with gain, fades, source in-point, and trim/loop mode (`openklip music-add` / `music-set` / `music-rm`); Config panel Music section, placed-music timeline track, preview bed with a mute toggle, mixed into the export by ffmpeg
 - **Cleanup review**: deterministic filler-word detection (isolated disfluencies auto-safe; ambiguous words and phrases flagged review) plus dead-air detection from real audio analysis, with per-candidate risk and an "apply all safe" batch action; Cleanup section in the Config panel, `openklip cleanup <slug> [--json] [--apply-safe]`, MCP `cleanup_report`
 - **VAD snap + seam crossfades**: cut boundaries optionally snap onto detected silence (`cuts.snap`) and export joins the resulting seams with equal-power crossfades that reuse a few ms of removed audio to avoid clicks; wired through the exporter, preview scheduler, and every CLI/MCP range/status query so they all agree; Config panel Audio section, GUI/MCP `cuts-snap` action
@@ -101,18 +104,31 @@ Verified against the current codebase (`VERSION` / `package.json` `0.16.0.0`, 12
 - **Revert (undo)**: every logged mutation keeps a pre-mutation snapshot in `working/history/` (newest 100 revisions); `openklip revert <slug> (--to <rev> | --task <id> | --last) [--force]`, the MCP `revert` tool, and per-entry/per-task "Revert" buttons in the History panel restore `project.json` to an earlier state as a normal, itself-revertible mutation. Restores `project.json` only, not `brief.md`, chats, tasks, asset files, or derived media; see [TODO.md](./TODO.md#known-limitations) for the details
 - **Project brief**: `brief.md` at the project root holds audience, goal, tone, must-use assets, avoid list, target length, and export formats; agents read it on every chat/edit prompt (2000-char bounded); GUI Brief section in the Config panel; `openklip brief <slug> [--set <text...> | --file <path>]` and MCP `brief_get` / `brief_set`
 - **Agent tasks with live progress**: every tool-calling chat edit gets a visible task (`working/tasks.json`); the chat panel's task progress card polls every 2 seconds while running and shows each step plus a cancel button that kills the underlying agent process; the agent signals completion explicitly (`task_step` / `task_complete` MCP tools) instead of relying on heuristics; agents can list past tasks with `openklip tasks <slug> [--limit] [--status]` or MCP `task_list`
-- **Make-a-draft and revise-draft playbooks**: `templates/make-draft/skill.md` turns one prompt into a full first draft: reads the brief and assets, cuts filler, adds titles/captions, places b-roll or stills, adds a music bed if available, exports, and verifies itself. `templates/revise-draft/skill.md` interprets a revision request against an existing draft: targeted edits or a whole-task revert via `openklip revert`
+- **Make-a-draft, make-short, make-highlights, and revise-draft playbooks**: `templates/make-draft/skill.md` turns one prompt into a full first draft; `templates/make-short/skill.md` and `bun run agent-make-short` derive a vertical short; `templates/make-highlights/skill.md` finds clip candidates and trims each to a short; `templates/revise-draft/skill.md` applies targeted revisions or whole-task revert
 - **Browser project creation**: upload a video in the New Project dialog or drop one onto the empty workspace; format-validated on client and server, source persisted into the project folder, explicit overwrite confirm on name collisions, ingest progress overlay, editor opens on completion
 - **Workspace**: macOS folder picker on empty landing; inline project create; projects root persisted in `.openklip/projects-root`
 - **CLI**: full edit surface; `openklip actions --json` mutations manifest; `openklip tools --json` full agent tool list
-- **MCP server**: `openklip mcp` (stdio) exposes 71 tools with CLI/GUI parity; `.cursor/mcp.json` wired for Cursor
+- **MCP server**: `openklip mcp` (stdio) exposes 72 tools with CLI/GUI parity; `.cursor/mcp.json` wired for Cursor
 - **Edit templates**: `templates/<id>/skill.md` playbooks; `openklip template set`; brand presets at ingest (`openklip brand`)
 - **Agent selector**: drive filler cuts via Claude Code, Codex, Cursor, or Grok subscription CLIs
 - **Design system**: default shadcn/ui tokens with Base UI primitives (`app/globals.css`, `components.json`); light/dark via `.dark` class; icons via `web/lib/icon.tsx`
 - **Agent demo**: `bun run agent-demo` (phrase list → cut → status → optional export)
-- **Make short**: `bun run agent-make-short` (9:16 reframe → shorts export → verify)
+- **Make short**: `bun run agent-make-short` (Vision enrich on macOS, 9:16 scene reframe, shorts export, verify)
 
 Phrase-based cutting works on both surfaces: the transcript UI has search with batch cut and restore, and the CLI has `openklip cut --text`. First project on a machine: upload or drop a video in the browser, or use `openklip ingest` from the CLI. Known gaps: **[TODO.md](./TODO.md)**.
+
+### Shorts workflow (v0.21-0.25)
+
+End-to-end path from a long talking-head edit to a vertical short:
+
+1. **Ingest + analyze** (optional): `openklip analyze <slug>` writes asset cards and a `sceneLog` of on-screen spans.
+2. **Find hooks** (optional): `openklip highlights-detect <slug>` stores LLM clip candidates on `project.highlights`.
+3. **Trim** (when needed): cut tangents/filler to target length; `make-short` warns above `--max-sec` but does not auto-cut.
+4. **Reframe**: `openklip vision-focus <slug>` on macOS (or GUI Vision focus button), then `export-set --aspect 9:16 --crop-mode scene`.
+5. **Export**: `openklip export --platform shorts` or `bun run agent-make-short <slug>` for the full loop.
+6. **Verify**: `openklip verify <slug>`.
+
+See `templates/make-short/skill.md` (one short from an existing edit) and `templates/make-highlights/skill.md` (multiple clips from a long source).
 
 ---
 

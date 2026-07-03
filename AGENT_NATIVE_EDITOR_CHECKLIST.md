@@ -315,14 +315,18 @@ Goal: an agent can pursue a video outcome in a visible loop until it produces a 
   - [x] Verify draft.
   - Verification: runs on smoke project and produces `output/out.mp4`. Verified 2026-07-02: `templates/make-draft/skill.md` on the smoke project produced a full draft in 548s (cut 524 to 161 kept words, lower-third title, 2 aerial b-roll + 1 still, music bed, export social 1080p at 1920x1080 30fps 66.4s); the agent ran verify itself and reported the verdict honestly.
 - [x] Add a `make-short` workflow prompt (`templates/make-short/skill.md`) and deterministic loop (`bun run agent-make-short`).
-  - [ ] Find candidate hook.
-  - [ ] Pick 20-60 second span.
-  - [ ] Tighten pacing.
-  - [ ] Set vertical format.
-  - [ ] Add captions and title.
-  - [ ] Export short.
-  - Verification: produces one vertical draft from a long source.
-- [ ] Add a `revise-draft` workflow prompt.
+  - [x] Find candidate hook (`highlights-detect` optional; `templates/make-highlights/skill.md` for multi-clip).
+  - [x] Pick 20-60 second span (agent judgment + `cut`; `--max-sec` warns only).
+  - [x] Tighten pacing (`cleanup_report`, cut-text).
+  - [x] Set vertical format (`export-set` 9:16, scene/vision crop).
+  - [ ] Add captions and title (playbook instructs; not auto-applied by `agent-make-short`).
+  - [x] Export short (`shorts` preset).
+  - Verification: live `edgaras-raw` via `agent-make-short` and manual export; 1080x1920, verify passed (2026-07-03).
+- [x] Add a `make-highlights` workflow prompt (`templates/make-highlights/skill.md`).
+  - [x] Detect candidates (`highlights-detect`, `highlights_list`).
+  - [ ] Export each clip to a separate file (manual revert/copy between exports).
+  - Verification: unit tests for detection; multi-file export pipeline not implemented.
+- [x] Add a `revise-draft` workflow prompt.
   - [ ] Read current overlays and cuts.
   - [ ] Read user feedback.
   - [ ] Apply minimal changes.
@@ -562,18 +566,18 @@ Goal: agents can choose the right media, not just any media.
 
 ### 6.3 Highlight detection
 
-- [ ] Add candidate highlight query.
-  - [ ] Find strong hooks.
-  - [ ] Find concise claims.
-  - [ ] Find surprising or emotional moments.
-  - [ ] Find product-demo moments.
-  - [ ] Return spans with reasons.
-  - Verification: query returns bounded spans, not full transcript dumps.
+- [x] Add candidate highlight query.
+  - [x] Find strong hooks.
+  - [x] Find concise claims.
+  - [x] Find surprising or emotional moments.
+  - [x] Find product-demo moments.
+  - [x] Return spans with reasons.
+  - Verification: `openklip highlights-detect` + MCP `highlights_list` return bounded spans with title/reason/score (`src/highlights.ts`, `tests/highlights.test.ts`, 2026-07-03).
 - [ ] Add clip plan artifact.
-  - [ ] Store proposed shorts as draft plans.
-  - [ ] Include hook, span, title, caption style, target platform.
-  - [ ] Let user approve or edit before creating derived project.
-  - Verification: approved clip plan creates a new edit or export target.
+  - [x] Store proposed shorts as draft plans (`project.highlights` on `project.json`).
+  - [ ] Include hook, span, title, caption style, target platform (partial: title/span/reason/score only).
+  - [ ] Let user approve or edit before creating derived project (no GUI yet).
+  - Verification: approved clip plan creates a new edit or export target. Partial: `templates/make-highlights/skill.md` documents trim+export per clip; multi-file export and GUI approval not implemented.
 
 ## Milestone 7: Shorts and aspect ratios
 
@@ -581,12 +585,12 @@ Goal: OpenKlip can produce social clips that look intentional.
 
 ### 7.1 Aspect ratio as project or export state
 
-- [ ] Define aspect ratio model.
-  - [ ] 16:9 landscape.
-  - [ ] 9:16 vertical.
-  - [ ] 1:1 square.
-  - [ ] Per-export override if needed.
-  - Verification: preview and export use same dimensions.
+- [x] Define aspect ratio model.
+  - [x] 16:9 landscape.
+  - [x] 9:16 vertical.
+  - [x] 1:1 square.
+  - [x] Per-export override if needed.
+  - Verification: `project.export.aspect`, `src/export-aspect.ts`, preview + export parity (`tests/export-aspect.test.ts`, 2026-07-03).
 - [ ] Add safe area overlays.
   - [ ] TikTok/Reels caption safe area.
   - [ ] YouTube Shorts safe area.
@@ -595,18 +599,18 @@ Goal: OpenKlip can produce social clips that look intentional.
 
 ### 7.2 Reframe and crop
 
-- [ ] Add manual crop controls.
-  - [ ] Position x/y.
-  - [ ] Scale.
+- [x] Add manual crop controls.
+  - [x] Position x/y.
+  - [x] Scale.
   - [ ] Per-span crop.
   - [ ] Reset to center.
-  - Verification: export crop matches preview.
-- [ ] Add subject-aware auto reframe.
-  - [ ] Start with face or center heuristic.
-  - [ ] Store reframe spans in project state.
-  - [ ] Let user manually override.
-  - [ ] Expose reframe actions to agent.
-  - Verification: vertical export keeps face or subject visible on fixture.
+  - Verification: GUI Reframe controls + `export-set` (`tests/reframe-controls.test.tsx`, live `edgaras-raw` 1080x1920, 2026-07-03).
+- [x] Add subject-aware auto reframe.
+  - [x] Start with face or center heuristic (Vision face/saliency/OCR, sceneLog focus, scene/vision crop modes).
+  - [x] Store reframe spans in project state (`sceneLog.focusX`/`focusY`, `project.export.crop`).
+  - [x] Let user manually override (Manual crop mode + sliders).
+  - [x] Expose reframe actions to agent (`export-set`, `vision-focus`, `agent-make-short`).
+  - Verification: `edgaras-raw` Vision focus + scene crop + shorts export; verify passed (2026-07-03).
 - [ ] Add split-screen vertical layout.
   - [ ] Talking head top, screen/product bottom.
   - [ ] Product top, talking head bottom.
@@ -639,7 +643,7 @@ Goal: exports are fast, configurable, verified, and ready to publish.
 - [ ] Add export presets.
   - [x] YouTube 16:9.
     - Verification 2026-07-03: `youtube` (1080p) and `youtube-4k` (2160p) presets in `src/export-platforms.ts`, both social/studio compression at a -14 LUFS loudness target; pinned by `tests/export-platforms.test.ts`. Live CLI export on an isolated copy of the real 4K `edgaras-raw` project (`OPENKLIP_PROJECTS_ROOT` pointed at a scratch copy): `openklip export --platform youtube` produced a 1920x1080 output and `openklip export --platform youtube-4k` produced a 3840x2160 output (never upscaling past the 4K source), both confirmed via `ffprobe`. An `x` (Twitter/X) preset also shipped (1080p/30fps/web/-14 LUFS), beyond this checklist's original YouTube/Shorts/LinkedIn/Custom list.
-  - [ ] Shorts/Reels/TikTok 9:16. Not implemented: vertical/9:16 presets need the vertical reframe milestone before a preset for them would do what its name promises. See TODO.md Known Limitations.
+  - [x] Shorts/Reels/TikTok 9:16. Verified 2026-07-03: `shorts` platform preset (9:16, 30fps, 1920 cap, social, -14 LUFS) + `project.export` reframe (`export-set`, scene/vision crop, GUI orientation toggle). Live `edgaras-raw` 1080x1920 via `export --platform shorts`.
   - [x] LinkedIn square or landscape.
     - Verification 2026-07-03: `linkedin` preset (1080p, 30fps, web compression, -14 LUFS) in `src/export-platforms.ts`; landscape only, no square variant shipped. Pinned by `tests/export-platforms.test.ts`.
   - [ ] Custom. Not implemented: only the four fixed named presets exist; there is no user-defined preset builder.

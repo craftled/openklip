@@ -170,7 +170,7 @@ Single list of current gaps (code is truth). README and release notes point here
 - HyperFrames post-export (`openklip package`) is opt-in: requires separate `hyperframes` npm install and Chrome; not bundled.
 - `product-announcement` is the only json-render graphic catalog today; `json-graphic-add` / `json-graphic-set` accept no other type. An invalid json-render spec now shows an "Invalid graphic spec" card in the editor preview, but still degrades silently on export (the graphic is skipped).
 - json-render timeline interactions (select / trim / reload) and the smaller-screen Chat/Config overlay flows are wired and unit-covered but not yet verified end to end in a browser.
-- Export platform presets include a `shorts` destination (9:16, 30fps, 1920 height cap); landscape presets (`youtube`, `youtube-4k`, `x`, `linkedin`) stay 16:9-honest. Manual reframe crop (focus/zoom) is supported; auto subject tracking is not.
+- Export platform presets include a `shorts` destination (9:16, 30fps, 1920 height cap); landscape presets (`youtube`, `youtube-4k`, `x`, `linkedin`) stay 16:9-honest. Reframe crop (manual, scene, vision) is supported on macOS and via sceneLog; continuous subject tracking across time is not.
 - A platform preset's `fps` is a hard pin, not a cap: exporting 24/25fps footage with the `x` or `linkedin` preset (pinned to 30fps) retimes up to 30fps, which can duplicate frames and judder. This matches how an explicit `--fps` has always behaved; pass `--fps 24` (CLI) or set frame rate to Source (GUI) after picking the platform to opt out.
 - CLI `--loudness` accepts `-30..-10`; there is no "off" value to disable a preset's loudness normalization. Drop `--platform` and set compression/fps/maxHeight by hand if you want the export unnormalized.
 
@@ -210,6 +210,7 @@ Single list of current gaps (code is truth). README and release notes point here
 - **Find filler** and **Describe assets** shell out to the selected agent CLI; needs that CLI on PATH and signed in. Cursor requires one-time `cursor-agent login`.
 - Agent tasks (`working/tasks.json`) are cross-process safe (an advisory lockfile serializes the Next server and the spawned MCP process, so a stale step report cannot resurrect a cancelled task) and cancel kills the run's whole process group. Remaining gap: the run registry (`src/agent-run-registry.ts`) is in-process memory, so a dev-server restart mid-run orphans the spawned process group and leaves the task record `running` with no live cancel target.
 - [x] **`make-short` playbook** (v0.21.0.0): `templates/make-short/skill.md` trims an edit to short-form length when needed, sets 9:16 via `export-set`, adjusts manual reframe crop, exports with the `shorts` platform preset, and verifies. Verification 2026-07-03: `tests/templates.test.ts` and the wider `bun test` run.
+- [x] **`make-highlights` playbook** (v0.25.0.0): `templates/make-highlights/skill.md` runs highlight detection, trims each candidate span, reframes, and exports with the `shorts` preset. Detection: `openklip highlights-detect`, MCP `highlights_list`.
 - Agents can now query action history and past task ids (`openklip history`/`tasks`, MCP `history_list`/`task_list`, 2026-07-02); `revise-draft` uses `task_list` plus `history_list` to find the task that produced a draft instead of only reusing a task id already seen in the same conversation. Neither query tool supports filtering by actor; `history_list`/`openklip history` cap at 200 entries and `task_list`/`openklip tasks` at 100, same limits as the underlying stores.
 
 ### Design & UI (non-blocking polish)
@@ -231,7 +232,9 @@ Single list of current gaps (code is truth). README and release notes point here
 
 ### Not implemented (see Roadmap / Pending)
 
-- Vertical shorts (9:16 reframe) and LLM highlight detection.
+- Multi-clip export pipeline (one command exports every highlight to separate files; today each export overwrites `output/out.mp4`).
+- GUI for highlight candidates (list, preview seek, approve, export).
+- Per-platform caption safe areas and split-screen vertical layouts.
 - Noise reduction and de-essing (basic audio cleanup); two-pass loudness normalization for exact-target loudness.
 - OpenCLIP semantic b-roll matching.
 - OS-level file locking for concurrent CLI + server writes.
