@@ -6,7 +6,7 @@ Export performance, two-pass loudnorm, noise reduction, OS file locking, and dem
 
 ### Added
 - **Segment export seeking** (`src/export-segments.ts`): per-range `-ss/-to` inputs when kept duration is under half the source (voice-only exports without b-roll/stills/music); falls back to legacy `select` otherwise; `segmentMode` in export summary.
-- **Two-pass loudnorm** (`src/loudnorm-two-pass.ts`): `project.audio.loudness.mode` (`single` | `two-pass`); probe pass then exact targeting; CLI `export-set --loudness-mode`, GUI loudness mode picker.
+- **Two-pass loudnorm** (`src/loudnorm-two-pass.ts`): `project.audio.loudness.mode` (`single` | `two-pass`); probe pass then exact targeting; CLI `openklip audio --loudness-mode`, GUI loudness mode picker.
 - **Noise reduction**: `project.audio.noiseReduction` (ffmpeg `afftdn` on voice bus); CLI `--noise-reduction` / `--noise-strength`; GUI toggle in Audio section.
 - **OS-level project.json lock** (`src/project-file-lock.ts`): advisory lockfile beside `project.json` inside `mutateProject` (cross-process CLI + server safety).
 - **Demo GIF**: `bun run demo-gif` writes `docs/demo.gif`; README embed; `docs/REPO-TOPICS.md` suggests GitHub topics.

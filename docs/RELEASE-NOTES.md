@@ -152,6 +152,70 @@ See [TODO.md](../TODO.md#known-limitations) for the current list. Reframe is man
 
 ---
 
+## v0.20.0.0
+
+**Richer title styles: quote, divider, and callout positions beyond lower, center, and hero.**
+
+### Highlights
+- **Title positions**: `quote` (centered italic quote + attribution), `divider` (centered section label), and `callout` (compact top-left label) on title cards.
+- **Parity**: ASS export (`buildTitlesAss`), preview overlays, CLI/MCP/registry, and GUI position picker all share the same positions.
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations). Lower text card choreography, word-by-word reveal captions, and blurred-background screenshot composition are not implemented.
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#02000---2026-07-03)
+
+---
+
+## v0.19.0.0
+
+**B-roll split-screen display: speaker left, b-roll right in a 50/50 landscape composite.**
+
+### Highlights
+- **`display: split`**: third b-roll display mode alongside `cover` and `pip`; `hstack` in `buildBrollOverlayFilters` at preview and export.
+- **Surfaces**: CLI `broll-add` / `broll-set --display`, registry/MCP, GUI Cover/PiP/Split toggle.
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations). Background blur with foreground crop is not implemented.
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#01900---2026-07-03)
+
+---
+
+## v0.18.0.0
+
+**B-roll audio modes: mix b-roll soundtrack with voice at export, not only swap the picture.**
+
+### Highlights
+- **`audioMode`**: `silent` (default), `broll`, `mix`, `duck-voice`, `duck-broll` on each b-roll placement.
+- **Export mix**: `src/broll-audio.ts` trims and delays b-roll audio from the same inputs as video overlays; preview audio stays voice-only.
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations). Preview does not yet play b-roll audio modes.
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#01800---2026-07-03)
+
+---
+
+## v0.17.0.0
+
+**B-roll PiP display: keep the speaker on screen with a bottom-right inset instead of full-frame cover.**
+
+### Highlights
+- **`display: pip`**: inset at ~28% frame width; speaker stays visible under transparent pad + `overlay` composite.
+- **Surfaces**: CLI `broll-add` / `broll-set --display cover|pip`, registry/MCP, GUI Cover/PiP toggle; legacy projects without `display` parse as `cover`.
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations). Split screen and audio modes ship in v0.19 and v0.18 respectively.
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#01700---2026-07-03)
+
+---
+
 ## v0.16.0.0
 
 **Export platform presets: one named pick (YouTube, YouTube 4K, X, LinkedIn) sets compression, frame rate, resolution ceiling, and loudness target together, on CLI, API, MCP, and the GUI export dialog.**

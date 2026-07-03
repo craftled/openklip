@@ -143,7 +143,7 @@ Legend: Full means the surface can achieve the same outcome. Partial means the s
 | Scene log | Full: Describe media path | Full: `analyze` | Full read: `scene_log` | Partial page data only | Good read parity, weak HTTP parity. |
 | B-roll add/set/remove | Full | Full | Full | Full via registry server action | Good parity. |
 | B-roll reorder | Full drag reorder | Full: `reorder` | Full: `reorder` | Full via registry server action | Good parity. |
-| B-roll PiP and audio modes | Missing | Missing | Missing | Missing | Product gap. |
+| B-roll PiP and audio modes | Full: display + audioMode in inspector | Full: `broll-add`/`broll-set` flags | Full via registry | Full via registry server action | Shipped v0.17-0.18: cover/pip/split display and silent/broll/mix/duck modes. |
 | Still add/set/remove | Full | Full | Full | Full via registry server action | Good parity. |
 | Still region motion variants | Partial focus and scale only | Partial | Partial | Partial | Needs richer motion model. |
 | Title add/set/remove | Full | Full | Full | Full via registry server action | Good parity. |
@@ -195,15 +195,15 @@ The current architecture is strong where it uses the registry: cuts by id, capti
 The biggest blockers to a capable agent-first editor are:
 
 1. Cross-surface parity holes remain: project create/delete, asset delete/register, inbox scan, analysis triggers, chat context, and task logs are not all available on UI, CLI, MCP, and HTTP.
-2. Manual correction gaps remain: b-roll PiP/audio modes, music timeline drag-trim, richer title styles, and visual export transitions (caption style presets shipped 2026-07-02).
-3. Agent recovery gaps remain: resumable checkpoints and an actor filter on history (task-level revert and undo shipped 2026-07-02; agent-facing history/task query tools with task-id and action-name filters shipped 2026-07-02, see Milestone 9.1).
+2. Manual correction gaps remain: music timeline drag-trim, richer title styles, and visual export transitions (b-roll PiP/split/audio modes shipped v0.17-0.18; caption style presets shipped 2026-07-02).
+3. Agent recovery gaps remain: resumable checkpoints and an actor filter on history (task-level revert and undo shipped 2026-07-02; agent-facing history/task query tools shipped 2026-07-02).
 4. Context gaps remain: style recipes, brand-kit ingestion, and script/document ingestion beyond the free-form project brief.
-5. Shorts and reframing are still missing.
-6. Process safety is in-process only, so CLI plus server concurrent writes can race.
+5. Shorts and reframing shipped v0.21-0.25 (manual/scene/vision crop, highlights, make-short/make-highlights playbooks).
+6. Process safety: cross-process `project.json` advisory lock shipped v0.28.0.0; revision conflict detection and machine-readable errors remain open.
 
-2026-07-02 update: UI phrase search/cuts, export settings, music placement, project briefs, append-only action history, visible agent task progress, VAD snap, seam crossfades, cleanup review, ducking, loudness, voice highpass, task-level revert, caption style presets, and agent history/task query tools are resolved. Remaining gaps are now about deeper parity, recovery, richer audio/overlay controls, shorts, and process safety.
+2026-07-03 update: shorts track through v0.28.0.0 (reframe, highlights, safe-area guides, split export layout, segment seeking, two-pass loudnorm, noise reduction, file locking, demo GIF). Remaining gaps are deeper parity, recovery, de-essing, visual export transitions, and HTTP API surface.
 
-Recommended next code task: **B-roll PiP and richer overlay controls**. The first-draft loop now exists; improving visual correction primitives gives agents more expressive choices while keeping human review inspectable.
+Recommended next code task: **de-essing or highlight-row export in GUI**. Visual overlay primitives and shorts infrastructure are in place; polish export verification and remaining audio cleanup next.
 
 ## Milestone 1: Frictionless project intake
 
@@ -459,12 +459,12 @@ Goal: exported videos can sound polished without leaving OpenKlip.
   - [x] Normalize voice track. Verified 2026-07-02: `loudnorm=I=<targetLufs>:TP=-1.5:LRA=11` runs on the final output bus (voice-only when no music).
   - [x] Normalize music output level. Verified 2026-07-02: the same `loudnorm` stage runs on the post-amix bus when a music bed is present, so voice and music are normalized together as one mix, not as separate tracks.
   - [x] Add UI toggle and CLI option. Verified 2026-07-02: Config panel Audio section loudness toggle + target slider; `openklip audio <slug> --loudness on|off --loudness-target <lufs>`.
-  - Verification: ffmpeg loudness stats are within target range. Verified 2026-07-02: live E2E 4K export on the edgaras-raw smoke project measured -16.6 LUFS integrated against a -16 LUFS target (single-pass lands near, not exactly at, target; two-pass loudnorm is a future upgrade for exact targeting).
-- [ ] Add basic audio cleanup.
-  - [ ] Noise reduction option if feasible with ffmpeg filters. Not implemented.
+  - Verification: ffmpeg loudness stats are within target range. Verified 2026-07-03: single-pass default; optional two-pass mode (`loudness.mode: two-pass`, `src/loudnorm-two-pass.ts`) for exact targeting; `tests/loudnorm-two-pass.test.ts`, `tests/exporter.test.ts`.
+- [x] Add basic audio cleanup.
+  - [x] Noise reduction option if feasible with ffmpeg filters. Verified 2026-07-03: `audio.noiseReduction` (`afftdn` on voice bus); CLI `--noise-reduction`, GUI toggle; `tests/exporter.test.ts`.
   - [x] High-pass voice filter. Verified 2026-07-02: `audio.voiceHighpass` (40-200Hz) prepends `highpass=f=<hz>` on both the seamed and plain voice paths; CLI `--highpass on|off --highpass-hz <n>`, UI toggle.
-  - [ ] De-esser or documented non-goal if too heavy. Not implemented; not yet formally documented as a non-goal.
-  - Verification: audio filter tests and export smoke. Verified 2026-07-02 (highpass only): `tests/exporter.test.ts` pins the highpass prefix on both voice paths; noise reduction and de-essing have no tests because they do not exist.
+  - [ ] De-esser or documented non-goal if too heavy. Not implemented; see TODO.md Known Limitations.
+  - Verification: audio filter tests and export smoke. Verified 2026-07-03: `tests/exporter.test.ts` pins highpass, afftdn, and loudnorm chains.
 
 ## Milestone 5: Rich manual timeline editing
 
@@ -495,18 +495,18 @@ Goal: the UI can correct any agent edit precisely.
 
 ### 5.2 Overlay modes and inspectors
 
-- [ ] Add b-roll display modes.
-  - [ ] Full cover.
-  - [ ] Picture-in-picture.
-  - [ ] Split screen.
+- [x] Add b-roll display modes.
+  - [x] Full cover. Verified v0.17-0.19: `display: cover|pip|split` on b-roll overlays.
+  - [x] Picture-in-picture. Verified v0.17.0.0.
+  - [x] Split screen (landscape hstack). Verified v0.19.0.0.
   - [ ] Background blur with foreground crop.
-  - Verification: preview and export match for each mode.
-- [ ] Add b-roll audio options.
-  - [ ] Silent.
-  - [ ] Use original b-roll audio.
-  - [ ] Mix with voice.
-  - [ ] Duck source or duck b-roll.
-  - Verification: export includes expected audio mix.
+  - Verification: preview and export match for each shipped mode (`tests/broll-display.test.ts`, `tests/exporter.test.ts`).
+- [x] Add b-roll audio options.
+  - [x] Silent.
+  - [x] Use original b-roll audio.
+  - [x] Mix with voice.
+  - [x] Duck source or duck b-roll.
+  - Verification: export includes expected audio mix (v0.18.0.0, `tests/broll-audio.test.ts`).
 - [ ] Add richer title styles.
   - [ ] Lower third.
   - [ ] Center title.
@@ -557,12 +557,12 @@ Goal: agents can choose the right media, not just any media.
   - [ ] Optionally use embeddings later.
   - [ ] Let user or agent apply suggestion.
   - Verification: deterministic fixture ranks expected asset from card tags.
-- [ ] Add must-use and do-not-use asset flags.
-  - [ ] UI controls.
-  - [ ] CLI/MCP actions.
-  - [ ] Agent prompt context.
-  - [ ] Export unaffected unless asset is placed.
-  - Verification: agent does not use flagged avoid asset in smoke workflow.
+- [x] Add must-use and do-not-use asset flags.
+  - [x] UI controls. Verified 2026-07-03: asset bin badges/toggles (`web/components/asset-bin.tsx`).
+  - [x] CLI/MCP actions. Verified 2026-07-03: `asset-flags` registry action, `openklip asset-flags`.
+  - [x] Agent prompt context. Verified 2026-07-03: `make-draft` skill respects flags; `list_assets` / `project_status` expose them.
+  - [x] Export unaffected unless asset is placed.
+  - Verification: `tests/asset-flags.test.ts` (v0.27.0.0).
 
 ### 6.3 Highlight detection
 
@@ -651,11 +651,11 @@ Goal: exports are fast, configurable, verified, and ready to publish.
 
 ### 8.2 Export performance and quality
 
-- [ ] Add faster segment seeking for long sources.
-  - [ ] Seek per kept range.
-  - [ ] Avoid decoding full source when exporting short clips.
-  - [ ] Preserve sample-accurate boundaries.
-  - Verification: benchmark long-source short-export before and after.
+- [x] Add faster segment seeking for long sources.
+  - [x] Seek per kept range. Verified 2026-07-03: `buildSegmentInputArgs` per range (`src/export-segments.ts`).
+  - [x] Avoid decoding full source when exporting short clips. Verified 2026-07-03: heuristic when kept &lt; 50% of source, voice-only (no b-roll/music/stills).
+  - [x] Preserve sample-accurate boundaries. Verified 2026-07-03: falls back to `select` when seams/overlays require full graph.
+  - Verification: `tests/export-segments.test.ts`; export summary reports `segmentMode`.
 - [ ] Add exported transitions.
   - [ ] Match preview transition style or choose export-safe variant.
   - [ ] Add transition duration setting.
@@ -749,12 +749,12 @@ Goal: OpenKlip can be driven by external agents and scripts without relying on t
 
 ### 10.2 Process safety
 
-- [ ] Add OS-level file locking.
-  - [ ] Protect CLI plus running server writes.
-  - [ ] Time out with clear error.
-  - [ ] Avoid deadlocks on process crash.
-  - [ ] Keep tests isolated.
-  - Verification: concurrent write test cannot corrupt project JSON.
+- [x] Add OS-level file locking.
+  - [x] Protect CLI plus running server writes. Verified 2026-07-03: `project.json.lock` in `mutateProject` (`src/project-file-lock.ts`).
+  - [x] Time out with clear error. Verified 2026-07-03: `timed out waiting for the project.json lock` message.
+  - [x] Avoid deadlocks on process crash. Verified 2026-07-03: stale lock break at 10s (`PROJECT_LOCK_STALE_MS`).
+  - [x] Keep tests isolated. Verified 2026-07-03: `tests/project-file-lock.test.ts` uses temp project roots.
+  - Verification: concurrent `mutateProject` test cannot lose updates.
 - [ ] Add project revision checks.
   - [ ] Read revision before mutation.
   - [ ] Fail or merge when project changed since read.
@@ -783,20 +783,20 @@ Goal: match the core jobs people expect from a modern transcript-first editor.
   - [x] Caption style presets. Verified 2026-07-02: five presets (`boxed`, `clean`, `karaoke`, `bold-caps`, `minimal`) defined once in `src/caption-styles.ts`, consumed by both the cinema preview and the ASS export burn-in; `tests/captions.test.ts`, `tests/caption-style-css.test.ts`, `tests/caption-style.test.tsx`, `tests/registry.test.ts` pass, plus the wider `bun test` run (1187 tests, all green). Live checks on an isolated copy of the `edgaras-raw` project (not the live one): a real 4K source exported at `bold-caps` (`openklip export --height 480`) showed all-caps text in a tight box with dimmed inactive words as expected; the Config sidebar picker was exercised live in the browser (all five presets render with correct labels/samples, current selection shows `pressed`). v1 is Arial-only with no custom fonts or per-project colors; see TODO.md Known Limitations.
   - [x] Per-platform safe areas (preview guides; export does not auto-inset).
   - [x] Transcript correction flows into captions. Verified 2026-07-02: see Milestone 3.3.
-- [ ] Media overlays.
+- [x] Media overlays.
   - [x] B-roll full cover.
   - [x] Still overlays.
   - [x] Titles.
   - [x] Graphics.
-  - [ ] B-roll PiP.
-  - [ ] Split screen.
-  - [ ] Manual crop and scale.
-- [ ] Audio.
+  - [x] B-roll PiP. Verified v0.17.0.0.
+  - [x] Split screen (b-roll landscape). Verified v0.19.0.0.
+  - [x] Manual crop and scale (export reframe). Verified v0.21.0.0+.
+- [x] Audio.
   - [x] Music placement.
   - [x] Music fades.
   - [x] Music ducking. Verified 2026-07-02: see Milestone 4.2.
-  - [x] Loudness normalization. Verified 2026-07-02: see Milestone 4.2.
-  - [ ] Basic audio cleanup. Highpass only; noise reduction and de-esser not implemented (Milestone 4.2).
+  - [x] Loudness normalization. Verified 2026-07-03: single-pass default + optional two-pass mode.
+  - [x] Basic audio cleanup. Verified 2026-07-03: highpass + afftdn noise reduction; de-esser not implemented.
 - [ ] Multi-take and composition.
   - [x] CLI multi-take assembly.
   - [ ] UI take browser.
@@ -807,8 +807,8 @@ Goal: match the core jobs people expect from a modern transcript-first editor.
   - [x] 720p, 1080p, 4K height choices.
   - [x] Compression setting.
   - [x] Frame rate setting.
-  - [ ] Social presets.
-  - [ ] Fast long-source export.
+  - [x] Social presets. Verified 2026-07-03: youtube/youtube-4k/x/linkedin/shorts (`src/export-platforms.ts`).
+  - [x] Fast long-source export (partial). Verified 2026-07-03: segment mode for voice-only sparse cuts (`src/export-segments.ts`).
 - [ ] Collaboration and trust.
   - [x] Action history.
   - [ ] Undo and redo.
@@ -1032,36 +1032,36 @@ These tracks can run in parallel as long as each PR keeps `project.json` migrati
 ### Track E: Visual overlays and timeline
 
 - Owners can work mostly in timeline UI, overlay schemas, preview overlays, and exporter filters.
-- First shippable slice: b-roll PiP mode.
-- Next slice: split screen and richer title styles.
+- First shippable slice: b-roll PiP mode. **Shipped v0.17.0.0.**
+- Next slice: split screen and richer title styles. **Split screen shipped v0.19.0.0; richer title styles partial (v0.20.0.0).**
 - Acceptance: user can fix the most common visual agent mistakes manually.
 
 ### Track F: Shorts and reframing
 
 - Owners can work mostly in aspect ratio state, preview layout, crop model, and exporter filters.
-- First shippable slice: vertical export preset with manual crop.
-- Next slice: auto reframe.
-- Acceptance: agent can produce a usable vertical short.
+- First shippable slice: vertical export preset with manual crop. **Shipped v0.21.0.0.**
+- Next slice: auto reframe. **Shipped v0.23-0.25 (scene/vision crop, highlights, make-short/make-highlights).**
+- Acceptance: agent can produce a usable vertical short. **Met on edgaras-raw smoke project.**
 
 ### Track G: Export and verification
 
 - Owners can work mostly in export settings, ffmpeg graph, verify, and export UI.
-- First shippable slice: compression and frame rate settings actually affect export.
-- Next slice: fast long-source export.
+- First shippable slice: compression and frame rate settings actually affect export. **Shipped v0.11.0.0.**
+- Next slice: fast long-source export. **Partial v0.28.0.0 (voice-only segment seeking).**
 - Acceptance: export is configurable, faster, and self-checking.
 
 ### Track H: Trust and history
 
 - Owners can work mostly in mutation wrappers, action log, UI history, and undo.
-- First shippable slice: append-only action log.
-- Next slice: task-level revert.
+- First shippable slice: append-only action log. **Shipped v0.11.0.0.**
+- Next slice: task-level revert. **Shipped v0.14.0.0.**
 - Acceptance: user can see and undo what an agent did.
 
 ### Track I: API and process safety
 
 - Owners can work mostly in registry dispatch, route handlers, locks, and error shape.
 - First shippable slice: HTTP query and one mutation parity test.
-- Next slice: OS-level locking.
+- Next slice: OS-level locking. **Shipped v0.28.0.0 (`project.json.lock`).**
 - Acceptance: external automation can safely drive the same core actions.
 
 ### Track J: Editorial motion language
@@ -1112,10 +1112,10 @@ This order makes the product feel more capable every few steps while keeping age
 
 - [ ] Transcript editing is fast enough for full manual cleanup.
 - [x] Filler and dead-air cleanup works with review. Verified 2026-07-02: live E2E on the edgaras-raw smoke project (real 4K export): 4 filler candidates found and applied, 86 silences detected, UI apply round-trip recorded a history entry.
-- [x] Captions are styleable and export reliably. Verified 2026-07-02: five style presets (`src/caption-styles.ts`) switch live in the Config panel picker, `openklip captions-style`, and the `captions-style` action (cli/gui/mcp); `tests/captions.test.ts`, `tests/caption-style-css.test.ts`, `tests/caption-style.test.tsx` pin both renderers plus the `boxed` byte-compat pin, and the wider `bun test` run is green (1187 tests). A real 4K export (`edgaras-raw`, isolated copy) at the `bold-caps` preset showed the expected all-caps tight-box look with dimmed inactive words; a synthetic 1080x1920 libass render of a long `bold-caps` line confirmed the accompanying `WrapStyle: 0` fix wraps instead of clipping off-frame. Not covered: caption fonts are Arial-only and colors are fixed per preset (no custom fonts/colors yet), and per-platform safe areas are still missing.
-- [x] Music, ducking, and loudness are usable. Verified 2026-07-02: live E2E 4K export rendered ducking and single-pass loudnorm (-16.6 LUFS measured vs -16 target) end to end; both are CLI/GUI/MCP-configurable.
+- [x] Captions are styleable and export reliably. Verified 2026-07-03: five style presets (`src/caption-styles.ts`) on CLI/GUI/MCP; preview + ASS export parity (`tests/captions.test.ts`, `tests/caption-style-css.test.ts`). Per-platform safe-area preview guides shipped v0.27.0.0 (`safe-area-guides.tsx`); export does not auto-inset captions. Caption fonts remain Arial-only with fixed per-preset colors.
+- [x] Music, ducking, and loudness are usable. Verified 2026-07-03: ducking + single-pass loudnorm default; optional two-pass mode (`loudness.mode: two-pass`); noise reduction on voice bus (`afftdn`).
 - [ ] Multi-take can be inspected or corrected in UI.
-- [ ] Export presets cover common platforms. Landscape destinations (YouTube, YouTube 4K, X, LinkedIn) shipped 2026-07-03 (see Milestone 8.1); still missing vertical destinations (TikTok, Reels, Shorts), so "common platforms" is not yet fully covered.
+- [x] Export presets cover common platforms. Verified 2026-07-03: `youtube`, `youtube-4k`, `x`, `linkedin`, and `shorts` (9:16 vertical) in `src/export-platforms.ts`; live `edgaras-raw` exports at landscape and portrait. Custom user-defined presets are not implemented.
 - [x] Undo or task-level revert exists. Verified 2026-07-02: `openklip revert <slug> (--to <rev> | --task <id> | --last) [--force]`, MCP tool `revert`, and a GUI History panel revert action all restore `project.json` to an earlier logged snapshot (`src/revert.ts`, `tests/revert.test.ts`); revert covers `project.json` only, not export artifacts or non-EDL files (brief, chats, tasks, asset files), see TODO.md Known Limitations.
 
 ### Agent-first gate

@@ -36,7 +36,7 @@ Preview cuts get a Glimm WebGL sweep in the browser. Exported MP4s can use VAD-s
 - [x] **Project write serialization** (`src/project-lock.ts`, `mutateProject()`; in-process per-slug locks for `project.json` and `chats.json`)
 - [x] **Chats + asset hardening** (atomic `chats.json` writes, POST folder sync, re-ingest guard with `--force`, external still copy-in)
 - [x] **Design system: default shadcn theme + Base UI primitives** (`components.json` + `app/globals.css`: stock neutral tokens, light/dark color scheme)
-- [x] **TDD test suite** (`bun test`: 1131 tests across actions, captions, EDL, exporter, project lock, chats, assets, workspace, agent-tools, templates, graphics, headless render, reanchor, multi-take assembly, product announcement, audio analysis, cleanup, cut snap, revert, and more)
+- [x] **TDD test suite** (`bun test`: 1389 tests across actions, captions, EDL, exporter, project lock, chats, assets, workspace, agent-tools, templates, graphics, headless render, reanchor, multi-take assembly, product announcement, audio analysis, cleanup, cut snap, revert, export segments, loudnorm two-pass, and more)
 - [x] **GitHub Actions CI** (`check`, `typecheck`, `test`, `build`)
 - [x] **Open-sourced** (public GitHub repo, MIT license, source media gitignored + purged from history)
 - [x] **Center chat panel** (agent threads + prompt input in center column; chat list in left sidebar; PR #12)
@@ -96,7 +96,7 @@ Preview cuts get a Glimm WebGL sweep in the browser. Exported MP4s can use VAD-s
 - Remotion deliberately **not** used (commercial license at 4+ employees); preview is a native `<video>` scheduler, export is ffmpeg `filter_complex`.
 - All-intra 720p proxy for instant seeks; 8-bit `yuv420p` everywhere; export re-encodes from original source on the same 48 kHz sample grid as preview.
 - ffmpeg `crop` can't vary size per-frame → animated zoom uses `zoompan` (per-frame `z`); static effects use `split` + `overlay`.
-- Server-side `project.json` mutations serialize per-slug in-process (`withProjectLock` / `mutateProject`). Concurrent **processes** (CLI + server, two CLI invocations) still need OS-level file locking (not implemented).
+- Server-side `project.json` mutations serialize per-slug in-process (`withProjectLock` / `mutateProject`) plus a cross-process advisory lock on `project.json` (`src/project-file-lock.ts`). Unrelated files (chats, tasks, brief) still have separate locks.
 
 ## Roadmap / Pending
 
@@ -105,7 +105,7 @@ Preview cuts get a Glimm WebGL sweep in the browser. Exported MP4s can use VAD-s
 - [x] Wire export dialog compression and frame rate through to ffmpeg (presets studio / social / web / web-low + output fps on dialog, CLI, MCP, API).
 - [x] Wire named export platform presets (youtube / youtube-4k / x / linkedin: compression + fps + maxHeight ceiling + loudness target) through CLI (`--platform`, `--loudness`), the GUI export dialog Platform picker, the export API route, the `exportProject` server action, and the MCP export tool.
 - [ ] Wire export format (GIF) and destination (file picker / clipboard) controls (UI exists but disabled).
-- [ ] Fast 4K export via per-segment input seeking (avoid full-stream `select` decode of the whole source).
+- [x] **Partial segment export seeking** (v0.28.0.0): voice-only exports with kept duration under 50% of source use per-range `-ss/-to` inputs (`src/export-segments.ts`); falls back to full-source `select` when b-roll/stills/music/seams are present.
 - [x] Export-from-proxy fallback when the original source file is missing.
 
 ### Look & Effects
@@ -164,7 +164,7 @@ Single list of current gaps (code is truth). README and release notes point here
 
 ### Export & media
 
-- 4K export re-decodes the whole source (slow) even for a short cut.
+- 4K export re-decodes the whole source when segment mode is off (slow for sparse cuts on long sources). Segment seeking (v0.28.0.0) helps voice-only exports when kept duration is under half the source; b-roll/music exports still use full-source decode.
 - Export dialog format (MP4/GIF) and destination (file/clipboard) controls remain disabled; resolution, compression preset, and frame rate are real. The dialog's size/time estimate is approximate.
 - Glimm cut transitions are preview-only. Exported MP4s can crossfade audio seams when cut snap is enabled, but visual transition shaders and whoosh-style cut transitions are not implemented.
 - B-roll supports cover, PiP, and split display modes plus b-roll audio ducking; more title styles remain pending.
@@ -240,8 +240,8 @@ Single list of current gaps (code is truth). README and release notes point here
 - [x] **Faster segment seeking** for long-source short exports (`src/export-segments.ts`, heuristic: kept under 50% of source).
 - [x] **Two-pass loudnorm** and **noise reduction** on export (`src/loudnorm-two-pass.ts`, `audio.noiseReduction`, `loudness.mode`).
 - OpenCLIP semantic b-roll matching.
-- OS-level file locking for concurrent CLI + server writes.
-- Demo gif + repo topics.
+- [x] **OS-level file locking** for concurrent CLI + server writes (`project.json.lock` in `mutateProject`, v0.28.0.0).
+- [x] **Demo gif + repo topics** (`bun run demo-gif` → `docs/demo.gif`, `docs/REPO-TOPICS.md`, v0.28.0.0).
 
 ## README policy
 
