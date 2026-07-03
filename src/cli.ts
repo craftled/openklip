@@ -2386,8 +2386,11 @@ try {
           : "not supported for this export";
         return `, transition ${t.type} requested but not applied (${reasonLabel})`;
       })();
+      const gifCapNote = r.gif?.capped
+        ? `, gif capped at ${r.gif.width}px/${r.gif.fps}fps`
+        : "";
       console.log(
-        `exported ${r.ranges} ranges, ${r.durationSec.toFixed(1)}s (${r.height}p, ${r.fps}fps, ${r.compression}${formatNote}${platformNote}${loudnessNote}${transitionNote}, music ${r.music}) -> ${r.out}`
+        `exported ${r.ranges} ranges, ${r.durationSec.toFixed(1)}s (${r.height}p, ${r.fps}fps, ${r.compression}${formatNote}${platformNote}${loudnessNote}${transitionNote}${gifCapNote}, music ${r.music}) -> ${r.out}`
       );
       break;
     }
