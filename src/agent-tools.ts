@@ -18,7 +18,7 @@ import { logBriefSet } from "./brief-log.ts";
 import { cleanupReport, fillerOnlyCleanupReport } from "./cleanup.ts";
 import { type Project, samplesToSec } from "./edl.ts";
 import { EXPORT_PLATFORM_IDS } from "./export-platforms.ts";
-import { EXPORT_COMPRESSIONS, exportCut } from "./exporter.ts";
+import { EXPORT_COMPRESSIONS, EXPORT_FORMATS, exportCut } from "./exporter.ts";
 import { listGraphics } from "./graphics.ts";
 import { listLuts } from "./lut.ts";
 import {
@@ -724,6 +724,10 @@ const queryTools: AgentToolDef[] = [
         .enum(EXPORT_COMPRESSIONS)
         .optional()
         .describe("Encoder preset; default social (today's settings)"),
+      format: z
+        .enum(EXPORT_FORMATS)
+        .optional()
+        .describe("Output container; default mp4 (gif has no audio track)"),
       crop: z
         .object({
           focusX: z.number().min(0).max(1).optional(),
@@ -760,6 +764,7 @@ const queryTools: AgentToolDef[] = [
       maxHeight,
       compression,
       crop,
+      format,
       fps,
       platform,
       loudnessTargetLufs,
@@ -768,6 +773,7 @@ const queryTools: AgentToolDef[] = [
         aspect,
         compression,
         crop,
+        format,
         fps,
         loudnessTargetLufs,
         maxHeight,

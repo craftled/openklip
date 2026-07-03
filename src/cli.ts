@@ -55,7 +55,9 @@ import {
 } from "./export-platforms.ts";
 import {
   EXPORT_COMPRESSIONS,
+  EXPORT_FORMATS,
   type ExportCompression,
+  type ExportFormat,
   exportCut,
   parseExportFpsFlag,
   parseExportLoudnessFlag,
@@ -2236,7 +2238,7 @@ try {
     case "export": {
       if (!rest[0]) {
         throw new Error(
-          "usage: openklip export <slug> [--height <px>] [--fps <n>] [--compression <preset>] [--platform <id>] [--loudness <lufs>] [--aspect <id>] [--crop-focus-x <0-1>] [--crop-focus-y <0-1>] [--crop-scale <1-3>]"
+          "usage: openklip export <slug> [--height <px>] [--fps <n>] [--compression <preset>] [--format <mp4|gif>] [--platform <id>] [--loudness <lufs>] [--aspect <id>] [--crop-focus-x <0-1>] [--crop-focus-y <0-1>] [--crop-scale <1-3>]"
         );
       }
       const heightIdx = rest.indexOf("--height");
@@ -2264,6 +2266,22 @@ try {
           );
         }
         compression = compressionRaw as ExportCompression;
+      }
+      // Guard against a trailing flag with no value: `flagValue` would
+      // otherwise silently return undefined and export would proceed with no
+      // format applied.
+      let format: ExportFormat | undefined;
+      if (rest.includes("--format")) {
+        const formatRaw = flagValue(rest, "--format");
+        if (
+          formatRaw === undefined ||
+          !EXPORT_FORMATS.includes(formatRaw as ExportFormat)
+        ) {
+          throw new Error(
+            `unknown export format "${formatRaw ?? ""}" (expected one of: ${EXPORT_FORMATS.join(", ")})`
+          );
+        }
+        format = formatRaw as ExportFormat;
       }
       // Guard against a trailing flag with no value: `flagValue` would
       // otherwise silently return undefined and export would proceed with no
@@ -2308,18 +2326,20 @@ try {
         aspect,
         compression,
         crop,
+        format,
         fps,
         loudnessTargetLufs,
         maxHeight,
         platform,
       });
+      const formatNote = r.format === "mp4" ? "" : `, format ${r.format}`;
       const platformNote = r.platform ? `, platform ${r.platform}` : "";
       const loudnessNote =
         r.loudnessTargetLufs === undefined
           ? ""
           : `, loudness ${r.loudnessTargetLufs} LUFS`;
       console.log(
-        `exported ${r.ranges} ranges, ${r.durationSec.toFixed(1)}s (${r.height}p, ${r.fps}fps, ${r.compression}${platformNote}${loudnessNote}, music ${r.music}) -> ${r.out}`
+        `exported ${r.ranges} ranges, ${r.durationSec.toFixed(1)}s (${r.height}p, ${r.fps}fps, ${r.compression}${formatNote}${platformNote}${loudnessNote}, music ${r.music}) -> ${r.out}`
       );
       break;
     }
