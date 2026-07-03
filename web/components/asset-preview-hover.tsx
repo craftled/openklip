@@ -1,14 +1,17 @@
 "use client";
 
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { BinAsset } from "@/components/asset-bin";
 import { MediaAudioVisualizerWave } from "@/components/media-audio-visualizer-wave";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
 import { APP_ICON_CLASS, Music } from "@/lib/icon";
 import { cn } from "@/lib/utils";
 
 const PREVIEW_WIDTH = 192;
-const PREVIEW_PAD = 8;
 const HIDE_DELAY_MS = 120;
 
 export function assetPreviewUrl(
@@ -78,44 +81,11 @@ function MusicPreview({ src }: { src: string }) {
   );
 }
 
-interface AssetPreviewPanelProps {
-  anchor: DOMRect;
-  asset: BinAsset;
-  onPointerEnter: () => void;
-  onPointerLeave: () => void;
-  src: string;
-}
-
-function AssetPreviewPanel({
-  anchor,
-  asset,
-  onPointerEnter,
-  onPointerLeave,
-  src,
-}: AssetPreviewPanelProps) {
+function AssetPreviewBody({ asset, src }: { asset: BinAsset; src: string }) {
   const mediaHeight = previewMediaHeight(asset.kind);
 
-  const position = useMemo(() => {
-    let left = anchor.right + PREVIEW_PAD;
-    if (left + PREVIEW_WIDTH > window.innerWidth - PREVIEW_PAD) {
-      left = anchor.left - PREVIEW_WIDTH - PREVIEW_PAD;
-    }
-    const panelHeight = mediaHeight + 32;
-    let top = anchor.top;
-    top = Math.min(
-      Math.max(PREVIEW_PAD, top),
-      window.innerHeight - panelHeight - PREVIEW_PAD
-    );
-    return { left, top };
-  }, [anchor, mediaHeight]);
-
-  return createPortal(
-    <div
-      className="fixed z-[100] w-48 overflow-hidden rounded-lg border border-border bg-background shadow-sm"
-      onPointerEnter={onPointerEnter}
-      onPointerLeave={onPointerLeave}
-      style={{ left: position.left, top: position.top }}
-    >
+  return (
+    <>
       <div
         className="relative flex items-center justify-center bg-black"
         style={{ height: mediaHeight }}
@@ -145,8 +115,7 @@ function AssetPreviewPanel({
       <p className="truncate px-2 py-1.5 text-muted-foreground text-xs">
         {asset.name}
       </p>
-    </div>,
-    document.body
+    </>
   );
 }
 
@@ -165,57 +134,24 @@ export function AssetPreviewRow({
   mediaVersion,
   slug,
 }: AssetPreviewRowProps) {
-  const rowRef = useRef<HTMLLIElement>(null);
-  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [preview, setPreview] = useState<{
-    anchor: DOMRect;
-    asset: BinAsset;
-  } | null>(null);
-
-  const clearHideTimer = () => {
-    if (hideTimer.current) {
-      clearTimeout(hideTimer.current);
-      hideTimer.current = null;
-    }
-  };
-
-  const showPreview = () => {
-    const el = rowRef.current;
-    if (!el) {
-      return;
-    }
-    clearHideTimer();
-    setPreview({ asset, anchor: el.getBoundingClientRect() });
-  };
-
-  const scheduleHide = () => {
-    clearHideTimer();
-    hideTimer.current = setTimeout(() => setPreview(null), HIDE_DELAY_MS);
-  };
-
-  useEffect(() => () => clearHideTimer(), []);
-
   const src = assetPreviewUrl(slug, asset.id, mediaVersion);
 
   return (
-    <>
-      <li
-        className={cn(className)}
-        onPointerEnter={showPreview}
-        onPointerLeave={scheduleHide}
-        ref={rowRef}
+    <HoverCard>
+      <HoverCardTrigger
+        closeDelay={HIDE_DELAY_MS}
+        delay={0}
+        render={<li className={cn(className)} data-slot="asset-preview-row" />}
       >
         {children}
-      </li>
-      {preview && (
-        <AssetPreviewPanel
-          anchor={preview.anchor}
-          asset={preview.asset}
-          onPointerEnter={clearHideTimer}
-          onPointerLeave={scheduleHide}
-          src={src}
-        />
-      )}
-    </>
+      </HoverCardTrigger>
+      <HoverCardContent
+        align="start"
+        className="w-48 overflow-hidden p-0"
+        side="right"
+      >
+        <AssetPreviewBody asset={asset} src={src} />
+      </HoverCardContent>
+    </HoverCard>
   );
 }

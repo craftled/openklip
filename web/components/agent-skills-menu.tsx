@@ -2,6 +2,7 @@
 
 import {
   type KeyboardEvent,
+  type ReactNode,
   useCallback,
   useEffect,
   useMemo,
@@ -16,6 +17,11 @@ import {
   PromptInputCommandList,
 } from "@/components/ai-elements/prompt-input";
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { APP_ICON_CLASS, Box } from "@/lib/icon";
 import {
   filterSkills,
@@ -25,6 +31,7 @@ import {
 import { cn } from "@/lib/utils";
 
 interface AgentSkillsMenuProps {
+  children?: ReactNode;
   className?: string;
   embedded?: boolean;
   highlightedIndex?: number;
@@ -35,31 +42,25 @@ interface AgentSkillsMenuProps {
   skills: SkillEntry[];
 }
 
-export function AgentSkillsMenu({
+function SkillsMenuPanel({
   className,
-  embedded = false,
   highlightedIndex = -1,
   onHighlight,
   onSelect,
-  open,
   query,
   skills,
-}: AgentSkillsMenuProps) {
+}: {
+  className?: string;
+  highlightedIndex?: number;
+  onHighlight?: (index: number) => void;
+  onSelect: (skill: SkillEntry) => void;
+  query: string;
+  skills: SkillEntry[];
+}) {
   const filtered = useMemo(() => filterSkills(skills, query), [query, skills]);
 
-  if (!open) {
-    return null;
-  }
-
   return (
-    <div
-      className={cn(
-        embedded
-          ? "overflow-hidden rounded-lg bg-popover text-popover-foreground"
-          : "absolute right-0 bottom-full left-0 z-50 mb-2 overflow-hidden border border-border bg-popover text-popover-foreground shadow-md",
-        className
-      )}
-    >
+    <div className={cn("overflow-hidden text-popover-foreground", className)}>
       <div className="border-border border-b px-3 py-2">
         <p className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
           Skills
@@ -104,6 +105,63 @@ export function AgentSkillsMenu({
         </PromptInputCommandList>
       </PromptInputCommand>
     </div>
+  );
+}
+
+export function AgentSkillsMenu({
+  children,
+  className,
+  embedded = false,
+  highlightedIndex = -1,
+  onHighlight,
+  onSelect,
+  open,
+  query,
+  skills,
+}: AgentSkillsMenuProps) {
+  if (embedded) {
+    return (
+      <SkillsMenuPanel
+        className={cn("rounded-lg bg-popover", className)}
+        highlightedIndex={highlightedIndex}
+        onHighlight={onHighlight}
+        onSelect={onSelect}
+        query={query}
+        skills={skills}
+      />
+    );
+  }
+
+  return (
+    <DropdownMenu modal={false} open={open}>
+      <div className="relative w-full">
+        <DropdownMenuTrigger
+          render={
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-x-0 bottom-0 h-0"
+            />
+          }
+        />
+        {children}
+      </div>
+      <DropdownMenuContent
+        align="start"
+        className={cn(
+          "w-[min(100vw-2rem,28rem)] overflow-hidden p-0",
+          className
+        )}
+        side="top"
+      >
+        <SkillsMenuPanel
+          highlightedIndex={highlightedIndex}
+          onHighlight={onHighlight}
+          onSelect={onSelect}
+          query={query}
+          skills={skills}
+        />
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
