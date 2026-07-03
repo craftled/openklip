@@ -9,6 +9,7 @@ import type {
   ColorAdjust,
   CropMode,
   CutSnap,
+  CutTransition,
   Project as EngineProject,
   ExportAspect,
   ExportSettings,
@@ -65,6 +66,10 @@ import {
   CleanupPanel,
 } from "@/components/cleanup-panel";
 import { ColorTempPad } from "@/components/color-temp-pad";
+import {
+  CutTransitionSweep,
+  type CutTransitionSweepHandle,
+} from "@/components/cut-transition-sweep";
 import {
   EditTimeline,
   type TimelineClipKind,
@@ -302,7 +307,12 @@ interface Project {
   graphics?: GraphicItem[];
   height: number;
   highlights?: Highlights;
-  look?: { vignette: boolean; filter?: Filter; color?: ColorAdjust };
+  look?: {
+    vignette: boolean;
+    filter?: Filter;
+    color?: ColorAdjust;
+    transition?: CutTransition;
+  };
   mediaVersion?: number;
   motion?: { speed?: number };
   music?: MusicPlacementView[];
@@ -629,6 +639,7 @@ export function App({
   const brollRef = useRef<HTMLVideoElement>(null);
   const musicRef = useRef<HTMLAudioElement>(null);
   const schedRef = useRef<CutScheduler | null>(null);
+  const sweepRef = useRef<CutTransitionSweepHandle>(null);
   const projectRef = useRef<Project | null>(null);
   const saveChainRef = useRef<Promise<void>>(Promise.resolve());
   const saveErrorRef = useRef<string | null>(null);
@@ -657,7 +668,15 @@ export function App({
     if (!(videoRef.current && project) || schedRef.current) {
       return;
     }
-    const sched = new CutScheduler(videoRef.current, () => rangesRef.current);
+    const sched = new CutScheduler(
+      videoRef.current,
+      () => rangesRef.current,
+      () =>
+        projectRef.current?.look?.transition ?? {
+          type: "none",
+          durationMs: 500,
+        }
+    );
     sched.onTick = (sourceSec) => {
       const lr = loopRef.current;
       if (lr && videoRef.current && sourceSec >= lr.outSec - 0.03) {
@@ -668,6 +687,7 @@ export function App({
       setCurSample(Math.round(sourceSec * project.sampleRate));
     };
     sched.onEnd = () => setPlaying(false);
+    sched.onCutBoundary = (transition) => sweepRef.current?.play(transition);
     schedRef.current = sched;
   }, [project]);
 
@@ -3462,6 +3482,7 @@ export function App({
                               sampleRate={sr}
                               titles={project.titles ?? []}
                             />
+                            <CutTransitionSweep ref={sweepRef} />
                             {(exporting || pendingSaves > 0) && (
                               <div className="pointer-events-none absolute top-2 right-2 z-[5] flex items-center gap-1.5 rounded-md bg-black/70 px-2 py-1 font-medium text-white text-xs backdrop-blur">
                                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
