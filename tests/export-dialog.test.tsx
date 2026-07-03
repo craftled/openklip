@@ -9,6 +9,7 @@ import {
   buildExportOptions,
   effectiveMaxHeight,
   outputDimensionsForMaxHeight,
+  resolveGifMaxWidthSubmission,
 } from "../web/components/export-dialog.tsx";
 import {
   ExportOptionsForm,
@@ -32,6 +33,7 @@ function renderForm(
       onDestinationChange={() => undefined}
       onFormatChange={() => undefined}
       onFrameRateChange={() => undefined}
+      onGifMaxWidthChange={() => undefined}
       onPlatformChange={() => undefined}
       onResolutionChange={() => undefined}
       platform="manual"
@@ -99,6 +101,16 @@ test("MP4 format selection does not show the no-audio hint", () => {
   assert.doesNotMatch(html, /no audio/i);
 });
 
+test("GIF max width override control renders for GIF format", () => {
+  const html = renderForm({ format: "gif" });
+  assert.match(html, /max width/i);
+});
+
+test("GIF max width override control does not render for MP4 format", () => {
+  const html = renderForm({ format: "mp4" });
+  assert.doesNotMatch(html, /max width/i);
+});
+
 test("Clipboard destination selection shows a path-only hint", () => {
   const html = renderForm({ destination: "clipboard" });
   assert.match(html, /exported file path, not the video itself/i);
@@ -142,6 +154,82 @@ test("buildExportOptions submits destination: clipboard when Clipboard is select
 test("buildExportOptions submits destination: file by default", () => {
   const options = buildExportOptions(baseExportState);
   assert.equal(options.destination, "file");
+});
+
+test("buildExportOptions includes gifMaxWidth when GIF format has a custom width", () => {
+  const options = buildExportOptions({
+    ...baseExportState,
+    format: "gif",
+    gifMaxWidth: 500,
+  });
+  assert.equal(options.gifMaxWidth, 500);
+});
+
+test("buildExportOptions omits gifMaxWidth when left at default/empty", () => {
+  const options = buildExportOptions({ ...baseExportState, format: "gif" });
+  assert.equal(options.gifMaxWidth, undefined);
+});
+
+test("buildExportOptions omits gifMaxWidth when the input matches the 960 default", () => {
+  const options = buildExportOptions({
+    ...baseExportState,
+    format: "gif",
+    gifMaxWidth: 960,
+  });
+  assert.equal(options.gifMaxWidth, undefined);
+});
+
+test("buildExportOptions omits gifMaxWidth for mp4 format even with a width set", () => {
+  const options = buildExportOptions({
+    ...baseExportState,
+    format: "mp4",
+    gifMaxWidth: 500,
+  });
+  assert.equal(options.gifMaxWidth, undefined);
+});
+
+// ── resolveGifMaxWidthSubmission (pure "what to submit" resolution) ────────
+
+test("resolveGifMaxWidthSubmission: empty string is undefined", () => {
+  assert.equal(resolveGifMaxWidthSubmission("", "gif"), undefined);
+});
+
+test("resolveGifMaxWidthSubmission: undefined input is undefined", () => {
+  assert.equal(resolveGifMaxWidthSubmission(undefined, "gif"), undefined);
+});
+
+test("resolveGifMaxWidthSubmission: a value matching the 960 default is undefined", () => {
+  assert.equal(resolveGifMaxWidthSubmission("960", "gif"), undefined);
+  assert.equal(resolveGifMaxWidthSubmission(960, "gif"), undefined);
+});
+
+test("resolveGifMaxWidthSubmission: the 1920 ceiling passes through unchanged", () => {
+  assert.equal(resolveGifMaxWidthSubmission("1920", "gif"), 1920);
+});
+
+test("resolveGifMaxWidthSubmission: an in-range custom value passes through unchanged", () => {
+  assert.equal(resolveGifMaxWidthSubmission("500", "gif"), 500);
+});
+
+test("resolveGifMaxWidthSubmission: an out-of-range value clamps to the 1920 ceiling", () => {
+  assert.equal(resolveGifMaxWidthSubmission("5000", "gif"), 1920);
+});
+
+// Zero/negative input is clamped to 1 rather than treated as equivalent to
+// empty: a user who explicitly typed "0" gets a deterministic, in-range
+// value instead of silently reverting to the untouched default.
+test("resolveGifMaxWidthSubmission: zero clamps to 1", () => {
+  assert.equal(resolveGifMaxWidthSubmission("0", "gif"), 1);
+});
+
+test("resolveGifMaxWidthSubmission: a negative value clamps to 1", () => {
+  assert.equal(resolveGifMaxWidthSubmission("-50", "gif"), 1);
+});
+
+test("resolveGifMaxWidthSubmission: non-GIF format is always undefined regardless of value", () => {
+  assert.equal(resolveGifMaxWidthSubmission("500", "mp4"), undefined);
+  assert.equal(resolveGifMaxWidthSubmission("1920", "mp4"), undefined);
+  assert.equal(resolveGifMaxWidthSubmission(undefined, "mp4"), undefined);
 });
 
 test("platform row renders Manual plus one chip per export platform", () => {
