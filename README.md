@@ -83,7 +83,7 @@ Verified against the current codebase (`VERSION` / `package.json` `0.38.0.0`, 16
 - **Bounded transcript reads**: `openklip transcript grep`, `span`, `phrase` for agent discovery without dumping full transcripts
 - **Preview**: all-intra proxy; scheduler plays kept ranges only; compact center column (`max-w-2xl`)
 - **Editor layout**: Resizable right chat sidebar (340–760px, persisted); center column is preview with Properties/Settings below video; transcript toggle; timeline in a bottom drawer
-- **Agent chat**: `/` skills menu, inline skill tokens; skills route to the same tool surface as `openklip tools` on `project.json`; Claude applies edits via MCP; other agents answer or suggest commands
+- **Agent chat**: `/` skills menu, inline skill tokens; skills route to the same tool surface as `openklip tools` on `project.json`; the tool-calling edit prompt also advertises a skill index (id + description, capped at 20) the model can load in full with the read-only `load_skill` tool; Claude applies edits via MCP; other agents answer or suggest commands
 - **Asset cards**: `openklip analyze` or **Describe assets** in the asset bin runs per-asset subagents that write summary/tags/bestFor onto each b-roll/still so agents place media by meaning
 - **Cinema player**: fullscreen overlay with Linear-parity transport bar (`web/components/cinema-player.tsx`, `player-controls.tsx`)
 - **Preview cut transitions**: a decorative `glimm` WebGL sweep plays at each auto-advance cut boundary, matching `project.look.transition` (crossfade or dip); respects `prefers-reduced-motion`, degrades gracefully without WebGL, and now plays in the fullscreen cinema player too (`CinemaPlayer` gained its own `CutScheduler`, fixing a bug where it previously played every cut uncut); see [TODO.md](./TODO.md#known-limitations) for the visual-parity caveat versus the export side's ffmpeg transition
@@ -115,7 +115,7 @@ Verified against the current codebase (`VERSION` / `package.json` `0.38.0.0`, 16
 - **Browser project creation**: upload a video in the New Project dialog or drop one onto the empty workspace; format-validated on client and server, source persisted into the project folder, explicit overwrite confirm on name collisions, ingest progress overlay, editor opens on completion
 - **Workspace**: macOS folder picker on empty landing; inline project create; projects root persisted in `.openklip/projects-root`
 - **CLI**: full edit surface; `openklip actions --json` mutations manifest; `openklip tools --json` full agent tool list
-- **MCP server**: `openklip mcp` (stdio) exposes 75 tools across query, mutation, task progress, revert, and export surfaces; `.cursor/mcp.json` wired for Cursor
+- **MCP server**: `openklip mcp` (stdio) exposes 76 tools across query, mutation, task progress, revert, and export surfaces; `.cursor/mcp.json` wired for Cursor
 - **Edit templates**: `templates/<id>/skill.md` playbooks; `openklip template set`; brand presets at ingest (`openklip brand`)
 - **Agent selector**: drive filler cuts via Claude Code, Codex, Cursor, or Grok subscription CLIs
 - **Design system**: default shadcn/ui tokens with Base UI primitives (`app/globals.css`, `components.json`); light/dark via `.dark` class; icons via `web/lib/icon.tsx`
