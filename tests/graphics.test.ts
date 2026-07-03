@@ -16,6 +16,9 @@ test("listGraphics finds the bundled templates sorted by name", () => {
   const ids = list.map((g) => g.id);
   assert.ok(ids.includes("lower-third"));
   assert.ok(ids.includes("kinetic-caption"));
+  assert.ok(ids.includes("shader-dithering"));
+  assert.ok(ids.includes("shader-grain-gradient"));
+  assert.ok(ids.includes("shader-mesh-gradient"));
   assert.ok(ids.includes("title-card"));
   const names = list.map((g) => g.name);
   const sorted = [...names].sort((a, b) => a.localeCompare(b));
@@ -35,6 +38,12 @@ test("loadGraphicManifest validates the lower-third manifest", () => {
 test("title-card is a rich-kind manifest", () => {
   const m = loadGraphicManifest("title-card");
   assert.equal(m.kind, "rich");
+});
+
+test("shader manifests are rich-kind templates", () => {
+  assert.equal(loadGraphicManifest("shader-dithering").kind, "rich");
+  assert.equal(loadGraphicManifest("shader-grain-gradient").kind, "rich");
+  assert.equal(loadGraphicManifest("shader-mesh-gradient").kind, "rich");
 });
 
 test("loadGraphicManifest throws for an unknown template", () => {

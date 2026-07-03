@@ -1,0 +1,20 @@
+{
+  "id": "shader-dithering",
+  "name": "Shader Dithering",
+  "kind": "rich",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "params": {
+    "colors": {
+      "type": "string",
+      "default": "#ffffff, #0f172a",
+      "label": "Colors (back,front)"
+    },
+    "speed": { "type": "number", "default": 1, "label": "Speed" },
+    "scale": { "type": "number", "default": 1, "label": "Scale" },
+    "shape": { "type": "string", "default": "warp", "label": "Shape" },
+    "type": { "type": "string", "default": "4x4", "label": "Dither Type" },
+    "size": { "type": "number", "default": 2.5, "label": "Pixel Size" }
+  }
+}

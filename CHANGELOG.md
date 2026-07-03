@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.35.0.0 - 2026-07-03
+
+Paper Shaders are now first-class rich graphics in preview and export.
+
+### Added
+- **Paper Shaders graphic templates** (`graphics/shader-mesh-gradient`, `graphics/shader-grain-gradient`, `graphics/shader-dithering`): three new `kind: "rich"` templates for deterministic animated backgrounds, exposed through the existing `graphic-add` / `graphic-set` flow with manifest-driven params (`colors`, `speed`, plus shader-specific knobs).
+- **Shader runtime integration in shared graphic runtime** (`web/lib/graphic-runtime.ts`): added `data-shader` host support backed by `@paper-design/shaders` (`meshGradient`, `grainGradient`, `dithering`). Shader mounts are initialized from template params, color strings map to shader uniforms, and animation is frame-driven by `setFrame()` from OpenKlip's timeline frame to keep preview and export deterministic.
+- **Shader mapping tests** (`tests/graphic-runtime-shaders.test.ts`, `tests/graphics.test.ts`): unit coverage for params-to-uniform mapping and manifest discovery for the new bundled shader templates.
+
+### Changed
+- **Headless rich renderer WebGL flags** (`src/headless-render.ts`): Chrome launch args now enable WebGL with SwiftShader (`--enable-webgl`, `--use-angle=swiftshader`, `--enable-unsafe-swiftshader`, `--ignore-gpu-blocklist`) so shader templates render in headless export.
+- **Graphic overlay lifecycle cleanup** (`web/components/graphic-overlay.tsx`): composition mount and param application are now split so params update without remounting HTML, and shader mounts are disposed on overlay teardown.
+- **Version**: bumped OpenKlip to `0.35.0.0`.
+
 ## 0.34.0.0 - 2026-07-03
 
 Browser upload for multi-take ingest, closing the last CLI-only gap in the Takes panel.

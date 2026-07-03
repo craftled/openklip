@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   applyGraphicFrame,
   applyGraphicParams,
+  disposeGraphicRuntime,
   graphicFrameAt,
 } from "@/lib/graphic-runtime";
 
@@ -101,8 +102,23 @@ export function GraphicOverlay({
     stage.innerHTML = comp.html;
     rootRef.current =
       stage.querySelector<HTMLElement>("[data-graphic-root]") ?? stage;
-    applyGraphicParams(rootRef.current, graphic.params);
-  }, [comp, graphic.params]);
+    return () => {
+      if (rootRef.current) {
+        disposeGraphicRuntime(rootRef.current);
+      }
+      rootRef.current = null;
+      stage.innerHTML = "";
+    };
+  }, [comp, graphic.template]);
+
+  // Apply dynamic params without remounting the composition fragment.
+  useLayoutEffect(() => {
+    const root = rootRef.current;
+    if (!root) {
+      return;
+    }
+    applyGraphicParams(root, graphic.params);
+  }, [graphic.params]);
 
   // Keep the intrinsic stage scaled to fill the fluid preview box.
   useLayoutEffect(() => {
