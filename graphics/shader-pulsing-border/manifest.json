@@ -1,0 +1,40 @@
+{
+  "id": "shader-pulsing-border",
+  "name": "Shader Pulsing Border",
+  "kind": "rich",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "params": {
+    "colors": {
+      "type": "string",
+      "default": "#0dc1fd, #d915ef, #ff3f2e",
+      "label": "Border colors (comma-separated hex)"
+    },
+    "speed": {
+      "type": "number",
+      "default": 1,
+      "label": "Speed"
+    },
+    "scale": {
+      "type": "number",
+      "default": 0.6,
+      "label": "Scale"
+    },
+    "thickness": {
+      "type": "number",
+      "default": 0.1,
+      "label": "Thickness"
+    },
+    "roundness": {
+      "type": "number",
+      "default": 0.25,
+      "label": "Roundness"
+    },
+    "pulse": {
+      "type": "number",
+      "default": 0.25,
+      "label": "Pulse"
+    }
+  }
+}

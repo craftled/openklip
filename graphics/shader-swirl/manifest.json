@@ -1,0 +1,35 @@
+{
+  "id": "shader-swirl",
+  "name": "Shader Swirl",
+  "kind": "rich",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "params": {
+    "colors": {
+      "type": "string",
+      "default": "#ffd1d1, #ff8a8a, #660000",
+      "label": "Colors (comma-separated hex)"
+    },
+    "speed": {
+      "type": "number",
+      "default": 0.32,
+      "label": "Speed"
+    },
+    "scale": {
+      "type": "number",
+      "default": 1,
+      "label": "Scale"
+    },
+    "bandCount": {
+      "type": "number",
+      "default": 4,
+      "label": "Band count"
+    },
+    "twist": {
+      "type": "number",
+      "default": 0.1,
+      "label": "Twist"
+    }
+  }
+}

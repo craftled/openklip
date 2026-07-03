@@ -1,0 +1,40 @@
+{
+  "id": "shader-waves",
+  "name": "Shader Waves",
+  "kind": "rich",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "params": {
+    "colorFront": {
+      "type": "string",
+      "default": "#ffbb00",
+      "label": "Foreground"
+    },
+    "colorBack": {
+      "type": "string",
+      "default": "#000000",
+      "label": "Background"
+    },
+    "scale": {
+      "type": "number",
+      "default": 0.6,
+      "label": "Scale"
+    },
+    "frequency": {
+      "type": "number",
+      "default": 0.5,
+      "label": "Frequency"
+    },
+    "amplitude": {
+      "type": "number",
+      "default": 0.5,
+      "label": "Amplitude"
+    },
+    "spacing": {
+      "type": "number",
+      "default": 1.2,
+      "label": "Line spacing"
+    }
+  }
+}

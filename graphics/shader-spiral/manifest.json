@@ -1,0 +1,40 @@
+{
+  "id": "shader-spiral",
+  "name": "Shader Spiral",
+  "kind": "rich",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "params": {
+    "colorFront": {
+      "type": "string",
+      "default": "#ffffff",
+      "label": "Ink"
+    },
+    "colorBack": {
+      "type": "string",
+      "default": "#0a0a12",
+      "label": "Background"
+    },
+    "speed": {
+      "type": "number",
+      "default": 1,
+      "label": "Speed"
+    },
+    "scale": {
+      "type": "number",
+      "default": 1,
+      "label": "Scale"
+    },
+    "strokeWidth": {
+      "type": "number",
+      "default": 0.5,
+      "label": "Stroke width"
+    },
+    "distortion": {
+      "type": "number",
+      "default": 0.3,
+      "label": "Distortion"
+    }
+  }
+}

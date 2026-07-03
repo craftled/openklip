@@ -1,0 +1,40 @@
+{
+  "id": "shader-gem-smoke",
+  "name": "Shader Gem Smoke",
+  "kind": "rich",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "params": {
+    "colors": {
+      "type": "string",
+      "default": "#333333, #e7e6df",
+      "label": "Smoke colors (comma-separated hex)"
+    },
+    "speed": {
+      "type": "number",
+      "default": 1,
+      "label": "Speed"
+    },
+    "scale": {
+      "type": "number",
+      "default": 0.6,
+      "label": "Scale"
+    },
+    "shape": {
+      "type": "string",
+      "default": "diamond",
+      "label": "Shape (circle, daisy, diamond, metaballs)"
+    },
+    "innerGlow": {
+      "type": "number",
+      "default": 1,
+      "label": "Inner glow"
+    },
+    "outerGlow": {
+      "type": "number",
+      "default": 0.55,
+      "label": "Outer glow"
+    }
+  }
+}

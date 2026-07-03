@@ -1,0 +1,35 @@
+{
+  "id": "shader-metaballs",
+  "name": "Shader Metaballs",
+  "kind": "rich",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "params": {
+    "colors": {
+      "type": "string",
+      "default": "#6e33cc, #ff5500, #ffc105, #f585ff",
+      "label": "Colors (comma-separated hex)"
+    },
+    "speed": {
+      "type": "number",
+      "default": 1,
+      "label": "Speed"
+    },
+    "scale": {
+      "type": "number",
+      "default": 1,
+      "label": "Scale"
+    },
+    "count": {
+      "type": "number",
+      "default": 10,
+      "label": "Ball count"
+    },
+    "size": {
+      "type": "number",
+      "default": 0.83,
+      "label": "Ball size"
+    }
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "id": "shader-liquid-metal",
+  "name": "Shader Liquid Metal",
+  "kind": "rich",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "params": {
+    "colorBack": {
+      "type": "string",
+      "default": "#AAAAAC",
+      "label": "Background"
+    },
+    "colorTint": {
+      "type": "string",
+      "default": "#ffffff",
+      "label": "Tint"
+    },
+    "speed": {
+      "type": "number",
+      "default": 1,
+      "label": "Speed"
+    },
+    "scale": {
+      "type": "number",
+      "default": 0.6,
+      "label": "Scale"
+    },
+    "shape": {
+      "type": "string",
+      "default": "diamond",
+      "label": "Shape (circle, daisy, diamond, metaballs)"
+    },
+    "distortion": {
+      "type": "number",
+      "default": 0.07,
+      "label": "Distortion"
+    },
+    "repetition": {
+      "type": "number",
+      "default": 2,
+      "label": "Stripe repetition"
+    }
+  }
+}

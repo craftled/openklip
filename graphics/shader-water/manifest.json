@@ -1,0 +1,40 @@
+{
+  "id": "shader-water",
+  "name": "Shader Water",
+  "kind": "rich",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "params": {
+    "colorBack": {
+      "type": "string",
+      "default": "#909090",
+      "label": "Background"
+    },
+    "colorHighlight": {
+      "type": "string",
+      "default": "#ffffff",
+      "label": "Highlight"
+    },
+    "speed": {
+      "type": "number",
+      "default": 1,
+      "label": "Speed"
+    },
+    "scale": {
+      "type": "number",
+      "default": 0.8,
+      "label": "Scale"
+    },
+    "caustic": {
+      "type": "number",
+      "default": 0.1,
+      "label": "Caustic"
+    },
+    "waves": {
+      "type": "number",
+      "default": 0.3,
+      "label": "Waves"
+    }
+  }
+}
