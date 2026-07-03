@@ -144,8 +144,8 @@ export function CleanupPanel({
 
   return (
     <div className="flex flex-col gap-2" data-cleanup-panel>
-      <div className="flex flex-wrap items-center justify-between gap-1.5">
-        <div className="flex items-center gap-1.5" data-cleanup-count>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2" data-cleanup-count>
           <Badge variant="secondary">
             {plural(report.fillerCount, "filler", "fillers")}
           </Badge>
@@ -174,7 +174,7 @@ export function CleanupPanel({
               className="flex items-start gap-1.5 text-muted-foreground text-xs"
               key={warning}
             >
-              <IconAlertTriangle className="mt-0.5 size-3.5 shrink-0 text-amber-500" />
+              <IconAlertTriangle className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
               <span>{warning}</span>
             </li>
           ))}
@@ -212,7 +212,7 @@ export function CleanupPanel({
           <ul className="flex max-h-32 flex-col gap-1 overflow-y-auto">
             {registeredSpans.map((span) => (
               <li
-                className="flex items-center gap-2 rounded-md border bg-background/50 px-2 py-1"
+                className="flex items-center gap-2 rounded-md border bg-background/50 px-2 py-1.5"
                 data-dead-air-span
                 key={span.id}
               >

@@ -59,10 +59,8 @@ function formatResetDate(value: string | null): string {
 function DetailItem({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex min-w-0 flex-col gap-0.5 rounded-md border border-border bg-muted/20 px-2 py-1.5">
-      <span className="text-[10px] text-muted-foreground uppercase">
-        {label}
-      </span>
-      <span className="truncate text-[12px] text-foreground">{value}</span>
+      <span className="text-muted-foreground text-xs uppercase">{label}</span>
+      <span className="truncate text-foreground text-xs">{value}</span>
     </div>
   );
 }
@@ -197,11 +195,7 @@ export function SettingsIntegrationsPanel() {
             <span className="flex items-center gap-2">
               <span>ElevenLabs</span>
               <Badge
-                className={
-                  status.elevenLabs.hasApiKey
-                    ? "h-4 border-emerald-500/30 bg-emerald-500/10 px-1.5 text-[10px] text-emerald-700 dark:text-emerald-300"
-                    : "h-4 px-1.5 text-[10px]"
-                }
+                className="h-4 px-1.5 text-xs"
                 variant={status.elevenLabs.hasApiKey ? "outline" : "secondary"}
               >
                 {isLoading
@@ -296,7 +290,7 @@ export function SettingsIntegrationsPanel() {
               </div>
             ) : null}
             {details?.voices.length ? (
-              <p className="text-[12px] text-muted-foreground">
+              <p className="text-muted-foreground text-xs">
                 Voices: {details.voices.join(", ")}
               </p>
             ) : null}
@@ -304,10 +298,8 @@ export function SettingsIntegrationsPanel() {
               <p
                 className={
                   error || testStatus?.ok === false
-                    ? "text-[12px] text-destructive"
-                    : testStatus?.ok
-                      ? "text-[12px] text-emerald-700 dark:text-emerald-300"
-                      : "text-[12px] text-muted-foreground"
+                    ? "text-destructive text-xs"
+                    : "text-muted-foreground text-xs"
                 }
               >
                 {error ?? testStatus?.message ?? updatedAt}
@@ -396,11 +388,7 @@ function ReveIntegrationRow({
         <span className="flex items-center gap-2">
           <span>Reve</span>
           <Badge
-            className={
-              status.hasApiKey
-                ? "h-4 border-emerald-500/30 bg-emerald-500/10 px-1.5 text-[10px] text-emerald-700 dark:text-emerald-300"
-                : "h-4 px-1.5 text-[10px]"
-            }
+            className="h-4 px-1.5 text-xs"
             variant={status.hasApiKey ? "outline" : "secondary"}
           >
             {isLoading
@@ -462,10 +450,8 @@ function ReveIntegrationRow({
           <p
             className={
               error || testStatus?.ok === false
-                ? "text-[12px] text-destructive"
-                : testStatus?.ok
-                  ? "text-[12px] text-emerald-700 dark:text-emerald-300"
-                  : "text-[12px] text-muted-foreground"
+                ? "text-destructive text-xs"
+                : "text-muted-foreground text-xs"
             }
           >
             {error ?? testStatus?.message ?? updatedAt}
