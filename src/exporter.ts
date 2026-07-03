@@ -1204,6 +1204,7 @@ export async function exportCut(
           template: x.graphic.template,
           compositionHtml: x.compositionHtml,
           params: x.params,
+          keyframes: x.graphic.keyframes,
           durationSamples: x.durationSamples,
           fps: outFps,
           width: outW,

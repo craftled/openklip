@@ -8,6 +8,15 @@
 // from it (frame-purity, Remotion-style). No wall-clock, no CSS transitions,
 // no animation keyframes. Those desync from frame-stepped export.
 import { cubicBezier, easeInOut, easeOut } from "motion";
+import type { Keyframe } from "../../src/keyframes.ts";
+import { evaluateKeyframes } from "../../src/keyframes.ts";
+
+export interface GraphicFrameOptions {
+  height: number;
+  keyframes?: Keyframe[];
+  sampleOffset?: number;
+  width: number;
+}
 
 export type EaseName = "easeOut" | "easeInOut" | "spring";
 
@@ -113,12 +122,14 @@ export function applyGraphicParams(
 
 // Compute and write opacity/transform/clip-path for each animated child from a
 // single frame number. Called once per preview rAF tick and once per export
-// frame, so the visual result is bit-identical across both.
+// frame, so the visual result is bit-identical across both. Optional keyframes
+// apply a wrapper transform on [data-graphic-root] on top of child data-anim.
 export function applyGraphicFrame(
   root: HTMLElement,
   frame: number,
   durFrames: number,
-  height: number
+  height: number,
+  options?: GraphicFrameOptions
 ): void {
   const children = root.querySelectorAll<HTMLElement>("[data-anim]");
   for (const el of Array.from(children)) {
@@ -161,6 +172,47 @@ export function applyGraphicFrame(
       el.style.clipPath = clip;
     }
   }
+
+  applyKeyframeWrapper(root, height, options);
+}
+
+function applyKeyframeWrapper(
+  root: HTMLElement,
+  height: number,
+  options?: GraphicFrameOptions
+): void {
+  const graphicRoot = root.matches("[data-graphic-root]")
+    ? root
+    : root.querySelector<HTMLElement>("[data-graphic-root]");
+  if (!graphicRoot) {
+    return;
+  }
+
+  const keyframes = options?.keyframes;
+  if (!keyframes?.length || options?.sampleOffset === undefined) {
+    graphicRoot.style.opacity = "";
+    graphicRoot.style.transform = "";
+    return;
+  }
+
+  const width = options.width;
+  const props = evaluateKeyframes(keyframes, options.sampleOffset);
+  const opacity = props.opacity ?? 1;
+  const scale = props.scale ?? 1;
+  const x = props.x ?? 0;
+  const y = props.y ?? 0;
+  graphicRoot.style.opacity = String(opacity);
+  graphicRoot.style.transform = `translate(${x * width}px, ${y * height}px) scale(${scale})`;
+}
+
+// Map an overlay-local frame index to the canonical sample offset used by
+// evaluateKeyframes. Matches graphicFrameAt's floor quantization in reverse.
+export function graphicSampleOffsetAt(
+  frame: number,
+  sampleRate: number,
+  fps: number
+): number {
+  return Math.floor((frame * sampleRate) / fps);
 }
 
 // Derive the frame/time fields from the canonical sample grid. Pinned here so
