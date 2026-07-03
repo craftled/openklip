@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.32.0.0 - 2026-07-03
+
+Cinema player cut-skip fix, GIF export caps, audio de-essing, and a history actor filter.
+
+### Fixed
+- **CinemaPlayer cut-skip bug** (`web/components/cinema-player.tsx`, `web/scheduler.ts`, `src/schedulerLogic.ts`): the fullscreen cinema preview had zero cut-skip logic and played the raw, uncut proxy start to finish, showing every deleted word or range, despite being a `[x]`-marked-shipped feature. `CinemaPlayer` now drives its own `CutScheduler` instance (reusing the existing class, not a second implementation) from the same `getRanges`/`getTransition` data `web/app.tsx` already computes for the inline preview, so both surfaces skip cuts identically and now share the Glimm cut-transition sweep (previously wired into the inline preview only, v0.31.0.0). This also fixed a downstream bug where titles/captions/graphics overlays were keyed against raw source time instead of post-cut-jump source time. The pure kept-range/cut-space position math (`outputPositionSec`/`sourceSecForOutputPosition`) moved out of `web/app.tsx` into shared `src/schedulerLogic.ts` so both preview surfaces use one implementation. `CutScheduler` gained a `.dispose()` method (closes its `AudioContext`) since CinemaPlayer's video element mounts and unmounts repeatedly (toolbar open/close), unlike the inline preview's.
+- **GIF export size and duration cap** (`src/exporter.ts`): `GIF_MAX_WIDTH_PX` (960), `GIF_MAX_FPS` (15), and `GIF_MAX_DURATION_SEC` (300, 5 minutes) bound the GIF-specific second ffmpeg pass (`clampGifDimensions`, aspect-preserving); the mp4 pipeline is completely unaffected. An export with `format: "gif"` whose kept duration exceeds 5 minutes now throws a clear error before any ffmpeg work runs, telling the user to trim the cut or export mp4 instead. `ExportResult.gif` reports the width/height/fps actually used and whether they were capped.
+
+### Added
+- **Audio de-essing** (`src/edl.ts`, `src/actions.ts`, `src/exporter.ts`, `src/export-segments.ts`): `project.audio.deEsser` (`enabled`, `intensity` 0-1, default 0.5) runs ffmpeg's bundled `deesser` filter on the voice bus, after highpass and noise reduction in the filter chain (highpass -> afftdn -> deesser), on both the plain voice-affix path and the VAD-snap-crossfade seamed path. `openklip audio <slug> --deess on|off --deess-intensity <0-1>`; the MCP `audio` action's Zod schema gained a bounds-checked `deEsser` field; the GUI Audio section gained a De-essing toggle and intensity slider. Only `intensity` is exposed; the filter's frequency (`f`) and output-mode (`s`) parameters stay hardcoded to ffmpeg's own defaults.
+- **History actor filter** (`src/agent-tools.ts`, `src/cli.ts`): MCP `history_list` gained `actor` (`human | agent | cli | mcp | system`, a new exported `HISTORY_ACTORS` tuple mirroring the real `Actor` union); `openklip history <slug> --actor <name>` combines with `--task`/`--action` (AND semantics), and the "no history entries match the filter" message lists `--actor=<name>` when relevant. The GUI History panel filter UI was not touched (CLI/MCP-only, scoped deliberately).
+
+### Changed
+- **Version**: bumped OpenKlip to `0.32.0.0`.
+
 ## 0.31.0.0 - 2026-07-03
 
 Real glimm preview cut transitions, closing the gap the entry below corrected.
