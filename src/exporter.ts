@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, rename, unlink } from "node:fs/promises";
 import { dirname, isAbsolute, join } from "node:path";
@@ -1425,13 +1426,27 @@ export async function exportCut(
         ...richGraphics.flatMap((rg) => ["-i", rg.asset.assetPath]),
         ...musicGraph.inputArgs,
       ];
-  // Render to a unique tmp sibling, then rename over out.mp4 on success:
-  // ffmpeg writing p.out in place means a GUI export racing an agent export
-  // corrupts the file both are writing. The tmp name KEEPS the .mp4
-  // extension so ffmpeg still infers the mp4 container from it.
+  // Render to unique tmp siblings, then rename only the final deliverable into
+  // place on success. ffmpeg writing the public output path in place means a
+  // GUI export racing an agent export can corrupt that file. GIF export also
+  // needs the intermediate mp4 to stay private until the second pass succeeds.
   const destOut = opts.outPath ?? p.out;
-  await mkdir(dirname(destOut), { recursive: true });
-  const tmpOut = join(p.output, `.out-tmp-${process.pid}-${Date.now()}.mp4`);
+  const destDir = dirname(destOut);
+  await mkdir(destDir, { recursive: true });
+  const tmpBase = join(
+    destDir,
+    `.out-tmp-${process.pid}-${Date.now()}-${randomUUID()}`
+  );
+  const tmpOut = `${tmpBase}.mp4`;
+  const tmpGifOut = `${tmpBase}.gif`;
+  const effectiveFormat: ExportFormat = resolved.format ?? "mp4";
+  const gifOut =
+    effectiveFormat === "gif"
+      ? destOut.toLowerCase().endsWith(".mp4")
+        ? `${destOut.slice(0, -4)}.gif`
+        : `${destOut}.gif`
+      : undefined;
+  let finalOut = destOut;
   try {
     await run(
       FFMPEG,
@@ -1459,50 +1474,45 @@ export async function exportCut(
       ],
       "ffmpeg(export)"
     );
-    await rename(tmpOut, destOut);
-  } catch (e) {
-    try {
-      await unlink(tmpOut);
-    } catch {
-      // Best-effort: ffmpeg may have failed before creating the tmp file.
-    }
-    throw e;
-  }
 
-  // GIF is a second, independent pass over the just-rendered mp4: the
-  // filter_complex/encode pipeline above never changes for format: "gif", so
-  // an mp4 export (the default) is byte-for-byte unaffected by this branch.
-  // Reuses the proven palettegen(stats_mode=diff)/paletteuse(dither=bayer)
-  // pattern from scripts/record-demo-gif.sh, adapted to this export's own
-  // resolved fps/width instead of that script's fixed demo-asset values.
-  // GIFs have no audio track; the -vf output here has no audio map, so the
-  // conversion naturally drops it without touching the main audio filters.
-  const effectiveFormat: ExportFormat = resolved.format ?? "mp4";
-  let finalOut = destOut;
-  if (effectiveFormat === "gif") {
-    const gifOut = destOut.toLowerCase().endsWith(".mp4")
-      ? `${destOut.slice(0, -4)}.gif`
-      : `${destOut}.gif`;
-    await run(
-      FFMPEG,
-      [
-        "-y",
-        "-i",
-        destOut,
-        "-vf",
-        `fps=${outFps},scale=${outW}:-1:flags=lanczos,split[s0][s1];[s0]palettegen=stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=3`,
-        "-loop",
-        "0",
-        gifOut,
-      ],
-      "ffmpeg(export-gif)"
-    );
-    try {
-      await unlink(destOut);
-    } catch {
-      // Best-effort: the mp4 is only an intermediate once the gif exists.
+    // GIF is a second, independent pass over the just-rendered private mp4:
+    // the filter_complex/encode pipeline above never changes for format:
+    // "gif", so an mp4 export (the default) is byte-for-byte unaffected by
+    // this branch. Reuses the proven palettegen(stats_mode=diff)/paletteuse
+    // (dither=bayer) pattern from scripts/record-demo-gif.sh, adapted to this
+    // export's own resolved fps/width. GIFs have no audio track; the -vf output
+    // here has no audio map, so conversion naturally drops it.
+    if (effectiveFormat === "gif") {
+      await run(
+        FFMPEG,
+        [
+          "-y",
+          "-i",
+          tmpOut,
+          "-vf",
+          `fps=${outFps},scale=${outW}:-1:flags=lanczos,split[s0][s1];[s0]palettegen=stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=3`,
+          "-loop",
+          "0",
+          tmpGifOut,
+        ],
+        "ffmpeg(export-gif)"
+      );
+      await rename(tmpGifOut, gifOut as string);
+      try {
+        await unlink(tmpOut);
+      } catch {
+        // Best-effort: the mp4 is only an intermediate once the gif exists.
+      }
+      finalOut = gifOut as string;
+    } else {
+      await rename(tmpOut, destOut);
     }
-    finalOut = gifOut;
+  } catch (e) {
+    await Promise.all([
+      unlink(tmpOut).catch(() => undefined),
+      unlink(tmpGifOut).catch(() => undefined),
+    ]);
+    throw e;
   }
 
   return {

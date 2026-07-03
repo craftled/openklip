@@ -1,4 +1,4 @@
-import { toast as sonnerToast } from "sonner";
+import { type ExternalToast, toast as sonnerToast } from "sonner";
 import {
   assetRemovedToast,
   assetRemoveFailedToast,
@@ -27,9 +27,8 @@ import {
 
 export type { ToastPayload } from "@/lib/toast-notifications";
 
-interface ToastOptions {
-  description?: string;
-}
+type ToastOptions = Pick<ExternalToast, "action" | "description" | "duration">;
+type ToastExtraOptions = Omit<ToastOptions, "description">;
 
 export interface ToastBackend {
   dismiss: (id: string | number) => void;
@@ -41,7 +40,8 @@ export interface ToastBackend {
 }
 
 export interface ToastRecorderCall {
-  description?: string;
+  action?: ToastOptions["action"];
+  description?: ToastOptions["description"];
   method: keyof Pick<ToastBackend, "error" | "info" | "loading" | "success">;
   title: string;
 }
@@ -63,29 +63,35 @@ export function createToastRecorder(): {
   calls: ToastRecorderCall[];
 } {
   const calls: ToastRecorderCall[] = [];
+  const record = (
+    method: ToastRecorderCall["method"],
+    title: string,
+    options?: ToastOptions
+  ) => {
+    const call: ToastRecorderCall = { method, title };
+    if (options?.description !== undefined) {
+      call.description = options.description;
+    }
+    if (options?.action !== undefined) {
+      call.action = options.action;
+    }
+    calls.push(call);
+  };
   const backend: ToastBackend = {
     dismiss: () => undefined,
     error: (title, options) => {
-      calls.push({ method: "error", title, description: options?.description });
+      record("error", title, options);
     },
     info: (title, options) => {
-      calls.push({ method: "info", title, description: options?.description });
+      record("info", title, options);
     },
     loading: (title, options) => {
-      calls.push({
-        method: "loading",
-        title,
-        description: options?.description,
-      });
+      record("loading", title, options);
       return calls.length;
     },
     promise: sonnerToast.promise,
     success: (title, options) => {
-      calls.push({
-        method: "success",
-        title,
-        description: options?.description,
-      });
+      record("success", title, options);
     },
   };
   return { backend, calls };
@@ -123,23 +129,49 @@ function show(payload: ToastPayload): void {
   applyToastPayload(toastBackend, payload);
 }
 
-export function toastError(title: string, description?: string): void {
-  toastBackend.error(title, description ? { description } : undefined);
+function toastOptions(
+  description?: string,
+  options?: ToastExtraOptions
+): ToastOptions | undefined {
+  if (!(description || options)) {
+    return;
+  }
+  return {
+    ...options,
+    ...(description ? { description } : {}),
+  };
 }
 
-export function toastSuccess(title: string, description?: string): void {
-  toastBackend.success(title, description ? { description } : undefined);
+export function toastError(
+  title: string,
+  description?: string,
+  options?: ToastExtraOptions
+): void {
+  toastBackend.error(title, toastOptions(description, options));
 }
 
-export function toastInfo(title: string, description?: string): void {
-  toastBackend.info(title, description ? { description } : undefined);
+export function toastSuccess(
+  title: string,
+  description?: string,
+  options?: ToastExtraOptions
+): void {
+  toastBackend.success(title, toastOptions(description, options));
+}
+
+export function toastInfo(
+  title: string,
+  description?: string,
+  options?: ToastExtraOptions
+): void {
+  toastBackend.info(title, toastOptions(description, options));
 }
 
 export function toastLoading(
   title: string,
-  description?: string
+  description?: string,
+  options?: ToastExtraOptions
 ): string | number {
-  return toastBackend.loading(title, description ? { description } : undefined);
+  return toastBackend.loading(title, toastOptions(description, options));
 }
 
 export function toastDismiss(id: string | number): void {

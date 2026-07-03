@@ -3,6 +3,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   statSync,
@@ -1365,6 +1366,30 @@ test("exportCut with format: gif produces a .gif, no leftover mp4, and ExportRes
       .subarray(0, 3)
       .toString("ascii");
     assert.equal(header, "GIF", "output should start with the GIF magic bytes");
+  });
+});
+
+test("exportCut with format: gif keeps public outputs untouched when final publish fails (smoke)", {
+  skip: FFMPEG_OK ? false : "ffmpeg binary unavailable",
+}, async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    const p = projectPaths(slug);
+    const src = join(p.dir, "source.mp4");
+    await writeGifSmokeSource(src, "ffmpeg(export-gif-atomic-failure-clip)");
+    writeGifSmokeFixture(slug, src);
+
+    mkdirSync(join(p.output, "out.gif"));
+
+    await assert.rejects(() => exportCut(slug, { format: "gif" }));
+    assert.ok(
+      !existsSync(p.out),
+      "intermediate mp4 should not be published on gif failure"
+    );
+    assert.deepEqual(
+      readdirSync(p.output).filter((name) => name.startsWith(".out-tmp-")),
+      [],
+      "temporary export files should be cleaned up after failure"
+    );
   });
 });
 

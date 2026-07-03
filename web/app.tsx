@@ -150,10 +150,13 @@ import {
   subscribeDefaultAgent,
 } from "@/lib/agent-preferences";
 import {
+  toastError,
+  toastInfo,
   toastNothingToPlay,
   toastPlaybackFailed,
   toastPromise,
   toastSaveError,
+  toastSuccess,
 } from "@/lib/app-toast";
 import type { AssetBinUpdate } from "@/lib/asset-bin-update";
 import { type DeadAirItem, reconcileDeadAirItems } from "@/lib/dead-air-state";
@@ -1998,36 +2001,55 @@ export function App({
     }
     setExporting(true);
     try {
-      await toastPromise(
-        (async () => {
-          await saveChainRef.current;
-          if (saveErrorRef.current) {
-            throw new Error(saveErrorRef.current);
-          }
-          const r = await exportProject(project.slug, {
-            compression: options?.compression,
-            format: options?.format,
-            fps:
-              options?.frameRate === "source" ? undefined : options?.frameRate,
-            maxHeight,
-            platform: options?.platform,
-          });
-          if (!r.ok) {
-            throw new Error(r.error);
-          }
-          // Destination is a client-only, post-export action: the export
-          // itself always renders to output/ regardless of destination, this
-          // only additionally copies the rendered file's absolute path so a
-          // user can paste it elsewhere. Guarded like the transcript-copy
-          // precedent in editor-transcript-panel.tsx since navigator.clipboard
-          // is unavailable outside a secure browser context.
-          if (options?.destination === "clipboard") {
-            void navigator.clipboard?.writeText(r.data.out);
-          }
-          return r.data;
-        })(),
-        exportPromiseMessages()
-      );
+      const exportRun = (async () => {
+        await saveChainRef.current;
+        if (saveErrorRef.current) {
+          throw new Error(saveErrorRef.current);
+        }
+        const r = await exportProject(project.slug, {
+          compression: options?.compression,
+          format: options?.format,
+          fps: options?.frameRate === "source" ? undefined : options?.frameRate,
+          maxHeight,
+          platform: options?.platform,
+        });
+        if (!r.ok) {
+          throw new Error(r.error);
+        }
+        return r.data;
+      })();
+
+      void toastPromise(exportRun, exportPromiseMessages());
+      const result = await exportRun;
+      if (options?.destination === "clipboard") {
+        toastInfo("Export path ready", result.out, {
+          duration: 15_000,
+          action: {
+            label: "Copy path",
+            onClick: () => {
+              const clipboard = navigator.clipboard;
+              if (!clipboard) {
+                toastError(
+                  "Clipboard unavailable",
+                  "Copy the path from the export toast."
+                );
+                return;
+              }
+              void clipboard
+                .writeText(result.out)
+                .then(() => toastSuccess("Path copied", result.out))
+                .catch((error) =>
+                  toastError(
+                    "Could not copy path",
+                    error instanceof Error ? error.message : String(error)
+                  )
+                );
+            },
+          },
+        });
+      }
+    } catch {
+      // toastPromise owns the export failure toast.
     } finally {
       setExporting(false);
     }
