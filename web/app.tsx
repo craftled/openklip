@@ -2484,7 +2484,7 @@ export function App({
           </div>
           <Button
             aria-label={configCloseLabel}
-            className="size-8 text-muted-foreground"
+            className="text-muted-foreground"
             onClick={() => {
               if (mobileRightPanel === "config") {
                 setMobileRightPanel(null);
@@ -3663,7 +3663,7 @@ export function App({
                             />
                             <video
                               className={cn(
-                                "absolute z-[1] bg-black object-cover",
+                                "absolute z-0 bg-black object-cover",
                                 activeCoverBroll
                                   ? "inset-0 block h-full w-full"
                                   : activePipBroll
@@ -3685,7 +3685,7 @@ export function App({
                             <SafeAreaGuides platform={safeAreaGuide} />
                             {vignetteOn && (
                               <div
-                                className="pointer-events-none absolute inset-0 z-[2]"
+                                className="pointer-events-none absolute inset-0 z-10"
                                 style={{
                                   background:
                                     "radial-gradient(ellipse at center, transparent 42%, rgba(0,0,0,0.62) 100%)",
@@ -3703,7 +3703,7 @@ export function App({
                             />
                             <CutTransitionSweep ref={sweepRef} />
                             {(exporting || pendingSaves > 0) && (
-                              <div className="pointer-events-none absolute top-2 right-2 z-[5] flex items-center gap-1.5 rounded-md bg-black/70 px-2 py-1 font-medium text-white text-xs backdrop-blur">
+                              <div className="pointer-events-none absolute top-2 right-2 z-20 flex items-center gap-1.5 rounded-md bg-black/70 px-2 py-1 font-medium text-white text-xs backdrop-blur">
                                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
                                 {exporting ? "Exporting…" : "Rebuilding…"}
                               </div>
@@ -3711,7 +3711,7 @@ export function App({
                             {/* Linear-parity transport, shared with the cinema overlay */}
                             <PlayerControls
                               captionsOn={captionsOn}
-                              className="absolute inset-x-0 bottom-0 z-[6] px-3 pb-2 opacity-0 transition-opacity duration-200 ease-out focus-within:opacity-100 group-hover/preview:opacity-100"
+                              className="absolute inset-x-0 bottom-0 z-30 px-3 pb-2 opacity-0 transition-opacity duration-200 ease-out focus-within:opacity-100 group-hover/preview:opacity-100"
                               current={outPos}
                               duration={keptDuration}
                               fullscreenLabel="Open cinema player"

@@ -8,6 +8,8 @@ import type { SkillEntry } from "@/lib/skills-catalog";
 import { cn } from "@/lib/utils";
 
 interface AgentSkillTokenFieldProps {
+  ariaControls?: string;
+  ariaExpanded?: boolean;
   className?: string;
   disabled?: boolean;
   onClearSkills: () => void;
@@ -17,6 +19,8 @@ interface AgentSkillTokenFieldProps {
 }
 
 export function AgentSkillTokenField({
+  ariaControls,
+  ariaExpanded,
   className,
   disabled,
   onClearSkills,
@@ -81,6 +85,8 @@ export function AgentSkillTokenField({
         </span>
       ))}
       <PromptInputTextarea
+        aria-controls={ariaControls}
+        aria-expanded={ariaExpanded}
         className="min-h-0 min-w-[8ch] flex-1 border-0 p-0 py-0 text-left shadow-none placeholder:text-left focus-visible:ring-0"
         disabled={disabled}
         onKeyDown={handleKeyDown}

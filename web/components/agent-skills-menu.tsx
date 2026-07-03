@@ -1,7 +1,9 @@
 "use client";
 
+import { Popover as PopoverPrimitive } from "@base-ui/react/popover";
 import {
   type KeyboardEvent,
+  type MouseEvent,
   type ReactNode,
   useCallback,
   useEffect,
@@ -17,11 +19,6 @@ import {
   PromptInputCommandList,
 } from "@/components/ai-elements/prompt-input";
 import { Badge } from "@/components/ui/badge";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { APP_ICON_CLASS, Box } from "@/lib/icon";
 import {
   filterSkills,
@@ -35,6 +32,7 @@ interface AgentSkillsMenuProps {
   className?: string;
   embedded?: boolean;
   highlightedIndex?: number;
+  id?: string;
   onHighlight?: (index: number) => void;
   onSelect: (skill: SkillEntry) => void;
   open: boolean;
@@ -45,6 +43,7 @@ interface AgentSkillsMenuProps {
 function SkillsMenuPanel({
   className,
   highlightedIndex = -1,
+  id,
   onHighlight,
   onSelect,
   query,
@@ -52,12 +51,16 @@ function SkillsMenuPanel({
 }: {
   className?: string;
   highlightedIndex?: number;
+  id?: string;
   onHighlight?: (index: number) => void;
   onSelect: (skill: SkillEntry) => void;
   query: string;
   skills: SkillEntry[];
 }) {
   const filtered = useMemo(() => filterSkills(skills, query), [query, skills]);
+  const handleItemMouseDown = useCallback((event: MouseEvent<HTMLElement>) => {
+    event.preventDefault();
+  }, []);
 
   return (
     <div className={cn("overflow-hidden text-popover-foreground", className)}>
@@ -67,7 +70,7 @@ function SkillsMenuPanel({
         </p>
       </div>
       <PromptInputCommand shouldFilter={false}>
-        <PromptInputCommandList className="max-h-72">
+        <PromptInputCommandList className="max-h-72" id={id}>
           {filtered.length === 0 ? (
             <PromptInputCommandEmpty className="py-4 text-left text-sm">
               No skills match.
@@ -79,6 +82,7 @@ function SkillsMenuPanel({
                   className="items-start gap-3 py-2.5"
                   data-highlighted={index === highlightedIndex ? "" : undefined}
                   key={skill.id}
+                  onMouseDown={handleItemMouseDown}
                   onMouseEnter={() => onHighlight?.(index)}
                   onSelect={() => onSelect(skill)}
                   value={`${skill.title} ${skill.description} ${skill.slash}`}
@@ -113,6 +117,7 @@ export function AgentSkillsMenu({
   className,
   embedded = false,
   highlightedIndex = -1,
+  id,
   onHighlight,
   onSelect,
   open,
@@ -124,6 +129,7 @@ export function AgentSkillsMenu({
       <SkillsMenuPanel
         className={cn("rounded-lg bg-popover", className)}
         highlightedIndex={highlightedIndex}
+        id={id}
         onHighlight={onHighlight}
         onSelect={onSelect}
         query={query}
@@ -133,9 +139,10 @@ export function AgentSkillsMenu({
   }
 
   return (
-    <DropdownMenu modal={false} open={open}>
+    <PopoverPrimitive.Root modal={false} open={open}>
       <div className="relative w-full">
-        <DropdownMenuTrigger
+        <PopoverPrimitive.Trigger
+          nativeButton={false}
           render={
             <div
               aria-hidden
@@ -145,23 +152,33 @@ export function AgentSkillsMenu({
         />
         {children}
       </div>
-      <DropdownMenuContent
-        align="start"
-        className={cn(
-          "w-[min(100vw-2rem,28rem)] overflow-hidden p-0",
-          className
-        )}
-        side="top"
-      >
-        <SkillsMenuPanel
-          highlightedIndex={highlightedIndex}
-          onHighlight={onHighlight}
-          onSelect={onSelect}
-          query={query}
-          skills={skills}
-        />
-      </DropdownMenuContent>
-    </DropdownMenu>
+      <PopoverPrimitive.Portal>
+        <PopoverPrimitive.Positioner
+          align="start"
+          className="isolate z-50 outline-none"
+          side="top"
+          sideOffset={4}
+        >
+          <PopoverPrimitive.Popup
+            className={cn(
+              "data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:fade-in-0 data-open:zoom-in-95 data-closed:fade-out-0 data-closed:zoom-out-95 z-50 max-h-(--available-height) w-[min(100vw-2rem,28rem)] origin-(--transform-origin) overflow-y-auto overflow-x-hidden rounded-lg bg-popover p-0 text-popover-foreground shadow-md outline-none ring-1 ring-foreground/10 duration-100 data-closed:animate-out data-open:animate-in data-closed:overflow-hidden",
+              className
+            )}
+            finalFocus={false}
+            initialFocus={false}
+          >
+            <SkillsMenuPanel
+              highlightedIndex={highlightedIndex}
+              id={id}
+              onHighlight={onHighlight}
+              onSelect={onSelect}
+              query={query}
+              skills={skills}
+            />
+          </PopoverPrimitive.Popup>
+        </PopoverPrimitive.Positioner>
+      </PopoverPrimitive.Portal>
+    </PopoverPrimitive.Root>
   );
 }
 
