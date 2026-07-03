@@ -701,11 +701,25 @@ const queryTools: AgentToolDef[] = [
     summary: "Render the current cut to output/out.mp4.",
     schema: z.object({
       slug,
+      aspect: z
+        .enum(["source", "16:9", "9:16", "1:1"])
+        .optional()
+        .describe(
+          "Output aspect for this export; defaults to project.export then platform"
+        ),
       maxHeight: z.number().int().positive().max(4320).optional(),
       compression: z
         .enum(EXPORT_COMPRESSIONS)
         .optional()
         .describe("Encoder preset; default social (today's settings)"),
+      crop: z
+        .object({
+          focusX: z.number().min(0).max(1).optional(),
+          focusY: z.number().min(0).max(1).optional(),
+          scale: z.number().min(1).max(3).optional(),
+        })
+        .optional()
+        .describe("One-off reframe crop overrides for this export"),
       fps: z
         .number()
         .int()
@@ -717,7 +731,7 @@ const queryTools: AgentToolDef[] = [
         .enum(EXPORT_PLATFORM_IDS)
         .optional()
         .describe(
-          "Destination preset (youtube, youtube-4k, x, linkedin); fills any of compression/fps/maxHeight/loudnessTargetLufs left unset above, explicit fields always win"
+          "Destination preset (youtube, youtube-4k, x, linkedin, shorts); fills any of aspect/compression/fps/maxHeight/loudnessTargetLufs left unset above, explicit fields always win"
         ),
       loudnessTargetLufs: z
         .number()
@@ -730,14 +744,18 @@ const queryTools: AgentToolDef[] = [
     }),
     run: async ({
       slug: projectSlug,
+      aspect,
       maxHeight,
       compression,
+      crop,
       fps,
       platform,
       loudnessTargetLufs,
     }) =>
       exportCut(projectSlug, {
+        aspect,
         compression,
+        crop,
         fps,
         loudnessTargetLufs,
         maxHeight,

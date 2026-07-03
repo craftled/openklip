@@ -439,6 +439,34 @@ export const AudioSchema = z
   });
 export type Audio = z.infer<typeof AudioSchema>;
 
+// Export aspect and manual reframe crop persisted on project.json so preview
+// and export share one frame (Track F). `aspect` selects the output ratio;
+// `crop` pans/zooms within the source before scaling to that frame.
+export const ExportAspectSchema = z
+  .enum(["source", "16:9", "9:16", "1:1"])
+  .default("source");
+export type ExportAspect = z.infer<typeof ExportAspectSchema>;
+
+export const ExportCropSchema = z
+  .object({
+    focusX: z.number().min(0).max(1).default(0.5),
+    focusY: z.number().min(0).max(1).default(0.5),
+    scale: z.number().min(1).max(3).default(1),
+  })
+  .default({ focusX: 0.5, focusY: 0.5, scale: 1 });
+export type ExportCrop = z.infer<typeof ExportCropSchema>;
+
+export const ExportSettingsSchema = z
+  .object({
+    aspect: ExportAspectSchema,
+    crop: ExportCropSchema,
+  })
+  .default({
+    aspect: "source",
+    crop: { focusX: 0.5, focusY: 0.5, scale: 1 },
+  });
+export type ExportSettings = z.infer<typeof ExportSettingsSchema>;
+
 export const ProjectSchema = z
   .object({
     version: z.literal(1),
@@ -499,6 +527,8 @@ export const ProjectSchema = z
     motion: MotionSchema,
     /** Export audio quality: ducking, loudness normalization, voice highpass. */
     audio: AudioSchema,
+    /** Export aspect ratio and manual reframe crop (preview/export parity). */
+    export: ExportSettingsSchema,
     /** Monotonic edit revision bumped by logged mutations (absent = 0). */
     revision: z.number().int().nonnegative().optional(),
   })

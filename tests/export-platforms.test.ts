@@ -8,12 +8,13 @@ import {
   resolvePlatformOptions,
 } from "../src/export-platforms.ts";
 
-test("EXPORT_PLATFORM_IDS lists the four v1 landscape-honest destinations", () => {
+test("EXPORT_PLATFORM_IDS lists landscape destinations plus shorts vertical", () => {
   assert.deepEqual(EXPORT_PLATFORM_IDS, [
     "youtube",
     "youtube-4k",
     "x",
     "linkedin",
+    "shorts",
   ]);
 });
 
@@ -37,7 +38,7 @@ test("isExportPlatformId narrows known ids and rejects unknown strings", () => {
 test("exportPlatform throws a message listing every known id for an unknown id", () => {
   assert.throws(
     () => exportPlatform("tiktok" as never),
-    /unknown export platform "tiktok".*youtube, youtube-4k, x, linkedin/
+    /unknown export platform "tiktok".*youtube, youtube-4k, x, linkedin, shorts/
   );
 });
 
@@ -71,6 +72,21 @@ test("linkedin expands to web/30fps/1080", () => {
   assert.equal(def.compression, "web");
   assert.equal(def.fps, 30);
   assert.equal(def.maxHeight, 1080);
+});
+
+test("shorts expands to 9:16 vertical, social/30fps/1920", () => {
+  const def = exportPlatform("shorts");
+  assert.equal(def.aspect, "9:16");
+  assert.equal(def.compression, "social");
+  assert.equal(def.fps, 30);
+  assert.equal(def.maxHeight, 1920);
+  assert.equal(def.targetLufs, -14);
+});
+
+test("resolvePlatformOptions fills aspect from the shorts platform", () => {
+  const resolved = resolvePlatformOptions("shorts", {});
+  assert.equal(resolved.aspect, "9:16");
+  assert.equal(resolved.maxHeight, 1920);
 });
 
 // ── resolvePlatformOptions merge semantics: explicit always wins ───────────
@@ -125,6 +141,7 @@ test("resolvePlatformOptions: every explicit field can win independently in one 
     loudnessTargetLufs: -18,
   });
   assert.deepEqual(resolved, {
+    aspect: undefined,
     compression: "web",
     fps: 25,
     maxHeight: 480,

@@ -6,10 +6,7 @@
 // that export invocation regardless of the project's saved
 // audio.loudness settings, and never mutates the project.
 //
-// v1 ships landscape-honest presets only: vertical destinations
-// (TikTok, Reels, Shorts) need the 9:16 reframe milestone before a
-// preset for them would do what its name promises.
-
+import type { ExportAspect } from "./edl.ts";
 import type { ExportCompression } from "./exporter.ts";
 
 export const EXPORT_PLATFORM_IDS = [
@@ -17,11 +14,14 @@ export const EXPORT_PLATFORM_IDS = [
   "youtube-4k",
   "x",
   "linkedin",
+  "shorts",
 ] as const;
 
 export type ExportPlatformId = (typeof EXPORT_PLATFORM_IDS)[number];
 
 export interface ExportPlatformDef {
+  /** Output aspect default; undefined keeps the project's saved aspect. */
+  aspect?: ExportAspect;
   /** Compression preset default (existing EXPORT_COMPRESSIONS id). */
   compression: ExportCompression;
   /** Output fps default; undefined keeps the source frame rate. */
@@ -76,6 +76,17 @@ const PLATFORMS: readonly ExportPlatformDef[] = [
     maxHeight: 1080,
     targetLufs: -14,
   },
+  {
+    id: "shorts",
+    label: "Shorts / Reels / TikTok",
+    summary:
+      "9:16 vertical, 30fps, 1080p-class height, social compression, -14 LUFS.",
+    aspect: "9:16",
+    compression: "social",
+    fps: 30,
+    maxHeight: 1920,
+    targetLufs: -14,
+  },
 ];
 
 const byId = new Map(PLATFORMS.map((p) => [p.id, p]));
@@ -104,6 +115,7 @@ export function exportPlatform(id: ExportPlatformId): ExportPlatformDef {
  */
 export function resolvePlatformOptions<
   T extends {
+    aspect?: ExportAspect;
     compression?: ExportCompression;
     fps?: number;
     loudnessTargetLufs?: number;
@@ -116,6 +128,7 @@ export function resolvePlatformOptions<
   const def = exportPlatform(platformId);
   return {
     ...explicit,
+    aspect: explicit.aspect ?? def.aspect,
     compression: explicit.compression ?? def.compression,
     fps: explicit.fps ?? def.fps,
     loudnessTargetLufs: explicit.loudnessTargetLufs ?? def.targetLufs,

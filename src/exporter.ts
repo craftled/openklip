@@ -24,6 +24,9 @@ import {
   type Broll,
   type BrollDisplay,
   type CutSnap,
+  type ExportAspect,
+  type ExportCrop,
+  ExportSettingsSchema,
   effectiveRanges,
   type MusicPlacement,
   ProjectSchema,
@@ -34,6 +37,11 @@ import {
   type Title,
   totalDurationSec,
 } from "./edl.ts";
+import {
+  buildReframeFilter,
+  normalizeExportCrop,
+  resolveExportDimensions,
+} from "./export-aspect.ts";
 import {
   type ExportPlatformId,
   resolvePlatformOptions,
@@ -73,7 +81,11 @@ export const EXPORT_COMPRESSIONS = [
 export type ExportCompression = (typeof EXPORT_COMPRESSIONS)[number];
 
 export interface ExportOptions {
+  /** Output aspect for this export; defaults to project.export then platform. */
+  aspect?: ExportAspect;
   compression?: ExportCompression; // libx264 preset/CRF bundle; default "social"
+  /** Manual reframe crop for this export; merges over project.export.crop. */
+  crop?: Partial<ExportCrop>;
   fps?: number; // output frame rate; default = rounded source rate
   /**
    * Export-invocation-only loudness normalization target (LUFS, -30..-10).
@@ -722,7 +734,9 @@ export async function exportCut(
   graphics: number;
   music: number;
   vignette: boolean;
+  width: number;
   height: number;
+  aspect: ExportAspect;
   fps: number;
   compression: ExportCompression;
   /** Present only when a platform preset was used to resolve this export. */
@@ -781,15 +795,17 @@ export async function exportCut(
       ? await probe(sourceInput.path)
       : { fps: project.fps, height: project.height, width: project.width };
 
-  // output resolution
-  const outH =
-    resolved.maxHeight && resolved.maxHeight < sourceMeta.height
-      ? resolved.maxHeight
-      : sourceMeta.height;
-  const outW =
-    outH === sourceMeta.height
-      ? sourceMeta.width
-      : Math.round((sourceMeta.width * outH) / sourceMeta.height / 2) * 2;
+  const projectExport = ExportSettingsSchema.parse(project.export ?? {});
+  const aspect = resolved.aspect ?? projectExport.aspect;
+  const crop = normalizeExportCrop(
+    opts.crop ? { ...projectExport.crop, ...opts.crop } : projectExport.crop
+  );
+  const { outH, outW } = resolveExportDimensions({
+    aspect,
+    maxHeight: resolved.maxHeight,
+    sourceHeight: sourceMeta.height,
+    sourceWidth: sourceMeta.width,
+  });
 
   const selectExpr = ranges
     .map((r) => `between(t,${sec(r.startSec)},${sec(r.endSec)})`)
@@ -1072,11 +1088,20 @@ export async function exportCut(
   const parts: string[] = [];
   // Retime right after setpts (before scale/overlays) so every downstream
   // enable window stays expressed in output seconds at outFps.
-  let base = `[0:v]select='${selectExpr}',setpts=N/FRAME_RATE/TB${fpsFilterFor(sourceMeta.fps, resolved.fps)}`;
-  if (outH !== sourceMeta.height) {
-    base += `,scale=${outW}:${outH}`;
-  }
-  parts.push(`${base}[v0]`);
+  const base = `[0:v]select='${selectExpr}',setpts=N/FRAME_RATE/TB${fpsFilterFor(sourceMeta.fps, resolved.fps)}`;
+  parts.push(`${base}[vsel]`);
+  parts.push(
+    buildReframeFilter({
+      aspect,
+      crop,
+      inputLabel: "vsel",
+      outputLabel: "v0",
+      outH,
+      outW,
+      sourceH: sourceMeta.height,
+      sourceW: sourceMeta.width,
+    })
+  );
   let last = "v0";
 
   if (zoomWins.length > 0) {
@@ -1303,7 +1328,9 @@ export async function exportCut(
     graphics: graphicsPlanned.length,
     music: musicWindows.length,
     vignette,
+    width: outW,
     height: outH,
+    aspect,
     fps: outFps,
     compression: resolved.compression ?? "social",
     platform: resolved.platform,

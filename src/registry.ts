@@ -35,6 +35,7 @@ import {
   setCaptionStyle,
   setCaptions,
   setCutSnap,
+  setExportSettings,
   setLook,
   setMotion,
   setPadMs,
@@ -56,6 +57,7 @@ import {
   PhraseAnchorSchema,
   type Project,
 } from "./edl.ts";
+import { EXPORT_ASPECT_IDS } from "./export-aspect.ts";
 import {
   PRODUCT_ANNOUNCEMENT_CATALOG,
   ProductAnnouncementCatalogSchema,
@@ -592,6 +594,26 @@ export const actions: ActionDef[] = [
     run: (p, i) => {
       setMotion(p, i);
       return { motion: p.motion };
+    },
+  }),
+  defineAction({
+    name: "export-set",
+    summary:
+      "Set export aspect ratio and manual reframe crop for preview/export parity.",
+    surfaces: ["cli", "gui", "mcp"],
+    schema: z.object({
+      aspect: z.enum(EXPORT_ASPECT_IDS).optional(),
+      crop: z
+        .object({
+          focusX: z.number().optional(),
+          focusY: z.number().optional(),
+          scale: z.number().optional(),
+        })
+        .optional(),
+    }),
+    run: (p, i) => {
+      setExportSettings(p, i);
+      return { export: p.export };
     },
   }),
   defineAction({

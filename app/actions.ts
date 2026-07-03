@@ -235,7 +235,9 @@ export async function saveStills(
 export async function exportProject(
   slug: string,
   options?: {
+    aspect?: "source" | "16:9" | "9:16" | "1:1";
     compression?: ExportCompression;
+    crop?: { focusX?: number; focusY?: number; scale?: number };
     fps?: number;
     loudnessTargetLufs?: number;
     maxHeight?: number;
@@ -244,7 +246,9 @@ export async function exportProject(
 ): Promise<
   ActionResult<{
     ranges: number;
+    width: number;
     height: number;
+    aspect: "source" | "16:9" | "9:16" | "1:1";
     fps: number;
     compression: ExportCompression;
     durationSec: number;
@@ -256,8 +260,23 @@ export async function exportProject(
     // Server actions are network-reachable: enforce the same bounds the HTTP
     // route and MCP tool do before any export work, instead of trusting the
     // caller (an unchecked fps would land verbatim in the filtergraph).
-    const { compression, fps, loudnessTargetLufs, maxHeight, platform } =
-      options ?? {};
+    const {
+      aspect,
+      compression,
+      crop,
+      fps,
+      loudnessTargetLufs,
+      maxHeight,
+      platform,
+    } = options ?? {};
+    if (
+      aspect !== undefined &&
+      !["source", "16:9", "9:16", "1:1"].includes(aspect)
+    ) {
+      throw new Error(
+        `unknown export aspect "${aspect}" (expected one of: source, 16:9, 9:16, 1:1)`
+      );
+    }
     if (
       fps !== undefined &&
       !(Number.isInteger(fps) && fps >= 1 && fps <= 120)
@@ -294,7 +313,9 @@ export async function exportProject(
       throw new Error("loudnessTargetLufs must be between -30 and -10");
     }
     const result = await exportCut(slug, {
+      aspect,
       compression,
+      crop,
       fps,
       loudnessTargetLufs,
       maxHeight,

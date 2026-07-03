@@ -23,7 +23,15 @@ interface RouteParams {
 // stays project-driven.
 const ExportRequestSchema = z
   .object({
+    aspect: z.enum(["source", "16:9", "9:16", "1:1"]).optional(),
     compression: z.enum(EXPORT_COMPRESSIONS).optional(),
+    crop: z
+      .object({
+        focusX: z.number().min(0).max(1).optional(),
+        focusY: z.number().min(0).max(1).optional(),
+        scale: z.number().min(1).max(3).optional(),
+      })
+      .optional(),
     fps: z.number().int().min(1).max(120).optional(),
     height: z.number().int().positive().max(4320).optional(),
     loudnessTargetLufs: z.number().min(-30).max(-10).optional(),
@@ -90,7 +98,9 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
   // 5. Render.
   try {
     const result = await exportCut(slug, {
+      aspect: parsed.data.aspect,
       compression: parsed.data.compression,
+      crop: parsed.data.crop,
       fps: parsed.data.fps,
       loudnessTargetLufs: parsed.data.loudnessTargetLufs,
       maxHeight: parsed.data.height,

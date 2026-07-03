@@ -9,9 +9,22 @@ import type {
   ColorAdjust,
   CutSnap,
   Project as EngineProject,
+  ExportAspect,
+  ExportSettings,
   Filter,
 } from "@engine/edl";
-import { AudioSchema, CutSnapSchema, effectiveRanges } from "@engine/edl";
+import {
+  AudioSchema,
+  CutSnapSchema,
+  ExportSettingsSchema,
+  effectiveRanges,
+} from "@engine/edl";
+import {
+  cropObjectPosition,
+  exportAspectToOrientation,
+  orientationToExportAspect,
+  shouldApplyReframe,
+} from "@engine/export-aspect";
 import { FILTER_OPTIONS, filterLabel } from "@engine/filter";
 import { validateProductAnnouncementSpec } from "@engine/product-announcement";
 import { useRouter } from "next/navigation";
@@ -69,6 +82,10 @@ import {
 import { OverlaySortable } from "@/components/overlay-sortable";
 import { PLAYER_SPEEDS, PlayerControls } from "@/components/player-controls";
 import { PreviewOverlays } from "@/components/preview-overlays";
+import {
+  type ExportPatch,
+  ReframeControls,
+} from "@/components/reframe-controls";
 import { SettingsView } from "@/components/settings/settings-view";
 import { TranscriptSearch } from "@/components/transcript-search";
 import { Button } from "@/components/ui/button";
@@ -261,6 +278,7 @@ interface Project {
   };
   dirPath: string;
   durationSamples: number;
+  export?: ExportSettings;
   fps: number;
   graphics?: GraphicItem[];
   height: number;
@@ -520,6 +538,11 @@ export function App({
     setFilterState(restored.look?.filter ?? "none");
     setColorState(restored.look?.color ?? null);
     setMotionSpeed(restored.motion?.speed ?? 1);
+    setOrientation(
+      exportAspectToOrientation(
+        ExportSettingsSchema.parse(restored.export ?? {}).aspect
+      )
+    );
     setChosenAsset(
       restored.assets?.find((a) => (a.kind ?? "broll") === "broll")?.id ?? ""
     );
@@ -536,7 +559,11 @@ export function App({
     "lower"
   );
   const [exporting, setExporting] = useState(false);
-  const [orientation, setOrientation] = useState<Orientation>("landscape");
+  const [orientation, setOrientation] = useState<Orientation>(() =>
+    exportAspectToOrientation(
+      ExportSettingsSchema.parse(initialProject.export ?? {}).aspect
+    )
+  );
   // In/out work area: when set, playback loops within [inSec, outSec] (source
   // time) so a single b-roll span or transition can be tightened on repeat.
   const [loop, setLoop] = useState<{ inSec: number; outSec: number } | null>(
@@ -1341,6 +1368,41 @@ export function App({
     }));
     enqueueSave(() => runGuiAction(project.slug, "audio", patch));
   };
+  const patchExport = useCallback(
+    (patch: ExportPatch) => {
+      setProject((prev) => {
+        const current = ExportSettingsSchema.parse(prev.export ?? {});
+        return {
+          ...prev,
+          export: {
+            aspect: patch.aspect ?? current.aspect,
+            crop: patch.crop
+              ? { ...current.crop, ...patch.crop }
+              : current.crop,
+          },
+        };
+      });
+      const input: {
+        aspect?: ExportAspect;
+        crop?: ExportPatch["crop"];
+      } = {};
+      if (patch.aspect !== undefined) {
+        input.aspect = patch.aspect;
+      }
+      if (patch.crop !== undefined) {
+        input.crop = patch.crop;
+      }
+      enqueueSave(() => runGuiAction(project.slug, "export-set", input));
+    },
+    [enqueueSave, project.slug]
+  );
+  const changeOrientation = useCallback(
+    (next: Orientation) => {
+      setOrientation(next);
+      patchExport({ aspect: orientationToExportAspect(next) });
+    },
+    [patchExport]
+  );
   const patchSnap = (patch: Partial<CutSnap>) => {
     setProject((prev) => ({
       ...prev,
@@ -2193,6 +2255,15 @@ export function App({
   const configCloseLabel =
     mobileRightPanel === "config" ? "Close config" : "Hide config";
 
+  const exportSettings = useMemo(
+    () => ExportSettingsSchema.parse(project.export ?? {}),
+    [project.export]
+  );
+  const previewReframe = shouldApplyReframe({
+    aspect: exportSettings.aspect,
+    crop: exportSettings.crop,
+  });
+
   const configPanel = (
     <div className="flex min-h-0 flex-1 overflow-y-auto bg-background">
       <div className="flex w-full flex-col overflow-hidden bg-background">
@@ -2786,6 +2857,13 @@ export function App({
                   selected={project.captions?.style ?? DEFAULT_CAPTION_STYLE}
                 />
               </Section>
+              <Section title="Reframe">
+                <ReframeControls
+                  applying={pendingSaves > 0}
+                  exportSettings={exportSettings}
+                  onPatchExport={patchExport}
+                />
+              </Section>
               <Section title="Timing">
                 <PropRow label="Pad" value={`${project.padMs ?? 50}ms`}>
                   <Slider
@@ -2965,6 +3043,7 @@ export function App({
                           defaultResolution={export1080 ? "1080" : "4k"}
                           disabled={exportDisabled}
                           durationSec={keptDuration}
+                          exportAspect={exportSettings.aspect}
                           onExport={onExport}
                           sourceFps={project.fps}
                           sourceHeight={project.height}
@@ -2986,7 +3065,7 @@ export function App({
                               ? value[0]
                               : value;
                             if (nextOrientation) {
-                              setOrientation(nextOrientation as Orientation);
+                              changeOrientation(nextOrientation as Orientation);
                             }
                           }}
                           size="sm"
@@ -3138,6 +3217,13 @@ export function App({
                                 transform: `scale(${zoomScale})`,
                                 transformOrigin: "center",
                                 transition: "transform 0.25s ease-out",
+                                ...(previewReframe
+                                  ? {
+                                      objectPosition: cropObjectPosition(
+                                        exportSettings.crop
+                                      ),
+                                    }
+                                  : {}),
                               }}
                             />
                             <video

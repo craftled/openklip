@@ -47,6 +47,7 @@ import {
   type Title,
   type Zoom,
 } from "./edl.ts";
+import { parseExportAspectFlag } from "./export-aspect.ts";
 import {
   EXPORT_PLATFORM_IDS,
   type ExportPlatformId,
@@ -232,11 +233,18 @@ Review & export
   openklip cleanup <slug> [--json]   filler-word and dead-air candidates (safe/review)
                                        --apply-safe      apply the safe candidates and print what changed
   openklip dead-air-rm <slug> <id>   remove a registered dead-air span by id
+  openklip export-set <slug>           set export aspect and manual reframe crop
+                                       --aspect <id>  source|16:9|9:16|1:1
+                                       --crop-focus-x <0-1>  horizontal pan
+                                       --crop-focus-y <0-1>  vertical pan
+                                       --crop-scale <1-3>    zoom into source before crop
   openklip export <slug>             render the current cut to out.mp4
                                        --height <px>  max output height (e.g. 1080)
                                        --fps <n>      output frame rate, integer 1-120 (default: source)
                                        --compression <preset>  studio|social|web|web-low
-                                       --platform <id>  destination preset (youtube|youtube-4k|x|linkedin); fills gaps only, explicit flags win
+                                       --platform <id>  destination preset (youtube|youtube-4k|x|linkedin|shorts); fills gaps only, explicit flags win
+                                       --aspect <id>  output aspect for this export only (overrides project.export)
+                                       --crop-focus-x/--crop-focus-y/--crop-scale  one-off reframe overrides
   openklip revert <slug> --to <rev>  restore an earlier logged revision
   openklip revert <slug> --task <id> revert every change made by one agent task
   openklip revert <slug> --last      undo the most recent logged edit
@@ -1948,10 +1956,50 @@ try {
       );
       break;
     }
+    case "export-set": {
+      if (!rest[0]) {
+        throw new Error(
+          "usage: openklip export-set <slug> [--aspect <id>] [--crop-focus-x <0-1>] [--crop-focus-y <0-1>] [--crop-scale <1-3>]"
+        );
+      }
+      const slug = rest[0];
+      const aspectRaw = flagValue(rest, "--aspect");
+      const focusX = flagNumber(rest, "--crop-focus-x");
+      const focusY = flagNumber(rest, "--crop-focus-y");
+      const scale = flagNumber(rest, "--crop-scale");
+      const input: {
+        aspect?: ReturnType<typeof parseExportAspectFlag>;
+        crop?: { focusX?: number; focusY?: number; scale?: number };
+      } = {};
+      if (aspectRaw !== undefined) {
+        input.aspect = parseExportAspectFlag(aspectRaw);
+      }
+      if (focusX !== undefined || focusY !== undefined || scale !== undefined) {
+        input.crop = {};
+        if (focusX !== undefined) {
+          input.crop.focusX = focusX;
+        }
+        if (focusY !== undefined) {
+          input.crop.focusY = focusY;
+        }
+        if (scale !== undefined) {
+          input.crop.scale = scale;
+        }
+      }
+      const project =
+        Object.keys(input).length === 0
+          ? await loadProject(slug)
+          : (await runLoggedAction(slug, "export-set", input)).project;
+      const ex = project.export;
+      console.log(
+        `export: aspect ${ex.aspect}, crop focus (${ex.crop.focusX}, ${ex.crop.focusY}), scale ${ex.crop.scale}`
+      );
+      break;
+    }
     case "export": {
       if (!rest[0]) {
         throw new Error(
-          "usage: openklip export <slug> [--height <px>] [--fps <n>] [--compression <preset>] [--platform <id>] [--loudness <lufs>]"
+          "usage: openklip export <slug> [--height <px>] [--fps <n>] [--compression <preset>] [--platform <id>] [--loudness <lufs>] [--aspect <id>] [--crop-focus-x <0-1>] [--crop-focus-y <0-1>] [--crop-scale <1-3>]"
         );
       }
       const heightIdx = rest.indexOf("--height");
@@ -2003,8 +2051,26 @@ try {
         }
         loudnessTargetLufs = parseExportLoudnessFlag(loudnessRaw);
       }
+      const aspectRaw = flagValue(rest, "--aspect");
+      const aspect =
+        aspectRaw === undefined ? undefined : parseExportAspectFlag(aspectRaw);
+      const cropFocusX = flagNumber(rest, "--crop-focus-x");
+      const cropFocusY = flagNumber(rest, "--crop-focus-y");
+      const cropScale = flagNumber(rest, "--crop-scale");
+      const crop =
+        cropFocusX === undefined &&
+        cropFocusY === undefined &&
+        cropScale === undefined
+          ? undefined
+          : {
+              ...(cropFocusX === undefined ? {} : { focusX: cropFocusX }),
+              ...(cropFocusY === undefined ? {} : { focusY: cropFocusY }),
+              ...(cropScale === undefined ? {} : { scale: cropScale }),
+            };
       const r = await exportCut(rest[0], {
+        aspect,
         compression,
+        crop,
         fps,
         loudnessTargetLufs,
         maxHeight,

@@ -1,5 +1,7 @@
 "use client";
 
+import type { ExportAspect } from "@engine/edl";
+import { resolveExportDimensions } from "@engine/export-aspect";
 import {
   type ExportPlatformId,
   exportPlatform,
@@ -52,6 +54,8 @@ interface ExportDialogProps {
   defaultResolution?: ExportResolution;
   disabled?: boolean;
   durationSec: number;
+  /** Project-saved export aspect; used for Manual dimension preview. */
+  exportAspect?: ExportAspect;
   onExport: (options: ExportDialogOptions) => void | Promise<void>;
   sourceFps: number;
   sourceHeight: number;
@@ -67,12 +71,16 @@ interface ExportDialogProps {
 export function outputDimensionsForMaxHeight(
   maxHeight: number | undefined,
   sourceWidth: number,
-  sourceHeight: number
+  sourceHeight: number,
+  aspect: ExportAspect = "source"
 ): { width: number; height: number } {
-  const height =
-    maxHeight === undefined ? sourceHeight : Math.min(sourceHeight, maxHeight);
-  const width = Math.round((sourceWidth * height) / sourceHeight / 2) * 2;
-  return { width, height };
+  const { outW, outH } = resolveExportDimensions({
+    aspect,
+    maxHeight,
+    sourceHeight,
+    sourceWidth,
+  });
+  return { width: outW, height: outH };
 }
 
 function maxHeightForResolution(
@@ -138,6 +146,7 @@ export function ExportDialog({
   defaultResolution,
   disabled,
   durationSec,
+  exportAspect = "source",
   onExport,
   sourceFps,
   sourceHeight,
@@ -180,10 +189,22 @@ export function ExportDialog({
     [platform, resolution, sourceHeight]
   );
 
+  const activeAspect = useMemo((): ExportAspect => {
+    if (platform === "manual") {
+      return exportAspect;
+    }
+    return exportPlatform(platform).aspect ?? exportAspect;
+  }, [exportAspect, platform]);
+
   const dims = useMemo(
     () =>
-      outputDimensionsForMaxHeight(activeMaxHeight, sourceWidth, sourceHeight),
-    [activeMaxHeight, sourceHeight, sourceWidth]
+      outputDimensionsForMaxHeight(
+        activeMaxHeight,
+        sourceWidth,
+        sourceHeight,
+        activeAspect
+      ),
+    [activeAspect, activeMaxHeight, sourceHeight, sourceWidth]
   );
 
   const compressionMeta = COMPRESSION_COPY[compression];

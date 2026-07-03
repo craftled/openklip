@@ -15,6 +15,9 @@ import {
   type CutSnap,
   CutSnapSchema,
   type DeadAirSpan,
+  type ExportAspect,
+  type ExportCrop,
+  ExportSettingsSchema,
   type Filter,
   type Graphic,
   type Motion,
@@ -26,6 +29,7 @@ import {
   type Title,
   type Zoom,
 } from "./edl.ts";
+import { EXPORT_ASPECT_IDS } from "./export-aspect.ts";
 import {
   defaultGraphicParams,
   listGraphics,
@@ -1316,6 +1320,33 @@ export function setMotion(project: Project, input: Partial<Motion>): Project {
 
 function clampNum(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
+}
+
+// Patch export aspect and manual reframe crop. Bounds are enforced here on
+// write (crop focus 0-1, scale 1-3); the registry schema stays shape-only.
+export function setExportSettings(
+  project: Project,
+  input: {
+    aspect?: ExportAspect;
+    crop?: Partial<ExportCrop>;
+  }
+): Project {
+  const current = ExportSettingsSchema.parse(project.export ?? {});
+  const aspect = input.aspect ?? current.aspect;
+  if (!EXPORT_ASPECT_IDS.includes(aspect)) {
+    throw new Error(
+      `invalid export aspect "${aspect}" (expected one of: ${EXPORT_ASPECT_IDS.join(", ")})`
+    );
+  }
+  const crop = input.crop
+    ? {
+        focusX: clampNum(input.crop.focusX ?? current.crop.focusX, 0, 1),
+        focusY: clampNum(input.crop.focusY ?? current.crop.focusY, 0, 1),
+        scale: clampNum(input.crop.scale ?? current.crop.scale, 1, 3),
+      }
+    : current.crop;
+  project.export = { aspect, crop };
+  return project;
 }
 
 // Patch export audio quality settings: ducking, loudness normalization, and

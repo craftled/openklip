@@ -101,6 +101,7 @@ const EXPECTED = [
   "dead-air-add",
   "dead-air-rm",
   "audio",
+  "export-set",
   "look-vignette",
   "reorder",
   "reanchor",
@@ -321,6 +322,19 @@ test("audio: stores export audio quality settings, clamped, in project JSON", ()
     voiceHighpass: { enabled: false, hz: 80 },
   });
   assert.deepEqual(p.audio, r.audio);
+});
+
+test("export-set: stores aspect and crop, clamped, in project JSON", () => {
+  const p = makeProject();
+  const r = runAction("export-set", p, {
+    aspect: "9:16",
+    crop: { focusX: 1.5, focusY: -0.2, scale: 9 },
+  }) as { export: Project["export"] };
+  assert.deepEqual(r.export, {
+    aspect: "9:16",
+    crop: { focusX: 1, focusY: 0, scale: 3 },
+  });
+  assert.deepEqual(p.export, r.export);
 });
 
 test("word-text: corrects a word's text and round-trips originalText", () => {

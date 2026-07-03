@@ -364,6 +364,14 @@ test("projectStatus returns agent-friendly JSON shape", () => {
   assert.equal(s.captions.style, "boxed");
 });
 
+test("projectStatus includes export aspect and crop defaults", () => {
+  const s = projectStatus(makeProject());
+  assert.deepEqual(s.export, {
+    aspect: "source",
+    crop: { focusX: 0.5, focusY: 0.5, scale: 1 },
+  });
+});
+
 test("grepTranscript match times use word sample boundaries", () => {
   const p = makeProject();
   const m = grepTranscript(p, "world", { all: false }).matches[0];

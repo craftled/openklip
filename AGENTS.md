@@ -102,7 +102,8 @@ Time is integer audio samples at 48 kHz. The CLI takes seconds where a human num
 | List all agent tools (query + mutate + export) | `openklip tools` |
 | MCP server (stdio) | `openklip mcp` or `bun run mcp` |
 | Export MP4 | `openklip export <slug>` |
-| Export with a platform preset | `openklip export <slug> --platform youtube\|youtube-4k\|x\|linkedin [--loudness <lufs>]` |
+| Set export aspect and reframe crop | `openklip export-set <slug> [--aspect source\|16:9\|9:16\|1:1] [--crop-focus-x <0-1>] [--crop-focus-y <0-1>] [--crop-scale <1-3>]` |
+| Export with a platform preset | `openklip export <slug> --platform youtube\|youtube-4k\|x\|linkedin\|shorts [--loudness <lufs>]` |
 | Verify rendered cut | `openklip verify <slug>` |
 | Post-export packaging (HyperFrames) | `openklip package <slug> <pass>` |
 
@@ -223,7 +224,8 @@ Workflow: `take-add` each recording, read `take_transcript <slug> <takeId>` to f
 | `openklip cleanup <slug> [--json]` | Filler-word and dead-air cleanup candidates with risk (`safe`/`review`), reason, and estimated seconds saved. Degrades to filler-only (with a warning) when no audio analysis is available yet. |
 | `openklip cleanup <slug> --apply-safe` | Apply every `safe` candidate (cuts filler words, registers dead-air spans) and print what changed. `review` candidates are never auto-applied; apply them individually via `cut`/`dead-air-add` after a human or agent judgment call. |
 | `openklip dead-air-rm <slug> <id>` | Remove a registered dead-air span by id. CLI/MCP only; no GUI remove affordance yet. |
-| `openklip export <slug>` | Render the current cut to `out.mp4`. `--height 1080` for max output height, `--fps <n>` for output frame rate (1–120), `--compression studio\|social\|web\|web-low` for encoder preset (default `social`), `--platform youtube\|youtube-4k\|x\|linkedin` for a named destination preset (fills any of compression/fps/height/loudness left unset by the flags above; explicit flags always win; `maxHeight` never upscales past the source), `--loudness <lufs>` (-30..-10) to set or override the export's loudness normalization target for this export only (never mutates `project.audio.loudness`). |
+| `openklip export-set <slug>` | Set export aspect ratio and manual reframe crop on `project.export` (preview/export parity). `--aspect source\|16:9\|9:16\|1:1`, `--crop-focus-x`, `--crop-focus-y`, `--crop-scale`. |
+| `openklip export <slug>` | Render the current cut to `out.mp4`. `--height 1080` for max output height, `--fps <n>` for output frame rate (1–120), `--compression studio\|social\|web\|web-low` for encoder preset (default `social`), `--platform youtube\|youtube-4k\|x\|linkedin\|shorts` for a named destination preset (fills any of aspect/compression/fps/height/loudness left unset by the flags above; explicit flags always win; `maxHeight` never upscales past the source), `--aspect <id>` and `--crop-focus-x`/`--crop-focus-y`/`--crop-scale` for one-off reframe overrides, `--loudness <lufs>` (-30..-10) to set or override the export's loudness normalization target for this export only (never mutates `project.audio.loudness`). |
 | `openklip verify <slug>` | The verify loop: re-transcribe `output/out.mp4` with the same Whisper path used at ingest and diff it against the EDL. Flags filler that survived, deleted words that leaked back in, and low kept-word coverage (clipped words). Exits non-zero on drift. Requires an export. Also the `verify` agent tool. |
 | `openklip doctor [slug]` | Health check: ffmpeg/ffprobe binaries, Whisper script, and (with a slug) the project's `project.json`, source/proxy media, and asset proxies. Exits non-zero if any check fails. Run it when the agent loop fails deep inside a subprocess. |
 | `openklip revert <slug> --to <rev>` | Restore `project.json` to an earlier logged revision (needs a snapshot in `working/history/`; snapshots are kept for the newest 100 revisions). |

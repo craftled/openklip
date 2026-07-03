@@ -167,6 +167,18 @@ test("outputDimensionsForMaxHeight is a source-dims no-op for Manual+Source", ()
   assert.deepEqual(dims, { width: 5312, height: 2988 });
 });
 
+test("outputDimensionsForMaxHeight uses 9:16 aspect for vertical export", () => {
+  const dims = outputDimensionsForMaxHeight(1080, 1920, 1080, "9:16");
+  assert.deepEqual(dims, { width: 608, height: 1080 });
+});
+
+test("shorts platform chip renders in the export form", () => {
+  const html = renderForm();
+  const def = listExportPlatforms().find((p) => p.id === "shorts");
+  assert.ok(def, "shorts platform must exist");
+  assert.ok(html.includes(def.label));
+});
+
 // ── Client/server agreement: dialog's effectiveMaxHeight vs resolvePlatformOptions ──
 
 test("dialog's youtube-4k maxHeight agrees with the server's resolvePlatformOptions on a 1080p source", () => {

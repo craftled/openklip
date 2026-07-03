@@ -114,6 +114,10 @@ export interface OverlayViews {
 export interface ProjectStatusJson {
   captions: { enabled: boolean; maxWords: number; style: string };
   cuts: { snap: CutSnap };
+  export: {
+    aspect: "source" | "16:9" | "9:16" | "1:1";
+    crop: { focusX: number; focusY: number; scale: number };
+  };
   keptDurationSec: number;
   look: { vignette: boolean; filter: Filter; lut?: string };
   overlays: OverlayViews;
@@ -341,6 +345,14 @@ export function projectStatus(
       vignette: project.look?.vignette ?? false,
       filter: project.look?.filter ?? "none",
       ...(project.look?.lut ? { lut: project.look.lut } : {}),
+    },
+    export: {
+      aspect: project.export?.aspect ?? "source",
+      crop: {
+        focusX: project.export?.crop?.focusX ?? 0.5,
+        focusY: project.export?.crop?.focusY ?? 0.5,
+        scale: project.export?.crop?.scale ?? 1,
+      },
     },
     overlays: listOverlays(project),
   };
