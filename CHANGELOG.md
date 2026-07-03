@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.29.0.1 - 2026-07-03
+
+CLI/MCP parity follow-up to the 0.29.0.0 export format feature.
+
+### Added
+- **CLI/MCP export format parity** (`src/cli.ts`, `src/agent-tools.ts`): `openklip export <slug> --format <mp4|gif>` follows the same trailing-value-guard pattern as `--platform`/`--loudness` (errors, listing valid formats, if `--format` is given with no value); the printed export summary now includes a `format` note when non-default. The MCP `export` tool's Zod schema gained `format: z.enum(EXPORT_FORMATS).optional()`, threaded through to `exportCut`. Closes the CLI/MCP half of the gap the 0.29.0.0 export-format-destination feature left open; destination (clipboard) stays GUI-only by design, since it is a client-side browser API call with no server-side concept for CLI/MCP to wire into.
+
+### Changed
+- **Version**: bumped OpenKlip to `0.29.0.1`.
+
 ## 0.29.0.0 - 2026-07-03
 
 Export format (GIF) and destination (clipboard) controls, wired end to end.

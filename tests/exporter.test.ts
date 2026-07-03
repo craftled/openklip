@@ -2384,6 +2384,57 @@ test("CLI export --loudness with no following value errors", async () => {
   });
 });
 
+// ── CLI: --format flag (mirrors the --platform/--loudness CLI tests above) ──
+
+test("CLI export --format gif produces a .gif and the printed summary reports format gif (smoke)", {
+  skip: FFMPEG_OK ? false : "ffmpeg binary unavailable",
+}, async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    const p = projectPaths(slug);
+    const src = join(p.dir, "source.mp4");
+    await writeGifSmokeSource(src, "ffmpeg(cli-export-format-gif-clip)");
+    writeGifSmokeFixture(slug, src);
+
+    const result = await runCli(["export", slug, "--format", "gif"]);
+    assert.equal(result.code, 0, result.out);
+    assert.match(result.out, /format gif/);
+    assert.match(result.out, /\.gif/);
+  });
+});
+
+test("CLI export with no --format flag omits the format fragment from the summary (smoke)", {
+  skip: FFMPEG_OK ? false : "ffmpeg binary unavailable",
+}, async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    const p = projectPaths(slug);
+    const src = join(p.dir, "source.mp4");
+    await writeGifSmokeSource(src, "ffmpeg(cli-export-format-default-clip)");
+    writeGifSmokeFixture(slug, src);
+
+    const result = await runCli(["export", slug]);
+    assert.equal(result.code, 0, result.out);
+    assert.doesNotMatch(result.out, /format/);
+  });
+});
+
+test("CLI export --format bogus errors and lists the known formats", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const result = await runCli(["export", slug, "--format", "bogus"]);
+    assert.notEqual(result.code, 0);
+    assert.match(result.out, /unknown export format "bogus"/);
+    assert.match(result.out, /mp4, gif/);
+  });
+});
+
+test("CLI export --format with no following value errors", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const result = await runCli(["export", slug, "--format"]);
+    assert.notEqual(result.code, 0);
+  });
+});
+
 // ── E1: segment mode audio in buildAudioParts ────────────────────────────────
 
 test("buildAudioParts: segmentMode concat replaces aselect for voice-only export", () => {

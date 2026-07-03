@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { writeFileSync } from "node:fs";
+import { existsSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { test } from "node:test";
 import { readActionLog } from "../src/action-log.ts";
 import {
@@ -14,6 +15,7 @@ import {
   getAgentTool,
 } from "../src/agent-tools.ts";
 import { SAMPLE_RATE } from "../src/edl.ts";
+import { FFMPEG, run } from "../src/ffmpeg.ts";
 import { projectPaths } from "../src/paths.ts";
 import { actions } from "../src/registry.ts";
 import {
@@ -339,6 +341,96 @@ test("export tool schema bounds loudnessTargetLufs to -30..-10", () => {
     tool.schema.safeParse({ slug: "demo", loudnessTargetLufs: -31 }).success,
     false
   );
+});
+
+test("export tool schema accepts a known format and rejects an unknown one", () => {
+  const tool = getAgentTool("export");
+  assert.ok(tool, "export tool missing");
+  assert.equal(
+    tool.schema.safeParse({ slug: "demo", format: "gif" }).success,
+    true
+  );
+  assert.equal(
+    tool.schema.safeParse({ slug: "demo", format: "mp4" }).success,
+    true
+  );
+  assert.equal(
+    tool.schema.safeParse({ slug: "demo", format: "bogus" }).success,
+    false
+  );
+});
+
+const FFMPEG_OK = typeof FFMPEG === "string" && existsSync(FFMPEG);
+
+test("export tool threads format through to exportCut and produces a .gif (smoke)", {
+  skip: FFMPEG_OK ? false : "ffmpeg binary unavailable",
+}, async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    const p = projectPaths(slug);
+    const src = join(p.dir, "source.mp4");
+    await run(
+      FFMPEG,
+      [
+        "-y",
+        "-f",
+        "lavfi",
+        "-i",
+        "testsrc=duration=2:size=320x240:rate=30",
+        "-f",
+        "lavfi",
+        "-i",
+        "sine=frequency=440:duration=2",
+        "-c:v",
+        "libx264",
+        "-pix_fmt",
+        "yuv420p",
+        "-c:a",
+        "aac",
+        "-shortest",
+        src,
+      ],
+      "ffmpeg(agent-tools-export-format-gif-clip)"
+    );
+    writeFixtureProject(
+      slug,
+      makeProject({
+        slug,
+        source: src,
+        fps: 30,
+        width: 320,
+        height: 240,
+        durationSamples: 2 * SAMPLE_RATE,
+        captions: { enabled: false, maxWords: 6, style: "boxed" },
+        words: [
+          {
+            id: "w0",
+            text: "Hello",
+            startSample: 0,
+            endSample: SAMPLE_RATE,
+            deleted: false,
+          },
+          {
+            id: "w1",
+            text: "world",
+            startSample: SAMPLE_RATE,
+            endSample: 2 * SAMPLE_RATE,
+            deleted: false,
+          },
+        ],
+      })
+    );
+
+    const result = (await callAgentTool("export", {
+      slug,
+      format: "gif",
+    })) as { format: string; out: string };
+    assert.equal(result.format, "gif");
+    assert.ok(
+      result.out.endsWith(".gif"),
+      `expected a .gif path, got ${result.out}`
+    );
+    assert.ok(existsSync(result.out), "gif file should exist");
+  });
 });
 
 // ── PROJECT BRIEF: brief_get / brief_set (brief.md, not a project.json field) ─
