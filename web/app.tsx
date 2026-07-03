@@ -237,8 +237,12 @@ import {
 } from "../app/actions.ts";
 import { type CaptionWord, groupCaptions } from "../src/captions.ts";
 import { reanchorProject } from "../src/reanchor.ts";
+import {
+  outputPositionSec,
+  sourceSecForOutputPosition,
+} from "../src/schedulerLogic.ts";
 import { type ZoomWindow, zoomFactorAtSec } from "../src/zoom-ramp.ts";
-import { CutScheduler, type Range } from "./scheduler.ts";
+import { CutScheduler } from "./scheduler.ts";
 
 interface Word {
   deleted: boolean;
@@ -386,32 +390,10 @@ function firstSliderValue(value: number | readonly number[]): number {
 // shared with the server (exporter/query/CLI) so preview and export truth
 // cannot drift; see the two effectiveRanges(project, ...) call sites below.
 
-function outputPos(ranges: Range[], curSec: number): number {
-  let cum = 0;
-  for (const r of ranges) {
-    if (curSec < r.startSec) {
-      return cum;
-    }
-    if (curSec <= r.endSec) {
-      return cum + (curSec - r.startSec);
-    }
-    cum += r.endSec - r.startSec;
-  }
-  return cum;
-}
-
-/** Inverse of outputPos: map a cut-space position back to source seconds. */
-function sourceAtOutput(ranges: Range[], outSec: number): number {
-  let cum = 0;
-  for (const r of ranges) {
-    const len = r.endSec - r.startSec;
-    if (outSec <= cum + len) {
-      return r.startSec + (outSec - cum);
-    }
-    cum += len;
-  }
-  return ranges.at(-1)?.endSec ?? 0;
-}
+// Kept-range <-> cut-space position math itself now lives in one place
+// (src/schedulerLogic.ts outputPositionSec / sourceSecForOutputPosition),
+// shared with CinemaPlayer so the inline preview and the fullscreen player
+// cannot drift on what "current time" means.
 
 const fmt = (s: number): string =>
   `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
@@ -719,7 +701,10 @@ export function App({
   const keptDuration = ranges.reduce((a, r) => a + (r.endSec - r.startSec), 0);
   const sr = project?.sampleRate ?? 48_000;
   const curSec = curSample / sr;
-  const outPos = useMemo(() => outputPos(ranges, curSec), [ranges, curSec]);
+  const outPos = useMemo(
+    () => outputPositionSec(ranges, curSec),
+    [ranges, curSec]
+  );
 
   const captionGroups = useMemo(() => {
     if (!project) {
@@ -749,10 +734,10 @@ export function App({
       project
         ? (project.zooms ?? [])
             .map((z) => ({
-              endSec: outputPos(ranges, z.endSample / sr),
+              endSec: outputPositionSec(ranges, z.endSample / sr),
               rampSec: z.rampSec,
               scale: z.scale,
-              startSec: outputPos(ranges, z.startSample / sr),
+              startSec: outputPositionSec(ranges, z.startSample / sr),
             }))
             .filter((z) => z.endSec - z.startSec > 0.05)
         : [],
@@ -3149,8 +3134,16 @@ export function App({
         {cinema && (
           <CinemaPlayer
             captionsOn={captionsOn}
+            durationSec={keptDuration}
             exportDisabled={exportDisabled}
             exportLabel={exportLabel}
+            getRanges={() => rangesRef.current}
+            getTransition={() =>
+              projectRef.current?.look?.transition ?? {
+                type: "none",
+                durationMs: 500,
+              }
+            }
             onClose={() => setCinema(false)}
             onExport={onExport}
             onToggleCaptions={toggleCaptions}
@@ -3503,7 +3496,10 @@ export function App({
                               onPlayToggle={onPlay}
                               onSeekFraction={(frac) =>
                                 onSeek(
-                                  sourceAtOutput(ranges, frac * keptDuration)
+                                  sourceSecForOutputPosition(
+                                    ranges,
+                                    frac * keptDuration
+                                  )
                                 )
                               }
                               onToggleCaptions={() =>

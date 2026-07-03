@@ -57,7 +57,8 @@ interface PlayerControlsProps {
   bufferedFraction?: number;
   captionsOn: boolean;
   className?: string;
-  /** Current position, in display seconds (cut-space inline, raw in cinema). */
+  /** Current position, in cut-space (output) display seconds - both the
+   * inline preview and the cinema player report this space. */
   current: number;
   /** Total length, in display seconds. */
   duration: number;

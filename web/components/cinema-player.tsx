@@ -1,5 +1,10 @@
 "use client";
 
+import type { CutTransition, Range } from "@engine/edl";
+import {
+  outputPositionSec,
+  sourceSecForOutputPosition,
+} from "@engine/schedulerLogic";
 import {
   type ReactNode,
   useCallback,
@@ -8,22 +13,41 @@ import {
   useState,
 } from "react";
 import {
+  CutTransitionSweep,
+  type CutTransitionSweepHandle,
+} from "@/components/cut-transition-sweep";
+import {
   PlayerControls,
   PLAYER_SPEEDS as SPEEDS,
 } from "@/components/player-controls";
 import { Button } from "@/components/ui/button";
 import { Download, Play, X } from "@/lib/icon";
 import { cn } from "@/lib/utils";
+import { CutScheduler } from "@/scheduler";
 
 const HIDE_DELAY_MS = 2600;
+const DEFAULT_TRANSITION: CutTransition = { type: "none", durationMs: 500 };
 
 interface CinemaPlayerProps {
   /** Live caption / overlay node rendered over the video, bottom-centered. */
   captionSlot?: ReactNode;
   /** Whether the captions toggle starts on. */
   captionsOn?: boolean;
+  /** Total kept (cut-space/output) duration in seconds, matching the
+   * inline preview's keptDuration - drives the scrubber's total length. */
+  durationSec: number;
   exportDisabled?: boolean;
   exportLabel?: string;
+  /**
+   * Kept source-time ranges to skip deleted material during playback,
+   * matching the inline preview exactly. Read live (like CutScheduler's
+   * getRanges elsewhere), not snapshotted, so the caller can pass a cheap
+   * ref-backed getter (e.g. `() => rangesRef.current`) without CinemaPlayer
+   * recomputing effectiveRanges a second time.
+   */
+  getRanges: () => Range[];
+  /** Decorative cut-boundary sweep transition, matching project.look.transition. */
+  getTransition?: () => CutTransition;
   /** Optional eyebrow above/beside the name (e.g. "Cut preview"). */
   label?: string;
   /** Close the cinema overlay. */
@@ -33,9 +57,11 @@ interface CinemaPlayerProps {
   onToggleCaptions?: (next: boolean) => void;
   /**
    * Live overlay stack (titles/graphics/captions) rendered aligned to the
-   * letterboxed video box, driven by THIS player's current time in seconds.
+   * letterboxed video box, driven by THIS player's current SOURCE time in
+   * seconds (post cut-jump), matching the sample-position space
+   * titles/captions/graphics are stored in.
    */
-  overlay?: (curSec: number) => ReactNode;
+  overlay?: (curSourceSec: number) => ReactNode;
   poster?: string;
   /** Shown top-left, replacing Linear's "Episode 01". */
   projectName: string;
@@ -55,6 +81,12 @@ interface VideoBox {
  * White-on-black chrome, auto-hiding controls, a hairline scrubber with a
  * dot handle, and a left→right control row: play · volume · time · scrubber ·
  * remaining · speed · captions · PiP · fullscreen.
+ *
+ * Playback is cut-aware: a dedicated CutScheduler instance (this player's own
+ * video element cannot share the inline preview's scheduler, since a
+ * scheduler drives exactly one <video> via direct currentTime writes) skips
+ * deleted ranges exactly like the inline preview does, so the fullscreen view
+ * never shows raw, uncut source material.
  */
 export function CinemaPlayer({
   src,
@@ -69,14 +101,34 @@ export function CinemaPlayer({
   onToggleCaptions,
   overlay,
   poster,
+  getRanges,
+  getTransition,
+  durationSec,
 }: CinemaPlayerProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const schedRef = useRef<CutScheduler | null>(null);
+  const sweepRef = useRef<CutTransitionSweepHandle>(null);
+
+  // Ref-mirrors of the latest callback props, assigned during render (same
+  // pattern as app.tsx's rangesRef): the scheduler is constructed exactly
+  // once on mount below, so its closures must read through a ref to stay
+  // current rather than closing over a stale first-render callback.
+  const getRangesRef = useRef(getRanges);
+  getRangesRef.current = getRanges;
+  const getTransitionRef = useRef(getTransition);
+  getTransitionRef.current = getTransition;
 
   const [playing, setPlaying] = useState(false);
-  const [cur, setCur] = useState(0);
-  const [dur, setDur] = useState(0);
+  // Cut-space (output) position, in seconds: what the scrubber shows.
+  const [curOutputSec, setCurOutputSec] = useState(0);
+  // Raw source-timeline position, in seconds (post cut-jump): what overlays
+  // (titles/captions/graphics) are keyed against.
+  const [curSourceSec, setCurSourceSec] = useState(0);
+  // Raw proxy duration, used only for the buffered-fraction indicator; the
+  // scrubber's total length is durationSec (cut-space), not this.
+  const [rawDur, setRawDur] = useState(0);
   const [buffered, setBuffered] = useState(0);
   const [muted, setMuted] = useState(false);
   const [volume, setVolume] = useState(1);
@@ -144,29 +196,58 @@ export function CinemaPlayer({
     };
   }, [showChrome]);
 
-  // --- video element wiring ----------------------------------------------
-  const togglePlay = useCallback(() => {
+  // --- CutScheduler wiring -------------------------------------------------
+  // Constructed exactly once per mount (CinemaPlayer itself is mounted and
+  // unmounted whole by the caller when the cinema overlay opens/closes, so
+  // an empty dependency array is enough - no need for app.tsx's extra
+  // schedRef guard, which exists there to survive re-renders of a
+  // never-unmounting component).
+  useEffect(() => {
     const v = videoRef.current;
     if (!v) {
       return;
     }
-    if (v.paused) {
-      void v.play();
+    const sched = new CutScheduler(
+      v,
+      () => getRangesRef.current(),
+      () => getTransitionRef.current?.() ?? DEFAULT_TRANSITION
+    );
+    sched.onTick = (sourceSec) => {
+      setCurSourceSec(sourceSec);
+      setCurOutputSec(outputPositionSec(getRangesRef.current(), sourceSec));
+    };
+    sched.onEnd = () => setPlaying(false);
+    sched.onCutBoundary = (transition) => sweepRef.current?.play(transition);
+    schedRef.current = sched;
+    return () => {
+      sched.dispose();
+      schedRef.current = null;
+    };
+  }, []);
+
+  // --- video element wiring ----------------------------------------------
+  const togglePlay = useCallback(() => {
+    const sched = schedRef.current;
+    if (!sched) {
+      return;
+    }
+    if (sched.isPlaying) {
+      sched.pause();
     } else {
-      v.pause();
+      void sched.play();
     }
   }, []);
 
   const seekTo = useCallback(
-    (sec: number) => {
-      const v = videoRef.current;
-      if (!v) {
+    (outSec: number) => {
+      const sched = schedRef.current;
+      if (!sched) {
         return;
       }
-      v.currentTime = Math.max(0, Math.min(dur || v.duration || 0, sec));
-      setCur(v.currentTime);
+      const clamped = Math.max(0, Math.min(durationSec, outSec));
+      sched.seek(sourceSecForOutputPosition(getRangesRef.current(), clamped));
     },
-    [dur]
+    [durationSec]
   );
 
   const toggleFullscreen = useCallback(() => {
@@ -235,10 +316,10 @@ export function CinemaPlayer({
           togglePlay();
           break;
         case "ArrowLeft":
-          seekTo(cur - 5);
+          seekTo(curOutputSec - 5);
           break;
         case "ArrowRight":
-          seekTo(cur + 5);
+          seekTo(curOutputSec + 5);
           break;
         case "f":
           toggleFullscreen();
@@ -262,7 +343,7 @@ export function CinemaPlayer({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [
-    cur,
+    curOutputSec,
     onClose,
     seekTo,
     showChrome,
@@ -315,9 +396,9 @@ export function CinemaPlayer({
         className="relative max-h-full max-w-full cursor-pointer object-contain"
         onClick={togglePlay}
         onDoubleClick={toggleFullscreen}
-        onDurationChange={(e) => setDur(e.currentTarget.duration)}
+        onDurationChange={(e) => setRawDur(e.currentTarget.duration)}
         onLoadedMetadata={(e) => {
-          setDur(e.currentTarget.duration);
+          setRawDur(e.currentTarget.duration);
           measureBox();
         }}
         onPause={() => {
@@ -331,7 +412,6 @@ export function CinemaPlayer({
             setBuffered(v.buffered.end(v.buffered.length - 1));
           }
         }}
-        onTimeUpdate={(e) => setCur(e.currentTarget.currentTime)}
         onVolumeChange={(e) => {
           setMuted(e.currentTarget.muted);
           setVolume(e.currentTarget.volume);
@@ -354,7 +434,7 @@ export function CinemaPlayer({
             width: box.width,
           }}
         >
-          {overlay(cur)}
+          {overlay(curSourceSec)}
         </div>
       )}
 
@@ -364,6 +444,9 @@ export function CinemaPlayer({
           {captionSlot}
         </div>
       )}
+
+      {/* Decorative cut-boundary sweep, matching the inline preview. */}
+      <CutTransitionSweep ref={sweepRef} />
 
       {/* Center play affordance when paused */}
       {!playing && (
@@ -424,20 +507,20 @@ export function CinemaPlayer({
 
       {/* ── Bottom control bar (shared chrome) ──────────────────── */}
       <PlayerControls
-        bufferedFraction={dur ? buffered / dur : 0}
+        bufferedFraction={rawDur ? buffered / rawDur : 0}
         captionsOn={caps}
         className={cn(
           "absolute inset-x-0 bottom-0 z-30 px-5 pb-4 transition-opacity duration-200 ease-out",
           chromeVisible ? "opacity-100" : "pointer-events-none opacity-0"
         )}
-        current={cur}
-        duration={dur}
+        current={curOutputSec}
+        duration={durationSec}
         fullscreenActive={fs}
         muted={muted}
         onCycleSpeed={cycleSpeed}
         onFullscreen={toggleFullscreen}
         onPlayToggle={togglePlay}
-        onSeekFraction={(frac) => seekTo(frac * dur)}
+        onSeekFraction={(frac) => seekTo(frac * durationSec)}
         onToggleCaptions={toggleCaps}
         onToggleMute={toggleMute}
         onTogglePip={togglePip}
