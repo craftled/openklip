@@ -103,6 +103,7 @@ const EXPECTED = [
   "audio",
   "export-set",
   "look-vignette",
+  "look-transition",
   "reorder",
   "reanchor",
   "word-text",
@@ -687,4 +688,51 @@ test("reanchor manifest is exposed to mcp with an optional id", () => {
   const entry = actionManifest("mcp").find((m) => m.name === "reanchor");
   assert.ok(entry, "reanchor not exposed to mcp");
   assert.equal(entry?.inputSchema.type, "object");
+});
+
+// ── dead-air-rm: GUI parity (Task 2) ─────────────────────────────────────────
+
+test("dead-air-rm exposes the gui surface (cleanup panel remove button)", () => {
+  const gui = actionManifest("gui");
+  assert.ok(
+    gui.some((m) => m.name === "dead-air-rm"),
+    "dead-air-rm missing from gui manifest"
+  );
+});
+
+test("dead-air-rm: removes an existing span and returns removed=true", () => {
+  const p = makeProject();
+  runAction("dead-air-add", p, {
+    spans: [{ fromSec: 1, toSec: 2 }],
+  });
+  const id = (p.cuts?.deadAir ?? [])[0]?.id;
+  assert.ok(id, "dead-air-add should have created a span");
+  const result = runAction("dead-air-rm", p, { id }) as { removed: boolean };
+  assert.equal(result.removed, true);
+  assert.equal((p.cuts?.deadAir ?? []).length, 0);
+});
+
+// ── look-transition action (Task 3) ──────────────────────────────────────────
+
+test("look-transition is exposed to cli, gui, and mcp surfaces", () => {
+  const entry = getAction("look-transition");
+  assert.ok(entry, "look-transition not found");
+  assert.ok(entry?.surfaces.includes("cli"));
+  assert.ok(entry?.surfaces.includes("gui"));
+  assert.ok(entry?.surfaces.includes("mcp"));
+});
+
+test("look-transition sets crossfade type and durationMs", () => {
+  const p = makeProject();
+  runAction("look-transition", p, { type: "crossfade", durationMs: 400 });
+  assert.equal(p.look.transition.type, "crossfade");
+  assert.equal(p.look.transition.durationMs, 400);
+});
+
+test("look-transition partial patch only changes provided fields", () => {
+  const p = makeProject();
+  runAction("look-transition", p, { type: "dip", durationMs: 600 });
+  runAction("look-transition", p, { type: "crossfade" });
+  assert.equal(p.look.transition.type, "crossfade");
+  assert.equal(p.look.transition.durationMs, 600);
 });

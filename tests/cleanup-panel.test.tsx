@@ -271,3 +271,37 @@ test("warnings render as a muted list", () => {
   });
   assert.match(html, /dead-air detection needs audio analysis/);
 });
+
+// ── Registered dead-air spans section ───────────────────────────────────────
+
+test("registered spans section is absent when registeredSpans is empty", () => {
+  const html = renderPanel({ registeredSpans: [] });
+  assert.doesNotMatch(html, /data-dead-air-registered/);
+});
+
+test("registered spans section renders when spans are provided", () => {
+  const html = renderPanel({
+    registeredSpans: [
+      { id: "da-1", startSec: 5, endSec: 6.5 },
+      { id: "da-2", startSec: 20, endSec: 21.2 },
+    ],
+  });
+  assert.match(html, /data-dead-air-registered/);
+  // Two remove buttons
+  const rmCount = html.split("data-dead-air-rm=").length - 1;
+  assert.equal(rmCount, 2);
+  // Timecodes and duration labels
+  assert.match(html, /0:05/); // 5s
+  assert.match(html, /0:06/); // 6s
+  assert.match(html, /1\.5s/); // 6.5-5 = 1.5s
+  assert.match(html, /0:20/); // 20s
+});
+
+test("registered spans remove buttons are disabled while applying", () => {
+  const html = renderPanel({
+    applying: true,
+    registeredSpans: [{ id: "da-1", startSec: 5, endSec: 6.5 }],
+  });
+  const rmTag = tagWith(html, "data-dead-air-rm");
+  assert.ok(rmTag.includes('disabled=""'));
+});

@@ -56,6 +56,8 @@ import {
   buildSegmentAudioConcatFilter,
   buildSegmentInputArgs,
   buildSegmentVideoConcatFilter,
+  buildSegmentVideoTransitionFilter,
+  shouldApplyCutTransition,
   shouldUseSegmentExport,
 } from "./export-segments.ts";
 import { FFMPEG, probe, run } from "./ffmpeg.ts";
@@ -1171,23 +1173,45 @@ export async function exportCut(
   // ---- filtergraph ----
   const parts: string[] = [];
   const sourceDurationSec = project.durationSamples / sr;
+  const cutTransition = project.look?.transition ?? {
+    type: "none" as const,
+    durationMs: 500,
+  };
+  const transitionGate = {
+    ranges,
+    sourceDurationSec,
+    hasBroll: plans.length > 0,
+    hasStills: stillPlans.length > 0,
+    hasRichGraphics: richGraphics.length > 0,
+    hasMusic: musicWindows.length > 0,
+  };
+  const applyTransition = shouldApplyCutTransition(
+    cutTransition.type,
+    transitionGate
+  );
   const segmentMode =
-    shouldUseSegmentExport({
-      ranges,
-      sourceDurationSec,
-      hasBroll: plans.length > 0,
-      hasStills: stillPlans.length > 0,
-      hasRichGraphics: richGraphics.length > 0,
-      hasMusic: musicWindows.length > 0,
-    }) && !shouldUseSeamedVoice(ranges, project.cuts.snap);
+    applyTransition ||
+    (shouldUseSegmentExport(transitionGate) &&
+      !shouldUseSeamedVoice(ranges, project.cuts.snap));
   const fpsRetime = fpsFilterFor(sourceMeta.fps, resolved.fps);
   if (segmentMode) {
-    parts.push(
-      buildSegmentVideoConcatFilter({
-        rangeCount: ranges.length,
-        fpsFilter: fpsRetime,
-      })
-    );
+    if (applyTransition) {
+      parts.push(
+        buildSegmentVideoTransitionFilter({
+          durationSec: (cutTransition.durationMs ?? 500) / 1000,
+          fpsFilter: fpsRetime,
+          ranges,
+          transitionType: cutTransition.type,
+        })
+      );
+    } else {
+      parts.push(
+        buildSegmentVideoConcatFilter({
+          rangeCount: ranges.length,
+          fpsFilter: fpsRetime,
+        })
+      );
+    }
   } else {
     const base = `[0:v]select='${selectExpr}',setpts=N/FRAME_RATE/TB${fpsRetime}`;
     parts.push(`${base}[vsel]`);

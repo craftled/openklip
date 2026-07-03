@@ -1,4 +1,4 @@
-import type { Range } from "./edl.ts";
+import type { CutTransitionType, Range } from "./edl.ts";
 import { sec, totalDurationSec } from "./edl.ts";
 
 /** Max kept ranges before segment mode falls back to full-source select. */
@@ -111,4 +111,150 @@ export function buildSegmentAudioConcatFilter(input: {
   ).join("");
   parts.push(`${labels}concat=n=${input.rangeCount}:v=0:a=1[${out}]`);
   return parts.join(";");
+}
+
+/**
+ * Whether a cut transition can be applied to the current export.
+ * Transitions need the segment path (voice-only), at least two ranges,
+ * and a non-"none" type.
+ */
+export function shouldApplyCutTransition(
+  transitionType: CutTransitionType,
+  gate: SegmentExportGate
+): boolean {
+  if (transitionType === "none") {
+    return false;
+  }
+  if (gate.ranges.length < 2) {
+    return false;
+  }
+  // Transitions are incompatible with overlays: the segment path is
+  // unavailable when b-roll, stills, music, or rich graphics are present,
+  // so fall back to a hard cut.
+  if (
+    gate.hasBroll ||
+    gate.hasStills ||
+    gate.hasRichGraphics ||
+    gate.hasMusic
+  ) {
+    return false;
+  }
+  if (gate.ranges.length > SEGMENT_EXPORT_MAX_RANGES) {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Build a video filter chain that applies a crossfade (xfade) transition
+ * between all segment inputs. Each segment must already be prepared as
+ * `[vseg0]`, `[vseg1]`, ... by the caller.
+ *
+ * xfade offset is the time (output seconds) at which the transition starts.
+ * For N segments with crossfade duration D:
+ *   offset_0 = dur(seg0) - D
+ *   offset_k = offset_{k-1} + dur(seg_k) - D
+ *
+ * (Each xfade "consumes" D seconds from the tail of the left segment and
+ * the head of the right segment, so each subsequent xfade offset steps by
+ * (dur_k - D) rather than dur_k.)
+ */
+export function buildSegmentVideoCrossfadeFilter(input: {
+  durationSec: number;
+  fpsFilter: string;
+  outputLabel?: string;
+  ranges: Range[];
+}): string {
+  const { durationSec, fpsFilter, ranges } = input;
+  const out = input.outputLabel ?? "vsel";
+  const n = ranges.length;
+  if (n === 1) {
+    return `[0:v]setpts=PTS-STARTPTS${fpsFilter}[${out}]`;
+  }
+  const parts: string[] = [];
+  for (let i = 0; i < n; i++) {
+    parts.push(`[${i}:v]setpts=PTS-STARTPTS${fpsFilter}[vseg${i}]`);
+  }
+  // Build pairwise xfade chain
+  let left = "vseg0";
+  let runningOffset = 0;
+  for (let i = 1; i < n; i++) {
+    const segDur = ranges[i - 1].endSec - ranges[i - 1].startSec;
+    runningOffset += Math.max(0, segDur - durationSec);
+    const xOffset = sec(runningOffset);
+    const isLast = i === n - 1;
+    const outLabel = isLast ? out : `xf${i}`;
+    parts.push(
+      `[${left}][vseg${i}]xfade=transition=fade:duration=${sec(durationSec)}:offset=${xOffset}[${outLabel}]`
+    );
+    left = outLabel;
+  }
+  return parts.join(";");
+}
+
+/**
+ * Build a video filter chain that applies a dip-to-black transition between
+ * all segment inputs. Each segment fades out at the end and the next fades
+ * in at the start; segments are then hard-concatenated.
+ *
+ * Half the transition duration is consumed from the end of each outgoing
+ * segment and the start of each incoming segment (except the very first
+ * start and very last end, which stay at full brightness).
+ */
+export function buildSegmentVideoDipFilter(input: {
+  durationSec: number;
+  fpsFilter: string;
+  outputLabel?: string;
+  ranges: Range[];
+}): string {
+  const { durationSec, fpsFilter, ranges } = input;
+  const out = input.outputLabel ?? "vsel";
+  const n = ranges.length;
+  if (n === 1) {
+    return `[0:v]setpts=PTS-STARTPTS${fpsFilter}[${out}]`;
+  }
+  const half = durationSec / 2;
+  const parts: string[] = [];
+  for (let i = 0; i < n; i++) {
+    const dur = ranges[i].endSec - ranges[i].startSec;
+    const fadeOutStart = Math.max(0, dur - half);
+    const needFadeOut = i < n - 1;
+    const needFadeIn = i > 0;
+    let chain = `[${i}:v]setpts=PTS-STARTPTS${fpsFilter}`;
+    if (needFadeOut) {
+      chain += `,fade=t=out:st=${sec(fadeOutStart)}:d=${sec(half)}`;
+    }
+    if (needFadeIn) {
+      chain += `,fade=t=in:st=0:d=${sec(half)}`;
+    }
+    parts.push(`${chain}[vseg${i}]`);
+  }
+  const labels = Array.from({ length: n }, (_, i) => `[vseg${i}]`).join("");
+  parts.push(`${labels}concat=n=${n}:v=1:a=0[${out}]`);
+  return parts.join(";");
+}
+
+/**
+ * Unified dispatcher: build the video filter chain for a given transition
+ * type. Falls back to plain concat for "none" or single-range exports.
+ */
+export function buildSegmentVideoTransitionFilter(input: {
+  durationSec: number;
+  fpsFilter: string;
+  outputLabel?: string;
+  ranges: Range[];
+  transitionType: CutTransitionType;
+}): string {
+  const { transitionType, ...rest } = input;
+  if (transitionType === "crossfade") {
+    return buildSegmentVideoCrossfadeFilter(rest);
+  }
+  if (transitionType === "dip") {
+    return buildSegmentVideoDipFilter(rest);
+  }
+  return buildSegmentVideoConcatFilter({
+    fpsFilter: rest.fpsFilter,
+    outputLabel: rest.outputLabel,
+    rangeCount: rest.ranges.length,
+  });
 }

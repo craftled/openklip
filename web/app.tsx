@@ -1391,6 +1391,19 @@ export function App({
     }
   };
 
+  // Remove a registered dead-air span by id. Optimistically drops the span
+  // from local state then confirms via the dead-air-rm action.
+  const removeDeadAirSpan = (id: string) => {
+    setProject((prev) => ({
+      ...prev,
+      cuts: {
+        ...prev.cuts,
+        deadAir: (prev.cuts?.deadAir ?? []).filter((s) => s.id !== id),
+      },
+    }));
+    enqueueSave(() => runGuiAction(project.slug, "dead-air-rm", { id }));
+  };
+
   // Audio section: ducking/loudness/highpass patch through the audio action
   // (setAudio re-clamps bounds server-side); snap patches through the
   // existing cuts-snap action.
@@ -3039,6 +3052,12 @@ export function App({
                 applying={pendingSaves > 0}
                 onApply={applyCleanupCandidate}
                 onApplyAllSafe={applyAllSafeCleanup}
+                onRemoveSpan={removeDeadAirSpan}
+                registeredSpans={(project.cuts?.deadAir ?? []).map((s) => ({
+                  id: s.id,
+                  startSec: s.startSample / project.sampleRate,
+                  endSec: s.endSample / project.sampleRate,
+                }))}
                 report={cleanupReportView}
               />
             </Section>
