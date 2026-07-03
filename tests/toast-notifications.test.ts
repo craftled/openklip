@@ -31,6 +31,7 @@ import {
   revertFailedToast,
   revertSucceededToast,
   saveFailedToast,
+  transitionFallbackToast,
   workspacePickerToasts,
   workspacePickFailedToast,
 } from "../web/lib/toast-notifications.ts";
@@ -65,6 +66,43 @@ test("exportFailedToast", () => {
     title: "Export failed",
     description: "Empty cut",
   });
+});
+
+test("transitionFallbackToast: null when no transition was requested", () => {
+  assert.equal(transitionFallbackToast({ type: "none", applied: false }), null);
+});
+
+test("transitionFallbackToast: null when the requested transition applied", () => {
+  assert.equal(
+    transitionFallbackToast({ type: "crossfade", applied: true }),
+    null
+  );
+});
+
+test("transitionFallbackToast: info toast explaining the fallback when overlays are present", () => {
+  const payload = transitionFallbackToast({
+    type: "crossfade",
+    applied: false,
+    reason: "overlays-present",
+  });
+  assert.equal(payload?.kind, "info");
+  assert.equal(payload?.title, "Transition not applied");
+  assert.match(payload?.description ?? "", /crossfade/);
+  assert.match(
+    payload?.description ?? "",
+    /b-roll, stills, music, or graphics present/
+  );
+});
+
+test("transitionFallbackToast: info toast for dip requested but too few ranges", () => {
+  const payload = transitionFallbackToast({
+    type: "dip",
+    applied: false,
+    reason: "too-few-ranges",
+  });
+  assert.equal(payload?.kind, "info");
+  assert.match(payload?.description ?? "", /dip/);
+  assert.match(payload?.description ?? "", /fewer than two kept ranges/);
 });
 
 test("nothingToPlayToast", () => {

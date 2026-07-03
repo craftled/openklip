@@ -54,6 +54,7 @@ import {
   type ExportPlatformId,
   isExportPlatformId,
 } from "./export-platforms.ts";
+import { cutTransitionFallbackReasonLabel } from "./export-segments.ts";
 import {
   EXPORT_COMPRESSIONS,
   EXPORT_FORMATS,
@@ -2372,8 +2373,21 @@ try {
         r.loudnessTargetLufs === undefined
           ? ""
           : `, loudness ${r.loudnessTargetLufs} LUFS`;
+      const transitionNote = ((): string => {
+        const t = r.transition;
+        if (t.type === "none") {
+          return "";
+        }
+        if (t.applied) {
+          return `, transition ${t.type}`;
+        }
+        const reasonLabel = t.reason
+          ? cutTransitionFallbackReasonLabel(t.reason)
+          : "not supported for this export";
+        return `, transition ${t.type} requested but not applied (${reasonLabel})`;
+      })();
       console.log(
-        `exported ${r.ranges} ranges, ${r.durationSec.toFixed(1)}s (${r.height}p, ${r.fps}fps, ${r.compression}${formatNote}${platformNote}${loudnessNote}, music ${r.music}) -> ${r.out}`
+        `exported ${r.ranges} ranges, ${r.durationSec.toFixed(1)}s (${r.height}p, ${r.fps}fps, ${r.compression}${formatNote}${platformNote}${loudnessNote}${transitionNote}, music ${r.music}) -> ${r.out}`
       );
       break;
     }

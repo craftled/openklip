@@ -10,6 +10,9 @@ import {
   buildSegmentVideoCrossfadeFilter,
   buildSegmentVideoDipFilter,
   buildSegmentVideoTransitionFilter,
+  cutTransitionFallbackReason,
+  cutTransitionFallbackReasonLabel,
+  SEGMENT_EXPORT_MAX_RANGES,
   shouldApplyCutTransition,
 } from "../src/export-segments.ts";
 import { runAction } from "../src/registry.ts";
@@ -141,6 +144,92 @@ test("shouldApplyCutTransition: false when music present", () => {
   assert.equal(
     shouldApplyCutTransition("dip", { ...gate, hasMusic: true }),
     false
+  );
+});
+
+// ── cutTransitionFallbackReason ──────────────────────────────────────────────
+
+test("cutTransitionFallbackReason: undefined when the gate would allow the transition", () => {
+  assert.equal(cutTransitionFallbackReason(gate), undefined);
+});
+
+test("cutTransitionFallbackReason: too-few-ranges when only one range", () => {
+  assert.equal(
+    cutTransitionFallbackReason({
+      ...gate,
+      ranges: [{ startSec: 0, endSec: 5 }],
+    }),
+    "too-few-ranges"
+  );
+});
+
+test("cutTransitionFallbackReason: overlays-present when b-roll present", () => {
+  assert.equal(
+    cutTransitionFallbackReason({ ...gate, hasBroll: true }),
+    "overlays-present"
+  );
+});
+
+test("cutTransitionFallbackReason: overlays-present when music present", () => {
+  assert.equal(
+    cutTransitionFallbackReason({ ...gate, hasMusic: true }),
+    "overlays-present"
+  );
+});
+
+test("cutTransitionFallbackReason: overlays-present when stills present", () => {
+  assert.equal(
+    cutTransitionFallbackReason({ ...gate, hasStills: true }),
+    "overlays-present"
+  );
+});
+
+test("cutTransitionFallbackReason: overlays-present when rich graphics present", () => {
+  assert.equal(
+    cutTransitionFallbackReason({ ...gate, hasRichGraphics: true }),
+    "overlays-present"
+  );
+});
+
+test("cutTransitionFallbackReason: too-many-ranges past the max", () => {
+  const tooMany = Array.from(
+    { length: SEGMENT_EXPORT_MAX_RANGES + 1 },
+    (_, i) => ({
+      startSec: i * 2,
+      endSec: i * 2 + 1,
+    })
+  );
+  assert.equal(
+    cutTransitionFallbackReason({ ...gate, ranges: tooMany }),
+    "too-many-ranges"
+  );
+});
+
+test("cutTransitionFallbackReason: too-few-ranges wins over overlays when both apply", () => {
+  // Matches shouldApplyCutTransition's check order: ranges < 2 is checked
+  // before overlays, so the reported reason should agree.
+  assert.equal(
+    cutTransitionFallbackReason({
+      ...gate,
+      ranges: [{ startSec: 0, endSec: 5 }],
+      hasBroll: true,
+    }),
+    "too-few-ranges"
+  );
+});
+
+test("cutTransitionFallbackReasonLabel: readable text for each reason", () => {
+  assert.equal(
+    cutTransitionFallbackReasonLabel("too-few-ranges"),
+    "fewer than two kept ranges"
+  );
+  assert.equal(
+    cutTransitionFallbackReasonLabel("overlays-present"),
+    "b-roll, stills, music, or graphics present"
+  );
+  assert.equal(
+    cutTransitionFallbackReasonLabel("too-many-ranges"),
+    "too many kept ranges"
   );
 });
 

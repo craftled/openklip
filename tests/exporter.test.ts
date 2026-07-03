@@ -2435,6 +2435,288 @@ test("CLI export --format with no following value errors", async () => {
   });
 });
 
+// ── Transition fallback visibility: ExportResult.transition ────────────────
+
+async function makeTransitionSmokeSource(src: string) {
+  await run(
+    FFMPEG,
+    [
+      "-y",
+      "-f",
+      "lavfi",
+      "-i",
+      "testsrc=duration=4:size=320x240:rate=30",
+      "-f",
+      "lavfi",
+      "-i",
+      "sine=frequency=440:duration=4",
+      "-c:v",
+      "libx264",
+      "-pix_fmt",
+      "yuv420p",
+      "-c:a",
+      "aac",
+      "-shortest",
+      src,
+    ],
+    "ffmpeg(transition-smoke-clip)"
+  );
+}
+
+// Word w1 is deleted, splitting the kept words into two ranges (0-1s, 2-4s)
+// so shouldApplyCutTransition's "at least two ranges" gate is satisfied.
+function transitionSmokeProject(
+  slug: string,
+  src: string,
+  overrides: Partial<Project> = {}
+) {
+  return makeProject({
+    slug,
+    source: src,
+    fps: 30,
+    width: 320,
+    height: 240,
+    durationSamples: 4 * SAMPLE_RATE,
+    captions: { enabled: false, maxWords: 6, style: "boxed" },
+    words: [
+      {
+        id: "w0",
+        text: "one",
+        startSample: 0,
+        endSample: SAMPLE_RATE,
+        deleted: false,
+      },
+      {
+        id: "w1",
+        text: "two",
+        startSample: SAMPLE_RATE,
+        endSample: 2 * SAMPLE_RATE,
+        deleted: true,
+      },
+      {
+        id: "w2",
+        text: "three",
+        startSample: 2 * SAMPLE_RATE,
+        endSample: 3 * SAMPLE_RATE,
+        deleted: false,
+      },
+      {
+        id: "w3",
+        text: "four",
+        startSample: 3 * SAMPLE_RATE,
+        endSample: 4 * SAMPLE_RATE,
+        deleted: false,
+      },
+    ],
+    ...overrides,
+  });
+}
+
+test("exportCut: no transition requested reports transition.type none, applied false, no reason (smoke)", {
+  skip: FFMPEG_OK ? false : "ffmpeg binary unavailable",
+}, async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    const p = projectPaths(slug);
+    const src = join(p.dir, "source.mp4");
+    await makeTransitionSmokeSource(src);
+    writeFixtureProject(slug, transitionSmokeProject(slug, src));
+
+    const result = await exportCut(slug);
+    assert.equal(result.transition.type, "none");
+    assert.equal(result.transition.applied, false);
+    assert.equal(result.transition.reason, undefined);
+  });
+});
+
+test("exportCut: crossfade requested with two ranges and no overlays reports applied true (smoke)", {
+  skip: FFMPEG_OK ? false : "ffmpeg binary unavailable",
+}, async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    const p = projectPaths(slug);
+    const src = join(p.dir, "source.mp4");
+    await makeTransitionSmokeSource(src);
+    writeFixtureProject(
+      slug,
+      transitionSmokeProject(slug, src, {
+        look: {
+          vignette: false,
+          transition: { type: "crossfade", durationMs: 200 },
+        },
+      })
+    );
+
+    const result = await exportCut(slug);
+    assert.equal(result.transition.type, "crossfade");
+    assert.equal(result.transition.applied, true);
+    assert.equal(result.transition.reason, undefined);
+    assert.ok(existsSync(p.out), "out.mp4 missing");
+  });
+});
+
+test("exportCut: crossfade requested with b-roll present falls back and reports why (smoke)", {
+  skip: FFMPEG_OK ? false : "ffmpeg binary unavailable",
+}, async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    const p = projectPaths(slug);
+    const src = join(p.dir, "source.mp4");
+    await makeTransitionSmokeSource(src);
+    const brollSrc = join(p.dir, "assets", "broll.mp4");
+    mkdirSync(join(p.dir, "assets"), { recursive: true });
+    await run(
+      FFMPEG,
+      [
+        "-y",
+        "-f",
+        "lavfi",
+        "-i",
+        "testsrc=duration=1:size=320x240:rate=30",
+        "-c:v",
+        "libx264",
+        "-pix_fmt",
+        "yuv420p",
+        brollSrc,
+      ],
+      "ffmpeg(transition-smoke-broll)"
+    );
+    writeFixtureProject(
+      slug,
+      transitionSmokeProject(slug, src, {
+        look: {
+          vignette: false,
+          transition: { type: "crossfade", durationMs: 200 },
+        },
+        assets: [
+          {
+            id: "broll-1",
+            kind: "broll",
+            name: "broll.mp4",
+            src: brollSrc,
+            proxy: "assets/broll.mp4",
+            durationSamples: SAMPLE_RATE,
+          },
+        ],
+        broll: [
+          {
+            id: "b1",
+            assetId: "broll-1",
+            startSample: 2 * SAMPLE_RATE,
+            endSample: 3 * SAMPLE_RATE,
+            srcInSample: 0,
+            display: "cover",
+          },
+        ],
+      })
+    );
+
+    const result = await exportCut(slug);
+    assert.equal(result.transition.type, "crossfade");
+    assert.equal(result.transition.applied, false);
+    assert.equal(result.transition.reason, "overlays-present");
+    assert.ok(existsSync(p.out), "out.mp4 missing");
+  });
+});
+
+test("CLI export with a transition set and no overlays confirms it applied in the summary (smoke)", {
+  skip: FFMPEG_OK ? false : "ffmpeg binary unavailable",
+}, async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    const p = projectPaths(slug);
+    const src = join(p.dir, "source.mp4");
+    await makeTransitionSmokeSource(src);
+    writeFixtureProject(
+      slug,
+      transitionSmokeProject(slug, src, {
+        look: {
+          vignette: false,
+          transition: { type: "crossfade", durationMs: 200 },
+        },
+      })
+    );
+
+    const result = await runCli(["export", slug]);
+    assert.equal(result.code, 0, result.out);
+    assert.match(result.out, /transition crossfade\b/);
+    assert.doesNotMatch(result.out, /not applied/);
+  });
+});
+
+test("CLI export with a transition set and b-roll present reports the fallback and why (smoke)", {
+  skip: FFMPEG_OK ? false : "ffmpeg binary unavailable",
+}, async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    const p = projectPaths(slug);
+    const src = join(p.dir, "source.mp4");
+    await makeTransitionSmokeSource(src);
+    const brollSrc = join(p.dir, "assets", "broll.mp4");
+    mkdirSync(join(p.dir, "assets"), { recursive: true });
+    await run(
+      FFMPEG,
+      [
+        "-y",
+        "-f",
+        "lavfi",
+        "-i",
+        "testsrc=duration=1:size=320x240:rate=30",
+        "-c:v",
+        "libx264",
+        "-pix_fmt",
+        "yuv420p",
+        brollSrc,
+      ],
+      "ffmpeg(cli-transition-smoke-broll)"
+    );
+    writeFixtureProject(
+      slug,
+      transitionSmokeProject(slug, src, {
+        look: {
+          vignette: false,
+          transition: { type: "crossfade", durationMs: 200 },
+        },
+        assets: [
+          {
+            id: "broll-1",
+            kind: "broll",
+            name: "broll.mp4",
+            src: brollSrc,
+            proxy: "assets/broll.mp4",
+            durationSamples: SAMPLE_RATE,
+          },
+        ],
+        broll: [
+          {
+            id: "b1",
+            assetId: "broll-1",
+            startSample: 2 * SAMPLE_RATE,
+            endSample: 3 * SAMPLE_RATE,
+            srcInSample: 0,
+            display: "cover",
+          },
+        ],
+      })
+    );
+
+    const result = await runCli(["export", slug]);
+    assert.equal(result.code, 0, result.out);
+    assert.match(result.out, /transition crossfade requested but not applied/);
+    assert.match(result.out, /b-roll, stills, music, or graphics present/);
+  });
+});
+
+test("CLI export with no transition set omits the transition fragment from the summary (smoke)", {
+  skip: FFMPEG_OK ? false : "ffmpeg binary unavailable",
+}, async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    const p = projectPaths(slug);
+    const src = join(p.dir, "source.mp4");
+    await makeTransitionSmokeSource(src);
+    writeFixtureProject(slug, transitionSmokeProject(slug, src));
+
+    const result = await runCli(["export", slug]);
+    assert.equal(result.code, 0, result.out);
+    assert.doesNotMatch(result.out, /transition/);
+  });
+});
+
 // ── E1: segment mode audio in buildAudioParts ────────────────────────────────
 
 test("buildAudioParts: segmentMode concat replaces aselect for voice-only export", () => {

@@ -25,6 +25,7 @@ import {
   type Broll,
   type BrollDisplay,
   type CutSnap,
+  type CutTransitionType,
   type ExportAspect,
   type ExportCrop,
   ExportSettingsSchema,
@@ -57,6 +58,8 @@ import {
   buildSegmentInputArgs,
   buildSegmentVideoConcatFilter,
   buildSegmentVideoTransitionFilter,
+  type CutTransitionFallbackReason,
+  cutTransitionFallbackReason,
   shouldApplyCutTransition,
   shouldUseSegmentExport,
 } from "./export-segments.ts";
@@ -829,6 +832,15 @@ export async function exportCut(
   };
   /** True when per-range input seeking was used instead of full-source select. */
   segmentMode: boolean;
+  /** What happened to project.look.transition for this export. "none" means
+   * no transition was requested (the default, no applied/reason noise);
+   * otherwise applied reports whether it actually rendered, and reason (only
+   * present when applied is false) explains the hard-cut fallback. */
+  transition: {
+    applied: boolean;
+    reason?: CutTransitionFallbackReason;
+    type: CutTransitionType;
+  };
 }> {
   // ONE resolution point: a platform preset only fills gaps left unset by
   // the caller, so every surface (CLI/route/action/MCP) gets platform
@@ -1189,6 +1201,24 @@ export async function exportCut(
     cutTransition.type,
     transitionGate
   );
+  // Records what actually happened to project.look.transition for this
+  // export: "none" reports cleanly with no applied/reason noise, and a
+  // requested transition always reports whether it applied and, if it fell
+  // back to a hard cut, why (see shouldApplyCutTransition's gate order).
+  const transitionResult: {
+    applied: boolean;
+    reason?: CutTransitionFallbackReason;
+    type: CutTransitionType;
+  } =
+    cutTransition.type === "none"
+      ? { applied: false, type: "none" }
+      : {
+          applied: applyTransition,
+          type: cutTransition.type,
+          ...(applyTransition
+            ? {}
+            : { reason: cutTransitionFallbackReason(transitionGate) }),
+        };
   const segmentMode =
     applyTransition ||
     (shouldUseSegmentExport(transitionGate) &&
@@ -1566,5 +1596,6 @@ export async function exportCut(
       snapped,
     },
     segmentMode,
+    transition: transitionResult,
   };
 }

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.30.0.0 - 2026-07-03
+
+Exported cut transitions and GUI dead-air removal.
+
+### Added
+- **Exported cut transitions** (`src/edl.ts`, `src/export-segments.ts`, `src/exporter.ts`): `project.look.transition` (`none` | `crossfade` | `dip`, 50-2000ms duration, default `none`/500ms). Crossfade uses ffmpeg `xfade`; dip-to-black uses paired fades. Requires the segment-export path (voice-only: no b-roll, stills, music, or rich graphics) and at least two kept ranges; `shouldApplyCutTransition` (`src/export-segments.ts`) gates this and silently falls back to a hard cut when the export has overlays, isn't yet surfaced to the caller (see Known Limitations). `openklip look <slug> transition <crossfade|dip> [--duration ms]` (registry action `look-transition`). Preview (Glimm WebGL sweep) does not yet match the export transition type.
+- **Dead-air GUI removal** (`web/components/cleanup-panel.tsx`): the Cleanup panel now lists registered dead-air spans with a per-span remove button, calling the existing `dead-air-rm` action; previously CLI/MCP only.
+
+### Changed
+- **Version**: bumped OpenKlip to `0.30.0.0`.
+
 ## 0.29.0.1 - 2026-07-03
 
 CLI/MCP parity follow-up to the 0.29.0.0 export format feature.

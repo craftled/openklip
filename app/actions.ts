@@ -3,12 +3,20 @@
 import { existsSync } from "node:fs";
 import { loadBrief, saveBrief as saveBriefFile } from "@engine/brief";
 import { logBriefSet } from "@engine/brief-log";
-import type { ColorAdjust, Cuts, Filter, Motion, Project } from "@engine/edl";
+import type {
+  ColorAdjust,
+  Cuts,
+  CutTransitionType,
+  Filter,
+  Motion,
+  Project,
+} from "@engine/edl";
 import {
   EXPORT_PLATFORM_IDS,
   type ExportPlatformId,
   isExportPlatformId,
 } from "@engine/export-platforms";
+import type { CutTransitionFallbackReason } from "@engine/export-segments";
 import type { ExportCompression, ExportFormat } from "@engine/exporter";
 import { projectPaths } from "@engine/paths";
 import {
@@ -255,6 +263,11 @@ export async function exportProject(
     format: ExportFormat;
     durationSec: number;
     out: string;
+    transition: {
+      applied: boolean;
+      reason?: CutTransitionFallbackReason;
+      type: CutTransitionType;
+    };
   }>
 > {
   try {

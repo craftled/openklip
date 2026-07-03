@@ -1,3 +1,9 @@
+import type { CutTransitionType } from "@engine/edl";
+import {
+  type CutTransitionFallbackReason,
+  cutTransitionFallbackReasonLabel,
+} from "@engine/export-segments";
+
 export type ToastKind = "error" | "info" | "success";
 
 export interface ToastPayload {
@@ -11,6 +17,12 @@ export interface ExportResultData {
   height: number;
   out: string;
   ranges: number;
+}
+
+export interface ExportTransitionResultData {
+  applied: boolean;
+  reason?: CutTransitionFallbackReason;
+  type: CutTransitionType;
 }
 
 export interface FindFillerResult {
@@ -53,6 +65,27 @@ export function exportFailedToast(error: string): ToastPayload {
     kind: "error",
     title: "Export failed",
     description: error,
+  };
+}
+
+// Only surfaces when a transition was requested but silently fell back to a
+// hard cut: matches the "only say something when it's surprising" principle
+// already used for the CLI's formatNote/platformNote fragments. Returns null
+// when no transition was requested (type "none") or when it applied as
+// expected, so a normal export stays quiet.
+export function transitionFallbackToast(
+  transition: ExportTransitionResultData
+): ToastPayload | null {
+  if (transition.type === "none" || transition.applied) {
+    return null;
+  }
+  const reasonLabel = transition.reason
+    ? cutTransitionFallbackReasonLabel(transition.reason)
+    : "not supported for this export";
+  return {
+    kind: "info",
+    title: "Transition not applied",
+    description: `Requested ${transition.type} but exported a hard cut: ${reasonLabel}.`,
   };
 }
 
