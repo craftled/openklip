@@ -17,6 +17,7 @@ Change an existing draft on request: read what is already there, apply only what
 
 - **Targeted edit**: change a title's text, a zoom's span or scale, a music bed's gain, cut a few more words on a named phrase, or restore a few that were cut. Apply the specific mutation only; do not touch anything the user did not mention.
 - **Whole-task undo**: "undo that", "go back to before the b-roll", "redo the whole cut". Use revert with the prior task's id, and only when you are confident which task id produced the part the user wants gone.
+- **Convert to short**: user asks for Shorts, Reels, TikTok, vertical, or 9:16 without requesting a full redo of the draft. Do NOT revert; follow the convert-to-short path in section 3b only.
 - **Out of scope**: brief.md content or swapping media files. Say so in task_complete rather than attempting it; brief_set and asset registration are separate flows this playbook does not drive.
 
 ## 3. Targeted edits
@@ -27,6 +28,17 @@ Change an existing draft on request: read what is already there, apply only what
 - B-roll or stills: broll-set or still-set with the overlay id and only the changed fields.
 - Music: music-set with the placement id for gain or fade changes; music-add only if no bed exists yet. Keep ducking on (audio {"ducking": {"enabled": true}}) unless the user asks to turn it off.
 - Captions or look flags: captions, captions-max, look-vignette, and similar direct actions, called only for what was asked.
+
+## 3b. Convert to short
+
+Use this path when the classify step lands on **Convert to short**. Do not revert the draft or remove overlays unless the user separately asked to trim runtime or remove specific overlays.
+
+- Call export-set with `aspect: "9:16"` to set the vertical frame for both preview and export. Default crop (focusX 0.5, focusY 0.5, scale 1) centers a standard talking-head; adjust only when the speaker is visibly off-center or too small.
+- Patch crop with export-set when needed: raise `scale` slightly (1.1 to 1.4) to tighten on the speaker, or shift `focusX` / `focusY` (0 to 1) to keep the face in frame. One small adjustment at a time; re-read project_status after each change.
+- Keep captions on unless the brief or user says otherwise. Captions burn in for vertical export; avoid placing a hero title in the bottom third when captions are on.
+- Export with the `shorts` platform preset (`platform: "shorts"` on the export tool). That fills 9:16 aspect, 30fps, 1920 height cap, social compression, and -14 LUFS for this invocation only. Do not mutate `project.audio.loudness`.
+- Call verify. If it reports drift, fix and export once more.
+- In task_complete, report that aspect was set to 9:16, the crop used, and that `output/out.mp4` was rendered for Shorts. Name any overlays or cuts that were left untouched because the user did not ask to change them.
 
 ## 4. Whole-task revert
 

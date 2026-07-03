@@ -117,6 +117,7 @@ export interface ProjectStatusJson {
   export: {
     aspect: "source" | "16:9" | "9:16" | "1:1";
     crop: { focusX: number; focusY: number; scale: number };
+    cropMode: "manual" | "scene";
   };
   keptDurationSec: number;
   look: { vignette: boolean; filter: Filter; lut?: string };
@@ -353,6 +354,7 @@ export function projectStatus(
         focusY: project.export?.crop?.focusY ?? 0.5,
         scale: project.export?.crop?.scale ?? 1,
       },
+      cropMode: project.export?.cropMode ?? "manual",
     },
     overlays: listOverlays(project),
   };

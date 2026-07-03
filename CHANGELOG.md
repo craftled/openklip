@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.22.0.0 - 2026-07-03
+
+Scene crop mode, revise-draft convert-to-short, and make-short loop verification.
+
+### Added
+- **Scene crop mode** (`cropMode: manual|scene` on `project.export`): when `scene`, `export-set` derives crop focus from `sceneLog` speaker spans via `src/auto-crop.ts`. GUI Manual/Scene toggle in Reframe controls when a scene log exists. CLI `--crop-mode manual|scene` on `export-set`.
+- **`revise-draft` convert-to-short path**: section 3b routes Shorts/Reels/TikTok requests through `export-set` + `shorts` export without reverting the draft.
+- **`make-short` loop test** (`tests/make-short-loop.test.ts`): documents export-set 9:16 + shorts preset resolution.
+
+### Changed
+- **Version**: bumped OpenKlip to `0.22.0.0`.
+
 ## 0.21.0.0 - 2026-07-03
 
 The vertical export reframe release: landscape talking-head edits can export to 9:16 Shorts/Reels/TikTok with a manual pan/zoom crop shared by preview and ffmpeg.

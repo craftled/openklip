@@ -4,6 +4,7 @@
 // are the operations an external coding agent drives from the terminal.
 
 import { randomUUID } from "node:crypto";
+import { suggestCropFromSceneLog } from "./auto-crop.ts";
 import { CAPTION_STYLE_IDS, isCaptionStyleId } from "./caption-styles.ts";
 import { isNeutralColor } from "./color-adjust.ts";
 import {
@@ -12,6 +13,7 @@ import {
   type Broll,
   type ColorAdjust,
   ColorAdjustSchema,
+  type CropMode,
   type CutSnap,
   CutSnapSchema,
   type DeadAirSpan,
@@ -1329,6 +1331,7 @@ export function setExportSettings(
   input: {
     aspect?: ExportAspect;
     crop?: Partial<ExportCrop>;
+    cropMode?: CropMode;
   }
 ): Project {
   const current = ExportSettingsSchema.parse(project.export ?? {});
@@ -1338,14 +1341,30 @@ export function setExportSettings(
       `invalid export aspect "${aspect}" (expected one of: ${EXPORT_ASPECT_IDS.join(", ")})`
     );
   }
-  const crop = input.crop
-    ? {
-        focusX: clampNum(input.crop.focusX ?? current.crop.focusX, 0, 1),
-        focusY: clampNum(input.crop.focusY ?? current.crop.focusY, 0, 1),
-        scale: clampNum(input.crop.scale ?? current.crop.scale, 1, 3),
-      }
-    : current.crop;
-  project.export = { aspect, crop };
+  const cropMode = input.cropMode ?? current.cropMode;
+
+  // When switching to scene mode with a fixed aspect, derive focus from sceneLog.
+  let crop: ExportCrop;
+  if (cropMode === "scene" && aspect !== "source") {
+    const suggestion = suggestCropFromSceneLog(project, aspect);
+    crop = suggestion
+      ? {
+          focusX: suggestion.focusX,
+          focusY: suggestion.focusY,
+          scale: current.crop.scale,
+        }
+      : current.crop;
+  } else if (input.crop) {
+    crop = {
+      focusX: clampNum(input.crop.focusX ?? current.crop.focusX, 0, 1),
+      focusY: clampNum(input.crop.focusY ?? current.crop.focusY, 0, 1),
+      scale: clampNum(input.crop.scale ?? current.crop.scale, 1, 3),
+    };
+  } else {
+    crop = current.crop;
+  }
+
+  project.export = { aspect, crop, cropMode };
   return project;
 }
 

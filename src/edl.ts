@@ -456,14 +456,20 @@ export const ExportCropSchema = z
   .default({ focusX: 0.5, focusY: 0.5, scale: 1 });
 export type ExportCrop = z.infer<typeof ExportCropSchema>;
 
+export const CropModeSchema = z.enum(["manual", "scene"]).default("manual");
+export type CropMode = z.infer<typeof CropModeSchema>;
+
 export const ExportSettingsSchema = z
   .object({
     aspect: ExportAspectSchema,
     crop: ExportCropSchema,
+    /** Whether crop focus is set manually or derived from the sceneLog. */
+    cropMode: CropModeSchema,
   })
   .default({
     aspect: "source",
     crop: { focusX: 0.5, focusY: 0.5, scale: 1 },
+    cropMode: "manual",
   });
 export type ExportSettings = z.infer<typeof ExportSettingsSchema>;
 

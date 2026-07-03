@@ -51,6 +51,13 @@ test("loadTemplateSkill reads the make-draft, make-short, and revise-draft playb
   assert.match(reviseDraft, /project_overlays/);
 });
 
+test("revise-draft skill mentions Convert to short path", () => {
+  const reviseDraft = loadTemplateSkill("revise-draft");
+  assert.match(reviseDraft, /Convert to short/);
+  assert.match(reviseDraft, /export-set/);
+  assert.match(reviseDraft, /shorts/);
+});
+
 test("assertValidTemplateId rejects traversal", () => {
   assert.throws(() => assertValidTemplateId("../x"), /invalid template id/i);
   assert.equal(assertValidTemplateId("talking-head"), "talking-head");

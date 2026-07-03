@@ -7,6 +7,7 @@ import { partitionSafeCandidates } from "@engine/cleanup";
 import type {
   Audio,
   ColorAdjust,
+  CropMode,
   CutSnap,
   Project as EngineProject,
   ExportAspect,
@@ -291,6 +292,7 @@ interface Project {
   // Rides on the project object from a separate editor-page-data change
   // (VAD silence spans for dead-air detection); absent/undefined/null all
   // degrade the Cleanup section to filler-only via buildCleanupCandidates.
+  sceneLog?: { segments: unknown[]; analyzedAt: string; agent?: string } | null;
   silences?: SilenceSpan[] | null;
   slug: string;
   source: string;
@@ -1379,18 +1381,23 @@ export function App({
             crop: patch.crop
               ? { ...current.crop, ...patch.crop }
               : current.crop,
+            cropMode: patch.cropMode ?? current.cropMode,
           },
         };
       });
       const input: {
         aspect?: ExportAspect;
         crop?: ExportPatch["crop"];
+        cropMode?: CropMode;
       } = {};
       if (patch.aspect !== undefined) {
         input.aspect = patch.aspect;
       }
       if (patch.crop !== undefined) {
         input.crop = patch.crop;
+      }
+      if (patch.cropMode !== undefined) {
+        input.cropMode = patch.cropMode;
       }
       enqueueSave(() => runGuiAction(project.slug, "export-set", input));
     },
@@ -2861,6 +2868,7 @@ export function App({
                 <ReframeControls
                   applying={pendingSaves > 0}
                   exportSettings={exportSettings}
+                  hasSceneLog={Boolean(project.sceneLog)}
                   onPatchExport={patchExport}
                 />
               </Section>

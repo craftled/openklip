@@ -235,6 +235,7 @@ Review & export
   openklip dead-air-rm <slug> <id>   remove a registered dead-air span by id
   openklip export-set <slug>           set export aspect and manual reframe crop
                                        --aspect <id>  source|16:9|9:16|1:1
+                                       --crop-mode <mode>  manual|scene
                                        --crop-focus-x <0-1>  horizontal pan
                                        --crop-focus-y <0-1>  vertical pan
                                        --crop-scale <1-3>    zoom into source before crop
@@ -1959,20 +1960,28 @@ try {
     case "export-set": {
       if (!rest[0]) {
         throw new Error(
-          "usage: openklip export-set <slug> [--aspect <id>] [--crop-focus-x <0-1>] [--crop-focus-y <0-1>] [--crop-scale <1-3>]"
+          "usage: openklip export-set <slug> [--aspect <id>] [--crop-mode manual|scene] [--crop-focus-x <0-1>] [--crop-focus-y <0-1>] [--crop-scale <1-3>]"
         );
       }
       const slug = rest[0];
       const aspectRaw = flagValue(rest, "--aspect");
+      const cropModeRaw = flagValue(rest, "--crop-mode");
       const focusX = flagNumber(rest, "--crop-focus-x");
       const focusY = flagNumber(rest, "--crop-focus-y");
       const scale = flagNumber(rest, "--crop-scale");
       const input: {
         aspect?: ReturnType<typeof parseExportAspectFlag>;
         crop?: { focusX?: number; focusY?: number; scale?: number };
+        cropMode?: "manual" | "scene";
       } = {};
       if (aspectRaw !== undefined) {
         input.aspect = parseExportAspectFlag(aspectRaw);
+      }
+      if (cropModeRaw !== undefined) {
+        if (cropModeRaw !== "manual" && cropModeRaw !== "scene") {
+          throw new Error('--crop-mode must be "manual" or "scene"');
+        }
+        input.cropMode = cropModeRaw;
       }
       if (focusX !== undefined || focusY !== undefined || scale !== undefined) {
         input.crop = {};
@@ -1992,7 +2001,7 @@ try {
           : (await runLoggedAction(slug, "export-set", input)).project;
       const ex = project.export;
       console.log(
-        `export: aspect ${ex.aspect}, crop focus (${ex.crop.focusX}, ${ex.crop.focusY}), scale ${ex.crop.scale}`
+        `export: aspect ${ex.aspect}, crop mode ${ex.cropMode ?? "manual"}, crop focus (${ex.crop.focusX}, ${ex.crop.focusY}), scale ${ex.crop.scale}`
       );
       break;
     }

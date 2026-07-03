@@ -2,7 +2,25 @@
 
 Use these bodies when publishing releases. Each section matches a tag in `CHANGELOG.md` without duplicating the full changelog. **Known gaps:** always link to [TODO.md](../TODO.md#known-limitations); do not duplicate the list here.
 
-Publishing status checked on 2026-07-03 (`gh release list`): GitHub releases are published through `v0.16.0.0`. `v0.21.0.0` is prepared below for publication next.
+Publishing status checked on 2026-07-03 (`gh release list`): GitHub releases are published through `v0.21.0.0` (v0.17.0.0 through v0.20.0.0 backfilled on 2026-07-03). `v0.22.0.0` is prepared below for publication next.
+
+---
+
+## v0.22.0.0
+
+**Scene crop mode for vertical reframe, revise-draft convert-to-short, and verified make-short export loop.**
+
+### Highlights
+- **`cropMode: scene`**: after `openklip analyze`, export-set can derive crop focus from the scene log's speaker spans (GUI Manual/Scene toggle, MCP `export-set`, CLI `--crop-mode`).
+- **`revise-draft`**: new "Convert to short" path (section 3b) reframes and exports with the `shorts` preset without undoing the draft.
+- **Live verification**: `edgaras-raw` exported at 1080x1920 via `export-set --aspect 9:16` + `export --platform shorts`; verify passed.
+- Current codebase verification: 1303 tests.
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations) for the current list. Scene mode weights speaker spans but still centers at 0.5/0.5 until per-segment focus coordinates exist. Face/saliency tracking is not implemented.
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#02200---2026-07-03)
 
 ---
 

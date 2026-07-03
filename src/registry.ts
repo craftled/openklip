@@ -599,7 +599,7 @@ export const actions: ActionDef[] = [
   defineAction({
     name: "export-set",
     summary:
-      "Set export aspect ratio and manual reframe crop for preview/export parity.",
+      "Set export aspect ratio, manual reframe crop, and crop mode (manual or scene) for preview/export parity.",
     surfaces: ["cli", "gui", "mcp"],
     schema: z.object({
       aspect: z.enum(EXPORT_ASPECT_IDS).optional(),
@@ -610,6 +610,7 @@ export const actions: ActionDef[] = [
           scale: z.number().optional(),
         })
         .optional(),
+      cropMode: z.enum(["manual", "scene"]).optional(),
     }),
     run: (p, i) => {
       setExportSettings(p, i);

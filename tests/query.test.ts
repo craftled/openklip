@@ -369,6 +369,7 @@ test("projectStatus includes export aspect and crop defaults", () => {
   assert.deepEqual(s.export, {
     aspect: "source",
     crop: { focusX: 0.5, focusY: 0.5, scale: 1 },
+    cropMode: "manual",
   });
 });
 

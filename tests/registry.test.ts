@@ -333,6 +333,7 @@ test("export-set: stores aspect and crop, clamped, in project JSON", () => {
   assert.deepEqual(r.export, {
     aspect: "9:16",
     crop: { focusX: 1, focusY: 0, scale: 3 },
+    cropMode: "manual",
   });
   assert.deepEqual(p.export, r.export);
 });
