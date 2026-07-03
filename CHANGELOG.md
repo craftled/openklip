@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.21.0.0 - 2026-07-03
+
+The vertical export reframe release: landscape talking-head edits can export to 9:16 Shorts/Reels/TikTok with a manual pan/zoom crop shared by preview and ffmpeg.
+
+### Added
+- **Export aspect and reframe crop** (Track F): `project.export` on `project.json` stores `aspect` (`source`, `16:9`, `9:16`, `1:1`) and `crop` (`focusX`, `focusY`, `scale` 1–3). `src/export-aspect.ts` shares dimension math, crop box calculation, ffmpeg `crop`+`scale` filter construction, and preview `object-position` between the GUI and exporter.
+- **`export-set` action** (cli/gui/mcp): patch aspect and crop for preview/export parity. CLI `openklip export-set <slug>` plus one-off `openklip export --aspect` / `--crop-focus-x` / `--crop-focus-y` / `--crop-scale` overrides.
+- **`shorts` platform preset**: 9:16 vertical, 30fps, 1920 height cap, social compression, -14 LUFS. Platform picker in the GUI export dialog; MCP `export` tool and HTTP export route accept `aspect` and `crop`.
+- **GUI reframe controls**: Config sidebar Reframe section (focus X/Y, zoom); editor orientation toggle (16:9 / 9:16 / 1:1) persists `project.export.aspect`; preview applies the same crop when a fixed aspect is active.
+- **`project_status` reports export settings**: aspect and crop appear in `status --json` / MCP `project_status`.
+
+### Changed
+- **Version**: bumped OpenKlip to `0.21.0.0`.
+
 ## 0.20.0.0 - 2026-07-03
 
 The richer title styles release: three new editorial title positions beyond lower, center, and hero.

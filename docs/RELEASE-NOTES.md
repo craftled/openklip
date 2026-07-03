@@ -2,7 +2,25 @@
 
 Use these bodies when publishing releases. Each section matches a tag in `CHANGELOG.md` without duplicating the full changelog. **Known gaps:** always link to [TODO.md](../TODO.md#known-limitations); do not duplicate the list here.
 
-Publishing status checked on 2026-07-03 (`gh release list`): GitHub releases are published through `v0.15.0.0`. `v0.16.0.0` is prepared below for publication next.
+Publishing status checked on 2026-07-03 (`gh release list`): GitHub releases are published through `v0.16.0.0`. `v0.21.0.0` is prepared below for publication next.
+
+---
+
+## v0.21.0.0
+
+**Vertical export reframe: 9:16 Shorts/Reels/TikTok with manual pan/zoom crop, preview/export parity, and a `shorts` platform preset on every surface.**
+
+### Highlights
+- **`project.export`**: aspect (`source`, `16:9`, `9:16`, `1:1`) and manual crop (focus X/Y, zoom) persist on `project.json` and drive the same math in the GUI preview and ffmpeg export (`src/export-aspect.ts`).
+- **`export-set` + `shorts` preset**: `openklip export-set`, MCP `export-set`, and `openklip export --platform shorts` (or GUI Platform picker) land a vertical export without hand-rolling four separate flags. One-off `--aspect` / `--crop-*` flags override for a single export only.
+- **GUI**: Reframe sliders in Config, orientation toggle writes aspect, export dialog shows correct vertical dimensions when Shorts is selected.
+- Current codebase verification: 1294 tests.
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations) for the current list. Reframe is manual (focus/zoom sliders); auto subject tracking is not implemented yet. Caption safe areas per platform are still not modeled.
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#02100---2026-07-03)
 
 ---
 
