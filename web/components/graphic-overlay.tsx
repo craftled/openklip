@@ -7,7 +7,6 @@ import {
   applyGraphicParams,
   graphicFrameAt,
 } from "@/lib/graphic-runtime";
-import type { Keyframe } from "../../src/keyframes.ts";
 
 // One active graphic overlay rendered live over the <video>, driven by the SAME
 // scheduler-derived sample position the export rasterizer uses. The composition

@@ -247,7 +247,6 @@ export const GraphicSchema = z
     keyframes: KeyframeSchema.array().max(64).optional(),
     note: z.string().optional(),
     anchor: PhraseAnchorSchema.optional(),
-    keyframes: z.array(KeyframeSchema).optional(),
   })
   .superRefine((graphic, ctx) => {
     const hasJsonRenderFields =
