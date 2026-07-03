@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Check, Film, IconLoader, Upload, X } from "@/lib/icon";
 import { selectDroppedVideo } from "@/lib/project-intake";
 import { ingestTakeFromVideo } from "@/lib/take-create";
@@ -174,8 +175,8 @@ function AddTakeControl({
             type="file"
           />
         </label>
-        <input
-          className="min-w-0 flex-1 rounded-md border bg-transparent px-2 py-1 text-xs"
+        <Input
+          className="h-7 min-w-0 flex-1 text-xs"
           data-takes-add-label
           disabled={busy}
           onChange={(e) => onLabelChange(e.target.value)}

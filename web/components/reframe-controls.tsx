@@ -14,8 +14,11 @@ import {
   firstSliderValue,
   THIN_SLIDER,
 } from "@/components/slider-primitives";
+import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Slider } from "@/components/ui/slider";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { firstToggleValue } from "@/lib/toggle-value";
 
 function ControlRow({
   disabled = false,
@@ -107,14 +110,15 @@ export function ReframeControls({
     <div className="flex flex-col gap-2" data-reframe-section>
       {visionFocusAvailable && onRunVisionFocus && (
         <div className="flex items-center gap-2 pb-1">
-          <button
-            className="rounded-md border px-2 py-0.5 text-xs transition-colors hover:bg-muted disabled:opacity-50"
+          <Button
             disabled={applying || applyingVision}
             onClick={() => onRunVisionFocus()}
+            size="sm"
             type="button"
+            variant="outline"
           >
             {applyingVision ? "Running Vision…" : "Vision focus"}
-          </button>
+          </Button>
           <span className="text-muted-foreground text-xs">
             Face/saliency detection on ingest frames (macOS).
           </span>
@@ -123,53 +127,51 @@ export function ReframeControls({
       {hasSceneLog && (
         <div className="flex items-center gap-2 pb-1">
           <span className="text-muted-foreground text-xs">Crop mode</span>
-          <div className="flex overflow-hidden rounded-md border text-xs">
-            <button
-              className={`px-2 py-0.5 transition-colors ${isScene ? "text-muted-foreground hover:text-foreground" : "bg-foreground text-background"}`}
-              disabled={applying}
-              onClick={() => onPatchExport({ cropMode: "manual" })}
-              type="button"
-            >
-              Manual
-            </button>
-            <button
-              className={`px-2 py-0.5 transition-colors ${isScene ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"}`}
-              disabled={applying}
-              onClick={() => onPatchExport({ cropMode: "scene" })}
-              type="button"
-            >
-              Scene
-            </button>
-          </div>
+          <ToggleGroup
+            disabled={applying}
+            onValueChange={(value) => {
+              const mode = firstToggleValue(value);
+              if (mode === "manual" || mode === "scene") {
+                onPatchExport({ cropMode: mode });
+              }
+            }}
+            size="sm"
+            spacing={0}
+            value={[cropMode === "scene" ? "scene" : "manual"]}
+            variant="outline"
+          >
+            <ToggleGroupItem value="manual">Manual</ToggleGroupItem>
+            <ToggleGroupItem value="scene">Scene</ToggleGroupItem>
+          </ToggleGroup>
         </div>
       )}
       {isPortrait && (
         <div className="flex flex-col gap-2 pb-1">
           <div className="flex items-center gap-2">
             <span className="text-muted-foreground text-xs">Layout</span>
-            <div className="flex overflow-hidden rounded-md border text-xs">
-              <button
-                className={`px-2 py-0.5 transition-colors ${layout === "fill" ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"}`}
-                disabled={applying}
-                onClick={() => onPatchExport({ layout: "fill" })}
-                type="button"
-              >
-                Fill
-              </button>
-              <button
-                className={`px-2 py-0.5 transition-colors ${isSplit ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"}`}
-                disabled={applying}
-                onClick={() =>
+            <ToggleGroup
+              disabled={applying}
+              onValueChange={(value) => {
+                const next = firstToggleValue(value);
+                if (next === "fill") {
+                  onPatchExport({ layout: "fill" });
+                } else if (next === "split-vertical") {
                   onPatchExport({
                     layout: "split-vertical",
                     splitVertical,
-                  })
+                  });
                 }
-                type="button"
-              >
+              }}
+              size="sm"
+              spacing={0}
+              value={[layout]}
+              variant="outline"
+            >
+              <ToggleGroupItem value="fill">Fill</ToggleGroupItem>
+              <ToggleGroupItem value="split-vertical">
                 Split vertical
-              </button>
-            </div>
+              </ToggleGroupItem>
+            </ToggleGroup>
           </div>
           {isSplit && (
             <>
@@ -184,32 +186,24 @@ export function ReframeControls({
               />
               <div className="flex items-center gap-2">
                 <span className="text-muted-foreground text-xs">Position</span>
-                <div className="flex overflow-hidden rounded-md border text-xs">
-                  <button
-                    className={`px-2 py-0.5 transition-colors ${splitVertical.speakerPosition === "top" ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"}`}
-                    disabled={applying}
-                    onClick={() =>
+                <ToggleGroup
+                  disabled={applying}
+                  onValueChange={(value) => {
+                    const position = firstToggleValue(value);
+                    if (position === "top" || position === "bottom") {
                       onPatchExport({
-                        splitVertical: { speakerPosition: "top" },
-                      })
+                        splitVertical: { speakerPosition: position },
+                      });
                     }
-                    type="button"
-                  >
-                    Top
-                  </button>
-                  <button
-                    className={`px-2 py-0.5 transition-colors ${splitVertical.speakerPosition === "bottom" ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"}`}
-                    disabled={applying}
-                    onClick={() =>
-                      onPatchExport({
-                        splitVertical: { speakerPosition: "bottom" },
-                      })
-                    }
-                    type="button"
-                  >
-                    Bottom
-                  </button>
-                </div>
+                  }}
+                  size="sm"
+                  spacing={0}
+                  value={[splitVertical.speakerPosition]}
+                  variant="outline"
+                >
+                  <ToggleGroupItem value="top">Top</ToggleGroupItem>
+                  <ToggleGroupItem value="bottom">Bottom</ToggleGroupItem>
+                </ToggleGroup>
               </div>
             </>
           )}
