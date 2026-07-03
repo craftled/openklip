@@ -324,22 +324,22 @@ export function AgentChatPanel({
   const showStaticMockups = !(chatsLoading || activeThread?.messages.length);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col">
-        <div className="flex shrink-0 items-center justify-between gap-3 border-border border-b px-6 py-3">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+      <div className="mx-auto flex min-h-0 w-full min-w-0 max-w-2xl flex-1 flex-col">
+        <div className="flex min-w-0 shrink-0 items-center justify-between gap-3 border-border border-b px-6 py-3">
           <span className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
             Chat
           </span>
-          <div className="flex min-w-0 items-center gap-2">
+          <div className="flex min-w-0 flex-1 items-center justify-end gap-2 overflow-hidden">
             <span
-              className="flex shrink-0 items-center gap-1.5 text-muted-foreground text-xs"
+              className="flex min-w-0 items-center gap-1.5 text-muted-foreground text-xs"
               title={getAgentModelLabel(agent)}
             >
               <AgentProviderIcon className={APP_ICON_CLASS} value={agent} />
               <span className="truncate">{getAgentModelLabel(agent)}</span>
             </span>
             {activeThread && (
-              <span className="truncate text-muted-foreground text-xs">
+              <span className="min-w-0 truncate text-muted-foreground text-xs">
                 {activeThread.title}
               </span>
             )}
@@ -367,13 +367,13 @@ export function AgentChatPanel({
           key={activeThread?.id ?? "empty-chat"}
           scrollPreviousItemPeek={56}
         >
-          <MessageScroller className="min-h-0 flex-1">
+          <MessageScroller className="min-h-0 min-w-0 flex-1">
             <AgentChatTrail
               agentLabel={getAgentModelLabel(agent)}
               messages={activeThread?.messages ?? []}
             />
             <MessageScrollerViewport>
-              <MessageScrollerContent className="gap-3 px-6 py-4 text-left">
+              <MessageScrollerContent className="min-w-0 gap-3 px-6 py-4 text-left">
                 {chatsLoading && (
                   <MessageScrollerItem>
                     <p className="text-muted-foreground text-sm">
@@ -462,7 +462,7 @@ export function AgentChatPanel({
           </MessageScroller>
         </MessageScrollerProvider>
 
-        <div className="flex shrink-0 flex-col gap-3 border-border border-t px-6 py-4">
+        <div className="flex min-w-0 shrink-0 flex-col gap-3 border-border border-t px-6 py-4">
           <TaskProgressPanel running={isRunning} slug={slug} />
           <AgentPromptInput
             activeSlug={activeSlug}
