@@ -7,6 +7,7 @@ import type {
 import { listExportPlatforms } from "@engine/export-platforms";
 import type { ExportCompression, ExportFormat } from "@engine/exporter";
 import type { ComponentType } from "react";
+import { CommitNumberInput } from "@/components/slider-primitives";
 import {
   Select,
   SelectContent,
@@ -70,6 +71,14 @@ export const COMPRESSION_COPY: Record<
 
 export const FRAME_RATES = [24, 25, 30, 48, 60] as const;
 
+// Local mirror of GIF_MAX_WIDTH_PX (960) and GIF_MAX_WIDTH_OVERRIDE_CEILING_PX
+// (1920) in src/exporter.ts. web/ may only type-import that module (it
+// touches node:child_process for ffmpeg), so the two bounds are duplicated
+// here for the GUI control; the real ceiling is enforced server-side in
+// clampGifDimensions regardless of what this dialog sends.
+export const GIF_MAX_WIDTH_DEFAULT_PX = 960;
+export const GIF_MAX_WIDTH_CEILING_PX = 1920;
+
 /**
  * Pure mapping from an export platform's preset defaults to the concrete
  * values the form's own controls already speak (fps-select value and
@@ -113,10 +122,12 @@ export function ExportOptionsForm({
   dims,
   format,
   frameRate,
+  gifMaxWidth,
   onCompressionChange,
   onDestinationChange,
   onFormatChange,
   onFrameRateChange,
+  onGifMaxWidthChange,
   onPlatformChange,
   onResolutionChange,
   platform,
@@ -129,10 +140,13 @@ export function ExportOptionsForm({
   format: ExportFormat;
   /** "source" or a stringified FRAME_RATES entry. */
   frameRate: string;
+  /** undefined shows the GIF_MAX_WIDTH_DEFAULT_PX (960) fallback. */
+  gifMaxWidth?: number;
   onCompressionChange: (value: ExportCompression) => void;
   onDestinationChange: (value: ExportDestination) => void;
   onFormatChange: (value: ExportFormat) => void;
   onFrameRateChange: (value: string) => void;
+  onGifMaxWidthChange: (value: number) => void;
   onPlatformChange: (value: ExportPlatformSelection) => void;
   onResolutionChange: (value: ExportResolution) => void;
   platform: ExportPlatformSelection;
@@ -199,9 +213,21 @@ export function ExportOptionsForm({
             </ToggleGroupItem>
           </ToggleGroup>
           {format === "gif" && (
-            <p className="mt-2 text-muted-foreground text-xs">
-              GIF exports have no audio.
-            </p>
+            <div className="mt-2 flex flex-col gap-1.5">
+              <p className="text-muted-foreground text-xs">
+                GIF exports have no audio.
+              </p>
+              <label className="flex items-center gap-2 text-muted-foreground text-xs">
+                Max width (px)
+                <CommitNumberInput
+                  max={GIF_MAX_WIDTH_CEILING_PX}
+                  min={1}
+                  onCommit={onGifMaxWidthChange}
+                  step={1}
+                  value={gifMaxWidth ?? GIF_MAX_WIDTH_DEFAULT_PX}
+                />
+              </label>
+            </div>
           )}
         </div>
 
