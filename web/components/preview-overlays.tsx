@@ -90,7 +90,7 @@ export function PreviewOverlays({
       )}
       {calloutTitle && (
         <div
-          className="pointer-events-none absolute top-[12%] left-4 z-[3]"
+          className="pointer-events-none absolute top-[12%] left-4 z-10"
           key={calloutTitle.id}
         >
           <span className="rounded-md bg-black/70 px-3 py-1.5 font-semibold text-sm text-white uppercase tracking-wide backdrop-blur">
@@ -101,7 +101,7 @@ export function PreviewOverlays({
       {standardTitle && (
         <div
           className={cn(
-            "pointer-events-none absolute inset-x-0 z-[3] flex justify-center",
+            "pointer-events-none absolute inset-x-0 z-10 flex justify-center",
             standardTitle.position === "lower"
               ? "bottom-[16%]"
               : "top-1/2 -translate-y-1/2"

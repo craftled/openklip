@@ -351,7 +351,7 @@ function TranscriptScrollFade({
     <div
       aria-hidden
       className={cn(
-        "pointer-events-none absolute right-2.5 bottom-0 left-0 z-10 h-16 opacity-0 transition-opacity duration-150 ease-out motion-reduce:transition-none",
+        "pointer-events-none absolute right-2.5 bottom-0 left-0 z-10 h-16 opacity-0 transition-opacity duration-200 ease-out motion-reduce:transition-none",
         active && "opacity-100 duration-0"
       )}
       data-active={active ? "true" : "false"}

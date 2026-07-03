@@ -17,9 +17,9 @@ export interface CutTransitionSweepProps {
 }
 
 // Decorative WebGL sweep overlay played over a preview cut boundary. Sits
-// above every other preview-container layer (SafeAreaGuides, the vignette,
-// PreviewOverlays, PlayerControls all top out at z-[6]) so the band visually
-// covers the cut instant. Pointer-events are disabled so it never blocks the
+// above every other preview-container layer (safe-area guides at z-30,
+// hero title at z-20, overlays at z-10) so the band visually covers the
+// cut instant. Pointer-events are disabled so it never blocks the
 // transport controls underneath.
 export function CutTransitionSweep({ ref }: CutTransitionSweepProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -50,7 +50,7 @@ export function CutTransitionSweep({ ref }: CutTransitionSweepProps) {
 
   return (
     <canvas
-      className="pointer-events-none absolute inset-0 z-[7] h-full w-full"
+      className="pointer-events-none absolute inset-0 z-30 h-full w-full"
       ref={canvasRef}
     />
   );

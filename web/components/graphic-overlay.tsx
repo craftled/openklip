@@ -143,7 +143,7 @@ export function GraphicOverlay({
   }
 
   return (
-    <div className="pointer-events-none absolute inset-0 z-[3]" ref={boxRef}>
+    <div className="pointer-events-none absolute inset-0 z-10" ref={boxRef}>
       <div
         className="absolute top-0 left-0 origin-top-left"
         ref={stageRef}

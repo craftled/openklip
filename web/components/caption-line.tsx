@@ -28,7 +28,7 @@ export function CaptionLine({
   return (
     <div
       className={cn(
-        "pointer-events-none absolute inset-x-0 z-[3] flex justify-center",
+        "pointer-events-none absolute inset-x-0 z-10 flex justify-center",
         raised ? "bottom-[28%]" : "bottom-[9%]"
       )}
     >
