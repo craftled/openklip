@@ -21,6 +21,7 @@ import {
   WordSchema,
   ZoomSchema,
 } from "../src/edl.ts";
+import { KeyframeSchema } from "../src/keyframes.ts";
 import { makeProject } from "./helpers/projectFixture.ts";
 
 test("ProjectSchema enforces the canonical 48 kHz sample rate", () => {
@@ -87,6 +88,51 @@ test("GraphicSchema rejects an invalid track", () => {
       startSample: 0,
       endSample: 1,
       track: "captions",
+    })
+  );
+});
+
+test("GraphicSchema accepts optional keyframes", () => {
+  const g = GraphicSchema.parse({
+    id: "g-kf",
+    template: "lower-third",
+    startSample: 0,
+    endSample: 48_000,
+    keyframes: [
+      KeyframeSchema.parse({
+        sampleOffset: 0,
+        property: "opacity",
+        value: 0,
+        easing: "linear",
+      }),
+      KeyframeSchema.parse({
+        sampleOffset: 24_000,
+        property: "opacity",
+        value: 1,
+        easing: "easeIn",
+      }),
+    ],
+  });
+  assert.equal(g.keyframes?.length, 2);
+  assert.equal(g.keyframes?.[1]?.easing, "easeIn");
+});
+
+test("GraphicSchema enforces keyframe max length", () => {
+  const keyframes = Array.from({ length: 65 }, (_, index) =>
+    KeyframeSchema.parse({
+      sampleOffset: index,
+      property: "x",
+      value: index / 100,
+      easing: "linear",
+    })
+  );
+  assert.throws(() =>
+    GraphicSchema.parse({
+      id: "g-too-many-kf",
+      template: "lower-third",
+      startSample: 0,
+      endSample: 48_000,
+      keyframes,
     })
   );
 });

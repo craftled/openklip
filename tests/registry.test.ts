@@ -546,6 +546,41 @@ test("graphic-set: merges params over the existing record", () => {
   assert.equal(updated.params.subtitle, "C", "patched param updated");
 });
 
+test("graphic-set: sets and clears keyframes", () => {
+  const p = makeProject();
+  const added = runAction("graphic-add", p, {
+    template: "lower-third",
+    fromSec: 0,
+    toSec: 2,
+  }) as { id: string };
+  const updated = runAction("graphic-set", p, {
+    id: added.id,
+    keyframes: [
+      { sampleOffset: 0, property: "opacity", value: 0, easing: "linear" },
+      {
+        sampleOffset: SAMPLE_RATE,
+        property: "opacity",
+        value: 1,
+        easing: "easeInOut",
+      },
+    ],
+  }) as { keyframes?: Array<{ easing: string }> };
+  assert.equal(updated.keyframes?.length, 2);
+  assert.equal(updated.keyframes?.[1]?.easing, "easeInOut");
+
+  runAction("graphic-set", p, {
+    id: added.id,
+    keyframes: [],
+  });
+  assert.equal(p.graphics?.[0]?.keyframes, undefined);
+
+  runAction("graphic-set", p, {
+    id: added.id,
+    keyframes: null,
+  });
+  assert.equal(p.graphics?.[0]?.keyframes, undefined);
+});
+
 test("graphic-rm: removes by id and reports removed", () => {
   const p = makeProject();
   const added = runAction("graphic-add", p, {
@@ -567,6 +602,15 @@ test("graphic-add manifest renders params record to JSON Schema for MCP", () => 
   // The z.record(union) params field must survive z.toJSONSchema() so MCP tool
   // registration does not throw at runtime.
   assert.ok(entry?.inputSchema.properties.params, "params missing from schema");
+});
+
+test("graphic-set manifest exposes keyframes for MCP", () => {
+  const entry = actionManifest("mcp").find((m) => m.name === "graphic-set");
+  assert.ok(entry, "graphic-set not exposed to mcp");
+  assert.ok(
+    entry?.inputSchema.properties.keyframes,
+    "keyframes missing from graphic-set schema"
+  );
 });
 
 test("actionTable renders a markdown row for each action", () => {

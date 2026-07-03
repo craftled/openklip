@@ -340,6 +340,34 @@ test("listOverlays surfaces an anchor when present and null otherwise", () => {
   assert.equal(o.titles[1].anchor, null);
 });
 
+test("listOverlays includes graphic keyframe count and keyframes", () => {
+  const p = makeProject({
+    graphics: [
+      {
+        id: "g1",
+        template: "lower-third",
+        params: { title: "Hello" },
+        startSample: 0,
+        endSample: 2 * SAMPLE_RATE,
+        track: "title",
+        keyframes: [
+          { sampleOffset: 0, property: "opacity", value: 0, easing: "linear" },
+          {
+            sampleOffset: SAMPLE_RATE,
+            property: "opacity",
+            value: 1,
+            easing: "easeIn",
+          },
+        ],
+      },
+    ],
+  });
+  const overlays = listOverlays(p);
+  assert.equal(overlays.graphics.length, 1);
+  assert.equal(overlays.graphics[0].keyframeCount, 2);
+  assert.equal(overlays.graphics[0].keyframes?.[1]?.easing, "easeIn");
+});
+
 test("wordSpan view carries a note on a cut word", () => {
   const p = makeProject();
   p.words[1].deleted = true;
