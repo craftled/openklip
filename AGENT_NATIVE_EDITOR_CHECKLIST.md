@@ -157,7 +157,8 @@ Legend: Full means the surface can achieve the same outcome. Partial means the s
 | Template set/list/show | Full select and skills | Full | Full | Full list route, set via server action | Good enough. |
 | Brand preset apply | Partial ingest/apply path not prominent in UI | Full: `brand` | Missing | Missing public route | CLI-only for now. |
 | Export MP4 | Full | Full | Full | Full: export route and server action | Good parity for height only. |
-| Export compression and frame rate | Full: export dialog | Full: `--compression`, `--fps` | Full: export tool inputs | Full: export route body | Shipped 2026-07-02. Format and destination controls remain disabled. |
+| Export compression and frame rate | Full: export dialog | Full: `--compression`, `--fps` | Full: export tool inputs | Full: export route body | Shipped 2026-07-02. |
+| Export format (MP4/GIF) and destination (file/clipboard) | Full: export dialog toggles, both enabled | Missing: no `--format` flag | Missing: export tool has no `format` input | Partial: route/`exportProject` accept `format`; destination is GUI-only and never reaches the server | Shipped 2026-07-03 (`src/exporter.ts`, `web/components/export-dialog.tsx`). GIF has no audio and no size/duration cap; clipboard copies the output path only, not the video. |
 | Verify export | Full button | Full | Full | Partial server action path | Good CLI/MCP parity. |
 | Package post-export | Missing UI | Full: `package` | Missing | Missing | CLI-only optional feature. |
 | Multi-take add/list/transcript/assemble | Missing UI | Full | Full query/assemble tools | Missing public route | Strong agent feature, weak UI parity. |
@@ -636,10 +637,10 @@ Goal: exports are fast, configurable, verified, and ready to publish.
   - [x] 60 fps.
   - Verification: ffprobe reports selected frame rate.
 - [ ] Add export destination options.
-  - [ ] Project output folder.
-  - [ ] User-selected folder if feasible.
-  - [ ] Copy path to clipboard if supported.
-  - Verification: export lands in selected destination.
+  - [x] Project output folder. Verified 2026-07-03: the File destination (default, GUI export dialog) always renders to `output/`, same as before; the toggle is now real state (`web/components/export-dialog.tsx`) instead of a hardcoded, disabled value.
+  - [ ] User-selected folder if feasible. Not implemented: there is no OS save-as/folder picker; File always means the project's `output/` folder.
+  - [x] Copy path to clipboard if supported. Verified 2026-07-03: picking Clipboard copies the exported file's absolute path as text (`navigator.clipboard.writeText` in `web/app.tsx`) after a successful export; does not copy the video itself; `tests/export-dialog.test.tsx` pins the toggle, hint copy, and payload assembly.
+  - Verification: export lands in selected destination. Partially met 2026-07-03: File and Clipboard both work as described above; no user-selected folder exists yet.
 - [ ] Add export presets.
   - [x] YouTube 16:9.
     - Verification 2026-07-03: `youtube` (1080p) and `youtube-4k` (2160p) presets in `src/export-platforms.ts`, both social/studio compression at a -14 LUFS loudness target; pinned by `tests/export-platforms.test.ts`. Live CLI export on an isolated copy of the real 4K `edgaras-raw` project (`OPENKLIP_PROJECTS_ROOT` pointed at a scratch copy): `openklip export --platform youtube` produced a 1920x1080 output and `openklip export --platform youtube-4k` produced a 3840x2160 output (never upscaling past the 4K source), both confirmed via `ffprobe`. An `x` (Twitter/X) preset also shipped (1080p/30fps/web/-14 LUFS), beyond this checklist's original YouTube/Shorts/LinkedIn/Custom list.

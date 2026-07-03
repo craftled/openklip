@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, rename, unlink } from "node:fs/promises";
 import { dirname, isAbsolute, join } from "node:path";
@@ -96,12 +97,22 @@ export const EXPORT_COMPRESSIONS = [
 
 export type ExportCompression = (typeof EXPORT_COMPRESSIONS)[number];
 
+// Output container/format. "mp4" (default) is the historical, unchanged
+// render path. "gif" renders the identical mp4 first, then converts that mp4
+// into a sibling .gif via a second ffmpeg pass (palettegen/paletteuse), and
+// deletes the intermediate mp4 so exactly one deliverable remains.
+export const EXPORT_FORMATS = ["mp4", "gif"] as const;
+
+export type ExportFormat = (typeof EXPORT_FORMATS)[number];
+
 export interface ExportOptions {
   /** Output aspect for this export; defaults to project.export then platform. */
   aspect?: ExportAspect;
   compression?: ExportCompression; // libx264 preset/CRF bundle; default "social"
   /** Manual reframe crop for this export; merges over project.export.crop. */
   crop?: Partial<ExportCrop>;
+  /** Output container; default "mp4". "gif" has no audio track. */
+  format?: ExportFormat;
   fps?: number; // output frame rate; default = rounded source rate
   /**
    * Export-invocation-only loudness normalization target (LUFS, -30..-10).
@@ -799,6 +810,8 @@ export async function exportCut(
   aspect: ExportAspect;
   fps: number;
   compression: ExportCompression;
+  /** Output container actually produced; "mp4" when format was left unset. */
+  format: ExportFormat;
   /** Present only when a platform preset was used to resolve this export. */
   platform?: ExportPlatformId;
   /** The effective loudness target when normalization applied this export
@@ -1413,13 +1426,27 @@ export async function exportCut(
         ...richGraphics.flatMap((rg) => ["-i", rg.asset.assetPath]),
         ...musicGraph.inputArgs,
       ];
-  // Render to a unique tmp sibling, then rename over out.mp4 on success:
-  // ffmpeg writing p.out in place means a GUI export racing an agent export
-  // corrupts the file both are writing. The tmp name KEEPS the .mp4
-  // extension so ffmpeg still infers the mp4 container from it.
+  // Render to unique tmp siblings, then rename only the final deliverable into
+  // place on success. ffmpeg writing the public output path in place means a
+  // GUI export racing an agent export can corrupt that file. GIF export also
+  // needs the intermediate mp4 to stay private until the second pass succeeds.
   const destOut = opts.outPath ?? p.out;
-  await mkdir(dirname(destOut), { recursive: true });
-  const tmpOut = join(p.output, `.out-tmp-${process.pid}-${Date.now()}.mp4`);
+  const destDir = dirname(destOut);
+  await mkdir(destDir, { recursive: true });
+  const tmpBase = join(
+    destDir,
+    `.out-tmp-${process.pid}-${Date.now()}-${randomUUID()}`
+  );
+  const tmpOut = `${tmpBase}.mp4`;
+  const tmpGifOut = `${tmpBase}.gif`;
+  const effectiveFormat: ExportFormat = resolved.format ?? "mp4";
+  const gifOut =
+    effectiveFormat === "gif"
+      ? destOut.toLowerCase().endsWith(".mp4")
+        ? `${destOut.slice(0, -4)}.gif`
+        : `${destOut}.gif`
+      : undefined;
+  let finalOut = destOut;
   try {
     await run(
       FFMPEG,
@@ -1447,18 +1474,49 @@ export async function exportCut(
       ],
       "ffmpeg(export)"
     );
-    await rename(tmpOut, destOut);
-  } catch (e) {
-    try {
-      await unlink(tmpOut);
-    } catch {
-      // Best-effort: ffmpeg may have failed before creating the tmp file.
+
+    // GIF is a second, independent pass over the just-rendered private mp4:
+    // the filter_complex/encode pipeline above never changes for format:
+    // "gif", so an mp4 export (the default) is byte-for-byte unaffected by
+    // this branch. Reuses the proven palettegen(stats_mode=diff)/paletteuse
+    // (dither=bayer) pattern from scripts/record-demo-gif.sh, adapted to this
+    // export's own resolved fps/width. GIFs have no audio track; the -vf output
+    // here has no audio map, so conversion naturally drops it.
+    if (effectiveFormat === "gif") {
+      await run(
+        FFMPEG,
+        [
+          "-y",
+          "-i",
+          tmpOut,
+          "-vf",
+          `fps=${outFps},scale=${outW}:-1:flags=lanczos,split[s0][s1];[s0]palettegen=stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=3`,
+          "-loop",
+          "0",
+          tmpGifOut,
+        ],
+        "ffmpeg(export-gif)"
+      );
+      await rename(tmpGifOut, gifOut as string);
+      try {
+        await unlink(tmpOut);
+      } catch {
+        // Best-effort: the mp4 is only an intermediate once the gif exists.
+      }
+      finalOut = gifOut as string;
+    } else {
+      await rename(tmpOut, destOut);
     }
+  } catch (e) {
+    await Promise.all([
+      unlink(tmpOut).catch(() => undefined),
+      unlink(tmpGifOut).catch(() => undefined),
+    ]);
     throw e;
   }
 
   return {
-    out: destOut,
+    out: finalOut,
     durationSec: totalDurationSec(ranges),
     ranges: ranges.length,
     captions: captionsOn && assPath !== null,
@@ -1474,6 +1532,7 @@ export async function exportCut(
     aspect,
     fps: outFps,
     compression: resolved.compression ?? "social",
+    format: effectiveFormat,
     platform: resolved.platform,
     loudnessTargetLufs: effectiveLoudnessTarget,
     audio: {

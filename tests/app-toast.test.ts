@@ -6,6 +6,7 @@ import {
   resetToastBackendForTests,
   setToastBackendForTests,
   toastError,
+  toastInfo,
 } from "../web/lib/app-toast.ts";
 import {
   exportSuccessToast,
@@ -57,4 +58,17 @@ test("setToastBackendForTests routes toastError through mock", () => {
   });
   toastError("Test error", "details");
   assert.deepEqual(calls, [{ title: "Test error", description: "details" }]);
+});
+
+test("toastInfo can include an action", () => {
+  const recorder = createToastRecorder();
+  setToastBackendForTests(recorder.backend);
+  const action = { label: "Copy path", onClick: () => undefined };
+
+  toastInfo("Export path ready", "output/out.gif", { action });
+
+  assert.equal(recorder.calls[0]?.method, "info");
+  assert.equal(recorder.calls[0]?.title, "Export path ready");
+  assert.equal(recorder.calls[0]?.description, "output/out.gif");
+  assert.equal(recorder.calls[0]?.action, action);
 });

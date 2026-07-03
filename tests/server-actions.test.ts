@@ -343,6 +343,19 @@ test("exportProject rejects an unknown platform id before any export work", asyn
   });
 });
 
+test("exportProject rejects an unknown format before any export work", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const result = await exportProject(slug, {
+      format: "webm" as never,
+    });
+    assert.equal(result.ok, false);
+    if (!result.ok) {
+      assert.match(result.error, /unknown export format "webm"/);
+    }
+  });
+});
+
 test("exportProject rejects an out-of-bounds loudnessTargetLufs before any export work", async () => {
   await withTempProjectsRoot(async ({ slug }) => {
     writeFixtureProject(slug, makeProject({ slug }));

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.29.0.0 - 2026-07-03
+
+Export format (GIF) and destination (clipboard) controls, wired end to end.
+
+### Added
+- **Export format (MP4/GIF)** (`src/exporter.ts`): new `ExportFormat`/`EXPORT_FORMATS` (`mp4` default, `gif`) on `ExportOptions` and the `exportCut` return type. GIF is a second ffmpeg pass over the already-rendered mp4 (palettegen/paletteuse, same pattern as `scripts/record-demo-gif.sh`) that writes a sibling `.gif` and deletes the intermediate mp4; GIFs have no audio track. Wired through the GUI export dialog (`web/components/export-dialog.tsx`, `export-options-form.tsx`, a "GIF exports have no audio." hint), `web/app.tsx`'s `onExport`, `exportProject` in `app/actions.ts`, and the `.strict()` Zod schema in `app/api/projects/[slug]/export/route.ts`. CLI and MCP were not touched by this feature; neither has a `format` input yet.
+- **Export destination (file/clipboard)** (`web/components/export-dialog.tsx`, `web/app.tsx`): the previously hardcoded, disabled Destination toggle is now wired to real state. Picking Clipboard copies the exported file's absolute output path to the OS clipboard as text (`navigator.clipboard.writeText`, same precedent as the transcript-copy feature) after a successful export; it never copies the video itself and never reaches the server, so the rendered file always lands in `output/` either way. The export button no longer disables when Clipboard is selected.
+
+### Changed
+- **Version**: bumped OpenKlip to `0.29.0.0`.
+
 ## 0.28.0.0 - 2026-07-03
 
 Export performance, two-pass loudnorm, noise reduction, OS file locking, and demo GIF.

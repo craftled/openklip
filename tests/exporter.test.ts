@@ -3,6 +3,8 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
+  readFileSync,
   rmSync,
   statSync,
   writeFileSync,
@@ -1273,6 +1275,150 @@ test("exportCut applies the requested fps and compression (smoke)", {
     assert.ok(
       studioBytes > lowBytes,
       `studio export (${studioBytes}B) should outweigh web-low (${lowBytes}B)`
+    );
+  });
+});
+
+// ── format: "gif" (skip-gated real-ffmpeg smokes) ───────────────────────────
+// The gif conversion is a second pass run AFTER the existing mp4 pipeline
+// finishes unchanged, so these smokes both prove the gif path works and
+// guard that a plain/omitted/"mp4" format is byte-for-byte unaffected.
+
+function writeGifSmokeFixture(slug: string, src: string) {
+  writeFixtureProject(
+    slug,
+    makeProject({
+      slug,
+      source: src,
+      fps: 30,
+      width: 320,
+      height: 240,
+      durationSamples: 2 * SAMPLE_RATE,
+      captions: { enabled: false, maxWords: 6, style: "boxed" },
+      words: [
+        {
+          id: "w0",
+          text: "Hello",
+          startSample: 0,
+          endSample: SAMPLE_RATE,
+          deleted: false,
+        },
+        {
+          id: "w1",
+          text: "world",
+          startSample: SAMPLE_RATE,
+          endSample: 2 * SAMPLE_RATE,
+          deleted: false,
+        },
+      ],
+    })
+  );
+}
+
+async function writeGifSmokeSource(src: string, label: string) {
+  await run(
+    FFMPEG,
+    [
+      "-y",
+      "-f",
+      "lavfi",
+      "-i",
+      "testsrc=duration=2:size=320x240:rate=30",
+      "-f",
+      "lavfi",
+      "-i",
+      "sine=frequency=440:duration=2",
+      "-c:v",
+      "libx264",
+      "-pix_fmt",
+      "yuv420p",
+      "-c:a",
+      "aac",
+      "-shortest",
+      src,
+    ],
+    label
+  );
+}
+
+test("exportCut with format: gif produces a .gif, no leftover mp4, and ExportResult.format is gif (smoke)", {
+  skip: FFMPEG_OK ? false : "ffmpeg binary unavailable",
+}, async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    const p = projectPaths(slug);
+    const src = join(p.dir, "source.mp4");
+    await writeGifSmokeSource(src, "ffmpeg(export-gif-smoke-clip)");
+    writeGifSmokeFixture(slug, src);
+
+    const result = await exportCut(slug, { format: "gif" });
+    assert.equal(result.format, "gif");
+    assert.ok(
+      result.out.endsWith(".gif"),
+      `expected a .gif path, got ${result.out}`
+    );
+    assert.ok(existsSync(result.out), "gif file should exist");
+    assert.ok(
+      !existsSync(p.out),
+      "intermediate mp4 should not remain after gif conversion"
+    );
+
+    const header = Buffer.from(await Bun.file(result.out).arrayBuffer())
+      .subarray(0, 3)
+      .toString("ascii");
+    assert.equal(header, "GIF", "output should start with the GIF magic bytes");
+  });
+});
+
+test("exportCut with format: gif keeps public outputs untouched when final publish fails (smoke)", {
+  skip: FFMPEG_OK ? false : "ffmpeg binary unavailable",
+}, async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    const p = projectPaths(slug);
+    const src = join(p.dir, "source.mp4");
+    await writeGifSmokeSource(src, "ffmpeg(export-gif-atomic-failure-clip)");
+    writeGifSmokeFixture(slug, src);
+
+    mkdirSync(join(p.output, "out.gif"));
+
+    await assert.rejects(() => exportCut(slug, { format: "gif" }));
+    assert.ok(
+      !existsSync(p.out),
+      "intermediate mp4 should not be published on gif failure"
+    );
+    assert.deepEqual(
+      readdirSync(p.output).filter((name) => name.startsWith(".out-tmp-")),
+      [],
+      "temporary export files should be cleaned up after failure"
+    );
+  });
+});
+
+test("exportCut with format omitted or 'mp4' is byte-for-byte unchanged (regression guard)", {
+  skip: FFMPEG_OK ? false : "ffmpeg binary unavailable",
+}, async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    const p = projectPaths(slug);
+    const src = join(p.dir, "source.mp4");
+    await writeGifSmokeSource(src, "ffmpeg(export-mp4-regression-clip)");
+    writeGifSmokeFixture(slug, src);
+
+    const omitted = await exportCut(slug, {});
+    assert.equal(omitted.format, "mp4");
+    assert.equal(omitted.out, p.out);
+    const omittedBytes = readFileSync(p.out);
+
+    const explicit = await exportCut(slug, { format: "mp4" });
+    assert.equal(explicit.format, "mp4");
+    assert.equal(explicit.out, p.out);
+    const explicitBytes = readFileSync(p.out);
+
+    assert.ok(
+      omittedBytes.equals(explicitBytes),
+      "omitted-format and explicit format:'mp4' exports should render identical bytes"
+    );
+    assert.ok(
+      !existsSync(p.out.replace(/\.mp4$/i, ".gif")),
+      "no stray .gif should exist"
     );
   });
 });

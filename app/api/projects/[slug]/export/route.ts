@@ -1,7 +1,11 @@
 import { existsSync } from "node:fs";
 import { effectiveRanges } from "@engine/edl";
 import { EXPORT_PLATFORM_IDS } from "@engine/export-platforms";
-import { EXPORT_COMPRESSIONS, exportCut } from "@engine/exporter";
+import {
+  EXPORT_COMPRESSIONS,
+  EXPORT_FORMATS,
+  exportCut,
+} from "@engine/exporter";
 import { assertValidSlug, projectPaths } from "@engine/paths";
 import { loadProject } from "@engine/projectStore";
 import type { NextRequest } from "next/server";
@@ -16,11 +20,13 @@ interface RouteParams {
 
 // Export options the GUI / an agent may pass. `height` mirrors the CLI
 // `--height` flag (max output height); `compression` and `fps` mirror
-// `--compression` / `--fps`; `platform` mirrors `--platform` (fills any of
-// the above left unset; explicit fields always win); `loudnessTargetLufs`
-// overrides project.audio.loudness for this export only (never mutates the
-// project) and shares the AudioSchema's -30..-10 LUFS bound. Everything else
-// stays project-driven.
+// `--compression` / `--fps`; `format` mirrors `--format` ("mp4" default,
+// "gif" converts the rendered mp4 to a sibling .gif and drops the audio
+// track); `platform` mirrors `--platform` (fills any of the above left
+// unset; explicit fields always win); `loudnessTargetLufs` overrides
+// project.audio.loudness for this export only (never mutates the project)
+// and shares the AudioSchema's -30..-10 LUFS bound. Everything else stays
+// project-driven.
 const ExportRequestSchema = z
   .object({
     aspect: z.enum(["source", "16:9", "9:16", "1:1"]).optional(),
@@ -32,6 +38,7 @@ const ExportRequestSchema = z
         scale: z.number().min(1).max(3).optional(),
       })
       .optional(),
+    format: z.enum(EXPORT_FORMATS).optional(),
     fps: z.number().int().min(1).max(120).optional(),
     height: z.number().int().positive().max(4320).optional(),
     loudnessTargetLufs: z.number().min(-30).max(-10).optional(),
@@ -101,6 +108,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
       aspect: parsed.data.aspect,
       compression: parsed.data.compression,
       crop: parsed.data.crop,
+      format: parsed.data.format,
       fps: parsed.data.fps,
       loudnessTargetLufs: parsed.data.loudnessTargetLufs,
       maxHeight: parsed.data.height,

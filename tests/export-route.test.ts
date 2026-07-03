@@ -120,6 +120,21 @@ test("export route returns 400 for an unknown platform id", async () => {
   });
 });
 
+test("export route accepts a known format value (404 for a missing project, not 400)", async () => {
+  await withTempProjectsRoot(async () => {
+    const res = await POST(exportRequest({ format: "gif" }), ctx("missing"));
+    assert.equal(res.status, 404);
+  });
+});
+
+test("export route returns 400 for an unknown format value", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const res = await POST(exportRequest({ format: "webm" }), ctx(slug));
+    assert.equal(res.status, 400);
+  });
+});
+
 test("export route accepts a loudnessTargetLufs within -30..-10 (404 for a missing project, not 400)", async () => {
   await withTempProjectsRoot(async () => {
     const res = await POST(

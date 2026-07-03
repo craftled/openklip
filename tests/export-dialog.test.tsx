@@ -6,6 +6,7 @@ import {
 } from "@engine/export-platforms";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
+  buildExportOptions,
   effectiveMaxHeight,
   outputDimensionsForMaxHeight,
 } from "../web/components/export-dialog.tsx";
@@ -25,8 +26,11 @@ function renderForm(
       compression="social"
       destination="file"
       dims={{ width: 1280, height: 720 }}
+      format="mp4"
       frameRate="source"
       onCompressionChange={() => undefined}
+      onDestinationChange={() => undefined}
+      onFormatChange={() => undefined}
       onFrameRateChange={() => undefined}
       onPlatformChange={() => undefined}
       onResolutionChange={() => undefined}
@@ -75,14 +79,69 @@ test("compression and frame-rate groups drop the coming-soon copy", () => {
   assert.doesNotMatch(html, /coming soon/i);
 });
 
-test("destination and format stay disabled (out of scope)", () => {
+test("destination and format toggles are enabled (no longer out of scope)", () => {
   const html = renderForm();
   for (const label of ["File", "Clipboard", "MP4", "GIF"]) {
     assert.ok(
-      isDisabledButton(buttonAttrs(html, label)),
-      `"${label}" should stay disabled`
+      !isDisabledButton(buttonAttrs(html, label)),
+      `"${label}" should be enabled`
     );
   }
+});
+
+test("GIF format selection shows a no-audio hint", () => {
+  const html = renderForm({ format: "gif" });
+  assert.match(html, /no audio/i);
+});
+
+test("MP4 format selection does not show the no-audio hint", () => {
+  const html = renderForm({ format: "mp4" });
+  assert.doesNotMatch(html, /no audio/i);
+});
+
+test("Clipboard destination selection shows a path-only hint", () => {
+  const html = renderForm({ destination: "clipboard" });
+  assert.match(html, /exported file path, not the video itself/i);
+});
+
+test("File destination selection does not show the clipboard path hint", () => {
+  const html = renderForm({ destination: "file" });
+  assert.doesNotMatch(html, /exported file path, not the video itself/i);
+});
+
+// ── Format/destination payload assembly (pure, portal-free) ────────────────
+
+const baseExportState = {
+  compression: "social" as const,
+  destination: "file" as const,
+  format: "mp4" as const,
+  frameRate: "source",
+  maxHeight: undefined,
+  platform: "manual" as const,
+  resolution: "4k" as const,
+};
+
+test("buildExportOptions submits format: gif when GIF is selected", () => {
+  const options = buildExportOptions({ ...baseExportState, format: "gif" });
+  assert.equal(options.format, "gif");
+});
+
+test("buildExportOptions submits format: mp4 by default", () => {
+  const options = buildExportOptions(baseExportState);
+  assert.equal(options.format, "mp4");
+});
+
+test("buildExportOptions submits destination: clipboard when Clipboard is selected", () => {
+  const options = buildExportOptions({
+    ...baseExportState,
+    destination: "clipboard",
+  });
+  assert.equal(options.destination, "clipboard");
+});
+
+test("buildExportOptions submits destination: file by default", () => {
+  const options = buildExportOptions(baseExportState);
+  assert.equal(options.destination, "file");
 });
 
 test("platform row renders Manual plus one chip per export platform", () => {

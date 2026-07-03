@@ -5,7 +5,7 @@ import type {
   ExportPlatformId,
 } from "@engine/export-platforms";
 import { listExportPlatforms } from "@engine/export-platforms";
-import type { ExportCompression } from "@engine/exporter";
+import type { ExportCompression, ExportFormat } from "@engine/exporter";
 import type { ComponentType } from "react";
 import {
   Select,
@@ -106,14 +106,16 @@ function ExportOptionLabel({
 
 // Presentational export settings, extracted from ExportDialog so the option
 // markup is testable with renderToStaticMarkup (the dialog itself only mounts
-// its content in a portal once opened). Format and destination stay disabled;
-// GIF/clipboard/presets are out of scope for now.
+// its content in a portal once opened).
 export function ExportOptionsForm({
   compression,
   destination,
   dims,
+  format,
   frameRate,
   onCompressionChange,
+  onDestinationChange,
+  onFormatChange,
   onFrameRateChange,
   onPlatformChange,
   onResolutionChange,
@@ -124,9 +126,12 @@ export function ExportOptionsForm({
   compression: ExportCompression;
   destination: ExportDestination;
   dims: { width: number; height: number };
+  format: ExportFormat;
   /** "source" or a stringified FRAME_RATES entry. */
   frameRate: string;
   onCompressionChange: (value: ExportCompression) => void;
+  onDestinationChange: (value: ExportDestination) => void;
+  onFormatChange: (value: ExportFormat) => void;
   onFrameRateChange: (value: string) => void;
   onPlatformChange: (value: ExportPlatformSelection) => void;
   onResolutionChange: (value: ExportResolution) => void;
@@ -177,17 +182,27 @@ export function ExportOptionsForm({
           <ExportOptionLabel icon={Video} label="Format" />
           <ToggleGroup
             className="w-full"
-            disabled
-            value={["mp4"]}
+            onValueChange={(value) => {
+              const formatValue = firstToggleValue(value);
+              if (formatValue) {
+                onFormatChange(formatValue as ExportFormat);
+              }
+            }}
+            value={[format]}
             variant="outline"
           >
             <ToggleGroupItem className="flex-1" value="mp4">
               MP4
             </ToggleGroupItem>
-            <ToggleGroupItem className="flex-1 opacity-50" value="gif">
+            <ToggleGroupItem className="flex-1" value="gif">
               GIF
             </ToggleGroupItem>
           </ToggleGroup>
+          {format === "gif" && (
+            <p className="mt-2 text-muted-foreground text-xs">
+              GIF exports have no audio.
+            </p>
+          )}
         </div>
 
         <div>
@@ -268,11 +283,16 @@ export function ExportOptionsForm({
         </div>
       </div>
 
-      <div className="opacity-60">
+      <div>
         <ExportOptionLabel icon={Film} label="Export to" />
         <ToggleGroup
           className="w-full sm:max-w-xs"
-          disabled
+          onValueChange={(value) => {
+            const destinationValue = firstToggleValue(value);
+            if (destinationValue) {
+              onDestinationChange(destinationValue as ExportDestination);
+            }
+          }}
           value={[destination]}
           variant="outline"
         >
@@ -280,15 +300,16 @@ export function ExportOptionsForm({
             <Upload data-icon="inline-start" />
             File
           </ToggleGroupItem>
-          <ToggleGroupItem
-            className="flex-1 gap-2 opacity-50"
-            disabled
-            value="clipboard"
-          >
+          <ToggleGroupItem className="flex-1 gap-2" value="clipboard">
             <Copy data-icon="inline-start" />
             Clipboard
           </ToggleGroupItem>
         </ToggleGroup>
+        {destination === "clipboard" && (
+          <p className="mt-2 text-muted-foreground text-xs">
+            Copies the exported file path, not the video itself.
+          </p>
+        )}
       </div>
     </>
   );

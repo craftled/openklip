@@ -9,7 +9,7 @@ import {
   type ExportPlatformId,
   isExportPlatformId,
 } from "@engine/export-platforms";
-import type { ExportCompression } from "@engine/exporter";
+import type { ExportCompression, ExportFormat } from "@engine/exporter";
 import { projectPaths } from "@engine/paths";
 import {
   applyBroll,
@@ -238,6 +238,7 @@ export async function exportProject(
     aspect?: "source" | "16:9" | "9:16" | "1:1";
     compression?: ExportCompression;
     crop?: { focusX?: number; focusY?: number; scale?: number };
+    format?: ExportFormat;
     fps?: number;
     loudnessTargetLufs?: number;
     maxHeight?: number;
@@ -251,12 +252,15 @@ export async function exportProject(
     aspect: "source" | "16:9" | "9:16" | "1:1";
     fps: number;
     compression: ExportCompression;
+    format: ExportFormat;
     durationSec: number;
     out: string;
   }>
 > {
   try {
-    const { EXPORT_COMPRESSIONS, exportCut } = await import("@engine/exporter");
+    const { EXPORT_COMPRESSIONS, EXPORT_FORMATS, exportCut } = await import(
+      "@engine/exporter"
+    );
     // Server actions are network-reachable: enforce the same bounds the HTTP
     // route and MCP tool do before any export work, instead of trusting the
     // caller (an unchecked fps would land verbatim in the filtergraph).
@@ -264,6 +268,7 @@ export async function exportProject(
       aspect,
       compression,
       crop,
+      format,
       fps,
       loudnessTargetLufs,
       maxHeight,
@@ -291,6 +296,11 @@ export async function exportProject(
         `unknown compression preset "${compression}" (expected one of: ${EXPORT_COMPRESSIONS.join(", ")})`
       );
     }
+    if (format !== undefined && !EXPORT_FORMATS.includes(format)) {
+      throw new Error(
+        `unknown export format "${format}" (expected one of: ${EXPORT_FORMATS.join(", ")})`
+      );
+    }
     if (
       maxHeight !== undefined &&
       !(Number.isInteger(maxHeight) && maxHeight >= 1 && maxHeight <= 4320)
@@ -316,6 +326,7 @@ export async function exportProject(
       aspect,
       compression,
       crop,
+      format,
       fps,
       loudnessTargetLufs,
       maxHeight,
