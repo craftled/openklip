@@ -73,7 +73,7 @@ Agent sidebar chats use `working/chats.json`, not `localStorage` (color scheme a
 
 ## What works today
 
-Verified against the current codebase (`VERSION` / `package.json` `0.28.0.0`, 1389 tests):
+Verified against the current codebase (`VERSION` / `package.json` `0.29.0.0`, 1402 tests):
 
 - **Ingest**: video → local transcript + preview proxy + `project.json` (`openklip ingest`; refuses re-ingest unless `--force`)
 - **Transcript editing**: click words to toggle `deleted`; `openklip cut` / `cut --text` / `restore` on CLI
@@ -88,7 +88,7 @@ Verified against the current codebase (`VERSION` / `package.json` `0.28.0.0`, 13
 - **Captions**: preview overlay + ASS burn-in on export; five style presets (`boxed`, `clean`, `karaoke`, `bold-caps`, `minimal`) defined once and rendered identically by both (`openklip captions-style <slug> <style>`, Config panel picker); unknown/missing style ids fall back to `boxed` on load
 - **Assets**: register b-roll, music, stills; sidebar asset bin with upload + `assets/` folder sync; upload from chat `+`
 - **Overlays**: b-roll cover, Ken Burns stills, push-in zooms, title cards (lower / center / hero), vignette; phrase helpers (`*-add-phrase`) on CLI
-- **Export**: ffmpeg composes kept ranges + overlays + captions; GUI export dialog picks max height (720p / 1080p / 4K), compression preset (studio / social / web / web-low), output frame rate (source / 24 / 25 / 30 / 48 / 60), and platform preset with a live size/time estimate; same settings on CLI (`--height`, `--fps`, `--compression`, `--platform`), MCP, and the export API
+- **Export**: ffmpeg composes kept ranges + overlays + captions; GUI export dialog picks max height (720p / 1080p / 4K), compression preset (studio / social / web / web-low), output frame rate (source / 24 / 25 / 30 / 48 / 60), output format (MP4 / GIF, GIF has no audio), destination (file / clipboard, clipboard copies the exported path as text), and platform preset with a live size/time estimate; height, compression, frame rate, and platform settings match on CLI (`--height`, `--fps`, `--compression`, `--platform`), MCP, and the export API. Format and destination are GUI-only for now
 - **Export platform presets**: Platform picker (GUI) and `--platform <id>` (CLI/MCP): `youtube`, `youtube-4k`, `x`, `linkedin`, and **`shorts`** (9:16 vertical, 30fps, 1920 height cap, -14 LUFS). Any control changed after picking a platform still wins; `--loudness <lufs>` overrides loudness for one export only
 - **Vertical reframe (Shorts)**: `project.export` stores aspect (`source`, `16:9`, `9:16`, `1:1`) and crop (focus X/Y, zoom 1-3) shared by preview and ffmpeg export; GUI Reframe controls, orientation toggle (16:9 / 9:16 / 1:1), Manual / Scene / Vision crop modes, Fill / Split vertical layout, safe-area preview guides (TikTok, Reels, YouTube Shorts, generic); `openklip export-set`, `openklip vision-focus` (macOS), `bun run agent-make-short`
 - **Vision reframe sidecar** (macOS): `tools/vision-focus.swift` detects face center, falls back to attention saliency, attaches on-frame OCR text; GUI **Vision focus** button in Reframe; enriches speaker `sceneLog` segments with `focusX`/`focusY`

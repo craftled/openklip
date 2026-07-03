@@ -2006,6 +2006,7 @@ export function App({
           }
           const r = await exportProject(project.slug, {
             compression: options?.compression,
+            format: options?.format,
             fps:
               options?.frameRate === "source" ? undefined : options?.frameRate,
             maxHeight,
@@ -2013,6 +2014,15 @@ export function App({
           });
           if (!r.ok) {
             throw new Error(r.error);
+          }
+          // Destination is a client-only, post-export action: the export
+          // itself always renders to output/ regardless of destination, this
+          // only additionally copies the rendered file's absolute path so a
+          // user can paste it elsewhere. Guarded like the transcript-copy
+          // precedent in editor-transcript-panel.tsx since navigator.clipboard
+          // is unavailable outside a secure browser context.
+          if (options?.destination === "clipboard") {
+            void navigator.clipboard?.writeText(r.data.out);
           }
           return r.data;
         })(),

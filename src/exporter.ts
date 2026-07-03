@@ -96,12 +96,22 @@ export const EXPORT_COMPRESSIONS = [
 
 export type ExportCompression = (typeof EXPORT_COMPRESSIONS)[number];
 
+// Output container/format. "mp4" (default) is the historical, unchanged
+// render path. "gif" renders the identical mp4 first, then converts that mp4
+// into a sibling .gif via a second ffmpeg pass (palettegen/paletteuse), and
+// deletes the intermediate mp4 so exactly one deliverable remains.
+export const EXPORT_FORMATS = ["mp4", "gif"] as const;
+
+export type ExportFormat = (typeof EXPORT_FORMATS)[number];
+
 export interface ExportOptions {
   /** Output aspect for this export; defaults to project.export then platform. */
   aspect?: ExportAspect;
   compression?: ExportCompression; // libx264 preset/CRF bundle; default "social"
   /** Manual reframe crop for this export; merges over project.export.crop. */
   crop?: Partial<ExportCrop>;
+  /** Output container; default "mp4". "gif" has no audio track. */
+  format?: ExportFormat;
   fps?: number; // output frame rate; default = rounded source rate
   /**
    * Export-invocation-only loudness normalization target (LUFS, -30..-10).
@@ -799,6 +809,8 @@ export async function exportCut(
   aspect: ExportAspect;
   fps: number;
   compression: ExportCompression;
+  /** Output container actually produced; "mp4" when format was left unset. */
+  format: ExportFormat;
   /** Present only when a platform preset was used to resolve this export. */
   platform?: ExportPlatformId;
   /** The effective loudness target when normalization applied this export
@@ -1457,8 +1469,44 @@ export async function exportCut(
     throw e;
   }
 
+  // GIF is a second, independent pass over the just-rendered mp4: the
+  // filter_complex/encode pipeline above never changes for format: "gif", so
+  // an mp4 export (the default) is byte-for-byte unaffected by this branch.
+  // Reuses the proven palettegen(stats_mode=diff)/paletteuse(dither=bayer)
+  // pattern from scripts/record-demo-gif.sh, adapted to this export's own
+  // resolved fps/width instead of that script's fixed demo-asset values.
+  // GIFs have no audio track; the -vf output here has no audio map, so the
+  // conversion naturally drops it without touching the main audio filters.
+  const effectiveFormat: ExportFormat = resolved.format ?? "mp4";
+  let finalOut = destOut;
+  if (effectiveFormat === "gif") {
+    const gifOut = destOut.toLowerCase().endsWith(".mp4")
+      ? `${destOut.slice(0, -4)}.gif`
+      : `${destOut}.gif`;
+    await run(
+      FFMPEG,
+      [
+        "-y",
+        "-i",
+        destOut,
+        "-vf",
+        `fps=${outFps},scale=${outW}:-1:flags=lanczos,split[s0][s1];[s0]palettegen=stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=3`,
+        "-loop",
+        "0",
+        gifOut,
+      ],
+      "ffmpeg(export-gif)"
+    );
+    try {
+      await unlink(destOut);
+    } catch {
+      // Best-effort: the mp4 is only an intermediate once the gif exists.
+    }
+    finalOut = gifOut;
+  }
+
   return {
-    out: destOut,
+    out: finalOut,
     durationSec: totalDurationSec(ranges),
     ranges: ranges.length,
     captions: captionsOn && assPath !== null,
@@ -1474,6 +1522,7 @@ export async function exportCut(
     aspect,
     fps: outFps,
     compression: resolved.compression ?? "social",
+    format: effectiveFormat,
     platform: resolved.platform,
     loudnessTargetLufs: effectiveLoudnessTarget,
     audio: {

@@ -6,7 +6,7 @@ import {
   type ExportPlatformId,
   exportPlatform,
 } from "@engine/export-platforms";
-import type { ExportCompression } from "@engine/exporter";
+import type { ExportCompression, ExportFormat } from "@engine/exporter";
 import { type ReactElement, type ReactNode, useMemo, useState } from "react";
 import {
   COMPRESSION_COPY,
@@ -40,13 +40,43 @@ import { cn } from "@/lib/utils";
 
 export interface ExportDialogOptions {
   compression: ExportCompression;
+  /** Client-only: whether web/app.tsx should also copy the output path to
+   * the clipboard after a successful export. Never reaches the server. */
   destination: ExportDestination;
+  format: ExportFormat;
   /** "source" keeps the source frame rate; a number requests that rate. */
   frameRate: number | "source";
   maxHeight?: number;
   /** undefined when Manual is selected; otherwise the active preset id. */
   platform?: ExportPlatformId;
   resolution: ExportResolution;
+}
+
+/**
+ * Pure assembly of the payload handed to onExport, extracted so the
+ * format/destination submission logic is testable without mounting the
+ * portal-rendered dialog (same rationale as effectiveMaxHeight above).
+ */
+export function buildExportOptions(state: {
+  compression: ExportCompression;
+  destination: ExportDestination;
+  format: ExportFormat;
+  /** "source" or a stringified FRAME_RATES entry. */
+  frameRate: string;
+  maxHeight?: number;
+  platform: ExportPlatformSelection;
+  resolution: ExportResolution;
+}): ExportDialogOptions {
+  return {
+    compression: state.compression,
+    destination: state.destination,
+    format: state.format,
+    frameRate:
+      state.frameRate === "source" ? "source" : Number(state.frameRate),
+    maxHeight: state.maxHeight,
+    platform: state.platform === "manual" ? undefined : state.platform,
+    resolution: state.resolution,
+  };
 }
 
 interface ExportDialogProps {
@@ -160,7 +190,8 @@ export function ExportDialog({
   // "source" or a stringified frame rate; mapped to number | "source" on export.
   const [frameRate, setFrameRate] = useState<string>("source");
   const [platform, setPlatform] = useState<ExportPlatformSelection>("manual");
-  const destination: ExportDestination = "file";
+  const [format, setFormat] = useState<ExportFormat>("mp4");
+  const [destination, setDestination] = useState<ExportDestination>("file");
 
   // Picking a platform chip sets the compression/fps/resolution controls to
   // the preset's defaults; the controls stay independently editable after
@@ -218,14 +249,17 @@ export function ExportDialog({
 
   const handleExport = async () => {
     setOpen(false);
-    await onExport({
-      compression,
-      destination,
-      frameRate: frameRate === "source" ? "source" : Number(frameRate),
-      maxHeight: activeMaxHeight,
-      platform: platform === "manual" ? undefined : platform,
-      resolution,
-    });
+    await onExport(
+      buildExportOptions({
+        compression,
+        destination,
+        format,
+        frameRate,
+        maxHeight: activeMaxHeight,
+        platform,
+        resolution,
+      })
+    );
   };
 
   return (
@@ -247,8 +281,11 @@ export function ExportDialog({
           compression={compression}
           destination={destination}
           dims={dims}
+          format={format}
           frameRate={frameRate}
           onCompressionChange={setCompression}
+          onDestinationChange={setDestination}
+          onFormatChange={setFormat}
           onFrameRateChange={setFrameRate}
           onPlatformChange={handlePlatformChange}
           onResolutionChange={setResolution}
@@ -264,11 +301,7 @@ export function ExportDialog({
           </p>
           <div className="flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row">
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <Button
-              className={cn("gap-2")}
-              disabled={destination !== "file"}
-              onClick={handleExport}
-            >
+            <Button className={cn("gap-2")} onClick={handleExport}>
               <Download data-icon="inline-start" />
               Export to file…
               <Kbd className="bg-primary-foreground/15 text-primary-foreground">
