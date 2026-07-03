@@ -2955,16 +2955,15 @@ export function App({
                             <Select
                               onValueChange={(v) => {
                                 if (
-                                  v === "linear" ||
-                                  v === "easeIn" ||
-                                  v === "easeOut" ||
-                                  v === "easeInOut"
+                                  typeof v === "string" &&
+                                  (KEYFRAME_EASINGS as string[]).includes(v)
                                 ) {
+                                  const easing = v as Keyframe["easing"];
                                   updateGraphic(selGraphic.id, {
                                     keyframes: updateKeyframeAt(
                                       selGraphicKeyframes,
                                       index,
-                                      { easing: v }
+                                      { easing }
                                     ),
                                   });
                                 }
