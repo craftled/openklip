@@ -19,7 +19,9 @@ import { join } from "node:path";
 // Type-only import: erased at compile time, so puppeteer-core stays out of the
 // bundle (the runtime use is the lazy dynamic import inside renderHeadlessAlpha).
 import type { Browser } from "puppeteer-core";
+import { SAMPLE_RATE } from "./edl.ts";
 import { FFMPEG, run } from "./ffmpeg.ts";
+import type { Keyframe } from "./keyframes.ts";
 import { graphicRuntimeEntryPath } from "./script-paths.ts";
 
 export interface HeadlessRenderInput {
@@ -27,6 +29,7 @@ export interface HeadlessRenderInput {
   durFrames: number;
   fps: number;
   height: number;
+  keyframes?: Keyframe[];
   outPath: string;
   params: Record<string, string | number | boolean>;
   width: number;
@@ -159,8 +162,16 @@ export async function renderHeadlessAlpha(
     }, input.params);
 
     for (let f = 0; f < input.durFrames; f++) {
+      const sampleOffset = Math.floor((f * SAMPLE_RATE) / input.fps);
       await page.evaluate(
-        (frame: number, durFrames: number, height: number) => {
+        (
+          frame: number,
+          durFrames: number,
+          height: number,
+          width: number,
+          keyframes: unknown,
+          sampleOffsetArg: number
+        ) => {
           const api = (
             window as unknown as {
               __okGraphic: {
@@ -168,7 +179,13 @@ export async function renderHeadlessAlpha(
                   r: Element,
                   fr: number,
                   df: number,
-                  h: number
+                  h: number,
+                  opts?: {
+                    width: number;
+                    height: number;
+                    keyframes?: unknown;
+                    sampleOffset?: number;
+                  }
                 ) => void;
               };
             }
@@ -177,11 +194,19 @@ export async function renderHeadlessAlpha(
           if (!root) {
             return;
           }
-          api.applyGraphicFrame(root, frame, durFrames, height);
+          api.applyGraphicFrame(root, frame, durFrames, height, {
+            width,
+            height,
+            keyframes,
+            sampleOffset: sampleOffsetArg,
+          });
         },
         f,
         input.durFrames,
-        input.height
+        input.height,
+        input.width,
+        input.keyframes,
+        sampleOffset
       );
       const buf = (await page.screenshot({
         omitBackground: true,

@@ -1009,6 +1009,7 @@ export function updateGraphic(
     fromSec?: number;
     toSec?: number;
     params?: Record<string, string | number | boolean>;
+    keyframes?: Graphic["keyframes"] | null;
     track?: Graphic["track"];
     note?: string;
   }
@@ -1049,6 +1050,13 @@ export function updateGraphic(
         };
   item.template = template;
   item.params = { ...base, ...(patch.params ?? {}) };
+  if (patch.keyframes !== undefined) {
+    if (patch.keyframes === null || patch.keyframes.length === 0) {
+      item.keyframes = undefined;
+    } else {
+      item.keyframes = patch.keyframes;
+    }
+  }
   item.track = track;
   item.startSample = Math.round(fromSec * SAMPLE_RATE);
   item.endSample = Math.round(endSec * SAMPLE_RATE);

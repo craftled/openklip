@@ -6,6 +6,7 @@ import {
 } from "./audio-analysis-core.ts";
 import { CAPTION_STYLE_IDS, DEFAULT_CAPTION_STYLE } from "./caption-styles.ts";
 import { ExportLayoutSchema, SplitVerticalSchema } from "./export-layout.ts";
+import { KeyframeSchema } from "./keyframes.ts";
 import {
   ProductAnnouncementCatalogSchema,
   ProductAnnouncementSpecSchema,
@@ -243,6 +244,7 @@ export const GraphicSchema = z
     startSample: z.number().int().nonnegative(),
     endSample: z.number().int().nonnegative(),
     track: z.enum(["broll", "title", "zoom"]).default("title"),
+    keyframes: KeyframeSchema.array().max(64).optional(),
     note: z.string().optional(),
     anchor: PhraseAnchorSchema.optional(),
   })

@@ -10,6 +10,7 @@ import {
   type Project,
   samplesToSec,
 } from "./edl.ts";
+import type { Keyframe } from "./keyframes.ts";
 import { findPhraseRuns, type PhraseRun } from "./phrase-match.ts";
 import { validateProductAnnouncementSpec } from "./product-announcement.ts";
 
@@ -60,6 +61,8 @@ export interface OverlayViews {
     catalog?: string;
     fromSec: number;
     id: string;
+    keyframeCount: number;
+    keyframes?: Keyframe[];
     note?: string;
     params?: Record<string, string | number | boolean>;
     template: string;
@@ -311,6 +314,8 @@ export function listOverlays(project: Project): OverlayViews {
         track: g.track,
         fromSec: sec(g.startSample),
         toSec: sec(g.endSample),
+        keyframeCount: g.keyframes?.length ?? 0,
+        ...(g.keyframes === undefined ? {} : { keyframes: g.keyframes }),
         anchor: g.anchor ?? null,
         ...(g.catalog === undefined ? {} : { catalog: g.catalog }),
         ...(type === "template" ? { params: g.params } : {}),

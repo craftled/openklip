@@ -29,6 +29,7 @@ import {
   shouldApplyReframe,
 } from "@engine/export-aspect";
 import { FILTER_OPTIONS, filterLabel } from "@engine/filter";
+import type { Keyframe } from "@engine/keyframes";
 import { validateProductAnnouncementSpec } from "@engine/product-announcement";
 import {
   SAFE_AREA_PLATFORMS,
@@ -180,6 +181,7 @@ import {
   Moon,
   PanelLeft,
   PanelRight,
+  Plus,
   Scan,
   Sparkles,
   Sun,
@@ -189,6 +191,18 @@ import {
   ZoomIn,
 } from "@/lib/icon";
 import { isModKeyOnly, isTypingTarget } from "@/lib/keyboard-shortcuts";
+import {
+  addKeyframe,
+  clampKeyframeSampleOffset,
+  defaultKeyframeValue,
+  formatKeyframeProperty,
+  KEYFRAME_EASINGS,
+  KEYFRAME_PROPERTIES,
+  keyframeValueBounds,
+  playheadOffsetInClip,
+  removeKeyframeAt,
+  updateKeyframeAt,
+} from "@/lib/keyframe-ui";
 import { musicPreviewTime } from "@/lib/music-preview";
 import {
   type PhraseSearchMatch,
@@ -453,6 +467,8 @@ export function App({
   const [project, setProject] = useState<Project>(initialProject);
   const [playing, setPlaying] = useState(false);
   const [curSample, setCurSample] = useState(0);
+  const [newKeyframeProperty, setNewKeyframeProperty] =
+    useState<Keyframe["property"]>("opacity");
   const [captionsOn, setCaptionsOn] = useState(
     initialProject.captions?.enabled ?? true
   );
@@ -1139,6 +1155,27 @@ export function App({
     setProject({ ...project, stills });
     enqueueSave(() => saveStills(project.slug, stills));
   };
+
+  const updateGraphic = useCallback(
+    (id: string, patch: { keyframes: Keyframe[] }) => {
+      setProject((prev) => {
+        const graphics = (prev.graphics ?? []).map((g) =>
+          g.id === id ? { ...g, keyframes: patch.keyframes } : g
+        );
+        const graphic = graphics.find((g) => g.id === id);
+        const actionName =
+          graphic?.type === "json-render" ? "json-graphic-set" : "graphic-set";
+        enqueueSave(() =>
+          runGuiAction(prev.slug, actionName, {
+            id,
+            keyframes: patch.keyframes,
+          })
+        );
+        return { ...prev, graphics };
+      });
+    },
+    [enqueueSave]
+  );
 
   // Music placement dispatches through the music-add/music-set/music-rm
   // registry actions (history logs them) with optimistic setProject; the add
@@ -2120,6 +2157,21 @@ export function App({
   );
   const selGraphicLabel =
     selGraphic?.type === "json-render" ? "Announcement graphic" : "Graphic";
+  const selGraphicKeyframes = useMemo(() => {
+    if (!selGraphic?.keyframes?.length) {
+      return [];
+    }
+    return [...selGraphic.keyframes].sort(
+      (a, b) => a.sampleOffset - b.sampleOffset
+    );
+  }, [selGraphic?.keyframes]);
+  const graphicPlayheadOffset = selGraphic
+    ? playheadOffsetInClip(
+        curSample,
+        selGraphic.startSample,
+        selGraphic.endSample
+      )
+    : null;
   const presetOf = (z: ZoomItem) =>
     Object.entries(ZOOM_PRESETS).find(
       ([, v]) =>
@@ -2351,6 +2403,7 @@ export function App({
         endSample: g.endSample,
         startSec: g.startSample / sr,
         endSec: g.endSample / sr,
+        keyframes: g.keyframes,
         label:
           g.type === "json-render"
             ? "Announcement graphic"
@@ -2826,6 +2879,172 @@ export function App({
                       </span>
                     </PropRow>
                   )}
+                </Section>
+              )}
+
+              {selGraphic && (
+                <Section title="Keyframes">
+                  {selGraphicKeyframes.length === 0 ? (
+                    <p className="text-muted-foreground text-xs">
+                      No keyframes yet. Scrub the playhead inside this graphic
+                      and add one below.
+                    </p>
+                  ) : (
+                    selGraphicKeyframes.map((kf, index) => {
+                      const bounds = keyframeValueBounds(kf.property);
+                      const valueLabel =
+                        kf.property === "opacity"
+                          ? kf.value.toFixed(2)
+                          : kf.property === "scale"
+                            ? `${kf.value.toFixed(2)}×`
+                            : kf.value.toFixed(2);
+                      return (
+                        <div
+                          className="space-y-2 rounded-md border border-border/60 bg-muted/30 p-2"
+                          key={`${kf.sampleOffset}-${kf.property}-${index}`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-medium text-xs">
+                              {formatKeyframeProperty(kf.property)}
+                            </span>
+                            <span className="text-muted-foreground text-xs tabular-nums">
+                              {fmt(kf.sampleOffset / sr)} in clip
+                            </span>
+                            <Button
+                              aria-label={`Remove keyframe ${formatKeyframeProperty(kf.property)}`}
+                              className="size-7 shrink-0"
+                              onClick={() =>
+                                updateGraphic(selGraphic.id, {
+                                  keyframes: removeKeyframeAt(
+                                    selGraphicKeyframes,
+                                    index
+                                  ),
+                                })
+                              }
+                              size="icon-sm"
+                              type="button"
+                              variant="ghost"
+                            >
+                              <Trash2 className="size-3.5" />
+                            </Button>
+                          </div>
+                          <PropRow label="Value" value={valueLabel}>
+                            <Slider
+                              className={SLIDER}
+                              max={bounds.max}
+                              min={bounds.min}
+                              onValueChange={(value) =>
+                                updateGraphic(selGraphic.id, {
+                                  keyframes: updateKeyframeAt(
+                                    selGraphicKeyframes,
+                                    index,
+                                    {
+                                      value: firstSliderValue(value),
+                                    }
+                                  ),
+                                })
+                              }
+                              step={bounds.step}
+                              value={[kf.value]}
+                            />
+                          </PropRow>
+                          <Field className="grid h-7 grid-cols-[4.25rem_1fr] items-center gap-2.5">
+                            <FieldLabel className="text-muted-foreground text-xs">
+                              Easing
+                            </FieldLabel>
+                            <Select
+                              onValueChange={(v) => {
+                                if (
+                                  v === "linear" ||
+                                  v === "easeIn" ||
+                                  v === "easeOut" ||
+                                  v === "easeInOut"
+                                ) {
+                                  updateGraphic(selGraphic.id, {
+                                    keyframes: updateKeyframeAt(
+                                      selGraphicKeyframes,
+                                      index,
+                                      { easing: v }
+                                    ),
+                                  });
+                                }
+                              }}
+                              value={kf.easing}
+                            >
+                              <SelectTrigger className="w-full" size="sm">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectGroup>
+                                  {KEYFRAME_EASINGS.map((easing) => (
+                                    <SelectItem key={easing} value={easing}>
+                                      {easing}
+                                    </SelectItem>
+                                  ))}
+                                </SelectGroup>
+                              </SelectContent>
+                            </Select>
+                          </Field>
+                        </div>
+                      );
+                    })
+                  )}
+                  <div className="mt-1 flex gap-2">
+                    <Select
+                      onValueChange={(v) => {
+                        if (
+                          v === "opacity" ||
+                          v === "scale" ||
+                          v === "x" ||
+                          v === "y"
+                        ) {
+                          setNewKeyframeProperty(v);
+                        }
+                      }}
+                      value={newKeyframeProperty}
+                    >
+                      <SelectTrigger className="flex-1" size="sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          {KEYFRAME_PROPERTIES.map((property) => (
+                            <SelectItem key={property} value={property}>
+                              {formatKeyframeProperty(property)}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      disabled={graphicPlayheadOffset === null}
+                      onClick={() => {
+                        if (!selGraphic || graphicPlayheadOffset === null) {
+                          return;
+                        }
+                        const clipLength =
+                          selGraphic.endSample - selGraphic.startSample;
+                        const sampleOffset = clampKeyframeSampleOffset(
+                          graphicPlayheadOffset,
+                          clipLength
+                        );
+                        updateGraphic(selGraphic.id, {
+                          keyframes: addKeyframe(selGraphicKeyframes, {
+                            sampleOffset,
+                            property: newKeyframeProperty,
+                            value: defaultKeyframeValue(newKeyframeProperty),
+                            easing: "linear",
+                          }),
+                        });
+                      }}
+                      size="sm"
+                      type="button"
+                      variant="secondary"
+                    >
+                      <Plus data-icon="inline-start" />
+                      At playhead
+                    </Button>
+                  </div>
                 </Section>
               )}
 

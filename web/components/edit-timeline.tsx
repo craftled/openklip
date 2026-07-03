@@ -1,5 +1,6 @@
 "use client";
 
+import type { Keyframe } from "@engine/keyframes";
 import {
   type ComponentType,
   type MouseEvent,
@@ -23,6 +24,7 @@ import {
   Type,
   ZoomIn,
 } from "@/lib/icon";
+import { keyframePositionFraction } from "@/lib/keyframe-ui";
 import {
   minClipSpanSamples,
   moveClipSpan,
@@ -54,6 +56,7 @@ export interface TimelineClip {
   endSample: number;
   endSec: number;
   id: string;
+  keyframes?: Keyframe[];
   label: string;
   startSample: number;
   startSec: number;
@@ -397,6 +400,29 @@ function EditableClipBlock({
       <span className="pointer-events-none block truncate px-1.5 py-0.5 text-left">
         {clip.label}
       </span>
+      {clip.keyframes?.map((kf, index) => {
+        const clipLength = clip.endSample - clip.startSample;
+        if (clipLength <= 0) {
+          return null;
+        }
+        const fraction = keyframePositionFraction(kf.sampleOffset, clipLength);
+        return (
+          <button
+            aria-label={`Keyframe ${kf.property} at ${Math.round(fraction * 100)}%`}
+            className="absolute bottom-0.5 z-40 size-1.5 rotate-45 border border-foreground/70 bg-primary shadow-sm hover:bg-primary/80 dark:border-primary-foreground/40"
+            key={`${kf.sampleOffset}-${kf.property}-${index}`}
+            onPointerDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onSelect();
+            }}
+            style={{
+              left: `calc(${fraction * 100}% - 3px)`,
+            }}
+            type="button"
+          />
+        );
+      })}
       <button
         aria-label={`Resize end: ${clip.label}`}
         className="absolute top-0 right-0 bottom-0 z-30 cursor-ew-resize rounded-r bg-foreground/15 opacity-0 hover:opacity-100"

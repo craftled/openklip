@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { z } from "zod";
 import { readActionLog } from "./action-log.ts";
 import { summarize } from "./actions.ts";
 import { listAgentTasks } from "./agent-tasks.ts";
@@ -72,6 +73,7 @@ import { exportAllHighlights, exportHighlight } from "./highlight-export.ts";
 import { detectHighlights, highlightClipLines } from "./highlights.ts";
 import { ingest } from "./ingest.ts";
 import { loadIngesters } from "./ingesters.ts";
+import { type Keyframe, KeyframeSchema } from "./keyframes.ts";
 import { listLuts, lutPath } from "./lut.ts";
 import { startMcpServer } from "./mcp-server.ts";
 import {
@@ -190,7 +192,8 @@ Overlays
   openklip graphic-add <slug> <template> <fromSec> <toSec>
                                      overlay an HTML/CSS graphic template
                                        --param key=value (repeatable)  --track broll|title|zoom
-  openklip graphic-set <slug> <graphicId> patch graphic (--template --from --to --param --track)
+  openklip graphic-set <slug> <graphicId> patch graphic (--template --from --to --param --track
+                                      [--keyframes-file keyframes.json | --clear-keyframes])
   openklip graphic-rm <slug> <graphicId> remove a graphic overlay
   openklip json-graphic-add <slug> product-announcement <fromSec> <toSec>
                                      overlay a validated json-render announcement spec
@@ -467,6 +470,28 @@ async function readJsonSpecFile(args: string[]): Promise<unknown> {
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     throw new Error(`could not read --spec-file ${specFile}: ${detail}`);
+  }
+}
+
+async function readGraphicKeyframesFlag(
+  args: string[]
+): Promise<Keyframe[] | null | undefined> {
+  if (args.includes("--clear-keyframes")) {
+    return null;
+  }
+  const keyframesFile = flagValue(args, "--keyframes-file");
+  if (!keyframesFile) {
+    return;
+  }
+  try {
+    const raw = JSON.parse(await Bun.file(keyframesFile).text());
+    const parsed = z.array(KeyframeSchema).max(64).parse(raw);
+    return parsed;
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `could not read --keyframes-file ${keyframesFile}: ${detail}`
+    );
   }
 }
 
@@ -1208,12 +1233,13 @@ try {
     case "graphic-set": {
       if (!(rest[0] && rest[1])) {
         throw new Error(
-          "usage: openklip graphic-set <slug> <graphicId> [--template id] [--from N] [--to N] [--param key=value ...] [--track broll|title|zoom]"
+          "usage: openklip graphic-set <slug> <graphicId> [--template id] [--from N] [--to N] [--param key=value ...] [--track broll|title|zoom] [--keyframes-file keyframes.json | --clear-keyframes]"
         );
       }
       const slug = rest[0];
       const args = rest.slice(2);
       const params = collectParams(args);
+      const keyframes = await readGraphicKeyframesFlag(args);
       const { result: item } = await runLoggedAction<Graphic>(
         slug,
         "graphic-set",
@@ -1223,6 +1249,7 @@ try {
           fromSec: flagNumber(args, "--from"),
           toSec: flagNumber(args, "--to"),
           params: Object.keys(params).length > 0 ? params : undefined,
+          keyframes,
           track: trackFlag(args),
         }
       );

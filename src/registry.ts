@@ -60,6 +60,7 @@ import {
   type Project,
 } from "./edl.ts";
 import { EXPORT_ASPECT_IDS } from "./export-aspect.ts";
+import { KeyframeSchema } from "./keyframes.ts";
 import {
   PRODUCT_ANNOUNCEMENT_CATALOG,
   ProductAnnouncementCatalogSchema,
@@ -404,6 +405,7 @@ export const actions: ActionDef[] = [
       params: z
         .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
         .optional(),
+      keyframes: KeyframeSchema.array().max(64).nullable().optional(),
       track: track.optional(),
       note: z.string().optional(),
     }),

@@ -1,5 +1,6 @@
 "use client";
 
+import type { Keyframe } from "@engine/keyframes";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   applyGraphicFrame,
@@ -17,6 +18,7 @@ export interface GraphicItem {
   catalog?: string;
   endSample: number;
   id: string;
+  keyframes?: Keyframe[];
   params: Record<string, string | number | boolean>;
   spec?: unknown;
   startSample: number;
@@ -151,8 +153,20 @@ export function GraphicOverlay({
       sampleRate,
       comp.fps
     );
-    applyGraphicFrame(root, frame, durFrames, comp.height);
-  }, [comp, curSample, sampleRate, graphic.startSample, graphic.endSample]);
+    applyGraphicFrame(root, frame, durFrames, comp.height, {
+      width: comp.width,
+      height: comp.height,
+      keyframes: graphic.keyframes,
+      sampleOffset: curSample - graphic.startSample,
+    });
+  }, [
+    comp,
+    curSample,
+    sampleRate,
+    graphic.startSample,
+    graphic.endSample,
+    graphic.keyframes,
+  ]);
 
   if (!comp) {
     return null;
