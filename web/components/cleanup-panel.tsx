@@ -10,7 +10,13 @@ import {
 import type { Project } from "@engine/edl";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { IconAlertTriangle, Scissors } from "@/lib/icon";
+import { IconAlertTriangle, Scissors, Trash2 } from "@/lib/icon";
+
+export interface RegisteredDeadAirSpan {
+  endSec: number;
+  id: string;
+  startSec: number;
+}
 
 const MAX_ROWS = 200;
 
@@ -110,17 +116,22 @@ export interface CleanupPanelProps {
   applying?: boolean;
   onApply: (candidate: CleanupCandidate) => void;
   onApplyAllSafe: () => void;
+  onRemoveSpan?: (id: string) => void;
+  registeredSpans?: RegisteredDeadAirSpan[];
   report: CleanupReport;
 }
 
 // Presentational cleanup review list for the Config panel: filler-word and
-// dead-air candidates with counts, a batch "apply all safe" action, and a
-// per-row apply button. All state and behavior live in the caller (app.tsx),
-// matching the transcript-search.tsx / music-controls.tsx split.
+// dead-air candidates with counts, a batch "apply all safe" action, a per-row
+// apply button, and a registered dead-air spans list with per-span remove
+// buttons. All state and behavior live in the caller (app.tsx), matching the
+// transcript-search.tsx / music-controls.tsx split.
 export function CleanupPanel({
   applying = false,
   onApply,
   onApplyAllSafe,
+  onRemoveSpan,
+  registeredSpans,
   report,
 }: CleanupPanelProps) {
   const safeCandidates = report.candidates.filter((c) => c.risk === "safe");
@@ -192,6 +203,43 @@ export function CleanupPanel({
           ) : null}
         </>
       )}
+
+      {registeredSpans && registeredSpans.length > 0 ? (
+        <div className="flex flex-col gap-1" data-dead-air-registered>
+          <p className="font-medium text-muted-foreground text-xs">
+            Registered dead-air spans
+          </p>
+          <ul className="flex max-h-32 flex-col gap-1 overflow-y-auto">
+            {registeredSpans.map((span) => (
+              <li
+                className="flex items-center gap-2 rounded-md border bg-background/50 px-2 py-1"
+                data-dead-air-span
+                key={span.id}
+              >
+                <span className="min-w-0 flex-1 text-muted-foreground text-xs tabular-nums">
+                  {fmtTimecode(span.startSec)}
+                  {" – "}
+                  {fmtTimecode(span.endSec)}
+                  <span className="ml-1 text-muted-foreground/70">
+                    ({(span.endSec - span.startSec).toFixed(1)}s)
+                  </span>
+                </span>
+                <Button
+                  aria-label={`Remove dead-air span at ${fmtTimecode(span.startSec)}`}
+                  data-dead-air-rm
+                  disabled={applying}
+                  onClick={() => onRemoveSpan?.(span.id)}
+                  size="icon-sm"
+                  type="button"
+                  variant="ghost"
+                >
+                  <Trash2 />
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
     </div>
   );
 }

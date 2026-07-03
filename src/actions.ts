@@ -17,6 +17,8 @@ import {
   type CropMode,
   type CutSnap,
   CutSnapSchema,
+  type CutTransition,
+  CutTransitionSchema,
   type DeadAirSpan,
   type ExportAspect,
   type ExportCrop,
@@ -1280,6 +1282,7 @@ export function setLook(
     filter?: Filter;
     lut?: string | null;
     color?: Partial<ColorAdjust>;
+    transition?: Partial<CutTransition>;
   }
 ): Project {
   if (typeof input.vignette === "boolean") {
@@ -1298,6 +1301,13 @@ export function setLook(
   }
   if (input.color !== undefined) {
     project.look = mergeColor(project.look, input.color);
+  }
+  if (input.transition !== undefined) {
+    const base = CutTransitionSchema.parse(project.look.transition ?? {});
+    project.look = {
+      ...project.look,
+      transition: { ...base, ...input.transition },
+    };
   }
   return project;
 }

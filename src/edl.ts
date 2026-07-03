@@ -56,6 +56,24 @@ export const FilterSchema = z
   .default("none");
 export type Filter = z.infer<typeof FilterSchema>;
 
+// Visual transition applied between kept-range cuts at export.
+// "none" (default) is a hard cut, exactly the historical behavior.
+// "crossfade" dissolves between the outgoing and incoming frames using ffmpeg
+//   xfade. "dip" fades out to black then fades in, using a fade-out + fade-in
+//   pair on each segment. Transitions are only applied in the segment export
+//   path (voice-only, no b-roll/stills/music/rich graphics); falls back to
+//   hard cut when the path is unavailable or there is only one range.
+// durationMs is the total transition duration (50..2000 ms, default 500).
+export const CUT_TRANSITION_TYPES = ["none", "crossfade", "dip"] as const;
+export type CutTransitionType = (typeof CUT_TRANSITION_TYPES)[number];
+export const CutTransitionSchema = z
+  .object({
+    type: z.enum(CUT_TRANSITION_TYPES).default("none"),
+    durationMs: z.number().int().min(50).max(2000).default(500),
+  })
+  .default({ type: "none", durationMs: 500 });
+export type CutTransition = z.infer<typeof CutTransitionSchema>;
+
 // Continuous color adjustment layered on top of the base filter. Pure
 // numbers that map deterministically to ffmpeg
 // colorbalance (temperature/tint) then eq (contrast/brightness/saturation), in
@@ -561,8 +579,14 @@ export const ProjectSchema = z
         lut: z.string().optional(),
         /** Continuous color knobs on top of the filter (absent = neutral). */
         color: ColorAdjustSchema.optional(),
+        /** Visual transition applied between kept-range cuts at export. */
+        transition: CutTransitionSchema,
       })
-      .default({ vignette: false, filter: "none" }),
+      .default({
+        vignette: false,
+        filter: "none",
+        transition: { type: "none", durationMs: 500 },
+      }),
     zooms: z.array(ZoomSchema).default([]),
     titles: z.array(TitleSchema).default([]),
     stills: z.array(StillSchema).default([]),

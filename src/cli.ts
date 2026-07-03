@@ -38,6 +38,7 @@ import { runDoctor } from "./doctor.ts";
 import {
   type Broll,
   type BrollDisplay,
+  CUT_TRANSITION_TYPES,
   type Graphic,
   type MusicPlacement,
   type Project,
@@ -1588,9 +1589,42 @@ try {
         console.log(`color: ${colorAdjustSummary(project.look.color)}`);
         break;
       }
+      if (rest[1] === "transition") {
+        const transitionUsage = `openklip look <slug> transition <${CUT_TRANSITION_TYPES.join("|")}> [--duration ms]`;
+        const typeArg = rest[2];
+        if (
+          !(
+            typeArg &&
+            CUT_TRANSITION_TYPES.includes(
+              typeArg as (typeof CUT_TRANSITION_TYPES)[number]
+            )
+          )
+        ) {
+          throw new Error(`usage: ${transitionUsage}`);
+        }
+        const durationStr = flagValue(rest, "--duration");
+        const input: Record<string, string | number> = { type: typeArg };
+        if (durationStr !== undefined) {
+          const ms = Number(durationStr);
+          if (!Number.isInteger(ms) || ms < 50 || ms > 2000) {
+            throw new Error(
+              "--duration must be an integer between 50 and 2000 ms"
+            );
+          }
+          input.durationMs = ms;
+        }
+        const { project } = await runLoggedAction(
+          rest[0],
+          "look-transition",
+          input
+        );
+        const t = project.look.transition;
+        console.log(`transition: ${t.type}, ${t.durationMs}ms`);
+        break;
+      }
       if (rest[1] !== "vignette") {
         throw new Error(
-          `usage: openklip look <slug> vignette <on|off>\n       ${filterUsage}\n       openklip look <slug> lut <name|none>\n       openklip look <slug> color [--temp n] [--tint n] [--bright n] [--contrast n] [--sat n] | --reset`
+          `usage: openklip look <slug> vignette <on|off>\n       ${filterUsage}\n       openklip look <slug> lut <name|none>\n       openklip look <slug> color [--temp n] [--tint n] [--bright n] [--contrast n] [--sat n] | --reset\n       openklip look <slug> transition <${CUT_TRANSITION_TYPES.join("|")}> [--duration ms]`
         );
       }
       const vignette = parseOnOff(rest[2], "openklip look <slug> vignette");

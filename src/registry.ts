@@ -54,6 +54,7 @@ import { NEUTRAL_COLOR } from "./color-adjust.ts";
 import {
   BrollAudioModeSchema,
   BrollDisplaySchema,
+  CUT_TRANSITION_TYPES,
   FilterSchema,
   PhraseAnchorSchema,
   type Project,
@@ -522,10 +523,7 @@ export const actions: ActionDef[] = [
   defineAction({
     name: "dead-air-rm",
     summary: "Remove a registered dead-air span by id.",
-    // No GUI affordance yet (the cleanup panel only ADDS spans; a per-span
-    // remove/undo row is a TODO), so the gui surface stays off until one
-    // exists rather than advertising a caller-less surface.
-    surfaces: ["cli", "mcp"],
+    surfaces: ["cli", "gui", "mcp"],
     schema: z.object({ id: z.string() }),
     run: (p, i) => ({ removed: removeDeadAir(p, i.id) }),
   }),
@@ -580,6 +578,20 @@ export const actions: ActionDef[] = [
         setLook(p, { color: knobs });
       }
       return { color: p.look.color ?? null };
+    },
+  }),
+  defineAction({
+    name: "look-transition",
+    summary:
+      "Set the visual cut transition applied between kept-range segments at export (none, crossfade, or dip-to-black). Transitions require voice-only exports (no b-roll, stills, music, or rich graphics).",
+    surfaces: ["cli", "gui", "mcp"],
+    schema: z.object({
+      type: z.enum(CUT_TRANSITION_TYPES).optional(),
+      durationMs: z.number().int().min(50).max(2000).optional(),
+    }),
+    run: (p, i) => {
+      setLook(p, { transition: i });
+      return { transition: p.look.transition };
     },
   }),
   defineAction({
