@@ -125,7 +125,7 @@ Preview cuts get a Glimm WebGL sweep in the browser. Exported MP4s can use VAD-s
 
 - [x] Manual vertical/square export reframe: `project.export` aspect (`source`, `16:9`, `9:16`, `1:1`) and crop (focus X/Y, zoom) shared by preview and ffmpeg export; `shorts` platform preset; GUI Reframe controls and orientation toggle persist aspect.
 - [x] Scene crop mode (`cropMode: scene`): when `openklip analyze` has written a `sceneLog`, export-set in scene mode derives crop focus from speaker spans; segments may carry `focusX`/`focusY` (face center, 0-1) from scene analysis.
-- [ ] Face/saliency auto-crop beyond scene-log focus coords (Vision sidecar, per-frame bbox).
+- [x] Face/saliency auto-crop beyond scene-log focus coords (Vision sidecar, per-frame bbox): `tools/vision-focus.swift`, `openklip vision-focus`, `cropMode: vision`, `agent-make-short` enrichment on macOS.
 - [ ] Optional macOS Apple Vision sidecar for saliency-based reframe + OCR.
 - [ ] OpenCLIP semantic b-roll matching (deferred - heavy dependency).
 

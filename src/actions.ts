@@ -1343,9 +1343,21 @@ export function setExportSettings(
   }
   const cropMode = input.cropMode ?? current.cropMode;
 
-  // When switching to scene mode with a fixed aspect, derive focus from sceneLog.
+  // Scene mode derives focus from sceneLog; vision mode uses caller-supplied crop
+  // (from suggestCropFromVision / vision-focus CLI) when present.
   let crop: ExportCrop;
-  if (cropMode === "scene" && aspect !== "source") {
+  if (
+    cropMode === "vision" &&
+    aspect !== "source" &&
+    input.crop?.focusX !== undefined &&
+    input.crop?.focusY !== undefined
+  ) {
+    crop = {
+      focusX: clampNum(input.crop.focusX, 0, 1),
+      focusY: clampNum(input.crop.focusY, 0, 1),
+      scale: clampNum(input.crop.scale ?? current.crop.scale, 1, 3),
+    };
+  } else if (cropMode === "scene" && aspect !== "source") {
     const suggestion = suggestCropFromSceneLog(project, aspect);
     crop = suggestion
       ? {

@@ -2,7 +2,26 @@
 
 Use these bodies when publishing releases. Each section matches a tag in `CHANGELOG.md` without duplicating the full changelog. **Known gaps:** always link to [TODO.md](../TODO.md#known-limitations); do not duplicate the list here.
 
-Publishing status checked on 2026-07-03 (`gh release list`): GitHub releases are published through `v0.22.0.0`. `v0.23.0.0` is prepared below for publication next.
+Publishing status checked on 2026-07-03 (`gh release list`): GitHub releases are published through `v0.23.0.0`. `v0.24.0.0` is prepared below for publication next.
+
+---
+
+## v0.24.0.0
+
+**macOS Vision face detection for vertical reframe focus.**
+
+### Highlights
+- **Vision sidecar**: `tools/vision-focus.swift` detects the largest face in ingest frames; `src/vision-focus.ts` compiles it on first use and averages focus across samples.
+- **`openklip vision-focus <slug>`**: writes `focusX`/`focusY` onto speaker sceneLog segments before scene crop mode runs.
+- **`cropMode: vision`**: CLI `export-set --crop-mode vision` samples frames directly when no sceneLog exists.
+- **`agent-make-short`**: on macOS, enriches sceneLog via Vision before export-set.
+- Current codebase verification: run `bun test` after merge.
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations) for the current list. Vision focus is macOS-only and requires ingest frames; saliency/OCR sidecar is not implemented.
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#02400---2026-07-03)
 
 ---
 

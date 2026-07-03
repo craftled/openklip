@@ -1,4 +1,8 @@
 #!/usr/bin/env bun
+import { setExportSettings, summarize } from "../src/actions.ts";
+import type { CropMode, ExportCrop, Project } from "../src/edl.ts";
+import { exportCut } from "../src/exporter.ts";
+import { mutateProject } from "../src/projectStore.ts";
 /**
  * Make-short agent loop: derives a vertical short from an existing edit.
  * Sets 9:16 aspect with scene-based reframe when sceneLog is available,
@@ -9,11 +13,13 @@
  * the target, this script warns and continues. Run the full agent loop
  * (or openklip cut) to trim first.
  */
-import { setExportSettings, summarize } from "../src/actions.ts";
-import type { CropMode, Project } from "../src/edl.ts";
-import { exportCut } from "../src/exporter.ts";
-import { mutateProject } from "../src/projectStore.ts";
+import { listFrameSamples } from "../src/scene-log.ts";
 import { verifyCut } from "../src/verify.ts";
+import {
+  enrichSceneLogWithVisionFocus,
+  suggestCropFromVision,
+  visionFocusAvailable,
+} from "../src/vision-focus.ts";
 
 function help(): void {
   console.log(`OpenKlip make-short agent loop
@@ -35,12 +41,18 @@ Examples:
 }
 
 /**
- * Decide whether to use scene-derived crop or manual crop.
- * Returns "scene" when the project has a sceneLog, "manual" otherwise.
+ * Decide crop mode for make-short: scene when sceneLog exists, vision when
+ * macOS ingest frames are available without sceneLog, else manual.
  * Exported for testing.
  */
-export function chooseCropMode(project: Project): CropMode {
-  return project.sceneLog ? "scene" : "manual";
+export function chooseCropMode(project: Project, slug?: string): CropMode {
+  if (project.sceneLog) {
+    return "scene";
+  }
+  if (slug && visionFocusAvailable() && listFrameSamples(slug, 1).length > 0) {
+    return "vision";
+  }
+  return "manual";
 }
 
 if (import.meta.main) {
@@ -80,21 +92,52 @@ if (import.meta.main) {
       );
     }
 
-    const cropMode = chooseCropMode(project);
-    console.log(
-      `\n[make-short] setting 9:16 reframe, crop mode: ${cropMode}${project.sceneLog ? " (sceneLog detected)" : ""}`
-    );
-
     if (dryRun) {
+      const previewMode = chooseCropMode(project, slug);
+      console.log(`[make-short] dry-run: would use crop mode ${previewMode}`);
       console.log("[make-short] dry-run: skipping save and export");
       console.log("[make-short] done");
       process.exit(0);
     }
 
+    if (visionFocusAvailable() && listFrameSamples(slug, 1).length > 0) {
+      const enriched = await mutateProject(
+        slug,
+        async (p) => enrichSceneLogWithVisionFocus(slug, p),
+        { action: "vision-focus", actor: "agent" }
+      );
+      if (enriched > 0) {
+        console.log(
+          `[make-short] vision-focus enriched ${enriched} speaker segment(s)`
+        );
+      }
+    }
+
+    const refreshed = await loadProject(slug);
+    let cropMode = chooseCropMode(refreshed, slug);
+    let visionCrop: Partial<ExportCrop> | undefined;
+
+    if (cropMode === "vision") {
+      const suggestion = await suggestCropFromVision(slug, refreshed, "9:16");
+      if (suggestion) {
+        visionCrop = suggestion;
+      } else {
+        cropMode = "manual";
+      }
+    }
+
+    console.log(
+      `\n[make-short] setting 9:16 reframe, crop mode: ${cropMode}${refreshed.sceneLog ? " (sceneLog detected)" : ""}`
+    );
+
     await mutateProject(
       slug,
       (p) => {
-        setExportSettings(p, { aspect: "9:16", cropMode });
+        setExportSettings(p, {
+          aspect: "9:16",
+          cropMode,
+          crop: visionCrop,
+        });
       },
       { action: "export-set", actor: "agent" }
     );

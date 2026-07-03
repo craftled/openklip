@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.24.0.0 - 2026-07-03
+
+macOS Vision face detection for vertical reframe focus.
+
+### Added
+- **Vision sidecar** (`tools/vision-focus.swift`, `src/vision-focus.ts`): on macOS, detects the largest face in ingest frames via Apple Vision and returns normalized `focusX`/`focusY` for reframe crop.
+- **`openklip vision-focus <slug>`**: enriches speaker `sceneLog` segments with Vision-derived focus coords (logged as `vision-focus`).
+- **`cropMode: vision`** on `project.export`: `export-set --crop-mode vision` samples ingest frames and stores face-derived crop (CLI computes focus before the registry write).
+- **`agent-make-short`**: on macOS with ingest frames, runs `vision-focus` enrichment before export-set; falls back to direct `vision` crop when no sceneLog exists.
+
+### Changed
+- **Version**: bumped OpenKlip to `0.24.0.0`.
+
 ## 0.23.0.0 - 2026-07-03
 
 Scene-log focus coordinates and a deterministic make-short agent loop.

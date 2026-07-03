@@ -43,6 +43,7 @@ test("loadTemplateSkill reads the make-draft, make-short, and revise-draft playb
   const makeShort = loadTemplateSkill("make-short");
   assert.match(makeShort, /task_complete/);
   assert.match(makeShort, /export-set/);
+  assert.match(makeShort, /vision-focus/);
   assert.match(makeShort, /platform: "shorts"/);
 
   const reviseDraft = loadTemplateSkill("revise-draft");

@@ -80,6 +80,20 @@ test("make-short: shorts platform preset resolves 9:16 1920p 30fps social", () =
   assert.equal(resolved.loudnessTargetLufs, -14);
 });
 
+test("make-short: setExportSettings vision mode uses caller-supplied crop", () => {
+  const project = makeProjectWithExport();
+
+  setExportSettings(project, {
+    aspect: "9:16",
+    cropMode: "vision",
+    crop: { focusX: 0.33, focusY: 0.44 },
+  });
+
+  assert.equal(project.export?.cropMode, "vision");
+  assert.equal(project.export?.crop.focusX, 0.33);
+  assert.equal(project.export?.crop.focusY, 0.44);
+});
+
 test("make-short: chooseCropMode returns scene when sceneLog present", () => {
   const withScene = makeProject({
     sceneLog: {

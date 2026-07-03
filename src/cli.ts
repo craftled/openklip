@@ -100,6 +100,11 @@ import {
 } from "./templates.ts";
 import { TITLE_POSITION_IDS } from "./titles.ts";
 import { verifyCut, verifyVerdict } from "./verify.ts";
+import {
+  enrichSceneLogWithVisionFocus,
+  suggestCropFromVision,
+  visionFocusAvailable,
+} from "./vision-focus.ts";
 
 const [cmd, ...rest] = process.argv.slice(2);
 
@@ -235,10 +240,11 @@ Review & export
   openklip dead-air-rm <slug> <id>   remove a registered dead-air span by id
   openklip export-set <slug>           set export aspect and manual reframe crop
                                        --aspect <id>  source|16:9|9:16|1:1
-                                       --crop-mode <mode>  manual|scene
+                                       --crop-mode <mode>  manual|scene|vision
                                        --crop-focus-x <0-1>  horizontal pan
                                        --crop-focus-y <0-1>  vertical pan
                                        --crop-scale <1-3>    zoom into source before crop
+  openklip vision-focus <slug>         enrich sceneLog speaker segments with macOS Vision face focus (darwin only)
   openklip export <slug>             render the current cut to out.mp4
                                        --height <px>  max output height (e.g. 1080)
                                        --fps <n>      output frame rate, integer 1-120 (default: source)
@@ -1957,10 +1963,28 @@ try {
       );
       break;
     }
+    case "vision-focus": {
+      if (!rest[0]) {
+        throw new Error("usage: openklip vision-focus <slug>");
+      }
+      if (!visionFocusAvailable()) {
+        throw new Error(
+          "vision-focus requires macOS with tools/vision-focus.swift"
+        );
+      }
+      const slug = rest[0];
+      const updated = await mutateProject(
+        slug,
+        async (p) => enrichSceneLogWithVisionFocus(slug, p),
+        { action: "vision-focus", actor: "cli" }
+      );
+      console.log(`vision-focus: updated ${updated} speaker segment(s)`);
+      break;
+    }
     case "export-set": {
       if (!rest[0]) {
         throw new Error(
-          "usage: openklip export-set <slug> [--aspect <id>] [--crop-mode manual|scene] [--crop-focus-x <0-1>] [--crop-focus-y <0-1>] [--crop-scale <1-3>]"
+          "usage: openklip export-set <slug> [--aspect <id>] [--crop-mode manual|scene|vision] [--crop-focus-x <0-1>] [--crop-focus-y <0-1>] [--crop-scale <1-3>]"
         );
       }
       const slug = rest[0];
@@ -1972,14 +1996,18 @@ try {
       const input: {
         aspect?: ReturnType<typeof parseExportAspectFlag>;
         crop?: { focusX?: number; focusY?: number; scale?: number };
-        cropMode?: "manual" | "scene";
+        cropMode?: "manual" | "scene" | "vision";
       } = {};
       if (aspectRaw !== undefined) {
         input.aspect = parseExportAspectFlag(aspectRaw);
       }
       if (cropModeRaw !== undefined) {
-        if (cropModeRaw !== "manual" && cropModeRaw !== "scene") {
-          throw new Error('--crop-mode must be "manual" or "scene"');
+        if (
+          cropModeRaw !== "manual" &&
+          cropModeRaw !== "scene" &&
+          cropModeRaw !== "vision"
+        ) {
+          throw new Error('--crop-mode must be "manual", "scene", or "vision"');
         }
         input.cropMode = cropModeRaw;
       }
@@ -1994,6 +2022,27 @@ try {
         if (scale !== undefined) {
           input.crop.scale = scale;
         }
+      }
+      if (input.cropMode === "vision") {
+        const project = await loadProject(slug);
+        const aspect =
+          input.aspect ?? project.export?.aspect ?? ("9:16" as const);
+        if (aspect === "source") {
+          throw new Error(
+            'vision crop requires a fixed aspect (not "source"); pass --aspect 9:16'
+          );
+        }
+        const suggestion = await suggestCropFromVision(slug, project, aspect);
+        if (!suggestion) {
+          throw new Error(
+            "vision crop unavailable (no ingest frames or no faces detected)"
+          );
+        }
+        input.crop = {
+          focusX: suggestion.focusX,
+          focusY: suggestion.focusY,
+          scale: input.crop?.scale ?? project.export?.crop.scale,
+        };
       }
       const project =
         Object.keys(input).length === 0

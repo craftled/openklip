@@ -348,6 +348,18 @@ test("export-set: scene cropMode is accepted and stored", () => {
   assert.equal(r.export.aspect, "9:16");
 });
 
+test("export-set: vision cropMode with explicit crop stores face-derived focus", () => {
+  const p = makeProject();
+  const r = runAction("export-set", p, {
+    aspect: "9:16",
+    cropMode: "vision",
+    crop: { focusX: 0.35, focusY: 0.42 },
+  }) as { export: Project["export"] };
+  assert.equal(r.export.cropMode, "vision");
+  assert.equal(r.export.crop.focusX, 0.35);
+  assert.equal(r.export.crop.focusY, 0.42);
+});
+
 test("export-set: sceneLog focusX/focusY on segments round-trip through project", () => {
   const p = makeProject();
   p.sceneLog = {

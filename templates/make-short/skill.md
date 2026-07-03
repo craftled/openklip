@@ -21,7 +21,8 @@ Derive a vertical short from an existing edit: trim to a tight runtime if needed
 
 ## 3. Set vertical aspect and reframe
 
-- Call export-set with `aspect: "9:16"` so preview and export share the same frame. Default crop (focus 0.5 / 0.5, scale 1) centers a landscape talking-head; adjust only when the speaker is clearly off-center or too small in frame.
+- On macOS with ingest frames, run `openklip vision-focus <slug>` (or let `agent-make-short` do it) to write face-center `focusX`/`focusY` onto speaker sceneLog segments before cropping.
+- Call export-set with `aspect: "9:16"` and `cropMode: "scene"` when a sceneLog exists (Vision-enriched focus is used automatically). Without a sceneLog on macOS, `cropMode: "vision"` samples frames directly; otherwise use `manual` and patch focus by eye.
 - Patch crop with export-set when needed: raise `scale` slightly (1.1 to 1.4) to tighten on the speaker, or shift `focusX` / `focusY` (0 to 1) to keep the face in frame. Make one small adjustment at a time; re-read project_status after each change.
 - Keep captions on unless the brief says otherwise. Captions burn in for vertical export; there is no per-platform safe-area model yet, so avoid placing a hero title in the bottom third when captions are on.
 

@@ -83,7 +83,8 @@ export function ReframeControls({
   const crop = exportSettings.crop;
   const cropMode = exportSettings.cropMode ?? "manual";
   const isScene = cropMode === "scene";
-  const manualDisabled = applying || isScene;
+  const isVision = cropMode === "vision";
+  const manualDisabled = applying || isScene || isVision;
 
   return (
     <div className="flex flex-col gap-2" data-reframe-section>
@@ -141,6 +142,7 @@ export function ReframeControls({
         Pan and zoom the source frame before export. Preview uses the same crop
         when a fixed aspect is active.
         {isScene && " Crop focus is derived from scene analysis."}
+        {isVision && " Crop focus is derived from macOS Vision face detection."}
       </p>
     </div>
   );

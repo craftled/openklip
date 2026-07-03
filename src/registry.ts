@@ -610,7 +610,7 @@ export const actions: ActionDef[] = [
           scale: z.number().optional(),
         })
         .optional(),
-      cropMode: z.enum(["manual", "scene"]).optional(),
+      cropMode: z.enum(["manual", "scene", "vision"]).optional(),
     }),
     run: (p, i) => {
       setExportSettings(p, i);
