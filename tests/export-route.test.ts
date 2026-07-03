@@ -135,6 +135,35 @@ test("export route returns 400 for an unknown format value", async () => {
   });
 });
 
+// gifMaxWidth overrides the GIF export's default width ceiling (TODO.md known
+// limitation: "no user-facing control to customize these ceilings"); bounded
+// at 1920, the hard ceiling exporter.ts clamps to regardless of caller.
+test("export route accepts a gifMaxWidth within bounds (404 for a missing project, not 400)", async () => {
+  await withTempProjectsRoot(async () => {
+    const res = await POST(
+      exportRequest({ format: "gif", gifMaxWidth: 1280 }),
+      ctx("missing")
+    );
+    assert.equal(res.status, 404);
+  });
+});
+
+test("export route returns 400 for a gifMaxWidth above the 1920 ceiling", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const res = await POST(exportRequest({ gifMaxWidth: 5000 }), ctx(slug));
+    assert.equal(res.status, 400);
+  });
+});
+
+test("export route returns 400 for a fractional gifMaxWidth", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const res = await POST(exportRequest({ gifMaxWidth: 12.5 }), ctx(slug));
+    assert.equal(res.status, 400);
+  });
+});
+
 test("export route accepts a loudnessTargetLufs within -30..-10 (404 for a missing project, not 400)", async () => {
   await withTempProjectsRoot(async () => {
     const res = await POST(
