@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.33.0.0 - 2026-07-03
+
+Task actor filter, GIF export cap override, multi-take GUI browser, and GUI history filter UI.
+
+### Added
+- **Task actor filter** (`src/agent-tools.ts`, `src/cli.ts`, `src/agent-task-types.ts`, `src/agent-tasks.ts`): MCP `task_list` gained an `actor` input (mirrors `history_list`'s existing actor filter), combining with `--status`/`status` (AND semantics); `openklip tasks <slug> --actor <name>` lists every active filter in the "no tasks match" message. Along the way, `AgentTask` gained an optional `actor` field, recorded at creation via `actorFromEnv() ?? "human"`; the field is absent on tasks created before this change, meaning "unknown, not filterable by actor" for backward compatibility with existing `tasks.json` files.
+- **GIF export cap override** (`src/exporter.ts`): `GIF_MAX_WIDTH_OVERRIDE_CEILING_PX` (1920) and `ExportOptions.gifMaxWidth` let a caller raise the 960px default GIF width for one export; `clampGifDimensions` bounds-checks the override in the primitive itself, so no surface can bypass the 1920px hard ceiling even if it skips its own validation. Wired through CLI `--gif-max-width <px>`, the MCP `export` tool's `gifMaxWidth` input, the export route's Zod schema, and `exportProject` in `app/actions.ts`. Default behavior (no override) is unchanged; fps and duration ceilings stay fixed. No GUI control was added.
+- **Multi-take GUI browser and assemble panel** (`web/components/takes-panel.tsx`, `web/lib/take-word-range.ts`, `app/actions.ts`): a new Takes section in the Config sidebar (between Highlights and Music) lists ingested takes, lets a user click-select a word range per take (`resolveWordRange`), builds a multi-segment selection across takes, and assembles them via `assembleFromSelectionAction` (actor `human`), with a force-overwrite confirm click when an edit already exists. Ingesting a new take stays CLI-only (`openklip take-add`); this panel only browses and assembles takes already on disk.
+- **GUI History panel filter UI** (`web/components/history-panel.tsx`): actor/action/task `<select>` filters (`HistoryFilterControls`, AND semantics, matching the CLI/MCP's own exact-match filter behavior), sourced from the unfiltered fetch so narrowing one dimension does not hide the others' options, with a distinct "no entries match the current filters" empty state and a new `system` actor badge style.
+
+### Changed
+- **Version**: bumped OpenKlip to `0.33.0.0`.
+
 ## 0.32.0.0 - 2026-07-03
 
 Cinema player cut-skip fix, GIF export caps, audio de-essing, and a history actor filter.
