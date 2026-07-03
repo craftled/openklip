@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.31.0.0 - 2026-07-03
+
+Real glimm preview cut transitions, closing the gap the entry below corrected.
+
+### Added
+- **Preview cut transitions** (`web/scheduler.ts`, `src/schedulerLogic.ts`, `web/lib/cut-transition-sweep.ts`, `web/components/cut-transition-sweep.tsx`): `CutScheduler` gains an optional `getTransition` getter and an `onCutBoundary` callback, fired only from the playback auto-advance path (`jumpToRange`), never from a manual `seek()`. `cutTransitionSweepPlan` (pure, DOM-free) maps `project.look.transition` to a sweep plan; the glimm-facing module maps that to concrete `SweepOptions` (crossfade: built-in `azure` palette, `peakAlpha` 0.75, reads as a bright dissolve-like flash; dip: a custom near-black `accentPair` palette, reads as a genuine dip-to-black). Respects `prefers-reduced-motion`; degrades to a no-op controller when `createShader` reports WebGL is unavailable. Rendered at `z-[7]` in the main editor preview, above every other preview-container layer. Does not pixel-match the export side's ffmpeg `xfade`/fade-pair transition, just evokes the same two types; `CinemaPlayer` has its own separate playback path (no `CutScheduler`) and does not have the sweep yet.
+
+### Changed
+- **Version**: bumped OpenKlip to `0.31.0.0`.
+
 ## Documentation correction - 2026-07-03
 
 No code changed in this entry; it corrects the record left by earlier entries below.
