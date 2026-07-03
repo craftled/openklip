@@ -45,6 +45,8 @@ describe("integrations config", () => {
       const status = setElevenLabsApiKey("  test-key  ");
 
       expect(status.elevenLabs.hasApiKey).toBe(true);
+      expect(status.elevenLabs.keyPreview).toBe("••••••••-key");
+      expect(status.elevenLabs.keyPreview).not.toContain("test");
       expect(readElevenLabsApiKey()).toBe("test-key");
       expect(readIntegrationsStatus()).not.toHaveProperty("elevenLabs.apiKey");
 

@@ -39,6 +39,7 @@ describe("/api/integrations", () => {
       expect(await saved.json()).toEqual({
         elevenLabs: {
           hasApiKey: true,
+          keyPreview: expect.any(String),
           updatedAt: expect.any(String),
         },
       });
@@ -47,6 +48,7 @@ describe("/api/integrations", () => {
       expect(await status.json()).toEqual({
         elevenLabs: {
           hasApiKey: true,
+          keyPreview: expect.any(String),
           updatedAt: expect.any(String),
         },
       });
@@ -56,6 +58,7 @@ describe("/api/integrations", () => {
       expect(await cleared.json()).toEqual({
         elevenLabs: {
           hasApiKey: false,
+          keyPreview: null,
           updatedAt: null,
         },
       });

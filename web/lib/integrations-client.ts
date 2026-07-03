@@ -1,6 +1,7 @@
 export interface IntegrationsStatus {
   elevenLabs: {
     hasApiKey: boolean;
+    keyPreview: string | null;
     updatedAt: string | null;
   };
 }
@@ -39,6 +40,7 @@ export async function fetchIntegrationsStatus(): Promise<IntegrationsStatus> {
   return {
     elevenLabs: {
       hasApiKey: data.elevenLabs?.hasApiKey ?? false,
+      keyPreview: data.elevenLabs?.keyPreview ?? null,
       updatedAt: data.elevenLabs?.updatedAt ?? null,
     },
   };
@@ -61,6 +63,7 @@ export async function saveElevenLabsApiKey(
   return {
     elevenLabs: {
       hasApiKey: data.elevenLabs?.hasApiKey ?? false,
+      keyPreview: data.elevenLabs?.keyPreview ?? null,
       updatedAt: data.elevenLabs?.updatedAt ?? null,
     },
   };
@@ -77,6 +80,7 @@ export async function clearElevenLabsApiKey(): Promise<IntegrationsStatus> {
   return {
     elevenLabs: {
       hasApiKey: data.elevenLabs?.hasApiKey ?? false,
+      keyPreview: data.elevenLabs?.keyPreview ?? null,
       updatedAt: data.elevenLabs?.updatedAt ?? null,
     },
   };

@@ -23,8 +23,14 @@ const IntegrationsConfigSchema = z
 export interface IntegrationStatus {
   elevenLabs: {
     hasApiKey: boolean;
+    keyPreview: string | null;
     updatedAt: string | null;
   };
+}
+
+function maskApiKey(apiKey: string): string {
+  const visible = apiKey.slice(-4);
+  return `${"•".repeat(8)}${visible}`;
 }
 
 export interface IntegrationTestResult {
@@ -83,6 +89,7 @@ export function readIntegrationsStatus(): IntegrationStatus {
   return {
     elevenLabs: {
       hasApiKey: Boolean(apiKey),
+      keyPreview: apiKey ? maskApiKey(apiKey) : null,
       updatedAt: config.elevenLabs?.updatedAt ?? null,
     },
   };

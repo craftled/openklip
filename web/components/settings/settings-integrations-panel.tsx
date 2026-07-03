@@ -71,7 +71,7 @@ export function SettingsIntegrationsPanel() {
   const [isTesting, setIsTesting] = useState(false);
   const [details, setDetails] = useState<ElevenLabsDetails | null>(null);
   const [status, setStatus] = useState<IntegrationsStatus>({
-    elevenLabs: { hasApiKey: false, updatedAt: null },
+    elevenLabs: { hasApiKey: false, keyPreview: null, updatedAt: null },
   });
   const [testStatus, setTestStatus] = useState<
     IntegrationTestStatus["elevenLabs"] | null
@@ -213,8 +213,8 @@ export function SettingsIntegrationsPanel() {
               className="h-8 text-sm"
               onChange={(event) => setApiKey(event.target.value)}
               placeholder={
-                status.elevenLabs.hasApiKey
-                  ? "Enter a new key to replace the saved one"
+                status.elevenLabs.keyPreview
+                  ? `Saved ${status.elevenLabs.keyPreview} · enter a new key to replace`
                   : "Paste xi-api-key"
               }
               type="password"
