@@ -69,6 +69,7 @@ function AgentPromptInputInner({
 }: AgentPromptInputProps) {
   const { agent, defaultAgent, setAgent } = useAgentChat();
   const controller = usePromptInputController();
+  const promptRootRef = useRef<HTMLDivElement>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const [uploadingAssets, setUploadingAssets] = useState(false);
   const [templates, setTemplates] = useState<TemplateOption[]>([]);
@@ -100,6 +101,11 @@ function AgentPromptInputInner({
     controller?.textInput.clear();
   }, [controller]);
 
+  const focusPromptField = useCallback(() => {
+    const promptField = promptRootRef.current?.querySelector("textarea");
+    promptField?.focus({ preventScroll: true });
+  }, []);
+
   const selectSkill = useCallback(
     (skill: SkillEntry) => {
       setSelectedSkills((current) => {
@@ -112,6 +118,16 @@ function AgentPromptInputInner({
       clearInput();
     },
     [clearInput]
+  );
+
+  const handleSelectSkill = useCallback(
+    (skill: SkillEntry) => {
+      selectSkill(skill);
+      requestAnimationFrame(() => {
+        focusPromptField();
+      });
+    },
+    [focusPromptField, selectSkill]
   );
 
   const clearSelectedSkills = useCallback(() => {
@@ -134,9 +150,10 @@ function AgentPromptInputInner({
   const slashMenu = useSkillsSlashMenu({
     inputValue,
     onClearInput: clearInput,
-    onSelectSkill: selectSkill,
+    onSelectSkill: handleSelectSkill,
     skills,
   });
+  const skillsMenuId = "agent-skills-menu-list";
 
   const onSubmit = async ({ text }: PromptInputMessage) => {
     if (selectedSkills.length > 0) {
@@ -189,134 +206,141 @@ function AgentPromptInputInner({
   return (
     <AgentSkillsMenu
       highlightedIndex={slashMenu.highlightedIndex}
+      id={skillsMenuId}
       onHighlight={slashMenu.setHighlightedIndex}
-      onSelect={selectSkill}
+      onSelect={handleSelectSkill}
       open={slashMenu.menuOpen}
       query={slashMenu.slashQuery}
       skills={skills}
     >
-      <PromptInput
-        className="min-w-0 rounded-lg"
-        inputGroupClassName="items-stretch overflow-visible"
-        onSubmit={onSubmit}
-      >
-        <PromptInputBody>
-          {selectedSkills.length > 0 ? (
-            <AgentSkillTokenField
-              disabled={isRunning || chatsLoading || uploadingAssets}
-              onClearSkills={clearSelectedSkills}
-              onKeyDown={slashMenu.handleInputKeyDown}
-              onRemoveSkill={removeSelectedSkill}
-              skills={selectedSkills}
-            />
-          ) : (
-            <PromptInputTextarea
-              className="w-full text-left placeholder:text-left"
-              disabled={isRunning || chatsLoading || uploadingAssets}
-              onKeyDown={slashMenu.handleInputKeyDown}
-              placeholder={`Ask about ${activeSlug}… or type / for skills`}
-            />
-          )}
-        </PromptInputBody>
-        <PromptInputFooter>
-          <PromptInputTools>
-            <PromptInputButton
-              aria-label="Upload assets"
-              disabled={uploadingAssets}
-              onClick={() => uploadInputRef.current?.click()}
-              tooltip="Upload b-roll, music, or stills"
-            >
-              <Plus />
-            </PromptInputButton>
-            <input
-              accept="video/*,audio/*,image/*"
-              className="hidden"
-              multiple
-              onChange={(e) => {
-                void onUploadAssets(e.target.files);
-                e.target.value = "";
-              }}
-              ref={uploadInputRef}
-              type="file"
-            />
-            <ProjectFolderButton
-              className="min-w-0 max-w-[5.5rem] shrink"
-              slug={slug}
-            />
-            <DropdownMenu
-              onOpenChange={setSkillsOpen}
-              open={skillsOpen && !slashMenu.menuOpen}
-            >
-              <DropdownMenuTrigger
-                render={
-                  <PromptInputButton
-                    aria-label="Skills"
-                    tooltip="Browse edit skills"
-                  >
-                    <Sparkles data-icon="inline-start" />
-                    <span className="sr-only">Skills</span>
-                  </PromptInputButton>
-                }
+      <div ref={promptRootRef}>
+        <PromptInput
+          className="min-w-0 rounded-lg"
+          inputGroupClassName="items-stretch overflow-visible"
+          onSubmit={onSubmit}
+        >
+          <PromptInputBody>
+            {selectedSkills.length > 0 ? (
+              <AgentSkillTokenField
+                ariaControls={slashMenu.menuOpen ? skillsMenuId : undefined}
+                ariaExpanded={slashMenu.menuOpen}
+                disabled={isRunning || chatsLoading || uploadingAssets}
+                onClearSkills={clearSelectedSkills}
+                onKeyDown={slashMenu.handleInputKeyDown}
+                onRemoveSkill={removeSelectedSkill}
+                skills={selectedSkills}
               />
-              <DropdownMenuContent
-                align="start"
-                className="w-[min(100vw-2rem,28rem)] p-0"
-                side="top"
+            ) : (
+              <PromptInputTextarea
+                aria-controls={slashMenu.menuOpen ? skillsMenuId : undefined}
+                aria-expanded={slashMenu.menuOpen}
+                className="w-full text-left placeholder:text-left"
+                disabled={isRunning || chatsLoading || uploadingAssets}
+                onKeyDown={slashMenu.handleInputKeyDown}
+                placeholder={`Ask about ${activeSlug}… or type / for skills`}
+              />
+            )}
+          </PromptInputBody>
+          <PromptInputFooter>
+            <PromptInputTools>
+              <PromptInputButton
+                aria-label="Upload assets"
+                disabled={uploadingAssets}
+                onClick={() => uploadInputRef.current?.click()}
+                tooltip="Upload b-roll, music, or stills"
               >
-                <AgentSkillsMenu
-                  embedded
-                  onSelect={selectSkill}
-                  open
-                  query=""
-                  skills={skills}
+                <Plus />
+              </PromptInputButton>
+              <input
+                accept="video/*,audio/*,image/*"
+                className="hidden"
+                multiple
+                onChange={(e) => {
+                  void onUploadAssets(e.target.files);
+                  e.target.value = "";
+                }}
+                ref={uploadInputRef}
+                type="file"
+              />
+              <ProjectFolderButton
+                className="min-w-0 max-w-[5.5rem] shrink"
+                slug={slug}
+              />
+              <DropdownMenu
+                onOpenChange={setSkillsOpen}
+                open={skillsOpen && !slashMenu.menuOpen}
+              >
+                <DropdownMenuTrigger
+                  render={
+                    <PromptInputButton
+                      aria-label="Skills"
+                      tooltip="Browse edit skills"
+                    >
+                      <Sparkles data-icon="inline-start" />
+                      <span className="sr-only">Skills</span>
+                    </PromptInputButton>
+                  }
                 />
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <PromptInputSelect
-              onValueChange={(value) => {
-                if (value) {
-                  setAgent(value as AgentModelId);
-                }
-              }}
-              value={agent}
-            >
-              <PromptInputSelectTrigger
-                className="min-w-0 max-w-[8.5rem]"
-                size="sm"
+                <DropdownMenuContent
+                  align="start"
+                  className="w-[min(100vw-2rem,28rem)] p-0"
+                  side="top"
+                >
+                  <AgentSkillsMenu
+                    embedded
+                    onSelect={handleSelectSkill}
+                    open
+                    query=""
+                    skills={skills}
+                  />
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <PromptInputSelect
+                onValueChange={(value) => {
+                  if (value) {
+                    setAgent(value as AgentModelId);
+                  }
+                }}
+                value={agent}
               >
-                <AgentModelTriggerValue value={agent} />
-              </PromptInputSelectTrigger>
-              <PromptInputSelectContent className="w-72">
-                {AGENT_MODEL_GROUPS.map((group) => (
-                  <SelectGroup key={group.id}>
-                    <AgentModelGroupLabel
-                      groupId={group.id}
-                      label={group.label}
-                    />
-                    {group.models.map((model) => (
-                      <PromptInputSelectItem
-                        key={model.value}
-                        value={model.value}
-                      >
-                        <AgentModelOptionContent
-                          defaultAgent={defaultAgent}
-                          groupId={group.id}
-                          label={model.label}
+                <PromptInputSelectTrigger
+                  className="min-w-0 max-w-[8.5rem]"
+                  size="sm"
+                >
+                  <AgentModelTriggerValue value={agent} />
+                </PromptInputSelectTrigger>
+                <PromptInputSelectContent className="w-72">
+                  {AGENT_MODEL_GROUPS.map((group) => (
+                    <SelectGroup key={group.id}>
+                      <AgentModelGroupLabel
+                        groupId={group.id}
+                        label={group.label}
+                      />
+                      {group.models.map((model) => (
+                        <PromptInputSelectItem
+                          key={model.value}
                           value={model.value}
-                        />
-                      </PromptInputSelectItem>
-                    ))}
-                  </SelectGroup>
-                ))}
-              </PromptInputSelectContent>
-            </PromptInputSelect>
-          </PromptInputTools>
-          <PromptInputSubmit
-            disabled={isRunning || chatsLoading || uploadingAssets}
-            status={isRunning || uploadingAssets ? "submitted" : undefined}
-          />
-        </PromptInputFooter>
-      </PromptInput>
+                        >
+                          <AgentModelOptionContent
+                            defaultAgent={defaultAgent}
+                            groupId={group.id}
+                            label={model.label}
+                            value={model.value}
+                          />
+                        </PromptInputSelectItem>
+                      ))}
+                    </SelectGroup>
+                  ))}
+                </PromptInputSelectContent>
+              </PromptInputSelect>
+            </PromptInputTools>
+            <PromptInputSubmit
+              disabled={isRunning || chatsLoading || uploadingAssets}
+              status={isRunning || uploadingAssets ? "submitted" : undefined}
+            />
+          </PromptInputFooter>
+        </PromptInput>
+      </div>
     </AgentSkillsMenu>
   );
 }
