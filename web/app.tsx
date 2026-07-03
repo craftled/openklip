@@ -9,11 +9,11 @@ import type {
   ColorAdjust,
   CropMode,
   CutSnap,
-  Highlights,
   Project as EngineProject,
   ExportAspect,
   ExportSettings,
   Filter,
+  Highlights,
 } from "@engine/edl";
 import {
   AudioSchema,
@@ -29,6 +29,11 @@ import {
 } from "@engine/export-aspect";
 import { FILTER_OPTIONS, filterLabel } from "@engine/filter";
 import { validateProductAnnouncementSpec } from "@engine/product-announcement";
+import {
+  SAFE_AREA_PLATFORMS,
+  type SafeAreaPlatform,
+  safeAreaGuideLabel,
+} from "@engine/safe-areas";
 import { useRouter } from "next/navigation";
 import {
   type ComponentType,
@@ -89,6 +94,7 @@ import {
   type ExportPatch,
   ReframeControls,
 } from "@/components/reframe-controls";
+import { SafeAreaGuides } from "@/components/safe-area-guides";
 import { SettingsView } from "@/components/settings/settings-view";
 import { TranscriptSearch } from "@/components/transcript-search";
 import { Button } from "@/components/ui/button";
@@ -187,6 +193,10 @@ import {
 } from "@/lib/preview-layout";
 import { buildProjectHoverContext } from "@/lib/project-context";
 import type { ProjectListing } from "@/lib/project-list";
+import {
+  getSafeAreaGuidePlatform,
+  setSafeAreaGuidePlatform,
+} from "@/lib/safe-area-preferences";
 import type { SettingsSectionId } from "@/lib/settings-navigation";
 import {
   applyColorScheme,
@@ -573,6 +583,14 @@ export function App({
       ExportSettingsSchema.parse(initialProject.export ?? {}).aspect
     )
   );
+  const [safeAreaGuide, setSafeAreaGuide] = useState<SafeAreaPlatform>("off");
+  useEffect(() => {
+    setSafeAreaGuide(getSafeAreaGuidePlatform());
+  }, []);
+  const onSafeAreaGuideChange = useCallback((platform: SafeAreaPlatform) => {
+    setSafeAreaGuide(platform);
+    setSafeAreaGuidePlatform(platform);
+  }, []);
   // In/out work area: when set, playback loops within [inSec, outSec] (source
   // time) so a single b-roll span or transition can be tightened on repeat.
   const [loop, setLoop] = useState<{ inSec: number; outSec: number } | null>(
@@ -1381,6 +1399,17 @@ export function App({
     (patch: ExportPatch) => {
       setProject((prev) => {
         const current = ExportSettingsSchema.parse(prev.export ?? {});
+        const layout = patch.layout ?? current.layout ?? "fill";
+        const splitVertical =
+          patch.splitVertical === undefined
+            ? current.splitVertical
+            : {
+                ...(current.splitVertical ?? {
+                  ratio: 0.45,
+                  speakerPosition: "top" as const,
+                }),
+                ...patch.splitVertical,
+              };
         return {
           ...prev,
           export: {
@@ -1389,6 +1418,8 @@ export function App({
               ? { ...current.crop, ...patch.crop }
               : current.crop,
             cropMode: patch.cropMode ?? current.cropMode,
+            layout,
+            ...(splitVertical === undefined ? {} : { splitVertical }),
           },
         };
       });
@@ -1396,6 +1427,8 @@ export function App({
         aspect?: ExportAspect;
         crop?: ExportPatch["crop"];
         cropMode?: CropMode;
+        layout?: ExportPatch["layout"];
+        splitVertical?: ExportPatch["splitVertical"];
       } = {};
       if (patch.aspect !== undefined) {
         input.aspect = patch.aspect;
@@ -1405,6 +1438,12 @@ export function App({
       }
       if (patch.cropMode !== undefined) {
         input.cropMode = patch.cropMode;
+      }
+      if (patch.layout !== undefined) {
+        input.layout = patch.layout;
+      }
+      if (patch.splitVertical !== undefined) {
+        input.splitVertical = patch.splitVertical;
       }
       enqueueSave(() => runGuiAction(project.slug, "export-set", input));
     },
@@ -3158,6 +3197,35 @@ export function App({
                             </ToggleGroupItem>
                           ))}
                         </ToggleGroup>
+                        {orientation === "portrait" && (
+                          <Select
+                            onValueChange={(value) => {
+                              if (value) {
+                                onSafeAreaGuideChange(
+                                  value as SafeAreaPlatform
+                                );
+                              }
+                            }}
+                            value={safeAreaGuide}
+                          >
+                            <SelectTrigger
+                              aria-label="Safe area guides"
+                              className="h-8 w-[9.5rem] text-xs"
+                              size="sm"
+                            >
+                              <SelectValue placeholder="Safe areas" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectGroup>
+                                {SAFE_AREA_PLATFORMS.map((platform) => (
+                                  <SelectItem key={platform} value={platform}>
+                                    {safeAreaGuideLabel(platform)}
+                                  </SelectItem>
+                                ))}
+                              </SelectGroup>
+                            </SelectContent>
+                          </Select>
+                        )}
                         <Button
                           aria-label="Toggle color scheme"
                           onClick={toggleColorScheme}
@@ -3319,6 +3387,7 @@ export function App({
                               playsInline
                               ref={musicRef}
                             />
+                            <SafeAreaGuides platform={safeAreaGuide} />
                             {vignetteOn && (
                               <div
                                 className="pointer-events-none absolute inset-0 z-[2]"

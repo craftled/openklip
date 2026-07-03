@@ -5,8 +5,8 @@ import {
   previewHighlightExports,
 } from "../scripts/agent-make-highlights.ts";
 import type { HighlightClip } from "../src/edl.ts";
-import { resolvePlatformOptions } from "../src/export-platforms.ts";
 import { intersectRangesWithSpan } from "../src/edl.ts";
+import { resolvePlatformOptions } from "../src/export-platforms.ts";
 
 const clips: HighlightClip[] = [
   { id: "h1", fromSec: 0, toSec: 30, title: "Hook" },

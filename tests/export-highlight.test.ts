@@ -2,14 +2,10 @@ import assert from "node:assert/strict";
 import { existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
-import { SAMPLE_RATE } from "../src/edl.ts";
+import { intersectRangesWithSpan, SAMPLE_RATE } from "../src/edl.ts";
 import { exportCut } from "../src/exporter.ts";
 import { FFMPEG, run } from "../src/ffmpeg.ts";
-import {
-  exportHighlight,
-  highlightOutPath,
-} from "../src/highlight-export.ts";
-import { intersectRangesWithSpan } from "../src/edl.ts";
+import { exportHighlight, highlightOutPath } from "../src/highlight-export.ts";
 import { projectPaths } from "../src/paths.ts";
 import {
   makeProject,

@@ -44,6 +44,10 @@ import {
   resolveExportDimensions,
 } from "./export-aspect.ts";
 import {
+  buildVerticalSplitFilter,
+  normalizeSplitVertical,
+} from "./export-layout.ts";
+import {
   type ExportPlatformId,
   resolvePlatformOptions,
 } from "./export-platforms.ts";
@@ -812,6 +816,8 @@ export async function exportCut(
   const crop = normalizeExportCrop(
     opts.crop ? { ...projectExport.crop, ...opts.crop } : projectExport.crop
   );
+  const exportLayout = projectExport.layout ?? "fill";
+  const splitVertical = normalizeSplitVertical(projectExport.splitVertical);
   const { outH, outW } = resolveExportDimensions({
     aspect,
     maxHeight: resolved.maxHeight,
@@ -1107,13 +1113,25 @@ export async function exportCut(
       aspect,
       crop,
       inputLabel: "vsel",
-      outputLabel: "v0",
+      outputLabel: exportLayout === "split-vertical" ? "v0ref" : "v0",
       outH,
       outW,
       sourceH: sourceMeta.height,
       sourceW: sourceMeta.width,
     })
   );
+  if (exportLayout === "split-vertical") {
+    parts.push(
+      buildVerticalSplitFilter({
+        inputLabel: "v0ref",
+        outputLabel: "v0",
+        outH,
+        outW,
+        ratio: splitVertical.ratio,
+        speakerPosition: splitVertical.speakerPosition,
+      })
+    );
+  }
   let last = "v0";
 
   if (zoomWins.length > 0) {

@@ -8,6 +8,7 @@ import { suggestCropFromSceneLog } from "./auto-crop.ts";
 import { CAPTION_STYLE_IDS, isCaptionStyleId } from "./caption-styles.ts";
 import { isNeutralColor } from "./color-adjust.ts";
 import {
+  type Asset,
   type Audio,
   AudioSchema,
   type Broll,
@@ -19,6 +20,7 @@ import {
   type DeadAirSpan,
   type ExportAspect,
   type ExportCrop,
+  type ExportLayout,
   ExportSettingsSchema,
   type Filter,
   type Graphic,
@@ -27,11 +29,13 @@ import {
   type PhraseAnchor,
   type Project,
   SAMPLE_RATE,
+  type SplitVertical,
   type Still,
   type Title,
   type Zoom,
 } from "./edl.ts";
 import { EXPORT_ASPECT_IDS } from "./export-aspect.ts";
+import { normalizeSplitVertical } from "./export-layout.ts";
 import {
   defaultGraphicParams,
   listGraphics,
@@ -1332,6 +1336,8 @@ export function setExportSettings(
     aspect?: ExportAspect;
     crop?: Partial<ExportCrop>;
     cropMode?: CropMode;
+    layout?: ExportLayout;
+    splitVertical?: Partial<SplitVertical>;
   }
 ): Project {
   const current = ExportSettingsSchema.parse(project.export ?? {});
@@ -1376,7 +1382,24 @@ export function setExportSettings(
     crop = current.crop;
   }
 
-  project.export = { aspect, crop, cropMode };
+  const layout = input.layout ?? current.layout ?? "fill";
+  let splitVertical = current.splitVertical;
+  if (input.splitVertical) {
+    splitVertical = normalizeSplitVertical({
+      ...splitVertical,
+      ...input.splitVertical,
+    });
+  } else if (layout === "split-vertical" && !splitVertical) {
+    splitVertical = normalizeSplitVertical(undefined);
+  }
+
+  project.export = {
+    aspect,
+    crop,
+    cropMode,
+    layout,
+    ...(splitVertical === undefined ? {} : { splitVertical }),
+  };
   return project;
 }
 
@@ -1438,6 +1461,43 @@ export function setAudio(
     : current.voiceHighpass;
   project.audio = { ducking, loudness, voiceHighpass };
   return project;
+}
+
+// Mark an asset as must-use or avoid for agent placement. Setting one flag
+// clears the other; when both are true in one call, avoid wins.
+export function setAssetFlags(
+  project: Project,
+  assetId: string,
+  input: { mustUse?: boolean; avoid?: boolean }
+): Asset {
+  const asset = project.assets.find((a) => a.id === assetId);
+  if (!asset) {
+    throw new Error(`unknown asset id "${assetId}"`);
+  }
+
+  const { mustUse, avoid } = input;
+
+  if (mustUse === true && avoid === true) {
+    asset.mustUse = undefined;
+    asset.avoid = true;
+    return asset;
+  }
+
+  if (mustUse === true) {
+    asset.mustUse = true;
+    asset.avoid = undefined;
+  } else if (mustUse === false) {
+    asset.mustUse = undefined;
+  }
+
+  if (avoid === true) {
+    asset.avoid = true;
+    asset.mustUse = undefined;
+  } else if (avoid === false) {
+    asset.avoid = undefined;
+  }
+
+  return asset;
 }
 
 // Add a push-in zoom over a span of the source timeline.

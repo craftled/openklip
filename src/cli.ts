@@ -123,6 +123,8 @@ Setup
   openklip serve [slug]              open the local editor (default: latest)
   openklip asset-add <slug> <file>   register b-roll, music, or still (auto-detect)
                                        --kind broll|music|still
+  openklip asset-flags <slug> <assetId> [--must-use] [--avoid] [--clear]
+                                     mark asset must-use or avoid for agents
   openklip broll <slug> <file>       register b-roll video (alias for asset-add)
 
 Transcript (read)
@@ -246,6 +248,9 @@ Review & export
                                        --crop-focus-x <0-1>  horizontal pan
                                        --crop-focus-y <0-1>  vertical pan
                                        --crop-scale <1-3>    zoom into source before crop
+                                       --layout fill|split-vertical  output frame layout (9:16)
+                                       --split-ratio <0.25-0.75>  speaker pane height fraction
+                                       --split-speaker top|bottom  speaker pane position
   openklip vision-focus <slug>         enrich sceneLog speaker segments with macOS Vision face focus (darwin only)
   openklip highlights <slug> [--json]   list LLM highlight clip candidates
   openklip highlights-detect <slug>      detect short-form clip candidates with an LLM
@@ -541,8 +546,12 @@ try {
       for (const a of project.assets) {
         const dur = samplesToSec(a.durationSamples).toFixed(1);
         const kind = (a.kind ?? "broll").padEnd(6);
+        const flags = [a.mustUse ? "must-use" : null, a.avoid ? "avoid" : null]
+          .filter(Boolean)
+          .join(",");
+        const flagSuffix = flags ? `  [${flags}]` : "";
         console.log(
-          `${a.id.padEnd(16)}  ${kind}  ${`${dur}s`.padStart(7)}  ${a.name}`
+          `${a.id.padEnd(16)}  ${kind}  ${`${dur}s`.padStart(7)}  ${a.name}${flagSuffix}`
         );
       }
       console.log(`\n${project.assets.length} asset(s)`);
@@ -700,6 +709,51 @@ try {
       const asset = await registerAsset(slug, fileArg, kind, "cli");
       console.log(
         `registered ${asset.kind} "${asset.id}" (${asset.name}, ${samplesToSec(asset.durationSamples).toFixed(1)}s)`
+      );
+      break;
+    }
+    case "asset-flags": {
+      if (!(rest[0] && rest[1])) {
+        throw new Error(
+          "usage: openklip asset-flags <slug> <assetId> [--must-use] [--avoid] [--clear]"
+        );
+      }
+      const slug = rest[0];
+      const assetId = rest[1];
+      const args = rest.slice(2);
+      const clear = args.includes("--clear");
+      const mustUse = args.includes("--must-use")
+        ? true
+        : clear
+          ? false
+          : undefined;
+      const avoid = args.includes("--avoid") ? true : clear ? false : undefined;
+      if (mustUse === undefined && avoid === undefined) {
+        throw new Error(
+          "usage: openklip asset-flags <slug> <assetId> [--must-use] [--avoid] [--clear]"
+        );
+      }
+      const { result } = await runLoggedAction(slug, "asset-flags", {
+        assetId,
+        ...(mustUse === undefined ? {} : { mustUse }),
+        ...(avoid === undefined ? {} : { avoid }),
+      });
+      const flags = result as {
+        assetId: string;
+        mustUse?: boolean;
+        avoid?: boolean;
+      };
+      const parts: string[] = [];
+      if (flags.mustUse) {
+        parts.push("must-use");
+      }
+      if (flags.avoid) {
+        parts.push("avoid");
+      }
+      console.log(
+        parts.length > 0
+          ? `${flags.assetId}: ${parts.join(", ")}`
+          : `${flags.assetId}: flags cleared`
       );
       break;
     }
@@ -2049,12 +2103,15 @@ try {
     case "export-set": {
       if (!rest[0]) {
         throw new Error(
-          "usage: openklip export-set <slug> [--aspect <id>] [--crop-mode manual|scene|vision] [--crop-focus-x <0-1>] [--crop-focus-y <0-1>] [--crop-scale <1-3>]"
+          "usage: openklip export-set <slug> [--aspect <id>] [--crop-mode manual|scene|vision] [--crop-focus-x <0-1>] [--crop-focus-y <0-1>] [--crop-scale <1-3>] [--layout fill|split-vertical] [--split-ratio <0.25-0.75>] [--split-speaker top|bottom]"
         );
       }
       const slug = rest[0];
       const aspectRaw = flagValue(rest, "--aspect");
       const cropModeRaw = flagValue(rest, "--crop-mode");
+      const layoutRaw = flagValue(rest, "--layout");
+      const splitRatio = flagNumber(rest, "--split-ratio");
+      const splitSpeakerRaw = flagValue(rest, "--split-speaker");
       const focusX = flagNumber(rest, "--crop-focus-x");
       const focusY = flagNumber(rest, "--crop-focus-y");
       const scale = flagNumber(rest, "--crop-scale");
@@ -2062,6 +2119,11 @@ try {
         aspect?: ReturnType<typeof parseExportAspectFlag>;
         crop?: { focusX?: number; focusY?: number; scale?: number };
         cropMode?: "manual" | "scene" | "vision";
+        layout?: "fill" | "split-vertical";
+        splitVertical?: {
+          ratio?: number;
+          speakerPosition?: "top" | "bottom";
+        };
       } = {};
       if (aspectRaw !== undefined) {
         input.aspect = parseExportAspectFlag(aspectRaw);
@@ -2075,6 +2137,24 @@ try {
           throw new Error('--crop-mode must be "manual", "scene", or "vision"');
         }
         input.cropMode = cropModeRaw;
+      }
+      if (layoutRaw !== undefined) {
+        if (layoutRaw !== "fill" && layoutRaw !== "split-vertical") {
+          throw new Error('--layout must be "fill" or "split-vertical"');
+        }
+        input.layout = layoutRaw;
+      }
+      if (splitRatio !== undefined || splitSpeakerRaw !== undefined) {
+        input.splitVertical = {};
+        if (splitRatio !== undefined) {
+          input.splitVertical.ratio = splitRatio;
+        }
+        if (splitSpeakerRaw !== undefined) {
+          if (splitSpeakerRaw !== "top" && splitSpeakerRaw !== "bottom") {
+            throw new Error('--split-speaker must be "top" or "bottom"');
+          }
+          input.splitVertical.speakerPosition = splitSpeakerRaw;
+        }
       }
       if (focusX !== undefined || focusY !== undefined || scale !== undefined) {
         input.crop = {};
@@ -2114,8 +2194,12 @@ try {
           ? await loadProject(slug)
           : (await runLoggedAction(slug, "export-set", input)).project;
       const ex = project.export;
+      const splitNote =
+        ex.layout === "split-vertical" && ex.splitVertical
+          ? `, split ${ex.splitVertical.ratio} speaker ${ex.splitVertical.speakerPosition}`
+          : "";
       console.log(
-        `export: aspect ${ex.aspect}, crop mode ${ex.cropMode ?? "manual"}, crop focus (${ex.crop.focusX}, ${ex.crop.focusY}), scale ${ex.crop.scale}`
+        `export: aspect ${ex.aspect}, layout ${ex.layout ?? "fill"}${splitNote}, crop mode ${ex.cropMode ?? "manual"}, crop focus (${ex.crop.focusX}, ${ex.crop.focusY}), scale ${ex.crop.scale}`
       );
       break;
     }

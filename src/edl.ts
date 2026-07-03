@@ -5,6 +5,7 @@ import {
   subtractDeadAir,
 } from "./audio-analysis-core.ts";
 import { CAPTION_STYLE_IDS, DEFAULT_CAPTION_STYLE } from "./caption-styles.ts";
+import { ExportLayoutSchema, SplitVerticalSchema } from "./export-layout.ts";
 import {
   ProductAnnouncementCatalogSchema,
   ProductAnnouncementSpecSchema,
@@ -107,6 +108,10 @@ export const AssetSchema = z.object({
   durationSamples: z.number().int().nonnegative(),
   /** Subagent description (absent until the analyze pass runs). */
   card: AssetCardSchema.optional(),
+  /** Brief-driven: agent should prefer placing this asset. */
+  mustUse: z.boolean().optional(),
+  /** Brief-driven: agent should not place this asset. */
+  avoid: z.boolean().optional(),
 });
 export type Asset = z.infer<typeof AssetSchema>;
 
@@ -492,13 +497,20 @@ export const ExportSettingsSchema = z
     crop: ExportCropSchema,
     /** Whether crop focus is manual, sceneLog-derived, or Vision face detection. */
     cropMode: CropModeSchema,
+    /** Output frame layout for fixed-aspect exports (9:16 split-screen). */
+    layout: ExportLayoutSchema.default("fill"),
+    /** Split-vertical pane settings when layout is split-vertical. */
+    splitVertical: SplitVerticalSchema.optional(),
   })
   .default({
     aspect: "source",
     crop: { focusX: 0.5, focusY: 0.5, scale: 1 },
     cropMode: "manual",
+    layout: "fill",
   });
 export type ExportSettings = z.infer<typeof ExportSettingsSchema>;
+
+export type { ExportLayout, SplitVertical } from "./export-layout.ts";
 
 export const ProjectSchema = z
   .object({

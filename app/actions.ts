@@ -371,9 +371,7 @@ export async function revealProjectFolder(slug: string): Promise<ActionResult> {
 
 export async function runVisionFocus(
   slug: string
-): Promise<
-  ActionResult<{ project: Project; segmentsUpdated: number }>
-> {
+): Promise<ActionResult<{ project: Project; segmentsUpdated: number }>> {
   try {
     const { enrichSceneLogWithVisionFocus, visionFocusAvailable } =
       await import("@engine/vision-focus");
@@ -398,7 +396,10 @@ export async function runHighlightsDetect(
   slug: string,
   opts?: { maxClips?: number; targetClipSec?: number }
 ): Promise<
-  ActionResult<{ project: Project; highlights: NonNullable<Project["highlights"]> }>
+  ActionResult<{
+    project: Project;
+    highlights: NonNullable<Project["highlights"]>;
+  }>
 > {
   try {
     const project = await loadProject(slug);

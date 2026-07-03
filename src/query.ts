@@ -112,6 +112,13 @@ export interface OverlayViews {
 }
 
 export interface ProjectStatusJson {
+  assets: Array<{
+    avoid?: boolean;
+    id: string;
+    kind: string;
+    mustUse?: boolean;
+    name: string;
+  }>;
   captions: { enabled: boolean; maxWords: number; style: string };
   cuts: { snap: CutSnap };
   export: {
@@ -119,11 +126,11 @@ export interface ProjectStatusJson {
     crop: { focusX: number; focusY: number; scale: number };
     cropMode: "manual" | "scene" | "vision";
   };
-  keptDurationSec: number;
   highlights?: {
     analyzedAt: string;
     clipCount: number;
   };
+  keptDurationSec: number;
   look: { vignette: boolean; filter: Filter; lut?: string };
   overlays: OverlayViews;
   padMs: number;
@@ -330,6 +337,13 @@ export function projectStatus(
   return {
     slug: project.slug,
     template: project.template,
+    assets: project.assets.map((a) => ({
+      id: a.id,
+      kind: a.kind ?? "broll",
+      name: a.name,
+      ...(a.mustUse === undefined ? {} : { mustUse: a.mustUse }),
+      ...(a.avoid === undefined ? {} : { avoid: a.avoid }),
+    })),
     words: {
       total: s.words,
       kept: s.kept,

@@ -261,6 +261,8 @@ const queryTools: AgentToolDef[] = [
           kind: a.kind ?? "broll",
           name: a.name,
           durationSec: samplesToSec(a.durationSamples),
+          ...(a.mustUse === undefined ? {} : { mustUse: a.mustUse }),
+          ...(a.avoid === undefined ? {} : { avoid: a.avoid }),
         })),
       };
     },

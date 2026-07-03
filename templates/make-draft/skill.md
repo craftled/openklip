@@ -27,7 +27,7 @@ One prompt to a full first draft: cuts, captions, titles, b-roll or stills, musi
 
 - Cover one to three spans with b-roll using broll-add-phrase, 2 to 6 seconds each, matched by the asset cards' bestFor and tags.
 - Where a visual beat needs texture and no b-roll fits, place a still with still-add (Ken Burns is applied automatically).
-- Respect the brief's must-use and avoid lists.
+- Respect the brief's must-use and avoid lists, and each asset's `mustUse` / `avoid` flags from list_assets.
 
 ## 5. Music
 

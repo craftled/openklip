@@ -106,6 +106,7 @@ const EXPECTED = [
   "reorder",
   "reanchor",
   "word-text",
+  "asset-flags",
 ];
 
 test("registry covers every documented mutation by name", () => {
@@ -334,6 +335,7 @@ test("export-set: stores aspect and crop, clamped, in project JSON", () => {
     aspect: "9:16",
     crop: { focusX: 1, focusY: 0, scale: 3 },
     cropMode: "manual",
+    layout: "fill",
   });
   assert.deepEqual(p.export, r.export);
 });

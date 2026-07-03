@@ -102,7 +102,8 @@ Time is integer audio samples at 48 kHz. The CLI takes seconds where a human num
 | List all agent tools (query + mutate + export) | `openklip tools` |
 | MCP server (stdio) | `openklip mcp` or `bun run mcp` |
 | Export MP4 | `openklip export <slug>` |
-| Set export aspect and reframe crop | `openklip export-set <slug> [--aspect source\|16:9\|9:16\|1:1] [--crop-mode manual\|scene\|vision] [--crop-focus-x <0-1>] [--crop-focus-y <0-1>] [--crop-scale <1-3>]` |
+| Set export aspect and reframe crop | `openklip export-set <slug> [--aspect source\|16:9\|9:16\|1:1] [--crop-mode manual\|scene\|vision] [--crop-focus-x <0-1>] [--crop-focus-y <0-1>] [--crop-scale <1-3>] [--layout fill\|split-vertical] [--split-ratio <0.25-0.75>] [--split-speaker top\|bottom]` |
+| Set asset must-use / avoid flags | `openklip asset-flags <slug> <assetId> [--must-use\|--avoid\|--clear]` |
 | Enrich sceneLog with macOS Vision face focus | `openklip vision-focus <slug>` (darwin only) |
 | List / detect LLM highlight clip candidates | `openklip highlights <slug> [--json]`, `openklip highlights-detect <slug> [--agent] [--max-clips] [--target-sec]` |
 | Export one or all highlight clips | `openklip export-highlight <slug> <h1|all> [--platform shorts]` |
@@ -229,7 +230,8 @@ Workflow: `take-add` each recording, read `take_transcript <slug> <takeId>` to f
 | `openklip cleanup <slug> [--json]` | Filler-word and dead-air cleanup candidates with risk (`safe`/`review`), reason, and estimated seconds saved. Degrades to filler-only (with a warning) when no audio analysis is available yet. |
 | `openklip cleanup <slug> --apply-safe` | Apply every `safe` candidate (cuts filler words, registers dead-air spans) and print what changed. `review` candidates are never auto-applied; apply them individually via `cut`/`dead-air-add` after a human or agent judgment call. |
 | `openklip dead-air-rm <slug> <id>` | Remove a registered dead-air span by id. CLI/MCP only; no GUI remove affordance yet. |
-| `openklip export-set <slug>` | Set export aspect ratio and reframe crop on `project.export` (preview/export parity). `--aspect source\|16:9\|9:16\|1:1`, `--crop-mode manual\|scene\|vision`, `--crop-focus-x`, `--crop-focus-y`, `--crop-scale`. |
+| `openklip export-set <slug>` | Set export aspect ratio and reframe crop on `project.export` (preview/export parity). `--aspect source\|16:9\|9:16\|1:1`, `--crop-mode manual\|scene\|vision`, `--crop-focus-x`, `--crop-focus-y`, `--crop-scale`, `--layout fill\|split-vertical`, `--split-ratio`, `--split-speaker top\|bottom`. |
+| `openklip asset-flags <slug> <assetId>` | Set `mustUse` or `avoid` on a registered asset (`--must-use`, `--avoid`, or `--clear`). Avoid wins if both are set. |
 | `openklip vision-focus <slug>` | On macOS, sample ingest frames with Apple Vision (face, saliency fallback, OCR text) and write `focusX`/`focusY` onto speaker `sceneLog` segments. GUI: Reframe **Vision focus** button. |
 | `openklip highlights <slug> [--json]` | List LLM highlight clip candidates stored on `project.highlights`. |
 | `openklip highlights-detect <slug>` | Run an LLM over the timed transcript to detect short-form clip spans. `--agent`, `--max-clips` (default 5), `--target-sec` (default 45). Persists `project.highlights`. |

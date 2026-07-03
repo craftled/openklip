@@ -6,6 +6,24 @@ Publishing status checked on 2026-07-03 (`gh release list`): GitHub releases are
 
 ---
 
+## v0.27.0.0
+
+**Safe-area preview guides, vertical split export layout, and asset must-use/avoid flags.**
+
+### Highlights
+- **Safe-area guides**: portrait preview overlays for TikTok, Reels, YouTube Shorts, and generic vertical; preference toggle in the editor (not stored on `project.json`).
+- **Split vertical layout**: export `fill` or `split-vertical` with configurable speaker pane ratio and top/bottom position; GUI Reframe controls and `export-set --layout`.
+- **Asset flags**: `mustUse` / `avoid` on assets; `openklip asset-flags`, GUI badges, agents respect flags in `make-draft`.
+- Current codebase verification: 1368 tests.
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations). Safe areas are preview guides only (export does not auto-inset captions); b-roll `display: split` remains the landscape side-by-side mode.
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#02700---2026-07-03)
+
+---
+
 ## v0.26.0.0
 
 **Multi-clip highlight export and Highlights GUI panel.**

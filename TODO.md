@@ -52,6 +52,7 @@ Preview cuts get a Glimm WebGL sweep in the browser. Exported MP4s can use VAD-s
 - [x] **Agentic chat edits (Claude)** (MCP-loaded chat applies cut/zoom/b-roll/title/export; non-Claude agents stay read-only or CLI-answer; v0.8.5)
 - [x] **Resizable chat sidebar** (full-height right column, drag handle 340–760px, localStorage persistence; v0.8.5)
 - [x] **Asset cards / analyze assets** (`src/asset-cards.ts`, `openklip analyze`, GUI **Describe assets** button; v0.8.5)
+- [x] **Asset must-use / avoid flags** (`asset-flags` registry action, CLI `openklip asset-flags`, GUI asset bin badges, `list_assets` / `project_status` exposure; agents respect flags in `make-draft`)
 - [x] **Tabler icons** (`@tabler/icons-react` via `web/lib/icon.tsx`; v0.8.5)
 - [x] **Written rationale (`note`)** (v0.8.10.0): optional `note` on cuts and overlays records the *why* of a pick; surfaces in CLI / query / transcript / MCP; metadata only, never reaches ffmpeg (`--note ""` clears it; pinned by an exporter no-op test)
 - [x] **Phrase-anchored cues** (`src/reanchor.ts`; v0.8.10.0): `*-add-phrase` overlays remember the spoken phrase and re-resolve onto the kept words after a re-cut (CLI + GUI via `applyProjectEdits`); flag `stale` and keep the last good span when the phrase is deleted; follow a surviving instance on duplicates; `openklip reanchor`
@@ -113,7 +114,7 @@ Preview cuts get a Glimm WebGL sweep in the browser. Exported MP4s can use VAD-s
 - [ ] Exported MP4 transitions between shots (ffmpeg shader / whoosh cut).
 - [x] Match the preview zoom curve to the export smoothstep ramp.
 - [x] Fix title/caption overlap when both are active on the same span.
-- [ ] B-roll PiP mode (not just full-cover) + b-roll audio ducking; more title styles.
+- [x] B-roll PiP mode + b-roll audio ducking (shipped v0.17-0.18); more title styles.
 
 ### Editing Intelligence
 
@@ -166,7 +167,7 @@ Single list of current gaps (code is truth). README and release notes point here
 - 4K export re-decodes the whole source (slow) even for a short cut.
 - Export dialog format (MP4/GIF) and destination (file/clipboard) controls remain disabled; resolution, compression preset, and frame rate are real. The dialog's size/time estimate is approximate.
 - Glimm cut transitions are preview-only. Exported MP4s can crossfade audio seams when cut snap is enabled, but visual transition shaders and whoosh-style cut transitions are not implemented.
-- B-roll is full-cover only (no PiP mode or b-roll audio ducking yet).
+- B-roll supports cover, PiP, and split display modes plus b-roll audio ducking; more title styles remain pending.
 - HyperFrames post-export (`openklip package`) is opt-in: requires separate `hyperframes` npm install and Chrome; not bundled.
 - `product-announcement` is the only json-render graphic catalog today; `json-graphic-add` / `json-graphic-set` accept no other type. An invalid json-render spec now shows an "Invalid graphic spec" card in the editor preview, but still degrades silently on export (the graphic is skipped).
 - json-render timeline interactions (select / trim / reload) and the smaller-screen Chat/Config overlay flows are wired and unit-covered but not yet verified end to end in a browser.
@@ -193,7 +194,7 @@ Single list of current gaps (code is truth). README and release notes point here
 - Multi-take assembly is CLI/MCP-only (`take-add` / `takes` / `assemble`): no GUI take browser. Each take is ingested with the full ffmpeg + Whisper path and parked in `takes/<id>/`; `assemble` writes a new single-source project and needs `--force` to overwrite an existing edit.
 - Phrase search (UI and CLI/MCP `transcript grep`/`phrase`) can miss a cut phrase when Whisper's tokenization of the spoken audio differs from the phrase text a user or agent types; the search returns an honest empty result rather than a fuzzy guess.
 - The transcript contentEditable does not restore a cut word when you type its text back into place (behavior change, 2026-07-02): deleted words stay visible, struck through, in the editable text, so a word's text merely reappearing is not treated as evidence of restoration and the word keeps its `deleted` flag. Restoring a cut word is always an explicit action: the timeline toggle, transcript search Restore/Restore all, Cleanup revert, or `openklip revert`.
-- Caption style presets (v1, 2026-07-02) are five fixed definitions in `src/caption-styles.ts`: all Arial, no custom fonts, no custom per-project colors, and no way to add a sixth preset without a code change. Preview and export emphasize the active word identically by contract (same `accentColor`/opacity rules), but the two renderers are still separate implementations (CSS vs libass), so font rendering (antialiasing, glyph metrics, exact pixel size) differs browser-vs-libass even for the same preset. Per-platform caption safe areas are still not implemented (see Milestone 8).
+- Per-platform caption safe areas are preview guides only (export does not auto-inset captions); split-screen vertical export layout is on `project.export.layout` (distinct from b-roll `display: split`).
 
 ### Workspace & platform
 
@@ -234,7 +235,8 @@ Single list of current gaps (code is truth). README and release notes point here
 
 - [x] Multi-clip highlight export: `openklip export-highlight`, `output/highlights/{id}.mp4`, `bun run agent-make-highlights` (`sourceSpan` on `exportCut`, no project mutation).
 - [x] GUI highlight candidates: Config **Highlights** panel (list, seek, Detect clips via `runHighlightsDetect`).
-- Per-platform caption safe areas and split-screen vertical layouts.
+- [x] **Per-platform caption safe areas** (preview guides for TikTok, Reels, YouTube Shorts, generic; `web/components/safe-area-guides.tsx`, local preference toggle).
+- [x] **Split-screen vertical export layout** (`project.export.layout: split-vertical`, `export-set --layout`, GUI Reframe Fill/Split controls).
 - Noise reduction and de-essing (basic audio cleanup); two-pass loudness normalization for exact-target loudness.
 - OpenCLIP semantic b-roll matching.
 - OS-level file locking for concurrent CLI + server writes.

@@ -180,7 +180,7 @@ Legend: Full means the surface can achieve the same outcome. Partial means the s
 | B-roll overlays | UI, CLI, MCP | UI, CLI, MCP | UI, CLI, MCP | UI, CLI, MCP | Needs PiP/audio modes. |
 | Still overlays | UI, CLI, MCP | UI, CLI, MCP | UI, CLI, MCP | UI, CLI, MCP | Needs richer motion modes. |
 | Graphics | UI, CLI, MCP | UI, CLI, MCP | UI, CLI, MCP | UI, CLI, MCP | Good parity. |
-| Captions | Ingest default | UI, CLI, MCP | UI, CLI, MCP | Off toggle, not deleted | Style presets shipped (2026-07-02); still needs per-platform safe areas. |
+| Captions | Ingest default | UI, CLI, MCP | UI, CLI, MCP | Off toggle, not deleted | Style presets shipped (2026-07-02); per-platform safe-area preview guides shipped (2026-07-03). |
 | Look and color | Project defaults | UI, CLI, MCP | UI, CLI, MCP | Reset by setting neutral values | Needs vignette strength/blur controls. |
 | Takes | CLI/MCP add and assemble | CLI/MCP | Assemble creates new source | File-level only | Missing UI take browser and API routes. |
 | Exports | UI, CLI, MCP, API | File output, status, verify | Re-export overwrites | Manual file delete only | Needs presets, settings, history. |
@@ -591,11 +591,11 @@ Goal: OpenKlip can produce social clips that look intentional.
   - [x] 1:1 square.
   - [x] Per-export override if needed.
   - Verification: `project.export.aspect`, `src/export-aspect.ts`, preview + export parity (`tests/export-aspect.test.ts`, 2026-07-03).
-- [ ] Add safe area overlays.
-  - [ ] TikTok/Reels caption safe area.
-  - [ ] YouTube Shorts safe area.
-  - [ ] Generic center safe area.
-  - Verification: captions and titles avoid safe areas in vertical preview.
+- [x] Add safe area overlays.
+  - [x] TikTok/Reels caption safe area.
+  - [x] YouTube Shorts safe area.
+  - [x] Generic center safe area.
+  - Verification: portrait preview guides (`safe-area-guides.tsx`, `src/safe-areas.ts`); preference toggle; export does not auto-inset captions (2026-07-03).
 
 ### 7.2 Reframe and crop
 
@@ -611,11 +611,11 @@ Goal: OpenKlip can produce social clips that look intentional.
   - [x] Let user manually override (Manual crop mode + sliders).
   - [x] Expose reframe actions to agent (`export-set`, `vision-focus`, `agent-make-short`).
   - Verification: `edgaras-raw` Vision focus + scene crop + shorts export; verify passed (2026-07-03).
-- [ ] Add split-screen vertical layout.
-  - [ ] Talking head top, screen/product bottom.
-  - [ ] Product top, talking head bottom.
-  - [ ] Configurable ratio.
-  - Verification: preview and export match.
+- [x] Add split-screen vertical layout.
+  - [x] Talking head top, screen/product bottom.
+  - [x] Product top, talking head bottom.
+  - [x] Configurable ratio.
+  - Verification: `project.export.layout: split-vertical`, `buildVerticalSplitFilter`, GUI Reframe Fill/Split controls (2026-07-03).
 
 ## Milestone 8: Export quality and formats
 
@@ -647,7 +647,7 @@ Goal: exports are fast, configurable, verified, and ready to publish.
   - [x] LinkedIn square or landscape.
     - Verification 2026-07-03: `linkedin` preset (1080p, 30fps, web compression, -14 LUFS) in `src/export-platforms.ts`; landscape only, no square variant shipped. Pinned by `tests/export-platforms.test.ts`.
   - [ ] Custom. Not implemented: only the four fixed named presets exist; there is no user-defined preset builder.
-  - Verification: preset sets dimensions, captions, and safe areas. Partially met 2026-07-03: `youtube`/`youtube-4k`/`x`/`linkedin` set dimensions (a source-capped `maxHeight`), compression, fps, and a loudness target correctly (`resolvePlatformOptions`, any explicit flag still wins), verified above and by `tests/export-platforms.test.ts`, `tests/exporter.test.ts`, `tests/agent-tools.test.ts`, `tests/export-route.test.ts`, `tests/server-actions.test.ts`. Presets do not touch captions or safe areas; a project's caption style and any per-platform safe-area layout (not implemented at all yet) are unaffected by picking a platform.
+  - Verification: preset sets dimensions, captions, and safe areas. Partially met 2026-07-03: `youtube`/`youtube-4k`/`x`/`linkedin`/`shorts` set dimensions (a source-capped `maxHeight`), compression, fps, and a loudness target correctly (`resolvePlatformOptions`, any explicit flag still wins), verified above and by `tests/export-platforms.test.ts`, `tests/exporter.test.ts`, `tests/agent-tools.test.ts`, `tests/export-route.test.ts`, `tests/server-actions.test.ts`. Presets do not touch captions; safe-area guides are preview-only (Milestone 7.1).
 
 ### 8.2 Export performance and quality
 
@@ -781,7 +781,7 @@ Goal: match the core jobs people expect from a modern transcript-first editor.
   - [x] Preview captions.
   - [x] Export captions.
   - [x] Caption style presets. Verified 2026-07-02: five presets (`boxed`, `clean`, `karaoke`, `bold-caps`, `minimal`) defined once in `src/caption-styles.ts`, consumed by both the cinema preview and the ASS export burn-in; `tests/captions.test.ts`, `tests/caption-style-css.test.ts`, `tests/caption-style.test.tsx`, `tests/registry.test.ts` pass, plus the wider `bun test` run (1187 tests, all green). Live checks on an isolated copy of the `edgaras-raw` project (not the live one): a real 4K source exported at `bold-caps` (`openklip export --height 480`) showed all-caps text in a tight box with dimmed inactive words as expected; the Config sidebar picker was exercised live in the browser (all five presets render with correct labels/samples, current selection shows `pressed`). v1 is Arial-only with no custom fonts or per-project colors; see TODO.md Known Limitations.
-  - [ ] Per-platform safe areas.
+  - [x] Per-platform safe areas (preview guides; export does not auto-inset).
   - [x] Transcript correction flows into captions. Verified 2026-07-02: see Milestone 3.3.
 - [ ] Media overlays.
   - [x] B-roll full cover.

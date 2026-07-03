@@ -30,6 +30,7 @@ import {
   reorderTitle,
   reorderZoom,
   restoreAll,
+  setAssetFlags,
   setAudio,
   setCaptionMaxWords,
   setCaptionStyle,
@@ -611,6 +612,13 @@ export const actions: ActionDef[] = [
         })
         .optional(),
       cropMode: z.enum(["manual", "scene", "vision"]).optional(),
+      layout: z.enum(["fill", "split-vertical"]).optional(),
+      splitVertical: z
+        .object({
+          ratio: z.number().optional(),
+          speakerPosition: z.enum(["top", "bottom"]).optional(),
+        })
+        .optional(),
     }),
     run: (p, i) => {
       setExportSettings(p, i);
@@ -675,6 +683,28 @@ export const actions: ActionDef[] = [
     surfaces: ["cli", "gui", "mcp"],
     schema: z.object({ id: z.string().optional() }),
     run: (p, i) => (i.id ? [reanchorOne(p, i.id)] : reanchorProject(p)),
+  }),
+  defineAction({
+    name: "asset-flags",
+    summary:
+      "Mark a registered asset as must-use or avoid for agent placement.",
+    surfaces: ["cli", "gui", "mcp"],
+    schema: z.object({
+      assetId: z.string(),
+      mustUse: z.boolean().optional(),
+      avoid: z.boolean().optional(),
+    }),
+    run: (p, i) => {
+      const asset = setAssetFlags(p, i.assetId, {
+        mustUse: i.mustUse,
+        avoid: i.avoid,
+      });
+      return {
+        assetId: asset.id,
+        ...(asset.mustUse === undefined ? {} : { mustUse: asset.mustUse }),
+        ...(asset.avoid === undefined ? {} : { avoid: asset.avoid }),
+      };
+    },
   }),
 ];
 

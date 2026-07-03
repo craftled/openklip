@@ -39,14 +39,14 @@ function HighlightRow({
         type="button"
       >
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="truncate text-xs font-medium">{clip.title}</span>
+          <span className="truncate font-medium text-xs">{clip.title}</span>
           <div className="flex flex-wrap items-center gap-1.5 text-muted-foreground text-xs tabular-nums">
             <span>
               {fmtTimecode(clip.fromSec)} – {fmtTimecode(clip.toSec)}
             </span>
-            {clip.score != null ? (
+            {clip.score == null ? null : (
               <span>{Math.round(clip.score * 100)}%</span>
-            ) : null}
+            )}
           </div>
           {clip.reason ? (
             <span className="truncate text-muted-foreground text-xs">

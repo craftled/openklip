@@ -36,16 +36,19 @@ import {
 } from "@/lib/icon";
 import { countNewAssetIds } from "@/lib/toast-notifications";
 import { cn } from "@/lib/utils";
+import { runGuiAction } from "../../app/actions.ts";
 
 export type { AssetBinUpdate } from "@/lib/asset-bin-update";
 
 export type AssetKind = "broll" | "music" | "still";
 
 export interface BinAsset {
+  avoid?: boolean;
   card?: AssetCardLite;
   durationSamples: number;
   id: string;
   kind: AssetKind;
+  mustUse?: boolean;
   name: string;
   proxy: string;
 }
@@ -101,6 +104,8 @@ function AssetBinRow({
   onCancelDelete,
   onConfirmDelete,
   onRequestDelete,
+  onToggleAvoid,
+  onToggleMust,
   sampleRate,
   slug,
 }: {
@@ -111,6 +116,8 @@ function AssetBinRow({
   onCancelDelete: () => void;
   onConfirmDelete: () => void;
   onRequestDelete: () => void;
+  onToggleAvoid: () => void;
+  onToggleMust: () => void;
   sampleRate: number;
   slug: string;
 }) {
@@ -166,6 +173,54 @@ function AssetBinRow({
         </span>
       ) : (
         <>
+          <span className="flex shrink-0 items-center gap-0.5">
+            <Button
+              aria-label={
+                asset.mustUse
+                  ? `Clear must-use on ${asset.name}`
+                  : `Mark ${asset.name} must-use`
+              }
+              aria-pressed={asset.mustUse === true}
+              className={cn(
+                "h-5 rounded px-1.5 text-[10px] uppercase tracking-wide",
+                asset.mustUse
+                  ? "bg-primary/15 text-primary hover:bg-primary/20"
+                  : "text-muted-foreground opacity-0 hover:bg-foreground/5 group-hover/asset:opacity-100"
+              )}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleMust();
+              }}
+              size="sm"
+              type="button"
+              variant="ghost"
+            >
+              Must
+            </Button>
+            <Button
+              aria-label={
+                asset.avoid
+                  ? `Clear avoid on ${asset.name}`
+                  : `Mark ${asset.name} avoid`
+              }
+              aria-pressed={asset.avoid === true}
+              className={cn(
+                "h-5 rounded px-1.5 text-[10px] uppercase tracking-wide",
+                asset.avoid
+                  ? "bg-destructive/15 text-destructive hover:bg-destructive/20"
+                  : "text-muted-foreground opacity-0 hover:bg-foreground/5 group-hover/asset:opacity-100"
+              )}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleAvoid();
+              }}
+              size="sm"
+              type="button"
+              variant="ghost"
+            >
+              Avoid
+            </Button>
+          </span>
           <Button
             aria-label={`Delete ${asset.name}`}
             className="shrink-0 rounded-sm text-muted-foreground opacity-0 hover:bg-destructive/10 hover:text-destructive focus-visible:opacity-100 group-hover/asset:opacity-100"
@@ -294,7 +349,66 @@ export function AssetBin({
         setDeletingId(null);
       }
     },
-    [onAssetsUpdated, slug]
+    [assets, onAssetsUpdated, slug]
+  );
+
+  const patchAssetFlags = useCallback(
+    (assetId: string, input: { mustUse?: boolean; avoid?: boolean }) => {
+      onAssetsUpdated({
+        assets: assets.map((a) => {
+          if (a.id !== assetId) {
+            return a;
+          }
+          const next = { ...a };
+          const { mustUse, avoid } = input;
+          if (mustUse === true && avoid === true) {
+            next.mustUse = undefined;
+            next.avoid = true;
+          } else if (mustUse === true) {
+            next.mustUse = true;
+            next.avoid = undefined;
+          } else if (mustUse === false) {
+            next.mustUse = undefined;
+          }
+          if (avoid === true) {
+            next.avoid = true;
+            next.mustUse = undefined;
+          } else if (avoid === false) {
+            next.avoid = undefined;
+          }
+          return next;
+        }),
+      });
+    },
+    [assets, onAssetsUpdated]
+  );
+
+  const onAssetFlags = useCallback(
+    async (assetId: string, input: { mustUse?: boolean; avoid?: boolean }) => {
+      patchAssetFlags(assetId, input);
+      const result = await runGuiAction(slug, "asset-flags", {
+        assetId,
+        ...input,
+      });
+      if (!result.ok) {
+        toastAssetRemoveFailed(result.error);
+      }
+    },
+    [patchAssetFlags, slug]
+  );
+
+  const onToggleMust = useCallback(
+    (asset: BinAsset) => {
+      void onAssetFlags(asset.id, { mustUse: !asset.mustUse });
+    },
+    [onAssetFlags]
+  );
+
+  const onToggleAvoid = useCallback(
+    (asset: BinAsset) => {
+      void onAssetFlags(asset.id, { avoid: !asset.avoid });
+    },
+    [onAssetFlags]
   );
 
   const onDrop = async (e: DragEvent) => {
@@ -393,6 +507,8 @@ export function AssetBin({
                       onCancelDelete={() => setConfirmDeleteId(null)}
                       onConfirmDelete={() => void onDeleteAsset(a.id)}
                       onRequestDelete={() => setConfirmDeleteId(a.id)}
+                      onToggleAvoid={() => onToggleAvoid(a)}
+                      onToggleMust={() => onToggleMust(a)}
                       sampleRate={sampleRate}
                       slug={slug}
                     />

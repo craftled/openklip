@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.27.0.0 - 2026-07-03
+
+Safe-area preview guides, vertical split export layout, and asset must-use/avoid flags.
+
+### Added
+- **Safe-area guides** (`src/safe-areas.ts`, `web/components/safe-area-guides.tsx`): portrait preview overlays for TikTok, Reels, YouTube Shorts, and a generic vertical preset; toggle stored in local preferences (not `project.json`).
+- **Vertical split export layout**: `project.export.layout` (`fill` | `split-vertical`) with `splitVertical.ratio` and `speakerPosition` (`top` | `bottom`); ffmpeg `buildVerticalSplitFilter` stacks speaker and content panes after reframe; GUI Fill / Split vertical controls in Reframe (9:16); CLI `export-set --layout`, `--split-ratio`, `--split-speaker`.
+- **Asset must-use / avoid flags**: optional `mustUse` and `avoid` on registered assets; `asset-flags` registry action, `openklip asset-flags <slug> <assetId> [--must-use|--avoid|--clear]`, GUI badges in the asset bin; `list_assets` and `project_status` expose flags; `make-draft` skill respects them.
+
+### Changed
+- **Version**: bumped OpenKlip to `0.27.0.0`.
+
 ## 0.26.0.0 - 2026-07-03
 
 Multi-clip highlight export and Highlights GUI panel.
