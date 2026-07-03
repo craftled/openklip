@@ -31,6 +31,7 @@ import {
   IconPlayerPause,
   IconPlayerPlay,
   IconPlayerStop,
+  IconPlugConnected,
   IconPlus,
   IconRefresh,
   IconRobot,
@@ -125,6 +126,7 @@ export const Pause = IconPlayerPause;
 export const Pencil = IconPencil;
 export const PictureInPicture2 = IconPictureInPicture;
 export const Play = IconPlayerPlay;
+export const PlugConnected = IconPlugConnected;
 export const Plus = IconPlus;
 export const PlusIcon = IconPlus;
 export const RotateCcw = IconRefresh;
