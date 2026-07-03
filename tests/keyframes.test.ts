@@ -226,3 +226,36 @@ test("KeyframeSchema: accepts spring easing", () => {
   });
   assert.equal(parsed.easing, "spring");
 });
+
+test("evaluateKeyframes: backOut overshoots and anticipate pulls back first", () => {
+  const base = (easing) => [
+    { sampleOffset: 0, property: "scale", value: 0, easing: "linear" },
+    { sampleOffset: 100, property: "scale", value: 1, easing },
+  ];
+  const backOutLate = evaluateKeyframes(base("backOut"), 90).scale ?? 0;
+  assert.ok(
+    backOutLate > 1,
+    `expected backOut overshoot past 1, got ${backOutLate}`
+  );
+  const anticipateEarly = evaluateKeyframes(base("anticipate"), 20).scale ?? 0;
+  assert.ok(
+    anticipateEarly < 0,
+    `expected anticipate to pull back below 0, got ${anticipateEarly}`
+  );
+  for (const easing of ["backOut", "anticipate"]) {
+    assert.equal(evaluateKeyframes(base(easing), 0).scale, 0);
+    assert.equal(evaluateKeyframes(base(easing), 100).scale, 1);
+  }
+});
+
+test("KeyframeSchema: accepts backOut and anticipate easing", () => {
+  for (const easing of ["backOut", "anticipate"]) {
+    const parsed = KeyframeSchema.parse({
+      sampleOffset: 0,
+      property: "opacity",
+      value: 1,
+      easing,
+    });
+    assert.equal(parsed.easing, easing);
+  }
+});

@@ -1,4 +1,4 @@
-import { cubicBezier } from "motion";
+import { anticipate, backOut, cubicBezier } from "motion";
 import { z } from "zod";
 
 export const KeyframeSchema = z.object({
@@ -6,7 +6,15 @@ export const KeyframeSchema = z.object({
   property: z.enum(["opacity", "scale", "x", "y"]),
   value: z.number(),
   easing: z
-    .enum(["linear", "easeIn", "easeOut", "easeInOut", "spring"])
+    .enum([
+      "linear",
+      "easeIn",
+      "easeOut",
+      "easeInOut",
+      "spring",
+      "backOut",
+      "anticipate",
+    ])
     .default("linear"),
 });
 
@@ -25,6 +33,10 @@ function applyEasing(easing: Keyframe["easing"], rawProgress: number): number {
   switch (easing) {
     case "spring":
       return springEase(t);
+    case "backOut":
+      return backOut(t);
+    case "anticipate":
+      return anticipate(t);
     case "easeIn":
       return t ** 3;
     case "easeOut":
