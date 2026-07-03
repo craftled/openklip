@@ -158,7 +158,7 @@ Legend: Full means the surface can achieve the same outcome. Partial means the s
 | Brand preset apply | Partial ingest/apply path not prominent in UI | Full: `brand` | Missing | Missing public route | CLI-only for now. |
 | Export MP4 | Full | Full | Full | Full: export route and server action | Good parity for height only. |
 | Export compression and frame rate | Full: export dialog | Full: `--compression`, `--fps` | Full: export tool inputs | Full: export route body | Shipped 2026-07-02. |
-| Export format (MP4/GIF) and destination (file/clipboard) | Full: export dialog toggles, both enabled | Full: `--format mp4\|gif` | Full: `format` input | Partial: route/`exportProject` accept `format`; destination is GUI-only and never reaches the server | Shipped 2026-07-03 (`src/exporter.ts`, `web/components/export-dialog.tsx`); CLI/MCP `--format`/`format` parity closed 2026-07-03 (v0.29.0.1). GIF has no audio; size/duration cap shipped v0.32.0.0 (960px width / 15fps / 300s kept duration, no user-facing control to customize it); clipboard copies the output path only, not the video; destination has no CLI/MCP equivalent by design. |
+| Export format (MP4/GIF) and destination (file/clipboard) | Full: export dialog toggles, both enabled | Full: `--format mp4\|gif` | Full: `format` input | Partial: route/`exportProject` accept `format`; destination is GUI-only and never reaches the server | Shipped 2026-07-03 (`src/exporter.ts`, `web/components/export-dialog.tsx`); CLI/MCP `--format`/`format` parity closed 2026-07-03 (v0.29.0.1). GIF has no audio; size/duration cap shipped v0.32.0.0 (960px width / 15fps / 300s kept duration); a width override (`--gif-max-width`, MCP `export` tool's `gifMaxWidth`, export route, `exportProject`) shipped v0.33.0.0, clamped to a 1920px hard ceiling in `clampGifDimensions` itself; no GUI control yet, and fps/duration stay fixed on every surface; clipboard copies the output path only, not the video; destination has no CLI/MCP equivalent by design. |
 | Verify export | Full button | Full | Full | Partial server action path | Good CLI/MCP parity. |
 | Package post-export | Missing UI | Full: `package` | Missing | Missing | CLI-only optional feature. |
 | Multi-take add/list/transcript/assemble | Missing UI | Full | Full query/assemble tools | Missing public route | Strong agent feature, weak UI parity. |
@@ -183,11 +183,11 @@ Legend: Full means the surface can achieve the same outcome. Partial means the s
 | Graphics | UI, CLI, MCP | UI, CLI, MCP | UI, CLI, MCP | UI, CLI, MCP | Good parity. |
 | Captions | Ingest default | UI, CLI, MCP | UI, CLI, MCP | Off toggle, not deleted | Style presets shipped (2026-07-02); per-platform safe-area preview guides shipped (2026-07-03). |
 | Look and color | Project defaults | UI, CLI, MCP | UI, CLI, MCP | Reset by setting neutral values | Needs vignette strength/blur controls. |
-| Takes | CLI/MCP add and assemble | CLI/MCP | Assemble creates new source | File-level only | Missing UI take browser and API routes. |
+| Takes | CLI/MCP add and assemble | CLI/MCP, and (v0.33.0.0) a GUI browse-and-assemble panel (`web/components/takes-panel.tsx`, Config sidebar between Highlights and Music) | Assemble creates new source | File-level only | UI take browser shipped 2026-07-03: browse/select/assemble existing takes; ingesting a NEW take is still CLI-only (`take-add`), no API routes. |
 | Exports | UI, CLI, MCP, API | File output, status, verify | Re-export overwrites | Manual file delete only | Needs presets, settings, history. |
 | Agent chats | UI/API | UI/API | UI/API rename/archive/append | UI/API | Not exposed to CLI/MCP as context or task log. |
 | Brief/context | UI, CLI, MCP | UI, CLI, MCP | CLI/MCP/UI save paths | File delete clears manually | `brief.md` shipped; CLI/GUI/MCP saves all history-log (2026-07-02). |
-| Action history | Append-only log on every user-facing mutation | History route + Config panel section; `openklip history` / MCP `history_list` (2026-07-02) | `openklip revert` / MCP `revert` / GUI History panel | Not applicable (append-only) | Task-level revert exists (2026-07-02); agent-facing history/task query tools added (2026-07-02, filter by task id or action name); actor filter added v0.32.0.0 (`--actor`/MCP `history_list` `actor`); still no filter UI in the GUI panel. |
+| Action history | Append-only log on every user-facing mutation | History route + Config panel section with actor/action/task filter UI (v0.33.0.0); `openklip history` / MCP `history_list` (2026-07-02) | `openklip revert` / MCP `revert` / GUI History panel | Not applicable (append-only) | Task-level revert exists (2026-07-02); agent-facing history/task query tools added (2026-07-02, filter by task id or action name); actor filter added v0.32.0.0 for history (`--actor`/MCP `history_list` `actor`) and v0.33.0.0 for tasks (`openklip tasks --actor`/MCP `task_list` `actor`); GUI History panel filter UI shipped v0.33.0.0. |
 
 ### 0.3 Baseline audit conclusion
 
@@ -197,12 +197,12 @@ The biggest blockers to a capable agent-first editor are:
 
 1. Cross-surface parity holes remain: project create/delete, asset delete/register, inbox scan, analysis triggers, chat context, and task logs are not all available on UI, CLI, MCP, and HTTP.
 2. Manual correction gaps remain: music timeline drag-trim, richer title styles, and visual export transitions (b-roll PiP/split/audio modes shipped v0.17-0.18; caption style presets shipped 2026-07-02).
-3. Agent recovery gaps remain: resumable checkpoints (task-level revert and undo shipped 2026-07-02; agent-facing history/task query tools shipped 2026-07-02; actor filter on history shipped v0.32.0.0).
+3. Agent recovery gaps remain: resumable checkpoints (task-level revert and undo shipped 2026-07-02; agent-facing history/task query tools shipped 2026-07-02; actor filter on history shipped v0.32.0.0, on tasks shipped v0.33.0.0).
 4. Context gaps remain: style recipes, brand-kit ingestion, and script/document ingestion beyond the free-form project brief.
 5. Shorts and reframing shipped v0.21-0.25 (manual/scene/vision crop, highlights, make-short/make-highlights playbooks).
 6. Process safety: cross-process `project.json` advisory lock shipped v0.28.0.0; revision conflict detection and machine-readable errors remain open.
 
-2026-07-03 update: shorts track through v0.28.0.0 (reframe, highlights, safe-area guides, split export layout, segment seeking, two-pass loudnorm, noise reduction, file locking, demo GIF). v0.32.0.0 closed the cinema player cut-skip bug, GIF export caps, de-essing, and the history actor filter. Remaining gaps are deeper cross-surface parity, agent recovery, and HTTP API surface.
+2026-07-03 update: shorts track through v0.28.0.0 (reframe, highlights, safe-area guides, split export layout, segment seeking, two-pass loudnorm, noise reduction, file locking, demo GIF). v0.32.0.0 closed the cinema player cut-skip bug, GIF export caps, de-essing, and the history actor filter. v0.33.0.0 closed the task actor filter, a GIF export cap width override, the multi-take GUI browser, and the GUI History panel filter UI. Remaining gaps are deeper cross-surface parity, agent recovery, and HTTP API surface.
 
 Recommended next code task: **highlight-row export in GUI**. Visual overlay primitives and shorts infrastructure are in place; polish export verification and remaining manual-correction gaps (music timeline drag-trim, richer title styles) next.
 
@@ -686,11 +686,11 @@ Goal: users trust agents because every change is inspectable, reversible, and re
   - [x] Project revision before and after.
   - Verification: every registry mutation records a log entry. Scope note 2026-07-02: every registry mutation logs across GUI/CLI/MCP. Updated 2026-07-02: previously-unlogged paths now log too, asset registration/deletion (`asset-add`/`asset-rm`), `template set`, `brand`/`ingest --brand`, and multi-take `assemble` (through `mutateProject`, preserving the revision counter), plus background folder-sync prune (`asset-prune`, actor `system`); verified via `tests/action-log.test.ts`, `tests/assets.test.ts`, `tests/asset-scanner.test.ts`, and `tests/assembly.test.ts`, and the full `bun test` run (1117 tests, all green).
 - [ ] Show action history in UI.
-  - [ ] Filter by actor.
-  - [ ] Filter by action type.
+  - [x] Filter by actor. Verified 2026-07-03: `HistoryFilterControls` actor `<select>` (`web/components/history-panel.tsx`), AND-combines with action/task filters; `tests/history-panel.test.tsx`.
+  - [x] Filter by action type. Verified 2026-07-03: `HistoryFilterControls` action `<select>`, same component and tests as above.
   - [ ] Jump to affected span or overlay.
   - [ ] Show note or rationale.
-  - Verification: user can inspect what an agent changed.
+  - Verification: user can inspect what an agent changed. Partially met 2026-07-03: filtering shipped; jump-to-span and note display remain open, so the parent item stays unticked.
 - [ ] Add undo and redo.
   - [x] Start with single-action undo for registry actions.
     - Verification 2026-07-02: `openklip revert <slug> --to <rev>` / `--last` restores `project.json` from the pre-mutation snapshot at `working/history/rev-<rev>.json` (`src/revert.ts`); pinned by `tests/revert.test.ts`.
@@ -800,7 +800,7 @@ Goal: match the core jobs people expect from a modern transcript-first editor.
   - [x] Basic audio cleanup. Verified 2026-07-03: highpass + afftdn noise reduction; de-esser shipped v0.32.0.0 (ffmpeg `deesser` filter, intensity 0-1).
 - [ ] Multi-take and composition.
   - [x] CLI multi-take assembly.
-  - [ ] UI take browser.
+  - [x] UI take browser. Verified 2026-07-03: `web/components/takes-panel.tsx` (Config sidebar Takes section, between Highlights and Music) lists ingested takes, click-selects a word range per take (`web/lib/take-word-range.ts`'s `resolveWordRange`), builds a multi-segment selection across takes, and assembles via `assembleFromSelectionAction`; `tests/assembly-actions.test.ts`, `tests/take-word-range.test.ts`, `tests/takes-panel.test.tsx`. Ingesting a new take via the browser is still not implemented (CLI-only `take-add`).
   - [ ] Agent pick-best-take workflow.
   - [ ] Manual take replacement.
 - [ ] Export.

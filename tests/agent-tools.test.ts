@@ -360,6 +360,26 @@ test("export tool schema accepts a known format and rejects an unknown one", () 
   );
 });
 
+// gifMaxWidth overrides GIF_MAX_WIDTH_PX (TODO.md known limitation: "no
+// user-facing control to customize these ceilings"); bounded at 1920 (the
+// hard ceiling exporter.ts clamps to regardless of caller).
+test("export tool schema accepts gifMaxWidth up to 1920 and rejects out-of-range or non-positive values", () => {
+  const tool = getAgentTool("export");
+  assert.ok(tool, "export tool missing");
+  assert.equal(
+    tool.schema.safeParse({ slug: "demo", gifMaxWidth: 1920 }).success,
+    true
+  );
+  assert.equal(
+    tool.schema.safeParse({ slug: "demo", gifMaxWidth: 1921 }).success,
+    false
+  );
+  assert.equal(
+    tool.schema.safeParse({ slug: "demo", gifMaxWidth: 0 }).success,
+    false
+  );
+});
+
 const FFMPEG_OK = typeof FFMPEG === "string" && existsSync(FFMPEG);
 
 test("export tool threads format through to exportCut and produces a .gif (smoke)", {
@@ -430,6 +450,80 @@ test("export tool threads format through to exportCut and produces a .gif (smoke
       `expected a .gif path, got ${result.out}`
     );
     assert.ok(existsSync(result.out), "gif file should exist");
+  });
+});
+
+test("export tool threads gifMaxWidth through to exportCut (smoke)", {
+  skip: FFMPEG_OK ? false : "ffmpeg binary unavailable",
+}, async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    const p = projectPaths(slug);
+    const src = join(p.dir, "source.mp4");
+    await run(
+      FFMPEG,
+      [
+        "-y",
+        "-f",
+        "lavfi",
+        "-i",
+        "testsrc=duration=2:size=1280x720:rate=15",
+        "-f",
+        "lavfi",
+        "-i",
+        "sine=frequency=440:duration=2",
+        "-c:v",
+        "libx264",
+        "-pix_fmt",
+        "yuv420p",
+        "-c:a",
+        "aac",
+        "-shortest",
+        src,
+      ],
+      "ffmpeg(agent-tools-export-gif-max-width-clip)"
+    );
+    // fps 15 (== GIF_MAX_FPS) so only width is under test; a 30fps source
+    // would also trip the unrelated fps cap and make `capped` true for a
+    // reason that has nothing to do with gifMaxWidth.
+    writeFixtureProject(
+      slug,
+      makeProject({
+        slug,
+        source: src,
+        fps: 15,
+        width: 1280,
+        height: 720,
+        durationSamples: 2 * SAMPLE_RATE,
+        captions: { enabled: false, maxWords: 6, style: "boxed" },
+        words: [
+          {
+            id: "w0",
+            text: "Hello",
+            startSample: 0,
+            endSample: SAMPLE_RATE,
+            deleted: false,
+          },
+          {
+            id: "w1",
+            text: "world",
+            startSample: SAMPLE_RATE,
+            endSample: 2 * SAMPLE_RATE,
+            deleted: false,
+          },
+        ],
+      })
+    );
+
+    const result = (await callAgentTool("export", {
+      slug,
+      format: "gif",
+      gifMaxWidth: 1280,
+    })) as { gif?: { capped: boolean; width: number } };
+    // Without the override, 1280x720 clamps to 960/540 (see the exporter.ts
+    // "clamps a high-resolution export" smoke); the override raises the
+    // ceiling so the full 1280 survives.
+    assert.equal(result.gif?.capped, false);
+    assert.equal(result.gif?.width, 1280);
   });
 });
 
@@ -1167,5 +1261,104 @@ test("task_list respects limit and filters by status", async () => {
     assert.equal(completedOnly.tasks.length, 1);
     assert.equal(completedOnly.tasks[0].id, first.id);
     assert.equal(completedOnly.tasks[0].status, "completed");
+  });
+});
+
+test("task_list filters tasks by actor", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    resetAgentTaskIdSequenceForTests();
+    writeFixtureProject(slug, makeProject({ slug }));
+    const prev = process.env.OPENKLIP_ACTOR;
+    let first: Awaited<ReturnType<typeof createAgentTask>>;
+    try {
+      process.env.OPENKLIP_ACTOR = "agent";
+      first = await createAgentTask(slug, { request: "Agent-created task" });
+      process.env.OPENKLIP_ACTOR = "human";
+      await createAgentTask(slug, { request: "Human-created task" });
+    } finally {
+      if (prev === undefined) {
+        delete process.env.OPENKLIP_ACTOR;
+      } else {
+        process.env.OPENKLIP_ACTOR = prev;
+      }
+    }
+
+    const result = (await callAgentTool("task_list", {
+      slug,
+      actor: "agent",
+    })) as { tasks: Array<{ id: string; actor?: string }> };
+    assert.equal(result.tasks.length, 1);
+    assert.equal(result.tasks[0].id, first.id);
+    assert.equal(result.tasks[0].actor, "agent");
+  });
+});
+
+test("task_list combines actor with status filters using AND semantics", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    resetAgentTaskIdSequenceForTests();
+    writeFixtureProject(slug, makeProject({ slug }));
+    const prev = process.env.OPENKLIP_ACTOR;
+    let agentCompleted: Awaited<ReturnType<typeof createAgentTask>>;
+    try {
+      // Two agent-created tasks (only one completed) and one human-created,
+      // completed task: --status alone would match two, --actor alone would
+      // match two. Only combining both narrows to exactly one, proving the
+      // actor filter is actually applied (not a no-op).
+      process.env.OPENKLIP_ACTOR = "agent";
+      agentCompleted = await createAgentTask(slug, {
+        request: "Agent task, completed",
+      });
+      await withTaskId(agentCompleted.id, async () => {
+        await callAgentTool("task_complete", { slug, outcome: "completed" });
+      });
+      await createAgentTask(slug, { request: "Agent task, running" });
+      process.env.OPENKLIP_ACTOR = "human";
+      const humanCompleted = await createAgentTask(slug, {
+        request: "Human task, completed",
+      });
+      await withTaskId(humanCompleted.id, async () => {
+        await callAgentTool("task_complete", { slug, outcome: "completed" });
+      });
+    } finally {
+      if (prev === undefined) {
+        delete process.env.OPENKLIP_ACTOR;
+      } else {
+        process.env.OPENKLIP_ACTOR = prev;
+      }
+    }
+
+    const result = (await callAgentTool("task_list", {
+      slug,
+      actor: "agent",
+      status: "completed",
+    })) as { tasks: Array<{ id: string; actor?: string; status: string }> };
+    assert.equal(result.tasks.length, 1);
+    assert.equal(result.tasks[0].id, agentCompleted.id);
+    assert.equal(result.tasks[0].actor, "agent");
+    assert.equal(result.tasks[0].status, "completed");
+  });
+});
+
+test("task_list actor filter matching nothing returns an empty array, not an error", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    resetAgentTaskIdSequenceForTests();
+    writeFixtureProject(slug, makeProject({ slug }));
+    const prev = process.env.OPENKLIP_ACTOR;
+    try {
+      process.env.OPENKLIP_ACTOR = "agent";
+      await createAgentTask(slug, { request: "Agent-created task" });
+    } finally {
+      if (prev === undefined) {
+        delete process.env.OPENKLIP_ACTOR;
+      } else {
+        process.env.OPENKLIP_ACTOR = prev;
+      }
+    }
+
+    const result = (await callAgentTool("task_list", {
+      slug,
+      actor: "human",
+    })) as { tasks: unknown[] };
+    assert.deepEqual(result.tasks, []);
   });
 });

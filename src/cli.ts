@@ -61,6 +61,7 @@ import {
   type ExportCompression,
   type ExportFormat,
   exportCut,
+  GIF_MAX_WIDTH_OVERRIDE_CEILING_PX,
   parseExportFpsFlag,
   parseExportLoudnessFlag,
 } from "./exporter.ts";
@@ -2290,7 +2291,7 @@ try {
     case "export": {
       if (!rest[0]) {
         throw new Error(
-          "usage: openklip export <slug> [--height <px>] [--fps <n>] [--compression <preset>] [--format <mp4|gif>] [--platform <id>] [--loudness <lufs>] [--aspect <id>] [--crop-focus-x <0-1>] [--crop-focus-y <0-1>] [--crop-scale <1-3>]"
+          "usage: openklip export <slug> [--height <px>] [--fps <n>] [--compression <preset>] [--format <mp4|gif>] [--gif-max-width <px>] [--platform <id>] [--loudness <lufs>] [--aspect <id>] [--crop-focus-x <0-1>] [--crop-focus-y <0-1>] [--crop-scale <1-3>]"
         );
       }
       const heightIdx = rest.indexOf("--height");
@@ -2334,6 +2335,25 @@ try {
           );
         }
         format = formatRaw as ExportFormat;
+      }
+      // Overrides GIF_MAX_WIDTH_PX (960) for this export's GIF-specific
+      // second pass only (TODO.md known limitation: "no user-facing control
+      // to customize these ceilings"). exporter.ts clamps to
+      // GIF_MAX_WIDTH_OVERRIDE_CEILING_PX regardless of caller, but failing
+      // fast here gives an immediate, actionable error instead of a silently
+      // clamped result.
+      const gifMaxWidthIdx = rest.indexOf("--gif-max-width");
+      let gifMaxWidth: number | undefined;
+      if (gifMaxWidthIdx !== -1) {
+        gifMaxWidth = Number(rest[gifMaxWidthIdx + 1]);
+        if (!(Number.isInteger(gifMaxWidth) && gifMaxWidth >= 1)) {
+          throw new Error("--gif-max-width must be a positive integer");
+        }
+        if (gifMaxWidth > GIF_MAX_WIDTH_OVERRIDE_CEILING_PX) {
+          throw new Error(
+            `--gif-max-width must be at most ${GIF_MAX_WIDTH_OVERRIDE_CEILING_PX}`
+          );
+        }
       }
       // Guard against a trailing flag with no value: `flagValue` would
       // otherwise silently return undefined and export would proceed with no
@@ -2380,6 +2400,7 @@ try {
         crop,
         format,
         fps,
+        gifMaxWidth,
         loudnessTargetLufs,
         maxHeight,
         platform,
@@ -2746,7 +2767,7 @@ try {
     case "tasks": {
       if (!rest[0]) {
         throw new Error(
-          "usage: openklip tasks <slug> [--limit N] [--status <status>]"
+          "usage: openklip tasks <slug> [--limit N] [--status <status>] [--actor <name>]"
         );
       }
       const tasksSlug = rest[0];
@@ -2764,20 +2785,33 @@ try {
           `--status must be one of: ${AGENT_TASK_STATUSES.join(", ")}`
         );
       }
+      const actorFilter = flagValue(rest, "--actor");
       const tasks = await listAgentTasks(tasksSlug, {
-        limit: statusFilter === undefined ? limit : Number.MAX_SAFE_INTEGER,
+        limit:
+          statusFilter === undefined && actorFilter === undefined
+            ? limit
+            : Number.MAX_SAFE_INTEGER,
       });
-      const filtered = (
-        statusFilter === undefined
-          ? tasks
-          : tasks.filter((t) => t.status === statusFilter)
-      ).slice(0, limit);
+      let allFiltered = tasks;
+      if (statusFilter !== undefined) {
+        allFiltered = allFiltered.filter((t) => t.status === statusFilter);
+      }
+      if (actorFilter !== undefined) {
+        allFiltered = allFiltered.filter((t) => t.actor === actorFilter);
+      }
+      const filtered = allFiltered.slice(0, limit);
       if (filtered.length === 0) {
-        // Distinguish "genuinely no tasks" from "a --status filter matched
-        // nothing" (Finding 6), same as the history command above.
-        if (statusFilter !== undefined && tasks.length > 0) {
+        // Distinguish "genuinely no tasks" from "a --status/--actor filter
+        // matched nothing" (Finding 6), same as the history command above.
+        const anyFilterActive =
+          statusFilter !== undefined || actorFilter !== undefined;
+        if (anyFilterActive && tasks.length > 0) {
+          const activeFilters = [
+            statusFilter === undefined ? undefined : `--status=${statusFilter}`,
+            actorFilter === undefined ? undefined : `--actor=${actorFilter}`,
+          ].filter((f): f is string => f !== undefined);
           console.log(
-            `no tasks match the filter (--status=${statusFilter}) for ${tasksSlug}.`
+            `no tasks match the filter (${activeFilters.join(", ")}) for ${tasksSlug}.`
           );
         } else {
           console.log(`no tasks for ${tasksSlug}.`);

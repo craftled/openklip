@@ -14,6 +14,7 @@ import {
   unlink,
   writeFile,
 } from "node:fs/promises";
+import { actorFromEnv } from "./action-log.ts";
 import {
   type AgentTask,
   type AgentTaskStatus,
@@ -302,6 +303,12 @@ export function createAgentTask(
       slug,
       request: truncate(input.request, REQUEST_MAX_CHARS),
       ...(input.chatId === undefined ? {} : { chatId: input.chatId }),
+      // Every current call site (the GUI chat's spawned tool-editing run,
+      // app/agent-actions.ts) creates a task from a human-initiated request
+      // with no OPENKLIP_ACTOR set on the Next server process, so "human" is
+      // the right default; a future CLI/MCP-initiated task creator would set
+      // OPENKLIP_ACTOR and be recorded correctly without any change here.
+      actor: actorFromEnv() ?? "human",
       status: "running",
       steps: [],
       startedAt: now,

@@ -1,6 +1,7 @@
 "use server";
 
 import { existsSync } from "node:fs";
+import { assembleFromSelection, listTakes, loadTake } from "@engine/assembly";
 import { loadBrief, saveBrief as saveBriefFile } from "@engine/brief";
 import { logBriefSet } from "@engine/brief-log";
 import type {
@@ -10,6 +11,7 @@ import type {
   Filter,
   Motion,
   Project,
+  Take,
 } from "@engine/edl";
 import {
   EXPORT_PLATFORM_IDS,
@@ -248,6 +250,7 @@ export async function exportProject(
     crop?: { focusX?: number; focusY?: number; scale?: number };
     format?: ExportFormat;
     fps?: number;
+    gifMaxWidth?: number;
     loudnessTargetLufs?: number;
     maxHeight?: number;
     platform?: ExportPlatformId;
@@ -271,9 +274,12 @@ export async function exportProject(
   }>
 > {
   try {
-    const { EXPORT_COMPRESSIONS, EXPORT_FORMATS, exportCut } = await import(
-      "@engine/exporter"
-    );
+    const {
+      EXPORT_COMPRESSIONS,
+      EXPORT_FORMATS,
+      exportCut,
+      GIF_MAX_WIDTH_OVERRIDE_CEILING_PX,
+    } = await import("@engine/exporter");
     // Server actions are network-reachable: enforce the same bounds the HTTP
     // route and MCP tool do before any export work, instead of trusting the
     // caller (an unchecked fps would land verbatim in the filtergraph).
@@ -283,6 +289,7 @@ export async function exportProject(
       crop,
       format,
       fps,
+      gifMaxWidth,
       loudnessTargetLufs,
       maxHeight,
       platform,
@@ -320,6 +327,18 @@ export async function exportProject(
     ) {
       throw new Error("maxHeight must be an integer between 1 and 4320");
     }
+    if (
+      gifMaxWidth !== undefined &&
+      !(
+        Number.isInteger(gifMaxWidth) &&
+        gifMaxWidth >= 1 &&
+        gifMaxWidth <= GIF_MAX_WIDTH_OVERRIDE_CEILING_PX
+      )
+    ) {
+      throw new Error(
+        `gifMaxWidth must be an integer between 1 and ${GIF_MAX_WIDTH_OVERRIDE_CEILING_PX}`
+      );
+    }
     if (platform !== undefined && !isExportPlatformId(platform)) {
       throw new Error(
         `unknown export platform "${platform}" (expected one of: ${EXPORT_PLATFORM_IDS.join(", ")})`
@@ -341,6 +360,7 @@ export async function exportProject(
       crop,
       format,
       fps,
+      gifMaxWidth,
       loudnessTargetLufs,
       maxHeight,
       platform,
@@ -445,6 +465,67 @@ export async function runHighlightsDetect(
     );
     const updated = await loadProject(slug);
     return { ok: true, data: { project: updated, highlights } };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+// ── Multi-take assembly GUI browser ─────────────────────────────────────────
+// Read/select-and-splice only: ingesting a NEW take stays CLI-only
+// (`openklip take-add`), matching src/cli.ts and the MCP tool surface
+// (list_takes/take_transcript/assemble all wrap src/assembly.ts the same way
+// these three do; there is deliberately no ingest-a-take GUI action here).
+
+export async function listTakesAction(
+  slug: string
+): Promise<ActionResult<{ takes: Take[] }>> {
+  try {
+    const takes = await listTakes(slug);
+    return { ok: true, data: { takes } };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function loadTakeAction(
+  slug: string,
+  takeId: string
+): Promise<ActionResult<{ take: Take }>> {
+  try {
+    const take = await loadTake(slug, takeId);
+    return { ok: true, data: { take } };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function assembleFromSelectionAction(
+  slug: string,
+  selection: {
+    segments: Array<{
+      takeId: string;
+      startWordId: string;
+      endWordId: string;
+      note?: string;
+    }>;
+    padMs?: number;
+  },
+  opts?: { force?: boolean }
+): Promise<
+  ActionResult<{
+    durationSec: number;
+    project: Project;
+    segments: number;
+    words: number;
+  }>
+> {
+  try {
+    const result = await assembleFromSelection(slug, selection, {
+      force: opts?.force,
+      actor: "human",
+    });
+    const project = await loadProject(slug);
+    return { ok: true, data: { ...result, project } };
   } catch (e) {
     return fail(e);
   }

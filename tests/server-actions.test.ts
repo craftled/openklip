@@ -356,6 +356,31 @@ test("exportProject rejects an unknown format before any export work", async () 
   });
 });
 
+// gifMaxWidth overrides GIF_MAX_WIDTH_PX for one export (TODO.md known
+// limitation: "no user-facing control to customize these ceilings"); server
+// actions enforce the same 1920 hard ceiling as the HTTP route and MCP tool.
+test("exportProject rejects an out-of-bounds gifMaxWidth before any export work", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const tooWide = await exportProject(slug, { gifMaxWidth: 5000 });
+    assert.equal(tooWide.ok, false);
+    if (!tooWide.ok) {
+      assert.match(
+        tooWide.error,
+        /gifMaxWidth must be an integer between 1 and 1920/
+      );
+    }
+    const fractional = await exportProject(slug, { gifMaxWidth: 12.5 });
+    assert.equal(fractional.ok, false);
+    if (!fractional.ok) {
+      assert.match(
+        fractional.error,
+        /gifMaxWidth must be an integer between 1 and 1920/
+      );
+    }
+  });
+});
+
 test("exportProject rejects an out-of-bounds loudnessTargetLufs before any export work", async () => {
   await withTempProjectsRoot(async ({ slug }) => {
     writeFixtureProject(slug, makeProject({ slug }));
