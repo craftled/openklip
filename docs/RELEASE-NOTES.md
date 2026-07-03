@@ -2,7 +2,25 @@
 
 Use these bodies when publishing releases. Each section matches a tag in `CHANGELOG.md` without duplicating the full changelog. **Known gaps:** always link to [TODO.md](../TODO.md#known-limitations); do not duplicate the list here.
 
-Publishing status checked on 2026-07-03 (`gh release list`): GitHub releases are published through `v0.21.0.0` (v0.17.0.0 through v0.20.0.0 backfilled on 2026-07-03). `v0.22.0.0` is prepared below for publication next.
+Publishing status checked on 2026-07-03 (`gh release list`): GitHub releases are published through `v0.22.0.0`. `v0.23.0.0` is prepared below for publication next.
+
+---
+
+## v0.23.0.0
+
+**Scene-log focus coordinates and a deterministic make-short agent loop.**
+
+### Highlights
+- **Speaker focus in scene log**: analyze can now persist `focusX`/`focusY` per speaker span; scene crop mode duration-weights them into export reframe.
+- **`bun run agent-make-short`**: one command to set 9:16, pick scene/manual crop, export with the `shorts` preset, and verify.
+- **Live check**: `edgaras-raw` via `agent-make-short` produced 1080x1920, `cropMode: scene`, verify passed.
+- Current codebase verification: 1318 tests.
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations) for the current list. Focus coords depend on scene analysis quality; Vision/saliency sidecar is not implemented.
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#02300---2026-07-03)
 
 ---
 

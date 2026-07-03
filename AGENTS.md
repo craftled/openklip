@@ -282,12 +282,23 @@ verify→ openklip status
 done  → openklip export
 ```
 
-**Demo script** (deterministic, no LLM): cuts a phrase list and optionally exports.
+**Demo scripts** (deterministic, no LLM):
+
+`agent-demo`: cuts a phrase list and optionally exports.
 
 ```bash
 bun run agent-demo <slug> --phrases scripts/example-phrases.txt
 bun run agent-demo <slug> --all "you know" "sort of" --export
 bun run agent-demo <slug> --phrases phrases.txt --dry-run   # preview only
+```
+
+`agent-make-short`: derives a vertical short from an existing edit (sets 9:16 reframe, exports with the shorts platform preset, verifies). Trimming to a target runtime is not auto-applied; trim with `cut` first when needed.
+
+```bash
+bun run agent-make-short <slug>
+bun run agent-make-short <slug> --max-sec 60       # warn if over 60s
+bun run agent-make-short <slug> --dry-run          # preview settings only
+bun run agent-make-short <slug> --skip-export      # reframe only, no render
 ```
 
 ## Editing guardrails

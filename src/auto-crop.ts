@@ -42,8 +42,8 @@ export function suggestCropFromSceneLog(
   for (const seg of speakerSegs) {
     const dur = Math.max(0, seg.toSec - seg.fromSec);
     totalWeight += dur;
-    sumX += 0.5 * dur;
-    sumY += 0.5 * dur;
+    sumX += (seg.focusX ?? 0.5) * dur;
+    sumY += (seg.focusY ?? 0.5) * dur;
   }
 
   if (totalWeight === 0) {

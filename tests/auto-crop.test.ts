@@ -168,3 +168,62 @@ test("suggestCropFromSceneLog ignores zero-duration segments", () => {
   assert.equal(result.focusX, 0.5);
   assert.equal(result.focusY, 0.5);
 });
+
+test("suggestCropFromSceneLog uses per-segment focusX/focusY in weighted average", () => {
+  // 10s at focusX=0.2, 5s at focusX=0.8 => (0.2*10 + 0.8*5) / 15 = 6/15 = 0.4
+  // 10s at focusY=0.3, 5s at focusY=0.9 => (0.3*10 + 0.9*5) / 15 = 7.5/15 = 0.5
+  const project = makeProject({
+    sceneLog: {
+      segments: [
+        {
+          fromSec: 0,
+          toSec: 10,
+          summary: "speaker close-up",
+          onScreen: "speaker",
+          focusX: 0.2,
+          focusY: 0.3,
+        },
+        {
+          fromSec: 10,
+          toSec: 15,
+          summary: "speaker wide",
+          onScreen: "speaker",
+          focusX: 0.8,
+          focusY: 0.9,
+        },
+      ],
+      analyzedAt: "2026-07-03T00:00:00Z",
+    },
+  });
+  const result = suggestCropFromSceneLog(project, "9:16");
+  assert.ok(result !== null);
+  assert.ok(
+    Math.abs(result.focusX - 0.4) < 0.0001,
+    `expected focusX ~0.4, got ${result.focusX}`
+  );
+  assert.ok(
+    Math.abs(result.focusY - 0.5) < 0.0001,
+    `expected focusY ~0.5, got ${result.focusY}`
+  );
+});
+
+test("suggestCropFromSceneLog falls back to 0.5 when segment has no focus coords", () => {
+  const project = makeProject({
+    sceneLog: {
+      segments: [
+        {
+          fromSec: 0,
+          toSec: 10,
+          summary: "speaker on camera",
+          onScreen: "speaker",
+          // no focusX/focusY
+        },
+      ],
+      analyzedAt: "2026-07-03T00:00:00Z",
+    },
+  });
+  const result = suggestCropFromSceneLog(project, "9:16");
+  assert.ok(result !== null);
+  assert.equal(result.focusX, 0.5);
+  assert.equal(result.focusY, 0.5);
+});

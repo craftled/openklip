@@ -110,6 +110,7 @@ Verified against the current codebase (`VERSION` / `package.json` `0.16.0.0`, 12
 - **Agent selector**: drive filler cuts via Claude Code, Codex, Cursor, or Grok subscription CLIs
 - **Design system**: default shadcn/ui tokens with Base UI primitives (`app/globals.css`, `components.json`); light/dark via `.dark` class; icons via `web/lib/icon.tsx`
 - **Agent demo**: `bun run agent-demo` (phrase list → cut → status → optional export)
+- **Make short**: `bun run agent-make-short` (9:16 reframe → shorts export → verify)
 
 Phrase-based cutting works on both surfaces: the transcript UI has search with batch cut and restore, and the CLI has `openklip cut --text`. First project on a machine: upload or drop a video in the browser, or use `openklip ingest` from the CLI. Known gaps: **[TODO.md](./TODO.md)**.
 

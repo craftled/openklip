@@ -338,6 +338,35 @@ test("export-set: stores aspect and crop, clamped, in project JSON", () => {
   assert.deepEqual(p.export, r.export);
 });
 
+test("export-set: scene cropMode is accepted and stored", () => {
+  const p = makeProject();
+  const r = runAction("export-set", p, {
+    aspect: "9:16",
+    cropMode: "scene",
+  }) as { export: Project["export"] };
+  assert.equal(r.export.cropMode, "scene");
+  assert.equal(r.export.aspect, "9:16");
+});
+
+test("export-set: sceneLog focusX/focusY on segments round-trip through project", () => {
+  const p = makeProject();
+  p.sceneLog = {
+    segments: [
+      {
+        fromSec: 0,
+        toSec: 10,
+        summary: "speaker on camera",
+        onScreen: "speaker",
+        focusX: 0.4,
+        focusY: 0.6,
+      },
+    ],
+    analyzedAt: "2026-07-03T00:00:00Z",
+  };
+  assert.equal(p.sceneLog.segments[0]?.focusX, 0.4);
+  assert.equal(p.sceneLog.segments[0]?.focusY, 0.6);
+});
+
 test("word-text: corrects a word's text and round-trips originalText", () => {
   const p = makeProject();
   const first = runAction("word-text", p, { id: "w0", text: "Word Zero" }) as {

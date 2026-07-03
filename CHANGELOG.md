@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.23.0.0 - 2026-07-03
+
+Scene-log focus coordinates and a deterministic make-short agent loop.
+
+### Added
+- **Scene segment focus coords**: optional `focusX`/`focusY` (0-1) on `SceneSegment`; scene-log prompt asks the vision model for speaker face center; `parseSceneLog` clamps and stores them; `suggestCropFromSceneLog` duration-weights per-segment focus.
+- **`agent-make-short` script**: `bun run agent-make-short <slug>` sets 9:16 + scene/manual crop mode, exports with the `shorts` preset, and verifies. Flags: `--max-sec`, `--dry-run`, `--skip-export`, `--skip-verify`.
+
+### Changed
+- **Version**: bumped OpenKlip to `0.23.0.0`.
+
 ## 0.22.0.0 - 2026-07-03
 
 Scene crop mode, revise-draft convert-to-short, and make-short loop verification.

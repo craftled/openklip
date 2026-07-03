@@ -98,8 +98,8 @@ export function buildSceneLogPrompt(
     .map((f) => `- t=${f.atSec.toFixed(1)}s : ${f.path}`)
     .join("\n");
   return `You are logging what is visually on screen in a ~${totalSec.toFixed(0)}s talking-head video, to help an editor decide where it needs b-roll. Read the sample frames (each labelled with its timestamp) and return ONLY a JSON object:
-{"segments":[{"fromSec":0,"toSec":12,"summary":"one concise sentence of what is on screen","onScreen":"speaker|slide|screen|other","brollOpportunity":true|false}]}
-Cover the timeline in order with a handful of spans (merge adjacent frames that look the same). Set "brollOpportunity" true when the span is a static talking head that would benefit from b-roll, false when the footage is already showing something (a slide, a demo, a screen-share). Base it ONLY on what you can see; if you cannot read the frames, reply {"segments":[]}. Respond with JSON only: no prose, no code fence.
+{"segments":[{"fromSec":0,"toSec":12,"summary":"one concise sentence of what is on screen","onScreen":"speaker|slide|screen|other","brollOpportunity":true|false,"focusX":0.5,"focusY":0.4}]}
+Cover the timeline in order with a handful of spans (merge adjacent frames that look the same). Set "brollOpportunity" true when the span is a static talking head that would benefit from b-roll, false when the footage is already showing something (a slide, a demo, a screen-share). For "speaker" segments, set focusX and focusY (each 0-1) to the horizontal and vertical center of the speaker's face in the frame (0=left/top, 1=right/bottom); omit for non-speaker segments. Base it ONLY on what you can see; if you cannot read the frames, reply {"segments":[]}. Respond with JSON only: no prose, no code fence.
 
 Frames:
 ${frameList}
@@ -151,6 +151,14 @@ export function parseSceneLog(text: string): SceneSegment[] | null {
     if (typeof r.brollOpportunity === "boolean") {
       seg.brollOpportunity = r.brollOpportunity;
     }
+    const fx = num(r.focusX);
+    if (fx !== null) {
+      seg.focusX = Math.min(1, Math.max(0, fx));
+    }
+    const fy = num(r.focusY);
+    if (fy !== null) {
+      seg.focusY = Math.min(1, Math.max(0, fy));
+    }
     segments.push(seg);
   }
   return segments.length > 0 ? segments : null;
@@ -166,7 +174,13 @@ export function sceneLogLines(sceneLog: SceneLog | undefined): string {
     .map((s) => {
       const on = s.onScreen ? ` [${s.onScreen}]` : "";
       const flag = s.brollOpportunity ? " (b-roll opportunity)" : "";
-      return `- ${s.fromSec.toFixed(1)}-${s.toSec.toFixed(1)}s${on}: ${s.summary}${flag}`;
+      const focus =
+        s.onScreen === "speaker" &&
+        s.focusX !== undefined &&
+        s.focusY !== undefined
+          ? ` focus ${s.focusX},${s.focusY}`
+          : "";
+      return `- ${s.fromSec.toFixed(1)}-${s.toSec.toFixed(1)}s${on}: ${s.summary}${focus}${flag}`;
     })
     .join("\n");
 }

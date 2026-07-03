@@ -323,6 +323,10 @@ export const SceneSegmentSchema = z.object({
   onScreen: z.enum(["speaker", "slide", "screen", "other"]).optional(),
   /** True when this span is visually static and a good candidate for b-roll. */
   brollOpportunity: z.boolean().optional(),
+  /** Horizontal face center in the frame [0=left, 1=right] for speaker segments. */
+  focusX: z.number().min(0).max(1).optional(),
+  /** Vertical face center in the frame [0=top, 1=bottom] for speaker segments. */
+  focusY: z.number().min(0).max(1).optional(),
 });
 export type SceneSegment = z.infer<typeof SceneSegmentSchema>;
 

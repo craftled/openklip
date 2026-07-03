@@ -314,7 +314,7 @@ Goal: an agent can pursue a video outcome in a visible loop until it produces a 
   - [x] Export draft.
   - [x] Verify draft.
   - Verification: runs on smoke project and produces `output/out.mp4`. Verified 2026-07-02: `templates/make-draft/skill.md` on the smoke project produced a full draft in 548s (cut 524 to 161 kept words, lower-third title, 2 aerial b-roll + 1 still, music bed, export social 1080p at 1920x1080 30fps 66.4s); the agent ran verify itself and reported the verdict honestly.
-- [ ] Add a `make-short` workflow prompt.
+- [x] Add a `make-short` workflow prompt (`templates/make-short/skill.md`) and deterministic loop (`bun run agent-make-short`).
   - [ ] Find candidate hook.
   - [ ] Pick 20-60 second span.
   - [ ] Tighten pacing.
