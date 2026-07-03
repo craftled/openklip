@@ -88,7 +88,7 @@ export function JsonRenderGraphicOverlay({
 
   if (!(validation.success && validation.spec)) {
     return (
-      <div className="pointer-events-none absolute inset-0 z-[3] flex items-center justify-center bg-black/45 p-6">
+      <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-black/45 p-6">
         <div className="max-w-md rounded-md border border-destructive/40 bg-background/95 p-4 text-sm shadow-sm">
           <div className="font-medium text-destructive">
             Invalid graphic spec
@@ -102,7 +102,7 @@ export function JsonRenderGraphicOverlay({
   }
 
   return (
-    <div className="pointer-events-none absolute inset-0 z-[3]" ref={boxRef}>
+    <div className="pointer-events-none absolute inset-0 z-10" ref={boxRef}>
       <div
         className="absolute top-0 left-0 origin-top-left"
         ref={stageRef}

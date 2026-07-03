@@ -156,7 +156,7 @@ export function CollapsibleSidebarMetaItem({
   value: string;
 }) {
   return (
-    <div className="flex h-7 items-center gap-2 px-2 text-[12px] text-sidebar-foreground">
+    <div className="flex h-7 items-center gap-2 px-2 text-sidebar-foreground text-xs">
       <Icon className={APP_ICON_CLASS} />
       <span className="min-w-0 flex-1 truncate">{label}</span>
       <span className="shrink-0 text-muted-foreground/70 tabular-nums">

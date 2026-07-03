@@ -112,7 +112,7 @@ export function ChatListItem({
     <SidebarMenuItem>
       {isRenaming ? (
         <Input
-          className="h-7 rounded-[min(var(--radius-md),12px)] border-border bg-background px-2 text-xs shadow-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+          className="h-7 rounded-md border-border bg-background px-2 text-xs shadow-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
           onBlur={commitRename}
           onChange={(e) => setDraftTitle(e.target.value)}
           onKeyDown={onRenameKeyDown}
@@ -141,7 +141,7 @@ export function ChatListItem({
               <MessageSquare className={APP_ICON_CLASS} />
             )}
             <span className="min-w-0 flex-1 truncate">{thread.title}</span>
-            <span className="shrink-0 text-[12px] text-muted-foreground/58 tabular-nums">
+            <span className="shrink-0 text-muted-foreground/58 text-xs tabular-nums">
               {timeLabel}
             </span>
           </SidebarMenuButton>

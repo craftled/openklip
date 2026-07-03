@@ -73,11 +73,11 @@ export function HeroTitleOverlay({
       <div
         aria-hidden
         className={cn(
-          "hero-bg-fade pointer-events-none absolute inset-0 z-[3]",
+          "hero-bg-fade pointer-events-none absolute inset-0 z-10",
           visible && !exiting && "is-visible"
         )}
       />
-      <div className="pointer-events-none absolute inset-0 z-[4] flex flex-col items-center justify-center px-[8%] text-center text-white">
+      <div className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center px-[8%] text-center text-white">
         <TextSwap
           className="font-medium text-[clamp(28px,5.5vw,64px)] leading-tight tracking-tight drop-shadow-[0_2px_24px_rgba(0,0,0,0.45)]"
           text={headline}

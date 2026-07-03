@@ -93,7 +93,7 @@ function SkillsMenuPanel({
                     </div>
                   </div>
                   <Badge
-                    className="shrink-0 font-normal text-[10px]"
+                    className="shrink-0 font-normal text-xs"
                     variant="secondary"
                   >
                     {skillKindLabel(skill.kind)}

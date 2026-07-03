@@ -22,7 +22,7 @@ export function SafeAreaGuides({ platform, className }: SafeAreaGuidesProps) {
 
   return (
     <div
-      className={cn("pointer-events-none absolute inset-0 z-[5]", className)}
+      className={cn("pointer-events-none absolute inset-0 z-30", className)}
       data-safe-area-guides
       data-safe-area-platform={platform}
     >

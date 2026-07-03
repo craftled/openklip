@@ -24,7 +24,7 @@ import { relativeTimeAgo } from "@/lib/relative-time";
 import { revertProjectAction } from "../../app/actions.ts";
 
 const BADGE_BASE =
-  "inline-flex shrink-0 items-center rounded-sm px-1.5 py-0.5 font-medium text-[10px] uppercase tracking-wide";
+  "inline-flex shrink-0 items-center rounded-sm px-1.5 py-0.5 font-medium text-xs uppercase tracking-wide";
 
 const ACTOR_BADGES: Record<string, string> = {
   human: "bg-primary/10 text-primary",
@@ -138,7 +138,7 @@ export function distinctTaskIds(entries: ActionLogEntry[]): string[] {
 }
 
 const FILTER_LABEL_CLASS =
-  "flex items-center gap-1 text-[11px] text-muted-foreground";
+  "flex items-center gap-1 text-xs text-muted-foreground";
 
 function FilterSelect({
   ariaLabel,
@@ -155,14 +155,14 @@ function FilterSelect({
 }) {
   return (
     <Field className={FILTER_LABEL_CLASS} orientation="horizontal">
-      <FieldLabel className="text-[11px]">{label}</FieldLabel>
+      <FieldLabel className="text-xs">{label}</FieldLabel>
       <Select
         onValueChange={(next) => onChange(next === "all" ? "" : (next ?? ""))}
         value={value || "all"}
       >
         <SelectTrigger
           aria-label={ariaLabel}
-          className="h-6 max-w-32 rounded-sm px-1 text-[11px]"
+          className="h-6 max-w-32 rounded-sm px-1 text-xs"
           size="sm"
         >
           <SelectValue />
@@ -225,7 +225,7 @@ export function HistoryFilterControls({
       />
       {hasActiveFilter ? (
         <Button
-          className="h-6 rounded-sm px-2 text-[11px] text-muted-foreground"
+          className="h-6 rounded-sm px-2 text-muted-foreground text-xs"
           onClick={() => onChange({ action: "", actor: "", task: "" })}
           size="sm"
           type="button"
@@ -502,12 +502,12 @@ function RevertButton({
 }) {
   if (forceConfirming) {
     return (
-      <span className="flex shrink-0 items-center gap-1 text-[11px]">
+      <span className="flex shrink-0 items-center gap-1 text-xs">
         <span className="text-muted-foreground">
           Also discards later changes.
         </span>
         <Button
-          className="h-5 rounded-sm px-1.5 text-[11px] text-destructive hover:bg-destructive/10"
+          className="h-5 rounded-sm px-1.5 text-destructive text-xs hover:bg-destructive/10"
           disabled={reverting}
           onClick={onConfirmForce}
           size="sm"
@@ -517,7 +517,7 @@ function RevertButton({
           Revert anyway
         </Button>
         <Button
-          className="h-5 rounded-sm px-1.5 text-[11px] text-muted-foreground"
+          className="h-5 rounded-sm px-1.5 text-muted-foreground text-xs"
           disabled={reverting}
           onClick={onCancel}
           size="sm"
@@ -531,12 +531,12 @@ function RevertButton({
   }
   if (confirming) {
     return (
-      <span className="flex shrink-0 items-center gap-1 text-[11px]">
+      <span className="flex shrink-0 items-center gap-1 text-xs">
         <span className="text-muted-foreground">
           {label}?{caveat ? ` ${caveat}` : ""}
         </span>
         <Button
-          className="h-5 rounded-sm px-1.5 text-[11px] text-destructive hover:bg-destructive/10"
+          className="h-5 rounded-sm px-1.5 text-destructive text-xs hover:bg-destructive/10"
           disabled={reverting}
           onClick={onConfirm}
           size="sm"
@@ -546,7 +546,7 @@ function RevertButton({
           Confirm
         </Button>
         <Button
-          className="h-5 rounded-sm px-1.5 text-[11px] text-muted-foreground"
+          className="h-5 rounded-sm px-1.5 text-muted-foreground text-xs"
           disabled={reverting}
           onClick={onCancel}
           size="sm"
@@ -616,19 +616,19 @@ function HistoryRow({
           />
         ) : null}
       </div>
-      <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+      <div className="flex items-center gap-2 text-muted-foreground text-xs">
         <span className="tabular-nums">{revisionSpanLabel(entry)}</span>
         <span className="ml-auto shrink-0">
           {relativeTimeAgo(entry.at, now)}
         </span>
       </div>
       {entry.input ? (
-        <div className="truncate font-mono text-[11px] text-muted-foreground">
+        <div className="truncate font-mono text-muted-foreground text-xs">
           in: {entry.input}
         </div>
       ) : null}
       {entry.result ? (
-        <div className="truncate font-mono text-[11px] text-muted-foreground">
+        <div className="truncate font-mono text-muted-foreground text-xs">
           out: {entry.result}
         </div>
       ) : null}
@@ -679,7 +679,7 @@ function HistoryGroupBlock({
     <li className="flex flex-col gap-2">
       {showGroupRevert ? (
         <div className="flex items-center justify-between gap-2 rounded-sm bg-muted/50 px-1.5 py-1">
-          <span className="truncate text-[11px] text-muted-foreground">
+          <span className="truncate text-muted-foreground text-xs">
             task {group.taskId}
           </span>
           <RevertButton
@@ -963,11 +963,11 @@ export function HistoryPanel({
         <span className="flex shrink-0 items-center gap-1">
           {undoLastConfirming ? (
             <>
-              <span className="text-[11px] text-muted-foreground">
+              <span className="text-muted-foreground text-xs">
                 Undo last edit?
               </span>
               <Button
-                className="h-5 rounded-sm px-1.5 text-[11px] text-destructive hover:bg-destructive/10"
+                className="h-5 rounded-sm px-1.5 text-destructive text-xs hover:bg-destructive/10"
                 disabled={undoLastReverting}
                 onClick={() => onConfirmRevert(LAST_REVERT_KEY)}
                 size="sm"
@@ -977,7 +977,7 @@ export function HistoryPanel({
                 Confirm
               </Button>
               <Button
-                className="h-5 rounded-sm px-1.5 text-[11px] text-muted-foreground"
+                className="h-5 rounded-sm px-1.5 text-muted-foreground text-xs"
                 disabled={undoLastReverting}
                 onClick={cancelRevert}
                 size="sm"
@@ -989,7 +989,7 @@ export function HistoryPanel({
             </>
           ) : (
             <Button
-              className="h-6 rounded-sm px-2 text-[11px] text-muted-foreground hover:text-destructive"
+              className="h-6 rounded-sm px-2 text-muted-foreground text-xs hover:text-destructive"
               disabled={!undoLastEnabled || undoLastReverting || loading}
               onClick={onRequestLastRevert}
               size="sm"
@@ -1040,7 +1040,7 @@ export function HistoryPanel({
         unfilteredCount={entries.length}
       />
       {entries.length > 0 && maxHistorySnapshots !== undefined ? (
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-muted-foreground text-xs">
           Revert is available for the newest {maxHistorySnapshots} logged edits.
         </p>
       ) : null}

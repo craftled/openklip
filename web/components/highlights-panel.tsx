@@ -83,7 +83,7 @@ export function HighlightsPanel({
 
   return (
     <div className="flex flex-col gap-2" data-highlights-panel>
-      <div className="flex flex-wrap items-center justify-between gap-1.5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <Badge data-highlights-count variant="secondary">
           {clips.length} {clips.length === 1 ? "clip" : "clips"}
         </Badge>

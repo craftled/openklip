@@ -258,7 +258,7 @@ export function AgentSidebar({
               <CollapsibleSidebarSection defaultOpen title="Chats">
                 <SidebarMenu>
                   {chatEmptyLabel && (
-                    <p className="px-2 py-1 text-[12px] text-muted-foreground/58">
+                    <p className="px-2 py-1 text-muted-foreground/58 text-xs">
                       {chatEmptyLabel}
                     </p>
                   )}
@@ -284,7 +284,7 @@ export function AgentSidebar({
                 </SidebarMenu>
                 {filteredArchivedChats.length > 0 && (
                   <>
-                    <p className="mt-2 mb-1 px-2 text-[12px] text-muted-foreground/58">
+                    <p className="mt-2 mb-1 px-2 text-muted-foreground/58 text-xs">
                       Archived
                     </p>
                     <SidebarMenu>
