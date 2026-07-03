@@ -447,13 +447,22 @@ export const AudioSchema = z
         releaseMs: z.number().min(20).max(2000).default(250),
       })
       .default({ enabled: false, amountDb: 12, attackMs: 25, releaseMs: 250 }),
-    /** Single-pass loudnorm to a target integrated loudness. */
+    /** Single-pass or two-pass loudnorm to a target integrated loudness. */
     loudness: z
       .object({
         enabled: z.boolean().default(false),
         targetLufs: z.number().min(-30).max(-10).default(-16),
+        mode: z.enum(["single", "two-pass"]).default("single"),
       })
-      .default({ enabled: false, targetLufs: -16 }),
+      .default({ enabled: false, targetLufs: -16, mode: "single" }),
+    /** Light noise reduction on the voice bus (ffmpeg afftdn). */
+    noiseReduction: z
+      .object({
+        enabled: z.boolean().default(false),
+        /** afftdn nr (1-97). */
+        nr: z.number().min(1).max(97).default(12),
+      })
+      .default({ enabled: false, nr: 12 }),
     /** Rumble-cut highpass applied to seam-crossfaded voice segments. */
     voiceHighpass: z
       .object({
@@ -464,7 +473,8 @@ export const AudioSchema = z
   })
   .default({
     ducking: { enabled: false, amountDb: 12, attackMs: 25, releaseMs: 250 },
-    loudness: { enabled: false, targetLufs: -16 },
+    loudness: { enabled: false, targetLufs: -16, mode: "single" as const },
+    noiseReduction: { enabled: false, nr: 12 },
     voiceHighpass: { enabled: false, hz: 80 },
   });
 export type Audio = z.infer<typeof AudioSchema>;

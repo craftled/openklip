@@ -643,6 +643,13 @@ export const actions: ActionDef[] = [
         .object({
           enabled: z.boolean().optional(),
           targetLufs: z.number().optional(),
+          mode: z.enum(["single", "two-pass"]).optional(),
+        })
+        .optional(),
+      noiseReduction: z
+        .object({
+          enabled: z.boolean().optional(),
+          nr: z.number().optional(),
         })
         .optional(),
       voiceHighpass: z

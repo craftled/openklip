@@ -213,6 +213,8 @@ Look & captions
   openklip audio <slug> [--duck on|off] [--duck-amount <1-30 dB>]
                         [--duck-attack <1-500 ms>] [--duck-release <20-2000 ms>]
                         [--loudness on|off] [--loudness-target <-30..-10 LUFS>]
+                        [--loudness-mode single|two-pass]
+                        [--noise-reduction on|off] [--noise-strength <1-97>]
                         [--highpass on|off] [--highpass-hz <40-200>]
   openklip pad <slug> <ms>               cut boundary padding (0-500 ms)
   openklip brand <slug> <name>           apply a brand preset (look defaults)
@@ -1639,7 +1641,7 @@ try {
     case "audio": {
       if (!rest[0]) {
         throw new Error(
-          "usage: openklip audio <slug> [--duck on|off] [--duck-amount <db>] [--duck-attack <ms>] [--duck-release <ms>] [--loudness on|off] [--loudness-target <lufs>] [--highpass on|off] [--highpass-hz <n>]"
+          "usage: openklip audio <slug> [--duck on|off] [--duck-amount <db>] [--duck-attack <ms>] [--duck-release <ms>] [--loudness on|off] [--loudness-target <lufs>] [--loudness-mode single|two-pass] [--noise-reduction on|off] [--noise-strength <n>] [--highpass on|off] [--highpass-hz <n>]"
         );
       }
       const slug = rest[0];
@@ -1649,6 +1651,9 @@ try {
       const duckRelease = flagNumber(rest, "--duck-release");
       const loudness = flagValue(rest, "--loudness");
       const loudnessTarget = flagNumber(rest, "--loudness-target");
+      const loudnessMode = flagValue(rest, "--loudness-mode");
+      const noiseReduction = flagValue(rest, "--noise-reduction");
+      const noiseStrength = flagNumber(rest, "--noise-strength");
       const highpass = flagValue(rest, "--highpass");
       const highpassHz = flagNumber(rest, "--highpass-hz");
 
@@ -1659,7 +1664,12 @@ try {
           attackMs?: number;
           releaseMs?: number;
         };
-        loudness?: { enabled?: boolean; targetLufs?: number };
+        loudness?: {
+          enabled?: boolean;
+          targetLufs?: number;
+          mode?: "single" | "two-pass";
+        };
+        noiseReduction?: { enabled?: boolean; nr?: number };
         voiceHighpass?: { enabled?: boolean; hz?: number };
       } = {};
       if (
@@ -1696,6 +1706,26 @@ try {
         if (loudnessTarget !== undefined) {
           input.loudness.targetLufs = loudnessTarget;
         }
+        if (loudnessMode !== undefined) {
+          if (loudnessMode !== "single" && loudnessMode !== "two-pass") {
+            throw new Error(
+              "openklip audio <slug> --loudness-mode must be single or two-pass"
+            );
+          }
+          input.loudness.mode = loudnessMode;
+        }
+      }
+      if (noiseReduction !== undefined || noiseStrength !== undefined) {
+        input.noiseReduction = {};
+        if (noiseReduction !== undefined) {
+          input.noiseReduction.enabled = parseOnOff(
+            noiseReduction,
+            "openklip audio <slug> --noise-reduction"
+          );
+        }
+        if (noiseStrength !== undefined) {
+          input.noiseReduction.nr = noiseStrength;
+        }
       }
       if (highpass !== undefined || highpassHz !== undefined) {
         input.voiceHighpass = {};
@@ -1716,7 +1746,7 @@ try {
           : (await runLoggedAction(slug, "audio", input)).project;
       const a = project.audio;
       console.log(
-        `audio: duck ${a.ducking.enabled ? "on" : "off"} (${a.ducking.amountDb}dB, attack ${a.ducking.attackMs}ms, release ${a.ducking.releaseMs}ms), loudness ${a.loudness.enabled ? "on" : "off"} (${a.loudness.targetLufs} LUFS), highpass ${a.voiceHighpass.enabled ? "on" : "off"} (${a.voiceHighpass.hz}Hz)`
+        `audio: duck ${a.ducking.enabled ? "on" : "off"} (${a.ducking.amountDb}dB, attack ${a.ducking.attackMs}ms, release ${a.ducking.releaseMs}ms), loudness ${a.loudness.enabled ? "on" : "off"} (${a.loudness.targetLufs} LUFS, ${a.loudness.mode}), noise ${a.noiseReduction.enabled ? "on" : "off"} (nr ${a.noiseReduction.nr}), highpass ${a.voiceHighpass.enabled ? "on" : "off"} (${a.voiceHighpass.hz}Hz)`
       );
       break;
     }

@@ -1,6 +1,10 @@
 # OpenKlip
 
+![OpenKlip demo](docs/demo.gif)
+
 **Agent-native video toolchain**
+
+![OpenKlip demo](docs/demo.gif)
 
 OpenKlip is a local-first toolchain for programmatic video editing. An external agent (Cursor, Claude Code, Codex, your scripts) runs the edit loop through CLI commands; the browser is where you review, adjust, and export. Every project is plain files on disk: `project.json` is the contract between agent and editor. No bundled LLM, no database, no cloud.
 
@@ -69,7 +73,7 @@ Agent sidebar chats use `working/chats.json`, not `localStorage` (color scheme a
 
 ## What works today
 
-Verified against the current codebase (`VERSION` / `package.json` `0.26.0.0`, 1348 tests):
+Verified against the current codebase (`VERSION` / `package.json` `0.28.0.0`, 1389 tests):
 
 - **Ingest**: video → local transcript + preview proxy + `project.json` (`openklip ingest`; refuses re-ingest unless `--force`)
 - **Transcript editing**: click words to toggle `deleted`; `openklip cut` / `cut --text` / `restore` on CLI

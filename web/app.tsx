@@ -355,6 +355,9 @@ function mergeAudioPatch(current: Audio | undefined, patch: AudioPatch): Audio {
     loudness: patch.loudness
       ? { ...base.loudness, ...patch.loudness }
       : base.loudness,
+    noiseReduction: patch.noiseReduction
+      ? { ...base.noiseReduction, ...patch.noiseReduction }
+      : base.noiseReduction,
     voiceHighpass: patch.voiceHighpass
       ? { ...base.voiceHighpass, ...patch.voiceHighpass }
       : base.voiceHighpass,

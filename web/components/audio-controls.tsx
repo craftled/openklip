@@ -104,6 +104,7 @@ function ToggleRow({
 export interface AudioPatch {
   ducking?: Partial<Audio["ducking"]>;
   loudness?: Partial<Audio["loudness"]>;
+  noiseReduction?: Partial<Audio["noiseReduction"]>;
   voiceHighpass?: Partial<Audio["voiceHighpass"]>;
 }
 
@@ -186,18 +187,66 @@ export function AudioControls({
           onCheckedChange={(enabled) => onPatchAudio({ loudness: { enabled } })}
         />
         {audio.loudness.enabled ? (
-          <ControlRow
-            disabled={applying}
-            label="Target (LUFS)"
-            max={-10}
-            min={-30}
-            onCommit={(n) => onPatchAudio({ loudness: { targetLufs: n } })}
-            step={1}
-            value={audio.loudness.targetLufs}
-          />
+          <>
+            <ControlRow
+              disabled={applying}
+              label="Target (LUFS)"
+              max={-10}
+              min={-30}
+              onCommit={(n) => onPatchAudio({ loudness: { targetLufs: n } })}
+              step={1}
+              value={audio.loudness.targetLufs}
+            />
+            <Field className="grid h-7 grid-cols-[5.5rem_1fr] items-center gap-2.5">
+              <FieldLabel className="text-muted-foreground text-xs">
+                Loudness mode
+              </FieldLabel>
+              <select
+                className="h-7 rounded-md border border-input bg-background px-2 text-xs"
+                disabled={applying}
+                onChange={(e) =>
+                  onPatchAudio({
+                    loudness: {
+                      mode: e.target.value as "single" | "two-pass",
+                    },
+                  })
+                }
+                value={audio.loudness.mode ?? "single"}
+              >
+                <option value="single">Single pass</option>
+                <option value="two-pass">Two pass (exact)</option>
+              </select>
+            </Field>
+          </>
         ) : null}
         <p className="text-muted-foreground text-xs leading-relaxed">
           Applied at export; preview audio is unprocessed.
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-2" data-audio-noise>
+        <ToggleRow
+          checked={audio.noiseReduction.enabled}
+          disabled={applying}
+          htmlId="audio-noise-enabled"
+          label="Noise reduction"
+          onCheckedChange={(enabled) =>
+            onPatchAudio({ noiseReduction: { enabled } })
+          }
+        />
+        {audio.noiseReduction.enabled ? (
+          <ControlRow
+            disabled={applying}
+            label="Strength"
+            max={97}
+            min={1}
+            onCommit={(n) => onPatchAudio({ noiseReduction: { nr: n } })}
+            step={1}
+            value={audio.noiseReduction.nr}
+          />
+        ) : null}
+        <p className="text-muted-foreground text-xs leading-relaxed">
+          Light afftdn cleanup on the voice bus at export only.
         </p>
       </div>
 

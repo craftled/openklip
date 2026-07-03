@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.28.0.0 - 2026-07-03
+
+Export performance, two-pass loudnorm, noise reduction, OS file locking, and demo GIF.
+
+### Added
+- **Segment export seeking** (`src/export-segments.ts`): per-range `-ss/-to` inputs when kept duration is under half the source (voice-only exports without b-roll/stills/music); falls back to legacy `select` otherwise; `segmentMode` in export summary.
+- **Two-pass loudnorm** (`src/loudnorm-two-pass.ts`): `project.audio.loudness.mode` (`single` | `two-pass`); probe pass then exact targeting; CLI `export-set --loudness-mode`, GUI loudness mode picker.
+- **Noise reduction**: `project.audio.noiseReduction` (ffmpeg `afftdn` on voice bus); CLI `--noise-reduction` / `--noise-strength`; GUI toggle in Audio section.
+- **OS-level project.json lock** (`src/project-file-lock.ts`): advisory lockfile beside `project.json` inside `mutateProject` (cross-process CLI + server safety).
+- **Demo GIF**: `bun run demo-gif` writes `docs/demo.gif`; README embed; `docs/REPO-TOPICS.md` suggests GitHub topics.
+
+### Changed
+- **Version**: bumped OpenKlip to `0.28.0.0`.
+
 ## 0.27.0.0 - 2026-07-03
 
 Safe-area preview guides, vertical split export layout, and asset must-use/avoid flags.

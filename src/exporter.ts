@@ -51,6 +51,12 @@ import {
   type ExportPlatformId,
   resolvePlatformOptions,
 } from "./export-platforms.ts";
+import {
+  buildSegmentAudioConcatFilter,
+  buildSegmentInputArgs,
+  buildSegmentVideoConcatFilter,
+  shouldUseSegmentExport,
+} from "./export-segments.ts";
 import { FFMPEG, probe, run } from "./ffmpeg.ts";
 import { filterChain } from "./filter.ts";
 import { renderGraphicOverlay } from "./graphic-render.ts";
@@ -60,6 +66,11 @@ import {
   loadGraphicManifest,
 } from "./graphics.ts";
 import { buildStillZoompan } from "./ken-burns.ts";
+import {
+  analyzeLoudnormPass,
+  buildTwoPassLoudnormFilter,
+  type LoudnormMeasured,
+} from "./loudnorm-two-pass.ts";
 import { lut3dExpr, lutPath } from "./lut.ts";
 import { projectPaths } from "./paths.ts";
 import {
@@ -423,11 +434,28 @@ export function buildMusicFilterParts(
 
 // ── Seam declick / crossfade (Milestone 4.2 D2) ─────────────────────────────
 
+export function voiceAffixes(audio?: Audio): {
+  highpassSuffix: string;
+  noiseSuffix: string;
+} {
+  const highpassHz = audio?.voiceHighpass?.enabled
+    ? audio.voiceHighpass.hz
+    : undefined;
+  const highpassSuffix =
+    highpassHz && highpassHz > 0 ? `,highpass=f=${highpassHz}` : "";
+  const noiseSuffix = audio?.noiseReduction?.enabled
+    ? `,afftdn=nr=${audio.noiseReduction.nr}`
+    : "";
+  return { highpassSuffix, noiseSuffix };
+}
+
 export interface SeamedVoiceOpts {
   /** cuts.snap.crossfadeMs (0-100ms schema range). */
   crossfadeMs: number;
   /** audio.voiceHighpass.hz, present only when the highpass is enabled. */
   highpassHz?: number;
+  /** audio.noiseReduction.nr when noise reduction is enabled. */
+  noiseNr?: number;
 }
 
 export interface SeamedVoiceResult {
@@ -481,7 +509,15 @@ export function buildSeamedVoiceParts(
   opts: SeamedVoiceOpts
 ): SeamedVoiceResult {
   const hp = opts.highpassHz;
-  const prefix = hp && hp > 0 ? `highpass=f=${hp},` : "";
+  const noiseNr = opts.noiseNr;
+  const affixParts: string[] = [];
+  if (hp && hp > 0) {
+    affixParts.push(`highpass=f=${hp}`);
+  }
+  if (noiseNr && noiseNr > 0) {
+    affixParts.push(`afftdn=nr=${noiseNr}`);
+  }
+  const prefix = affixParts.length > 0 ? `${affixParts.join(",")},` : "";
   const BUTT_FADE_SEC = 0.008;
 
   if (ranges.length === 0) {
@@ -594,8 +630,13 @@ export interface AudioFilterOpts {
    * project. Undefined leaves audio?.loudness exactly as before.
    */
   loudnessTargetLufs?: number;
+  /** Pass-2 measured values when loudness.mode is two-pass. */
+  loudnormMeasured?: LoudnormMeasured;
   /** Surviving ranges; required to consider the seam-declick path. */
   ranges?: Range[];
+  /** Per-range input seeking (voice-only exports). */
+  segmentMode?: boolean;
+  segmentRangeCount?: number;
   /** project.cuts.snap; the seam path only engages when this is enabled. */
   snap?: CutSnap;
 }
@@ -630,6 +671,7 @@ export function buildAudioParts(
   const loudness =
     loudnessOverride !== undefined || Boolean(audio?.loudness?.enabled);
   const useSeams = shouldUseSeamedVoice(ranges, snap);
+  const affixes = voiceAffixes(audio);
 
   const parts: string[] = [];
   // isTerminalVoice: nothing downstream of the voice stage runs, so it can
@@ -639,7 +681,16 @@ export function buildAudioParts(
   const isTerminalVoice = !(hasMusic || loudness || hasBrollAudioMix);
   const voiceLabel = isTerminalVoice ? "aout" : "avoice";
 
-  if (useSeams) {
+  if (opts.segmentMode && opts.segmentRangeCount) {
+    parts.push(
+      buildSegmentAudioConcatFilter({
+        rangeCount: opts.segmentRangeCount,
+        highpassSuffix: affixes.highpassSuffix,
+        noiseSuffix: affixes.noiseSuffix,
+        outputLabel: voiceLabel,
+      })
+    );
+  } else if (useSeams) {
     // Seam highpass is threaded through buildSeamedVoiceParts's own option
     // (applied before each atrim, ahead of the crossfades).
     const seam = buildSeamedVoiceParts(ranges, {
@@ -647,22 +698,14 @@ export function buildAudioParts(
       highpassHz: audio?.voiceHighpass?.enabled
         ? audio.voiceHighpass.hz
         : undefined,
+      noiseNr: audio?.noiseReduction?.enabled
+        ? audio.noiseReduction.nr
+        : undefined,
     });
     parts.push(...seam.filterParts, `[${seam.outLabel}]anull[${voiceLabel}]`);
   } else {
-    // F7: the plain aselect voice path (cuts.snap off, or a single surviving
-    // range) previously ignored voiceHighpass entirely - only the seam path
-    // above honored it, so enabling the highpass with snap off was a no-op.
-    // Appended right after asetpts, same as the seam path applies it right
-    // before its own atrim. Disabled (the default) emits no suffix, so this
-    // is byte-identical to the historical line the zero-settings pins expect.
-    const highpassHz = audio?.voiceHighpass?.enabled
-      ? audio.voiceHighpass.hz
-      : undefined;
-    const highpassSuffix =
-      highpassHz && highpassHz > 0 ? `,highpass=f=${highpassHz}` : "";
     parts.push(
-      `[0:a]aselect='${selectExpr}',asetpts=N/SR/TB${highpassSuffix}[${voiceLabel}]`
+      `[0:a]aselect='${selectExpr}',asetpts=N/SR/TB${affixes.highpassSuffix}${affixes.noiseSuffix}[${voiceLabel}]`
     );
   }
 
@@ -711,18 +754,26 @@ export function buildAudioParts(
 
   if (loudness) {
     const targetLufs = loudnessOverride ?? (audio as Audio).loudness.targetLufs;
-    // R2 (ffmpeg-verified): single-pass loudnorm internally upsamples and
-    // OUTPUTS 192 kHz; the aac encoder then clamps that to 96 kHz, so every
-    // loudness-enabled export would silently ship 96 kHz audio instead of the
-    // project's 48 kHz. Constrain the rate back to the project grid
-    // immediately after the loudnorm stage (this one line serves both the
-    // voice-only and post-amix paths; mixedLabel is whichever fed it).
-    // aformat (not a bare `aresample=48000`, which trips a channel-layout
-    // negotiation error after loudnorm on the bundled ffmpeg-static build)
-    // lets ffmpeg insert the correctly-negotiated resampler itself.
-    parts.push(
-      `[${mixedLabel}]loudnorm=I=${targetLufs}:TP=-1.5:LRA=11,aformat=sample_rates=${SAMPLE_RATE}[aout]`
-    );
+    const mode = (audio as Audio).loudness.mode ?? "single";
+    if (mode === "two-pass") {
+      if (opts.loudnormMeasured) {
+        parts.push(
+          buildTwoPassLoudnormFilter({
+            inputLabel: mixedLabel,
+            measured: opts.loudnormMeasured,
+            outputLabel: "aout",
+            sampleRate: SAMPLE_RATE,
+            targetLufs,
+          })
+        );
+      } else {
+        parts.push(`[${mixedLabel}]anull[apreln]`);
+      }
+    } else {
+      parts.push(
+        `[${mixedLabel}]loudnorm=I=${targetLufs}:TP=-1.5:LRA=11,aformat=sample_rates=${SAMPLE_RATE}[aout]`
+      );
+    }
   }
 
   return parts;
@@ -761,6 +812,8 @@ export async function exportCut(
     /** Whether VAD-snapped ranges (cuts.snap) actually shaped this export. */
     snapped: boolean;
   };
+  /** True when per-range input seeking was used instead of full-source select. */
+  segmentMode: boolean;
 }> {
   // ONE resolution point: a platform preset only fills gaps left unset by
   // the caller, so every surface (CLI/route/action/MCP) gets platform
@@ -1104,10 +1157,28 @@ export async function exportCut(
 
   // ---- filtergraph ----
   const parts: string[] = [];
-  // Retime right after setpts (before scale/overlays) so every downstream
-  // enable window stays expressed in output seconds at outFps.
-  const base = `[0:v]select='${selectExpr}',setpts=N/FRAME_RATE/TB${fpsFilterFor(sourceMeta.fps, resolved.fps)}`;
-  parts.push(`${base}[vsel]`);
+  const sourceDurationSec = project.durationSamples / sr;
+  const segmentMode =
+    shouldUseSegmentExport({
+      ranges,
+      sourceDurationSec,
+      hasBroll: plans.length > 0,
+      hasStills: stillPlans.length > 0,
+      hasRichGraphics: richGraphics.length > 0,
+      hasMusic: musicWindows.length > 0,
+    }) && !shouldUseSeamedVoice(ranges, project.cuts.snap);
+  const fpsRetime = fpsFilterFor(sourceMeta.fps, resolved.fps);
+  if (segmentMode) {
+    parts.push(
+      buildSegmentVideoConcatFilter({
+        rangeCount: ranges.length,
+        fpsFilter: fpsRetime,
+      })
+    );
+  } else {
+    const base = `[0:v]select='${selectExpr}',setpts=N/FRAME_RATE/TB${fpsRetime}`;
+    parts.push(`${base}[vsel]`);
+  }
   parts.push(
     buildReframeFilter({
       aspect,
@@ -1272,38 +1343,76 @@ export async function exportCut(
       srcInSec: pl.srcInSec,
     }))
   );
-  parts.push(
-    ...buildAudioParts(selectExpr, musicGraph, {
-      ranges,
-      snap: project.cuts.snap,
-      audio: project.audio,
-      brollAudio: brollAudioGraph,
-      loudnessTargetLufs: resolved.loudnessTargetLufs,
-    })
-  );
+  const audioFilterBase = {
+    ranges,
+    snap: project.cuts.snap,
+    audio: project.audio,
+    brollAudio: brollAudioGraph,
+    loudnessTargetLufs: resolved.loudnessTargetLufs,
+    segmentMode,
+    segmentRangeCount: segmentMode ? ranges.length : undefined,
+  };
+  const buildAudioFilterParts = (loudnormMeasured?: LoudnormMeasured) =>
+    buildAudioParts(selectExpr, musicGraph, {
+      ...audioFilterBase,
+      loudnormMeasured,
+    });
 
-  const inputs = [
-    "-i",
-    sourceInput.path,
-    ...plans.flatMap((pl) => ["-i", pl.srcPath]),
-    // Stills are single images looped for the overlay duration.
-    ...stillPlans.flatMap((sp) => [
-      "-loop",
-      "1",
-      "-t",
-      sec(sp.outEnd - sp.outStart),
-      "-i",
-      sp.srcPath,
-    ]),
-    // Rich-graphic alpha MOVs. MUST be appended AFTER stills to keep the
-    // 1 + plans.length + stillPlans.length + j index math above correct. ProRes
-    // 4444 alpha (yuva444p) is auto-detected by ffmpeg; no input codec flag.
-    ...richGraphics.flatMap((rg) => ["-i", rg.asset.assetPath]),
-    // Music beds are audio-only inputs and MUST stay after every video input
-    // (source, b-roll, stills, rich graphics) so the video index math above
-    // never shifts; buildMusicFilterParts numbered them from firstInputIndex.
-    ...musicGraph.inputArgs,
-  ];
+  const useTwoPassLoudnorm =
+    audioLoudness &&
+    project.audio.loudness.enabled &&
+    project.audio.loudness.mode === "two-pass";
+
+  let loudnormMeasured: LoudnormMeasured | undefined;
+  if (useTwoPassLoudnorm && effectiveLoudnessTarget !== undefined) {
+    const probeWav = join(p.working, `.loudnorm-probe-${process.pid}.wav`);
+    const probeParts = [...parts, ...buildAudioFilterParts()];
+    const probeInputs = segmentMode
+      ? buildSegmentInputArgs(ranges, sourceInput.path)
+      : ["-i", sourceInput.path];
+    await run(
+      FFMPEG,
+      [
+        "-y",
+        ...probeInputs,
+        "-filter_complex",
+        probeParts.join(";"),
+        "-map",
+        "[apreln]",
+        probeWav,
+      ],
+      "ffmpeg(loudnorm-probe)"
+    );
+    loudnormMeasured = await analyzeLoudnormPass(
+      probeWav,
+      effectiveLoudnessTarget
+    );
+    try {
+      await unlink(probeWav);
+    } catch {
+      // Best-effort cleanup.
+    }
+  }
+
+  parts.push(...buildAudioFilterParts(loudnormMeasured));
+
+  const inputs = segmentMode
+    ? [...buildSegmentInputArgs(ranges, sourceInput.path)]
+    : [
+        "-i",
+        sourceInput.path,
+        ...plans.flatMap((pl) => ["-i", pl.srcPath]),
+        ...stillPlans.flatMap((sp) => [
+          "-loop",
+          "1",
+          "-t",
+          sec(sp.outEnd - sp.outStart),
+          "-i",
+          sp.srcPath,
+        ]),
+        ...richGraphics.flatMap((rg) => ["-i", rg.asset.assetPath]),
+        ...musicGraph.inputArgs,
+      ];
   // Render to a unique tmp sibling, then rename over out.mp4 on success:
   // ffmpeg writing p.out in place means a GUI export racing an agent export
   // corrupts the file both are writing. The tmp name KEEPS the .mp4
@@ -1373,5 +1482,6 @@ export async function exportCut(
       loudness: audioLoudness,
       snapped,
     },
+    segmentMode,
   };
 }

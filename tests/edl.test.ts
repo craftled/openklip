@@ -292,7 +292,8 @@ test("ProjectSchema defaults audio off (backward-compat parse)", () => {
   });
   assert.deepEqual(project.audio, {
     ducking: { enabled: false, amountDb: 12, attackMs: 25, releaseMs: 250 },
-    loudness: { enabled: false, targetLufs: -16 },
+    loudness: { enabled: false, targetLufs: -16, mode: "single" },
+    noiseReduction: { enabled: false, nr: 12 },
     voiceHighpass: { enabled: false, hz: 80 },
   });
 });
@@ -317,7 +318,8 @@ test("ProjectSchema round-trips fully specified audio settings", () => {
   });
   assert.deepEqual(project.audio, {
     ducking: { enabled: true, amountDb: 18, attackMs: 10, releaseMs: 400 },
-    loudness: { enabled: true, targetLufs: -14 },
+    loudness: { enabled: true, targetLufs: -14, mode: "single" },
+    noiseReduction: { enabled: false, nr: 12 },
     voiceHighpass: { enabled: true, hz: 100 },
   });
 });

@@ -155,8 +155,8 @@ Preview cuts get a Glimm WebGL sweep in the browser. Exported MP4s can use VAD-s
 - [x] Derived `CompiledTimeline` (`src/compiledTimeline.ts`): never-persisted authoring→preview view.
 - [x] `safeAction` dev-mode stack traces in server actions; `serve` runs a health gate (`runDoctor`) before opening the editor.
 - [x] GitHub Actions CI (check + typecheck + tests + build).
-- [ ] OS-level file locking for concurrent CLI + server writes on the same project.
-- [ ] Demo gif + repo topics.
+- [x] OS-level file locking for concurrent CLI + server writes on the same project (`project.json.lock` advisory lock in `mutateProject`).
+- [x] Demo gif + repo topics (`bun run demo-gif`, `docs/demo.gif`, `docs/REPO-TOPICS.md`).
 
 ## Known Limitations
 
@@ -180,11 +180,11 @@ Single list of current gaps (code is truth). README and release notes point here
 - Music placements have no timeline drag-trim (adjust from/to in the Config panel Music section).
 - Preview caps music gain at 1.0; export honors gains up to 2.0.
 - All export audio quality processing (ducking, loudness normalization, voice highpass, seam crossfades) is export-only; preview audio is always unprocessed.
-- Single-pass loudnorm lands near, not exactly at, the target (a live 4K export measured -16.6 LUFS integrated against a -16 LUFS target; a `youtube` platform preset's -14 LUFS target measured -16.3 LUFS integrated on the same source, 2026-07-03); two-pass loudnorm for exact targeting is a future upgrade.
+- Single-pass loudnorm remains the default (`loudness.mode: single`); two-pass is opt-in for exact targeting. De-essing is not implemented.
 - Seam crossfades borrow up to half their duration from already-removed audio on each side of a cut; very short kept ranges clamp the crossfade down to a duration-preserving butt join instead.
 - `dead-air-rm` is still CLI/MCP only: the Cleanup panel adds spans but has no button to remove a registered one. The GUI History panel's revert (see Architecture & parity) can undo an unwanted `dead-air-add` after the fact, but that is not the same as a dedicated remove affordance.
 - `src/audio-analysis.ts` reads the whole ingest-time PCM (`working/audio16k.f32`) into memory for silence detection; fine for typical footage, unbounded for hours-long sources.
-- Noise reduction and de-essing are not implemented.
+- Noise reduction and de-essing: light `afftdn` noise reduction ships on the voice bus; de-essing is not implemented.
 
 ### Editing & transcript
 
@@ -223,7 +223,7 @@ Single list of current gaps (code is truth). README and release notes point here
 ### Architecture & parity
 
 - GUI server actions do not dispatch through `runAction()`: CLI uses `src/registry.ts`; GUI uses `app/actions.ts` + `projectMutations` (same `project.json`, separate code paths).
-- Project write locks are in-process only. Two concurrent **processes** writing the same slug (e.g. CLI agent + running editor server) can still race; the `revision` counter shares the same limit, so cross-process revision bumps can race.
+- Project write locks are in-process per slug plus a cross-process advisory lock on `project.json` (`src/project-file-lock.ts` inside `mutateProject`). Two concurrent processes writing different files (e.g. chats vs project) can still race unrelated paths.
 - Action history now covers every user-facing mutation: registry actions, GUI direct-save paths, asset registration/deletion, `template set`, `brand`/`ingest --brand`, multi-take `assemble` (through `mutateProject`, revision counter preserved), background folder-sync prune (`asset-prune`, actor `system`), and brief saves from CLI/GUI/MCP (one best-effort `brief-set` entry, no EDL revision bump). Revert (`openklip revert`, MCP `revert`, GUI History panel) undoes to a revision, a task's start, or the last edit. Agents can filter history by task id or action name (`openklip history`/MCP `history_list`, 2026-07-02), but there is still no actor filter, and the GUI History panel itself has no filter UI. Revert restores `project.json` only: `brief.md`, chats, tasks, asset files, and derived media (proxy, extracted audio, transcript) are not restored, snapshots are capped at the newest 100 revisions, and a revert cannot cross a multi-take `assemble` boundary (refused, since the on-disk media no longer matches). A CLI/MCP revert while the editor is open in a browser leaves the client stale until the next reload, the same pre-existing class as any external edit; GUI-initiated reverts reseed the open editor's state directly.
 - `ProjectSchema` is now `.passthrough()`: unknown top-level keys survive a load/save round-trip instead of being silently dropped by an older build, closing the previous forward-compat gap.
 - Revert only touches `project.json`, not the files an edit created or removed. Reverting an `asset-add` while the file is still in the `assets/` folder does not stick: the next folder sync re-registers it (folder contents win; delete the file too if you want the revert to hold). Reverting an `asset-rm` cannot bring back a deleted file; the restored registration itself gets pruned by the next folder sync (logged as `asset-prune`).
@@ -237,7 +237,8 @@ Single list of current gaps (code is truth). README and release notes point here
 - [x] GUI highlight candidates: Config **Highlights** panel (list, seek, Detect clips via `runHighlightsDetect`).
 - [x] **Per-platform caption safe areas** (preview guides for TikTok, Reels, YouTube Shorts, generic; `web/components/safe-area-guides.tsx`, local preference toggle).
 - [x] **Split-screen vertical export layout** (`project.export.layout: split-vertical`, `export-set --layout`, GUI Reframe Fill/Split controls).
-- Noise reduction and de-essing (basic audio cleanup); two-pass loudness normalization for exact-target loudness.
+- [x] **Faster segment seeking** for long-source short exports (`src/export-segments.ts`, heuristic: kept under 50% of source).
+- [x] **Two-pass loudnorm** and **noise reduction** on export (`src/loudnorm-two-pass.ts`, `audio.noiseReduction`, `loudness.mode`).
 - OpenCLIP semantic b-roll matching.
 - OS-level file locking for concurrent CLI + server writes.
 - Demo gif + repo topics.

@@ -1415,6 +1415,7 @@ export function setAudio(
   input: {
     ducking?: Partial<Audio["ducking"]>;
     loudness?: Partial<Audio["loudness"]>;
+    noiseReduction?: Partial<Audio["noiseReduction"]>;
     voiceHighpass?: Partial<Audio["voiceHighpass"]>;
   }
 ): Project {
@@ -1447,8 +1448,20 @@ export function setAudio(
           -30,
           -10
         ),
+        mode: input.loudness.mode ?? current.loudness.mode,
       }
     : current.loudness;
+  const noiseReduction = input.noiseReduction
+    ? {
+        enabled:
+          input.noiseReduction.enabled ?? current.noiseReduction.enabled,
+        nr: clampNum(
+          input.noiseReduction.nr ?? current.noiseReduction.nr,
+          1,
+          97
+        ),
+      }
+    : current.noiseReduction;
   const voiceHighpass = input.voiceHighpass
     ? {
         enabled: input.voiceHighpass.enabled ?? current.voiceHighpass.enabled,
@@ -1459,7 +1472,7 @@ export function setAudio(
         ),
       }
     : current.voiceHighpass;
-  project.audio = { ducking, loudness, voiceHighpass };
+  project.audio = { ducking, loudness, noiseReduction, voiceHighpass };
   return project;
 }
 

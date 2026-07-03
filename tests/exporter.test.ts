@@ -2237,3 +2237,110 @@ test("CLI export --loudness with no following value errors", async () => {
     assert.notEqual(result.code, 0);
   });
 });
+
+// ── E1: segment mode audio in buildAudioParts ────────────────────────────────
+
+test("buildAudioParts: segmentMode concat replaces aselect for voice-only export", () => {
+  const expr = "between(t,0.000000,2.000000)";
+  const zeroMusic: MusicFilterGraph = {
+    filterParts: [],
+    inputArgs: [],
+    mixInputLabels: [],
+  };
+  const parts = buildAudioParts(expr, zeroMusic, {
+    segmentMode: true,
+    segmentRangeCount: 2,
+  });
+  assert.match(parts[0], /concat=n=2:v=0:a=1\[aout\]/);
+});
+
+test("buildAudioParts: segmentMode applies highpass and noise on concat path", () => {
+  const expr = "between(t,0.000000,2.000000)";
+  const zeroMusic: MusicFilterGraph = {
+    filterParts: [],
+    inputArgs: [],
+    mixInputLabels: [],
+  };
+  const audio: Audio = AudioSchema.parse({
+    voiceHighpass: { enabled: true, hz: 90 },
+    noiseReduction: { enabled: true, nr: 12 },
+  });
+  const parts = buildAudioParts(expr, zeroMusic, {
+    audio,
+    segmentMode: true,
+    segmentRangeCount: 1,
+  });
+  assert.match(parts[0], /highpass=f=90/);
+  assert.match(parts[0], /afftdn=nr=12/);
+});
+
+// ── E3: noise reduction filter chain ────────────────────────────────────────
+
+test("buildAudioParts: noiseReduction appended after highpass in plain aselect path", () => {
+  const expr = "between(t,0.000000,2.000000)";
+  const zeroMusic: MusicFilterGraph = {
+    filterParts: [],
+    inputArgs: [],
+    mixInputLabels: [],
+  };
+  const audio: Audio = AudioSchema.parse({
+    noiseReduction: { enabled: true, nr: 15 },
+  });
+  const parts = buildAudioParts(expr, zeroMusic, { audio });
+  assert.deepEqual(parts, [
+    `[0:a]aselect='${expr}',asetpts=N/SR/TB,afftdn=nr=15[aout]`,
+  ]);
+});
+
+test("buildAudioParts: noiseReduction chains after highpass when both enabled", () => {
+  const expr = "between(t,0.000000,2.000000)";
+  const zeroMusic: MusicFilterGraph = {
+    filterParts: [],
+    inputArgs: [],
+    mixInputLabels: [],
+  };
+  const audio: Audio = AudioSchema.parse({
+    voiceHighpass: { enabled: true, hz: 80 },
+    noiseReduction: { enabled: true, nr: 10 },
+  });
+  const parts = buildAudioParts(expr, zeroMusic, { audio });
+  assert.deepEqual(parts, [
+    `[0:a]aselect='${expr}',asetpts=N/SR/TB,highpass=f=80,afftdn=nr=10[aout]`,
+  ]);
+});
+
+test("buildAudioParts: noiseReduction disabled leaves aselect path byte-identical", () => {
+  const expr = "between(t,0.000000,2.000000)";
+  const zeroMusic: MusicFilterGraph = {
+    filterParts: [],
+    inputArgs: [],
+    mixInputLabels: [],
+  };
+  const audio: Audio = AudioSchema.parse({
+    noiseReduction: { enabled: false },
+  });
+  assert.deepEqual(buildAudioParts(expr, zeroMusic, { audio }), [
+    `[0:a]aselect='${expr}',asetpts=N/SR/TB[aout]`,
+  ]);
+});
+
+test("buildSeamedVoiceParts: noiseReduction appended after highpass in segment prefix", () => {
+  const ranges: Range[] = [
+    { startSec: 0, endSec: 2 },
+    { startSec: 3, endSec: 5 },
+  ];
+  const result = buildSeamedVoiceParts(ranges, {
+    crossfadeMs: 24,
+    highpassHz: 80,
+    noiseNr: 10,
+  });
+  // Both atrim segments should have highpass then afftdn before the atrim
+  assert.ok(
+    result.filterParts[0].startsWith("[0:a]highpass=f=80,afftdn=nr=10,atrim="),
+    `Expected highpass,afftdn prefix, got: ${result.filterParts[0]}`
+  );
+  assert.ok(
+    result.filterParts[1].startsWith("[0:a]highpass=f=80,afftdn=nr=10,atrim="),
+    `Expected highpass,afftdn prefix, got: ${result.filterParts[1]}`
+  );
+});

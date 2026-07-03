@@ -319,7 +319,8 @@ test("audio: stores export audio quality settings, clamped, in project JSON", ()
   }) as { audio: Project["audio"] };
   assert.deepEqual(r.audio, {
     ducking: { enabled: true, amountDb: 30, attackMs: 25, releaseMs: 250 },
-    loudness: { enabled: true, targetLufs: -14 },
+    loudness: { enabled: true, targetLufs: -14, mode: "single" },
+    noiseReduction: { enabled: false, nr: 12 },
     voiceHighpass: { enabled: false, hz: 80 },
   });
   assert.deepEqual(p.audio, r.audio);

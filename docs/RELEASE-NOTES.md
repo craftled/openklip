@@ -6,6 +6,25 @@ Publishing status checked on 2026-07-03 (`gh release list`): GitHub releases are
 
 ---
 
+## v0.28.0.0
+
+**Export performance, two-pass loudnorm, noise reduction, OS file locking, and demo GIF.**
+
+### Highlights
+- **Segment export seeking**: per-range input seeks when exporting a short cut from a long source (voice-only; no b-roll/music).
+- **Two-pass loudnorm** and **noise reduction**: exact loudness targeting and light afftdn cleanup on the voice bus.
+- **OS file lock**: `project.json.lock` advisory lock inside `mutateProject` for CLI + server safety.
+- **Demo GIF**: `bun run demo-gif` → `docs/demo.gif` in README.
+- Current codebase verification: 1389 tests.
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations). Segment mode does not run with b-roll, stills, music, or seam crossfades; de-essing is not implemented.
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#02800---2026-07-03)
+
+---
+
 ## v0.27.0.0
 
 **Safe-area preview guides, vertical split export layout, and asset must-use/avoid flags.**

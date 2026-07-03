@@ -8,7 +8,8 @@ import { AudioControls } from "../web/components/audio-controls.tsx";
 function audio(overrides: Partial<Audio> = {}): Audio {
   return {
     ducking: { enabled: false, amountDb: 12, attackMs: 25, releaseMs: 250 },
-    loudness: { enabled: false, targetLufs: -16 },
+    loudness: { enabled: false, targetLufs: -16, mode: "single" },
+    noiseReduction: { enabled: false, nr: 12 },
     voiceHighpass: { enabled: false, hz: 80 },
     ...overrides,
   };
@@ -47,13 +48,14 @@ test("renders the section wrapper and one toggle per group", () => {
   assert.match(html, /data-audio-section/);
   assert.match(html, /data-audio-duck/);
   assert.match(html, /data-audio-loudness/);
+  assert.match(html, /data-audio-noise/);
   assert.match(html, /data-snap-toggle/);
   // Base UI Switch renders a button with role="switch".
   const switchCount = html.split('role="switch"').length - 1;
   assert.equal(
     switchCount,
-    4,
-    "expected 4 toggles: duck, loudness, highpass, snap"
+    5,
+    "expected 5 toggles: duck, loudness, noise, highpass, snap"
   );
 });
 
@@ -81,7 +83,7 @@ test("applying disables all toggles and numeric controls", () => {
   });
   // Every switch is disabled (Base UI renders disabled buttons).
   const switchCount = html.split('role="switch"').length - 1;
-  assert.equal(switchCount, 4);
+  assert.equal(switchCount, 5);
   const enabledSwitches = html
     .split("<button")
     .filter((b) => b.includes('role="switch"') && !b.includes("disabled"));

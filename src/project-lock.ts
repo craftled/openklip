@@ -12,8 +12,10 @@
 // don't conflict.
 //
 // Scope: this serializes within one process (one running server). Concurrent
-// processes (two CLI invocations, or a CLI agent and the server) write the
-// same files and need OS-level file locking; see the note in the PR.
+// processes (two CLI invocations, or a CLI agent and the server) are handled
+// by the OS-level advisory lockfile in src/project-file-lock.ts, which
+// mutateProject in src/projectStore.ts acquires INSIDE each withProjectLock
+// callback.
 function chain<T>(
   map: Map<string, Promise<unknown>>,
   slug: string,

@@ -11,6 +11,7 @@ import {
 } from "./action-log.ts";
 import { type Project, ProjectSchema } from "./edl.ts";
 import { projectPaths, projectsRoot } from "./paths.ts";
+import { acquireProjectFileLock } from "./project-file-lock.ts";
 import { withProjectLock } from "./project-lock.ts";
 
 export interface ProjectListing {
@@ -162,49 +163,66 @@ export function mutateProject<T>(
   meta?: MutateMeta
 ): Promise<T> {
   return withProjectLock(slug, async () => {
-    const project = await loadProject(slug);
-    const revisionBefore = project.revision ?? 0;
-    // Snapshot the pre-mutation state as a string NOW, before fn mutates
-    // `project` in place below: stringifying after fn ran would capture the
-    // POST-mutation state instead (fn mutates the same object, not a copy).
-    const preMutationJson = meta ? JSON.stringify(project, null, 2) : undefined;
-    const result = await fn(project);
-    if (meta) {
-      project.revision = revisionBefore + 1;
-    }
-    await saveProject(slug, project);
-    if (meta) {
-      try {
-        await appendActionLog(slug, {
-          at: Date.now(),
-          action: meta.action,
-          actor: meta.actor ?? actorFromEnv() ?? "human",
-          input: summarizeForLog(meta.input),
-          result: summarizeForLog(result),
-          revisionBefore,
-          revisionAfter: revisionBefore + 1,
-          taskId: meta.taskId,
-        });
-      } catch (err) {
-        // History is best-effort: a log write failure must never fail an edit
-        // that already saved.
-        console.error(`action log append failed for ${slug}:`, err);
+    // Cross-process advisory file lock: serializes concurrent CLI + server
+    // processes (withProjectLock above only serializes within one process).
+    // Same pattern as the tasks.json lock in src/agent-tasks.ts.
+    const p = projectPaths(slug);
+    await mkdir(p.working, { recursive: true });
+    const lockPath = `${p.project}.lock`;
+    await acquireProjectFileLock(lockPath);
+    try {
+      const project = await loadProject(slug);
+      const revisionBefore = project.revision ?? 0;
+      // Snapshot the pre-mutation state as a string NOW, before fn mutates
+      // `project` in place below: stringifying after fn ran would capture the
+      // POST-mutation state instead (fn mutates the same object, not a copy).
+      const preMutationJson = meta
+        ? JSON.stringify(project, null, 2)
+        : undefined;
+      const result = await fn(project);
+      if (meta) {
+        project.revision = revisionBefore + 1;
       }
-      if (preMutationJson !== undefined) {
+      await saveProject(slug, project);
+      if (meta) {
         try {
-          await writeHistorySnapshot(slug, revisionBefore, preMutationJson);
-          await pruneHistorySnapshots(slug);
+          await appendActionLog(slug, {
+            at: Date.now(),
+            action: meta.action,
+            actor: meta.actor ?? actorFromEnv() ?? "human",
+            input: summarizeForLog(meta.input),
+            result: summarizeForLog(result),
+            revisionBefore,
+            revisionAfter: revisionBefore + 1,
+            taskId: meta.taskId,
+          });
         } catch (err) {
-          // Same best-effort contract as the log append above: a snapshot
-          // failure (disk full, permissions) must never fail an edit that
-          // already saved.
-          console.warn(
-            `history snapshot write failed for ${slug} rev ${revisionBefore}:`,
-            err
-          );
+          // History is best-effort: a log write failure must never fail an
+          // edit that already saved.
+          console.error(`action log append failed for ${slug}:`, err);
+        }
+        if (preMutationJson !== undefined) {
+          try {
+            await writeHistorySnapshot(slug, revisionBefore, preMutationJson);
+            await pruneHistorySnapshots(slug);
+          } catch (err) {
+            // Same best-effort contract as the log append above: a snapshot
+            // failure (disk full, permissions) must never fail an edit that
+            // already saved.
+            console.warn(
+              `history snapshot write failed for ${slug} rev ${revisionBefore}:`,
+              err
+            );
+          }
         }
       }
+      return result;
+    } finally {
+      try {
+        await unlink(lockPath);
+      } catch {
+        // Best-effort: a stale-break by another process already removed it.
+      }
     }
-    return result;
   });
 }

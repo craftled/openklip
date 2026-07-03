@@ -89,7 +89,7 @@ Time is integer audio samples at 48 kHz. The CLI takes seconds where a human num
 | Fine-tune the grade (color knobs) | `openklip look <slug> color --temp 0.15 --contrast 0.96 --sat 0.84` |
 | Apply a LUT (.cube) | `openklip look <slug> lut <name>` |
 | List available LUTs | `openklip luts` |
-| Set export audio quality (ducking / loudness / highpass) | `openklip audio <slug> [--duck on\|off] [--loudness on\|off] [--highpass on\|off]` |
+| Set export audio quality (ducking / loudness / highpass / noise) | `openklip audio <slug> [--duck on\|off] [--loudness on\|off] [--loudness-mode single\|two-pass] [--noise-reduction on\|off] [--highpass on\|off]` |
 | Cut boundary padding | `openklip pad <slug> <ms>` |
 | Review edit | `openklip status <slug>` (`--json` for agents) |
 | Kept ranges / overlays | `openklip ranges <slug>`, `openklip overlays <slug>` |
@@ -212,7 +212,7 @@ Workflow: `take-add` each recording, read `take_transcript <slug> <takeId>` to f
 | `openklip look <slug> color [--temp n] [--tint n] [--bright n] [--contrast n] [--sat n] \| --reset` | Continuous color knobs **on top of** the base grade (the deck's "control room"): temperature/tint (colorbalance), then contrast/brightness/saturation (eq), in that order. Each knob defaults to the identity; only the ones you pass change, and an all-neutral result clears `look.color`. `--reset` returns to neutral. The GUI exposes the same knobs as live sliders previewed on a real frame; both write `look.color` through the one `look-color` action. |
 | `openklip look <slug> lut <name\|none>` | Apply a named `.cube` LUT from `luts/` (the technical color transform, e.g. log to Rec.709), applied before the grade. `none` clears it. Drop `name.cube` into `luts/`; reference by name so `project.json` stays portable. `openklip luts` lists them. |
 | `openklip audio <slug>` | Print current export audio quality settings (ducking, loudness, voice highpass). |
-| `openklip audio <slug> [--duck on\|off] [--duck-amount <1-30 dB>] [--duck-attack <1-500 ms>] [--duck-release <20-2000 ms>] [--loudness on\|off] [--loudness-target <-30..-10 LUFS>] [--highpass on\|off] [--highpass-hz <40-200>]` | Patch export audio quality: sidechain-duck the music bed under speech, apply single-pass loudness normalization toward a target LUFS, and/or highpass the voice track. Export-only; preview audio is unprocessed. |
+| `openklip audio <slug> [--duck on\|off] [--duck-amount <1-30 dB>] [--duck-attack <1-500 ms>] [--duck-release <20-2000 ms>] [--loudness on\|off] [--loudness-target <-30..-10 LUFS>] [--loudness-mode single\|two-pass] [--noise-reduction on\|off] [--noise-strength <1-97>] [--highpass on\|off] [--highpass-hz <40-200>]` | Patch export audio quality: ducking, loudness (single or two-pass), noise reduction, and voice highpass. Export-only; preview audio is unprocessed. |
 | `openklip pad <slug> <ms>` | Symmetric padding around kept ranges (0–500 ms). |
 | `openklip brand <slug> <name>` | Apply a brand preset (`brands/<name>.json`): sets caption/vignette/pad **defaults** only. `project.json` stays the edit; words and overlays are untouched. Also available at ingest: `openklip ingest <video> --brand <name>`. |
 | `openklip template list` | List edit templates (`templates/<id>/skill.md`): agent playbooks for cuts, overlays, and export. |
