@@ -97,6 +97,11 @@ export function filterHistoryEntries(
   });
 }
 
+/** True when at least one filter dimension (actor/action/task) is active. */
+export function hasActiveHistoryFilter(filter: HistoryFilter): boolean {
+  return Boolean(filter.actor || filter.action || filter.task);
+}
+
 /** Distinct actors actually present in the loaded entries, sorted. Options
  * are sourced from the data itself rather than the full Actor union: an
  * option that always yields zero results (an actor with no entries in the
@@ -179,7 +184,7 @@ export function HistoryFilterControls({
   taskOptions: string[];
   value: HistoryFilter;
 }) {
-  const hasActiveFilter = Boolean(value.actor || value.action || value.task);
+  const hasActiveFilter = hasActiveHistoryFilter(value);
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       <FilterSelect
@@ -334,28 +339,65 @@ export function groupHasBriefSet(group: HistoryGroup): boolean {
  * own constant separately. */
 export const HISTORY_PAGE_LIMIT = 200;
 
-/** True when a task group's revertibility can't be trusted: canRevertGroup
- * only ever sees the entries the history route actually returned, capped at
- * HISTORY_PAGE_LIMIT. If the panel is showing exactly that many entries AND
- * the group reaches the OLDEST visible one, the task may have earlier
- * entries beyond the window that got silently cut off, entries the server's
- * full-log resolveRevertTarget would still fold in. Below the limit, the
- * view is known-complete and this never fires. */
-export function groupTouchesTruncationBoundary(
-  group: HistoryGroup,
-  entries: ActionLogEntry[],
+// ── G5: the truncation warning must read the RAW fetched count, never a
+// client-side filtered/displayed count. A filter (filterHistoryEntries) can
+// only narrow what's shown from what was already fetched; it can never
+// prove there ISN'T more matching history further back that was never
+// fetched at all, so the warning must stay honestly non-committal about
+// that and must never depend on which filter (if any) happens to be
+// active. ───────────────────────────────────────────────────────────────
+
+/** True when the raw fetch hit HISTORY_PAGE_LIMIT: older history may exist
+ * beyond what was fetched. Deliberately takes only the raw fetched count,
+ * never a filtered/displayed count. Callers must always pass
+ * `rawEntries.length` from the true fetch (see groupTouchesTruncationBoundary
+ * below), never `filterHistoryEntries`'s output length. */
+export function shouldShowTruncationWarning(
+  rawFetchedCount: number,
   limit: number = HISTORY_PAGE_LIMIT
 ): boolean {
-  if (entries.length !== limit) {
+  return rawFetchedCount >= limit;
+}
+
+/** True when a task group's revertibility can't be trusted: canRevertGroup
+ * only ever sees the entries the history route actually returned, capped at
+ * HISTORY_PAGE_LIMIT. If the RAW fetch hit exactly that many entries AND the
+ * group reaches the OLDEST visible one, the task may have earlier entries
+ * beyond the window that got silently cut off, entries the server's
+ * full-log resolveRevertTarget would still fold in. Below the limit, the
+ * view is known-complete and this never fires.
+ *
+ * `rawEntries` must be the RAW fetched array (before any client-side
+ * actor/action/task filter), never the filtered/displayed one: a filter can
+ * only narrow what's shown, so checking its length against `limit` would
+ * almost never trip once a filter is active, hiding a warning that is still
+ * true. */
+export function groupTouchesTruncationBoundary(
+  group: HistoryGroup,
+  rawEntries: ActionLogEntry[],
+  limit: number = HISTORY_PAGE_LIMIT
+): boolean {
+  if (!shouldShowTruncationWarning(rawEntries.length, limit)) {
     return false;
   }
-  const oldestVisible = entries.at(-1);
+  const oldestVisible = rawEntries.at(-1);
   const oldestInGroup = group.entries.at(-1);
   return (
     oldestInGroup !== undefined &&
     oldestVisible !== undefined &&
     oldestInGroup === oldestVisible
   );
+}
+
+/** Disabled-affordance copy for a task-group revert that touches the
+ * truncation boundary. Both variants stay honestly non-committal about
+ * whether more (possibly matching) history exists beyond the fetched page;
+ * the filter-active variant just names the reason a narrow-looking view
+ * doesn't mean the underlying history is short. */
+function getTruncationDisabledLabel(filterActive: boolean | undefined): string {
+  return filterActive
+    ? "History truncated; older entries (possibly matching your filter) aren't shown, so this task's full extent can't be confirmed"
+    : "History truncated; can't confirm this task's full extent";
 }
 
 // resolveRevertTarget's task guard (src/revert.ts) throws a message ending
@@ -392,16 +434,25 @@ export function canRevertLast(
 
 interface RevertControls {
   confirmingKey?: string | null;
-  // The full (possibly-truncated) entries list the panel is rendering,
-  // threaded through so per-row/per-group checks (crossesAssembleBoundary,
-  // groupTouchesTruncationBoundary) see the same window the user does.
+  // The (possibly filtered/displayed) entries list the panel is rendering,
+  // threaded through so per-row assemble-boundary checks
+  // (crossesAssembleBoundary) see the same window the user does.
   entries?: ActionLogEntry[];
+  // G5: true when a client-side actor/action/task filter is currently
+  // active, so the truncation hint's wording can call that out instead of
+  // silently reusing the plain no-filter phrasing.
+  filterActive?: boolean;
   forceConfirmKey?: string | null;
   onCancel?: () => void;
   onConfirmForce?: (key: string) => void;
   onConfirmRevert?: (key: string) => void;
   onRequestGroupRevert?: (group: HistoryGroup, key: string) => void;
   onRequestRevert?: (entry: ActionLogEntry, key: string) => void;
+  // G5: the RAW fetched entries (before any client-side filter), used only
+  // by groupTouchesTruncationBoundary. Deliberately separate from `entries`
+  // above: a filter narrows `entries` for display, but truncation must
+  // always be judged against the true fetch, never the filtered view.
+  rawEntries?: ActionLogEntry[];
   revertingKey?: string | null;
   snapshotRevisions?: number[];
 }
@@ -592,12 +643,15 @@ function HistoryGroupBlock({
     groupKey !== undefined &&
     group.entries.length > 1 &&
     group.taskId !== undefined;
-  // G4: canRevertGroup only ever sees the (possibly truncated) entries the
-  // history route returned; when the view is exactly HISTORY_PAGE_LIMIT
-  // entries and this group reaches the oldest visible one, an earlier part
-  // of the task may have been cut off the window.
-  const truncated = controls?.entries
-    ? groupTouchesTruncationBoundary(group, controls.entries)
+  // G4/G5: canRevertGroup only ever sees the (possibly truncated) entries
+  // the history route returned; when the RAW fetch is exactly
+  // HISTORY_PAGE_LIMIT entries and this group reaches the oldest visible
+  // one, an earlier part of the task may have been cut off the window. Must
+  // read rawEntries, not controls.entries: the latter can be a client-side
+  // filtered/displayed subset whose length rarely equals the page limit,
+  // which would wrongly hide this warning once a filter narrows the view.
+  const truncated = controls?.rawEntries
+    ? groupTouchesTruncationBoundary(group, controls.rawEntries)
     : false;
   const canRevert = canRevertGroup(group, snapshotRevisions ?? []);
   // G3: revert restores project.json only, so a group spanning a brief-set
@@ -619,7 +673,7 @@ function HistoryGroupBlock({
             disabled={truncated || !canRevert}
             disabledLabel={
               truncated
-                ? "History truncated; can't confirm this task's full extent"
+                ? getTruncationDisabledLabel(controls?.filterActive)
                 : "No snapshot to revert to"
             }
             forceConfirming={controls?.forceConfirmKey === groupKey}
@@ -657,6 +711,7 @@ function HistoryGroupBlock({
 export function HistoryList({
   entries,
   now,
+  rawEntries,
   snapshotRevisions,
   unfilteredCount,
   ...controls
@@ -685,10 +740,19 @@ export function HistoryList({
     );
   }
   const groups = groupHistoryEntries(entries);
+  // G5: default rawEntries to entries when the caller doesn't pass a
+  // separate raw fetch (e.g. a bare <HistoryList entries={...} /> with no
+  // filter layer above it, as most tests in this file use): displayed IS
+  // raw in that case, so the truncation check should read `entries` itself.
   const passedControls: RevertControls | undefined =
     snapshotRevisions === undefined
       ? undefined
-      : { ...controls, entries, snapshotRevisions };
+      : {
+          ...controls,
+          entries,
+          rawEntries: rawEntries ?? entries,
+          snapshotRevisions,
+        };
   return (
     <ul className="flex list-none flex-col gap-2 p-0">
       {groups.map((group) => (
@@ -844,6 +908,10 @@ export function HistoryPanel({
     () => filterHistoryEntries(entries, filter),
     [entries, filter]
   );
+  // G5: whether the truncation hint's wording should call out the active
+  // filter. The truncation determination itself always reads the raw
+  // `entries` (below), never `filteredEntries`.
+  const filterActive = hasActiveHistoryFilter(filter);
 
   // Undo last edit always targets the true (unfiltered) history: a filtered
   // view is a lens on the log, not a different log, so revert eligibility
@@ -944,12 +1012,14 @@ export function HistoryPanel({
       <HistoryList
         confirmingKey={confirmingKey}
         entries={filteredEntries}
+        filterActive={filterActive}
         forceConfirmKey={forceConfirmKey}
         onCancel={cancelRevert}
         onConfirmForce={onConfirmForce}
         onConfirmRevert={onConfirmRevert}
         onRequestGroupRevert={onRequestGroupRevert}
         onRequestRevert={onRequestRevert}
+        rawEntries={entries}
         revertingKey={revertingKey}
         snapshotRevisions={snapshotRevisions}
         unfilteredCount={entries.length}
