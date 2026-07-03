@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.37.0.0 - 2026-07-04
+
+### Added
+
+- **Full Paper Shaders template set (21 new templates)**: bundled graphic overlays for every non-image shader in `@paper-design/shaders@0.0.77` except five image-filter effects (see known limitations). New ids include `shader-color-panels`, `shader-dot-grid`, `shader-dot-orbit`, `shader-gem-smoke`, `shader-god-rays`, `shader-liquid-metal`, `shader-metaballs`, `shader-neuro-noise`, `shader-paper-texture`, `shader-perlin-noise`, `shader-pulsing-border`, `shader-simplex-noise`, `shader-smoke-ring`, `shader-spiral`, `shader-static-mesh-gradient`, `shader-static-radial-gradient`, `shader-swirl`, `shader-voronoi`, `shader-warp`, `shader-water`, and `shader-waves`.
+- **Centralized shader spec module** (`web/lib/paper-shader-specs.ts`): all 24 shader ids (`ShaderId`, `SHADER_IDS`, `shaderSpecFor`) live in one file with uniform mapping aligned to the React wrapper defaults; `web/lib/graphic-runtime.ts` imports and re-exports for preview/export parity.
+- **Shader template generator** (`scripts/generate-shader-templates.ts`): regenerates manifest + composition pairs from a single config list.
+- **Expanded shader tests** (`tests/graphic-runtime-shaders.test.ts`, `tests/graphics.test.ts`): every shader id builds a spec; template discovery asserts 24 rich shader manifests.
+
+### Changed
+
+- **Version**: bumped OpenKlip to `0.37.0.0`.
+
 ## 0.36.0.0 - 2026-07-04
 
 Agent-native skills: the edit agent now sees the skill index up front and loads full procedures on demand (progressive disclosure), instead of only discovering templates by chance.

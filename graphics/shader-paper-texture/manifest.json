@@ -1,0 +1,40 @@
+{
+  "id": "shader-paper-texture",
+  "name": "Shader Paper Texture",
+  "kind": "rich",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "params": {
+    "colorFront": {
+      "type": "string",
+      "default": "#9fadbc",
+      "label": "Foreground"
+    },
+    "colorBack": {
+      "type": "string",
+      "default": "#ffffff",
+      "label": "Background"
+    },
+    "scale": {
+      "type": "number",
+      "default": 0.6,
+      "label": "Scale"
+    },
+    "contrast": {
+      "type": "number",
+      "default": 0.3,
+      "label": "Contrast"
+    },
+    "fiber": {
+      "type": "number",
+      "default": 0.3,
+      "label": "Fiber"
+    },
+    "folds": {
+      "type": "number",
+      "default": 0.65,
+      "label": "Folds"
+    }
+  }
+}

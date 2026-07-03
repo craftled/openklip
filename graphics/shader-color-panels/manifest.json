@@ -1,0 +1,35 @@
+{
+  "id": "shader-color-panels",
+  "name": "Shader Color Panels",
+  "kind": "rich",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "params": {
+    "colors": {
+      "type": "string",
+      "default": "#ff9d00, #fd4f30, #809bff, #6d2eff, #333aff",
+      "label": "Colors (comma-separated hex)"
+    },
+    "speed": {
+      "type": "number",
+      "default": 0.5,
+      "label": "Speed"
+    },
+    "scale": {
+      "type": "number",
+      "default": 0.8,
+      "label": "Scale"
+    },
+    "density": {
+      "type": "number",
+      "default": 3,
+      "label": "Panel density"
+    },
+    "length": {
+      "type": "number",
+      "default": 1.1,
+      "label": "Panel length"
+    }
+  }
+}

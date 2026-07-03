@@ -1,0 +1,40 @@
+{
+  "id": "shader-static-radial-gradient",
+  "name": "Shader Static Radial Gradient",
+  "kind": "rich",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "params": {
+    "colors": {
+      "type": "string",
+      "default": "#c084fc, #67e8f9, #818cf8",
+      "label": "Colors (comma-separated hex)"
+    },
+    "colorBack": {
+      "type": "string",
+      "default": "#0a0a12",
+      "label": "Background"
+    },
+    "speed": {
+      "type": "number",
+      "default": 0.5,
+      "label": "Speed"
+    },
+    "scale": {
+      "type": "number",
+      "default": 1,
+      "label": "Scale"
+    },
+    "radius": {
+      "type": "number",
+      "default": 1.2,
+      "label": "Radius"
+    },
+    "distortion": {
+      "type": "number",
+      "default": 0.25,
+      "label": "Distortion"
+    }
+  }
+}

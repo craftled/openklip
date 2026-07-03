@@ -1,0 +1,40 @@
+{
+  "id": "shader-smoke-ring",
+  "name": "Shader Smoke Ring",
+  "kind": "rich",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "params": {
+    "colors": {
+      "type": "string",
+      "default": "#c084fc, #67e8f9, #818cf8, #f472b6",
+      "label": "Colors (comma-separated hex)"
+    },
+    "speed": {
+      "type": "number",
+      "default": 1,
+      "label": "Speed"
+    },
+    "scale": {
+      "type": "number",
+      "default": 1,
+      "label": "Scale"
+    },
+    "radius": {
+      "type": "number",
+      "default": 0.5,
+      "label": "Radius"
+    },
+    "thickness": {
+      "type": "number",
+      "default": 0.35,
+      "label": "Thickness"
+    },
+    "noiseIterations": {
+      "type": "number",
+      "default": 4,
+      "label": "Noise layers"
+    }
+  }
+}

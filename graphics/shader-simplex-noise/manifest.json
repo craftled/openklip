@@ -1,0 +1,35 @@
+{
+  "id": "shader-simplex-noise",
+  "name": "Shader Simplex Noise",
+  "kind": "rich",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "params": {
+    "colors": {
+      "type": "string",
+      "default": "#4449CF, #FFD1E0, #F94446, #FFD36B, #FFFFFF",
+      "label": "Colors (comma-separated hex)"
+    },
+    "speed": {
+      "type": "number",
+      "default": 0.5,
+      "label": "Speed"
+    },
+    "scale": {
+      "type": "number",
+      "default": 0.6,
+      "label": "Scale"
+    },
+    "stepsPerColor": {
+      "type": "number",
+      "default": 2,
+      "label": "Steps per color"
+    },
+    "softness": {
+      "type": "number",
+      "default": 0,
+      "label": "Softness"
+    }
+  }
+}

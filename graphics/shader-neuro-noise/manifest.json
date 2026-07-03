@@ -1,0 +1,45 @@
+{
+  "id": "shader-neuro-noise",
+  "name": "Shader Neuro Noise",
+  "kind": "rich",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "params": {
+    "colorFront": {
+      "type": "string",
+      "default": "#ffffff",
+      "label": "Highlight"
+    },
+    "colorMid": {
+      "type": "string",
+      "default": "#47a8ff",
+      "label": "Mid"
+    },
+    "colorBack": {
+      "type": "string",
+      "default": "#000000",
+      "label": "Background"
+    },
+    "speed": {
+      "type": "number",
+      "default": 1,
+      "label": "Speed"
+    },
+    "scale": {
+      "type": "number",
+      "default": 1,
+      "label": "Scale"
+    },
+    "brightness": {
+      "type": "number",
+      "default": 0.5,
+      "label": "Brightness"
+    },
+    "contrast": {
+      "type": "number",
+      "default": 0.5,
+      "label": "Contrast"
+    }
+  }
+}

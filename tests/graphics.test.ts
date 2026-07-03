@@ -19,7 +19,11 @@ test("listGraphics finds the bundled templates sorted by name", () => {
   assert.ok(ids.includes("shader-dithering"));
   assert.ok(ids.includes("shader-grain-gradient"));
   assert.ok(ids.includes("shader-mesh-gradient"));
-  assert.ok(ids.includes("title-card"));
+  assert.ok(ids.includes("shader-metaballs"));
+  assert.ok(ids.includes("shader-warp"));
+  assert.ok(ids.includes("shader-water"));
+  const shaderIds = ids.filter((id) => id.startsWith("shader-"));
+  assert.equal(shaderIds.length, 24);
   const names = list.map((g) => g.name);
   const sorted = [...names].sort((a, b) => a.localeCompare(b));
   assert.deepEqual(names, sorted);
@@ -41,9 +45,13 @@ test("title-card is a rich-kind manifest", () => {
 });
 
 test("shader manifests are rich-kind templates", () => {
-  assert.equal(loadGraphicManifest("shader-dithering").kind, "rich");
-  assert.equal(loadGraphicManifest("shader-grain-gradient").kind, "rich");
-  assert.equal(loadGraphicManifest("shader-mesh-gradient").kind, "rich");
+  const shaderTemplateIds = listGraphics()
+    .map((g) => g.id)
+    .filter((id) => id.startsWith("shader-"));
+  assert.equal(shaderTemplateIds.length, 24);
+  for (const id of shaderTemplateIds) {
+    assert.equal(loadGraphicManifest(id).kind, "rich", id);
+  }
 });
 
 test("loadGraphicManifest throws for an unknown template", () => {

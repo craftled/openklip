@@ -1,0 +1,50 @@
+{
+  "id": "shader-dot-grid",
+  "name": "Shader Dot Grid",
+  "kind": "rich",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "params": {
+    "colorBack": {
+      "type": "string",
+      "default": "#000000",
+      "label": "Background"
+    },
+    "colorFill": {
+      "type": "string",
+      "default": "#ffffff",
+      "label": "Fill"
+    },
+    "colorStroke": {
+      "type": "string",
+      "default": "#ffaa00",
+      "label": "Stroke"
+    },
+    "scale": {
+      "type": "number",
+      "default": 0.6,
+      "label": "Scale"
+    },
+    "size": {
+      "type": "number",
+      "default": 2,
+      "label": "Dot size"
+    },
+    "gapX": {
+      "type": "number",
+      "default": 32,
+      "label": "Gap X"
+    },
+    "gapY": {
+      "type": "number",
+      "default": 32,
+      "label": "Gap Y"
+    },
+    "shape": {
+      "type": "string",
+      "default": "circle",
+      "label": "Shape (circle, diamond, square, triangle)"
+    }
+  }
+}

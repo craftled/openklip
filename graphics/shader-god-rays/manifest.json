@@ -1,0 +1,40 @@
+{
+  "id": "shader-god-rays",
+  "name": "Shader God Rays",
+  "kind": "rich",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "params": {
+    "colors": {
+      "type": "string",
+      "default": "#a600ff, #6200ff, #ffffff, #33fff5",
+      "label": "Ray colors (comma-separated hex)"
+    },
+    "speed": {
+      "type": "number",
+      "default": 0.75,
+      "label": "Speed"
+    },
+    "scale": {
+      "type": "number",
+      "default": 1,
+      "label": "Scale"
+    },
+    "intensity": {
+      "type": "number",
+      "default": 0.8,
+      "label": "Intensity"
+    },
+    "density": {
+      "type": "number",
+      "default": 0.3,
+      "label": "Ray density"
+    },
+    "bloom": {
+      "type": "number",
+      "default": 0.4,
+      "label": "Bloom"
+    }
+  }
+}

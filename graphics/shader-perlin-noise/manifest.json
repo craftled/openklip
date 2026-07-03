@@ -1,0 +1,40 @@
+{
+  "id": "shader-perlin-noise",
+  "name": "Shader Perlin Noise",
+  "kind": "rich",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "params": {
+    "colorFront": {
+      "type": "string",
+      "default": "#47a8ff",
+      "label": "Foreground"
+    },
+    "colorBack": {
+      "type": "string",
+      "default": "#0a0a12",
+      "label": "Background"
+    },
+    "speed": {
+      "type": "number",
+      "default": 1,
+      "label": "Speed"
+    },
+    "scale": {
+      "type": "number",
+      "default": 1,
+      "label": "Scale"
+    },
+    "octaveCount": {
+      "type": "number",
+      "default": 4,
+      "label": "Octaves"
+    },
+    "softness": {
+      "type": "number",
+      "default": 0.5,
+      "label": "Softness"
+    }
+  }
+}
