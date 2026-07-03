@@ -281,6 +281,7 @@ Review & export
                                        --limit <n>       max entries (default 50, max 200)
                                        --task <id>       only entries from one agent task
                                        --action <name>   only entries with this action name
+                                       --actor <name>    only entries logged by this actor (human|agent|cli|mcp|system)
   openklip tasks <slug>              agent task records (newest first)
                                        --limit <n>       max tasks (default 20, max 100)
                                        --status <status> pending|running|blocked|failed|completed|cancelled
@@ -2666,7 +2667,7 @@ try {
     case "history": {
       if (!rest[0]) {
         throw new Error(
-          "usage: openklip history <slug> [--limit N] [--task <id>] [--action <name>]"
+          "usage: openklip history <slug> [--limit N] [--task <id>] [--action <name>] [--actor <name>]"
         );
       }
       const historySlug = rest[0];
@@ -2677,6 +2678,7 @@ try {
       }
       const taskFilter = flagValue(rest, "--task");
       const actionFilter = flagValue(rest, "--action");
+      const actorFilter = flagValue(rest, "--actor");
       const allEntries = await readActionLog(historySlug);
       let entries = allEntries;
       if (taskFilter !== undefined) {
@@ -2684,6 +2686,9 @@ try {
       }
       if (actionFilter !== undefined) {
         entries = entries.filter((e) => e.action === actionFilter);
+      }
+      if (actorFilter !== undefined) {
+        entries = entries.filter((e) => e.actor === actorFilter);
       }
       const filteredOutAll = entries.length === 0;
       entries = entries.slice(0, limit);
@@ -2696,6 +2701,7 @@ try {
           const activeFilters = [
             taskFilter === undefined ? undefined : `--task=${taskFilter}`,
             actionFilter === undefined ? undefined : `--action=${actionFilter}`,
+            actorFilter === undefined ? undefined : `--actor=${actorFilter}`,
           ].filter((f): f is string => f !== undefined);
           console.log(
             `no history entries match the filter (${activeFilters.join(", ")}) for ${historySlug}.`
