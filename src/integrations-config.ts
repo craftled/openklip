@@ -9,22 +9,34 @@ import { join } from "node:path";
 import { z } from "zod";
 import { repoPath } from "./repo-paths.ts";
 
+const ProviderConfigSchema = z
+  .object({
+    apiKey: z.string().optional(),
+    updatedAt: z.string().optional(),
+  })
+  .optional();
+
 const IntegrationsConfigSchema = z
   .object({
-    elevenLabs: z
-      .object({
-        apiKey: z.string().optional(),
-        updatedAt: z.string().optional(),
-      })
-      .optional(),
+    elevenLabs: ProviderConfigSchema,
+    reve: ProviderConfigSchema,
   })
   .catchall(z.unknown());
 
+export interface ProviderStatus {
+  hasApiKey: boolean;
+  keyPreview: string | null;
+  updatedAt: string | null;
+}
+
 export interface IntegrationStatus {
-  elevenLabs: {
-    hasApiKey: boolean;
-    updatedAt: string | null;
-  };
+  elevenLabs: ProviderStatus;
+  reve: ProviderStatus;
+}
+
+function maskApiKey(apiKey: string): string {
+  const visible = apiKey.slice(-4);
+  return `${"•".repeat(8)}${visible}`;
 }
 
 export interface IntegrationTestResult {
@@ -77,24 +89,38 @@ function saveConfig(config: z.infer<typeof IntegrationsConfigSchema>): void {
   }
 }
 
-export function readIntegrationsStatus(): IntegrationStatus {
-  const config = loadConfig();
-  const apiKey = config.elevenLabs?.apiKey?.trim();
+type ProviderId = "elevenLabs" | "reve";
+
+function providerStatus(
+  provider?: z.infer<typeof ProviderConfigSchema>
+): ProviderStatus {
+  const apiKey = provider?.apiKey?.trim();
   return {
-    elevenLabs: {
-      hasApiKey: Boolean(apiKey),
-      updatedAt: config.elevenLabs?.updatedAt ?? null,
-    },
+    hasApiKey: Boolean(apiKey),
+    keyPreview: apiKey ? maskApiKey(apiKey) : null,
+    updatedAt: provider?.updatedAt ?? null,
   };
 }
 
-export function setElevenLabsApiKey(apiKey: string): IntegrationStatus {
+export function readIntegrationsStatus(): IntegrationStatus {
+  const config = loadConfig();
+  return {
+    elevenLabs: providerStatus(config.elevenLabs),
+    reve: providerStatus(config.reve),
+  };
+}
+
+function setProviderApiKey(
+  provider: ProviderId,
+  apiKey: string,
+  label: string
+): IntegrationStatus {
   const trimmed = apiKey.trim();
   if (!trimmed) {
-    throw new Error("ElevenLabs API key is required");
+    throw new Error(`${label} API key is required`);
   }
   const config = loadConfig();
-  config.elevenLabs = {
+  config[provider] = {
     apiKey: trimmed,
     updatedAt: new Date().toISOString(),
   };
@@ -102,16 +128,40 @@ export function setElevenLabsApiKey(apiKey: string): IntegrationStatus {
   return readIntegrationsStatus();
 }
 
-export function clearElevenLabsApiKey(): IntegrationStatus {
+function clearProviderApiKey(provider: ProviderId): IntegrationStatus {
   const config = loadConfig();
-  config.elevenLabs = undefined;
+  config[provider] = undefined;
   saveConfig(config);
   return readIntegrationsStatus();
 }
 
-export function readElevenLabsApiKey(): string | null {
-  const apiKey = loadConfig().elevenLabs?.apiKey?.trim();
+function readProviderApiKey(provider: ProviderId): string | null {
+  const apiKey = loadConfig()[provider]?.apiKey?.trim();
   return apiKey || null;
+}
+
+export function setElevenLabsApiKey(apiKey: string): IntegrationStatus {
+  return setProviderApiKey("elevenLabs", apiKey, "ElevenLabs");
+}
+
+export function clearElevenLabsApiKey(): IntegrationStatus {
+  return clearProviderApiKey("elevenLabs");
+}
+
+export function readElevenLabsApiKey(): string | null {
+  return readProviderApiKey("elevenLabs");
+}
+
+export function setReveApiKey(apiKey: string): IntegrationStatus {
+  return setProviderApiKey("reve", apiKey, "Reve");
+}
+
+export function clearReveApiKey(): IntegrationStatus {
+  return clearProviderApiKey("reve");
+}
+
+export function readReveApiKey(): string | null {
+  return readProviderApiKey("reve");
 }
 
 export async function testElevenLabsApiKey(
@@ -167,6 +217,76 @@ export async function testElevenLabsApiKey(
     return {
       ok: false,
       message: `Could not reach ElevenLabs: ${(e as Error).message}`,
+      status: null,
+    };
+  }
+}
+
+/**
+ * Verify a Reve API key without spending credits.
+ *
+ * Reve has no free "get account" endpoint — every documented route is a paid
+ * POST image generation. We exploit Reve's validation ordering: a request whose
+ * body is schema-valid but semantically out of range (test_time_scaling below
+ * its minimum) is checked for auth BEFORE the range is rejected, and the range
+ * error fires BEFORE any image is generated or billed. So an invalid key gets
+ * 401, and a valid key gets a 400 range error — neither produces an image.
+ */
+export async function testReveApiKey(
+  apiKey = readReveApiKey()
+): Promise<IntegrationTestResult> {
+  const trimmed = apiKey?.trim();
+  if (!trimmed) {
+    return {
+      ok: false,
+      message: "Add a Reve API key before testing.",
+      status: null,
+    };
+  }
+
+  try {
+    const res = await fetch("https://api.reve.com/v1/image/create", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${trimmed}`,
+      },
+      // Intentionally invalid: schema-valid so auth is checked, but the negative
+      // test_time_scaling is rejected before generation. See doc comment above.
+      body: JSON.stringify({
+        prompt: "openklip key verification",
+        aspect_ratio: "1:1",
+        test_time_scaling: -1,
+      }),
+    });
+
+    if (res.status === 401 || res.status === 403) {
+      return {
+        ok: false,
+        message: "Reve rejected this API key.",
+        status: res.status,
+      };
+    }
+
+    // Anything else (200 success or a 400 for our intentionally invalid body)
+    // means the key passed authentication.
+    if (res.ok || res.status === 400) {
+      return {
+        ok: true,
+        message: "Reve accepted this API key.",
+        status: res.status,
+      };
+    }
+
+    return {
+      ok: false,
+      message: `Reve test failed with HTTP ${res.status}.`,
+      status: res.status,
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      message: `Could not reach Reve: ${(e as Error).message}`,
       status: null,
     };
   }

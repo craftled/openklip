@@ -1,16 +1,22 @@
+export interface ProviderKeyStatus {
+  hasApiKey: boolean;
+  keyPreview: string | null;
+  updatedAt: string | null;
+}
+
 export interface IntegrationsStatus {
-  elevenLabs: {
-    hasApiKey: boolean;
-    updatedAt: string | null;
-  };
+  elevenLabs: ProviderKeyStatus;
+  reve: ProviderKeyStatus;
+}
+
+export interface ProviderTestResult {
+  message: string;
+  ok: boolean;
+  status: number | null;
 }
 
 export interface IntegrationTestStatus {
-  elevenLabs: {
-    ok: boolean;
-    message: string;
-    status: number | null;
-  };
+  elevenLabs: ProviderTestResult;
 }
 
 export interface ElevenLabsDetails {
@@ -26,22 +32,39 @@ export interface ElevenLabsDetails {
   voices: string[];
 }
 
-export async function fetchIntegrationsStatus(): Promise<IntegrationsStatus> {
-  const res = await fetch("/api/integrations");
+function providerKeyStatus(
+  data: Partial<ProviderKeyStatus> | undefined
+): ProviderKeyStatus {
+  return {
+    hasApiKey: data?.hasApiKey ?? false,
+    keyPreview: data?.keyPreview ?? null,
+    updatedAt: data?.updatedAt ?? null,
+  };
+}
+
+function mapStatus(data: Partial<IntegrationsStatus>): IntegrationsStatus {
+  return {
+    elevenLabs: providerKeyStatus(data.elevenLabs),
+    reve: providerKeyStatus(data.reve),
+  };
+}
+
+async function readStatusResponse(
+  res: Response,
+  fallback: string
+): Promise<IntegrationsStatus> {
   const data = (await res.json()) as Partial<IntegrationsStatus> & {
     error?: string;
   };
   if (!res.ok) {
-    throw new Error(
-      data.error ?? `Integrations request failed (${res.status})`
-    );
+    throw new Error(data.error ?? `${fallback} (${res.status})`);
   }
-  return {
-    elevenLabs: {
-      hasApiKey: data.elevenLabs?.hasApiKey ?? false,
-      updatedAt: data.elevenLabs?.updatedAt ?? null,
-    },
-  };
+  return mapStatus(data);
+}
+
+export async function fetchIntegrationsStatus(): Promise<IntegrationsStatus> {
+  const res = await fetch("/api/integrations");
+  return readStatusResponse(res, "Integrations request failed");
 }
 
 export async function saveElevenLabsApiKey(
@@ -52,34 +75,12 @@ export async function saveElevenLabsApiKey(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ elevenLabsApiKey }),
   });
-  const data = (await res.json()) as Partial<IntegrationsStatus> & {
-    error?: string;
-  };
-  if (!res.ok) {
-    throw new Error(data.error ?? `Save integration failed (${res.status})`);
-  }
-  return {
-    elevenLabs: {
-      hasApiKey: data.elevenLabs?.hasApiKey ?? false,
-      updatedAt: data.elevenLabs?.updatedAt ?? null,
-    },
-  };
+  return readStatusResponse(res, "Save integration failed");
 }
 
 export async function clearElevenLabsApiKey(): Promise<IntegrationsStatus> {
   const res = await fetch("/api/integrations", { method: "DELETE" });
-  const data = (await res.json()) as Partial<IntegrationsStatus> & {
-    error?: string;
-  };
-  if (!res.ok) {
-    throw new Error(data.error ?? `Clear integration failed (${res.status})`);
-  }
-  return {
-    elevenLabs: {
-      hasApiKey: data.elevenLabs?.hasApiKey ?? false,
-      updatedAt: data.elevenLabs?.updatedAt ?? null,
-    },
-  };
+  return readStatusResponse(res, "Clear integration failed");
 }
 
 export async function testElevenLabsApiKey(
@@ -102,6 +103,50 @@ export async function testElevenLabsApiKey(
       message: data.elevenLabs?.message ?? "ElevenLabs test did not run.",
       status: data.elevenLabs?.status ?? null,
     },
+  };
+}
+
+export async function saveReveApiKey(
+  reveApiKey: string
+): Promise<IntegrationsStatus> {
+  const res = await fetch("/api/integrations", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reveApiKey }),
+  });
+  return readStatusResponse(res, "Save integration failed");
+}
+
+export async function clearReveApiKey(): Promise<IntegrationsStatus> {
+  const res = await fetch("/api/integrations?provider=reve", {
+    method: "DELETE",
+  });
+  return readStatusResponse(res, "Clear integration failed");
+}
+
+export async function testReveApiKey(
+  reveApiKey?: string
+): Promise<ProviderTestResult> {
+  const res = await fetch("/api/integrations", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(
+      reveApiKey?.trim()
+        ? { provider: "reve", reveApiKey }
+        : { provider: "reve" }
+    ),
+  });
+  const data = (await res.json()) as {
+    reve?: Partial<ProviderTestResult>;
+    error?: string;
+  };
+  if (!res.ok) {
+    throw new Error(data.error ?? `Test integration failed (${res.status})`);
+  }
+  return {
+    ok: data.reve?.ok ?? false,
+    message: data.reve?.message ?? "Reve test did not run.",
+    status: data.reve?.status ?? null,
   };
 }
 

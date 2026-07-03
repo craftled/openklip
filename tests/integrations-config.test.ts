@@ -10,11 +10,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   clearElevenLabsApiKey,
+  clearReveApiKey,
   fetchElevenLabsDetails,
   readElevenLabsApiKey,
   readIntegrationsStatus,
+  readReveApiKey,
   setElevenLabsApiKey,
+  setReveApiKey,
   testElevenLabsApiKey,
+  testReveApiKey,
 } from "../src/integrations-config.ts";
 
 const realFetch = globalThis.fetch;
@@ -45,6 +49,8 @@ describe("integrations config", () => {
       const status = setElevenLabsApiKey("  test-key  ");
 
       expect(status.elevenLabs.hasApiKey).toBe(true);
+      expect(status.elevenLabs.keyPreview).toBe("••••••••-key");
+      expect(status.elevenLabs.keyPreview).not.toContain("test");
       expect(readElevenLabsApiKey()).toBe("test-key");
       expect(readIntegrationsStatus()).not.toHaveProperty("elevenLabs.apiKey");
 
@@ -160,6 +166,74 @@ describe("integrations config", () => {
         voices: ["Tomas voice", "Bella"],
       });
       expect(details).not.toHaveProperty("xi_api_key");
+    });
+  });
+
+  test("stores and clears Reve keys independently of ElevenLabs", async () => {
+    await withTempRepo(() => {
+      const saved = setReveApiKey("  reve-secret-key  ");
+
+      expect(saved.reve.hasApiKey).toBe(true);
+      expect(saved.reve.keyPreview).toBe("••••••••-key");
+      expect(saved.reve.keyPreview).not.toContain("reve-secret");
+      expect(saved.elevenLabs.hasApiKey).toBe(false);
+      expect(readReveApiKey()).toBe("reve-secret-key");
+
+      const cleared = clearReveApiKey();
+      expect(cleared.reve.hasApiKey).toBe(false);
+      expect(readReveApiKey()).toBeNull();
+    });
+  });
+
+  test("verifies a Reve key with a no-cost probe (400 = accepted)", async () => {
+    const calls: Array<{ headers: Headers; method: string; url: string }> = [];
+    globalThis.fetch = (async (
+      input: RequestInfo | URL,
+      init?: RequestInit
+    ) => {
+      await Promise.resolve();
+      calls.push({
+        url: String(input),
+        method: init?.method ?? "GET",
+        headers: new Headers(init?.headers),
+      });
+      // Valid key hits the intentional out-of-range param error, not billing.
+      return Response.json(
+        { error_code: "INVALID_PARAMETER_VALUE" },
+        { status: 400 }
+      );
+    }) as typeof fetch;
+
+    const result = await testReveApiKey("reve-secret-key");
+
+    expect(result).toEqual({
+      ok: true,
+      message: "Reve accepted this API key.",
+      status: 400,
+    });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url).toBe("https://api.reve.com/v1/image/create");
+    expect(calls[0]?.method).toBe("POST");
+    expect(calls[0]?.headers.get("authorization")).toBe(
+      "Bearer reve-secret-key"
+    );
+  });
+
+  test("maps a rejected Reve key (401) to a clear failure", async () => {
+    globalThis.fetch = (async () => {
+      await Promise.resolve();
+      return Response.json(
+        { error_code: "PARTNER_API_TOKEN_INVALID" },
+        { status: 401 }
+      );
+    }) as typeof fetch;
+
+    const result = await testReveApiKey("bad-key");
+
+    expect(result).toEqual({
+      ok: false,
+      message: "Reve rejected this API key.",
+      status: 401,
     });
   });
 });
