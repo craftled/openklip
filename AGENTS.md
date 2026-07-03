@@ -229,7 +229,7 @@ Workflow: `take-add` each recording, read `take_transcript <slug> <takeId>` to f
 | `openklip overlays <slug> [--json]` | All b-roll, titles, zooms, stills with ids and spans. |
 | `openklip cleanup <slug> [--json]` | Filler-word and dead-air cleanup candidates with risk (`safe`/`review`), reason, and estimated seconds saved. Degrades to filler-only (with a warning) when no audio analysis is available yet. |
 | `openklip cleanup <slug> --apply-safe` | Apply every `safe` candidate (cuts filler words, registers dead-air spans) and print what changed. `review` candidates are never auto-applied; apply them individually via `cut`/`dead-air-add` after a human or agent judgment call. |
-| `openklip dead-air-rm <slug> <id>` | Remove a registered dead-air span by id. CLI/MCP only; no GUI remove affordance yet. |
+| `openklip dead-air-rm <slug> <id>` | Remove a registered dead-air span by id. Also exposed in the GUI Cleanup panel. |
 | `openklip export-set <slug>` | Set export aspect ratio and reframe crop on `project.export` (preview/export parity). `--aspect source\|16:9\|9:16\|1:1`, `--crop-mode manual\|scene\|vision`, `--crop-focus-x`, `--crop-focus-y`, `--crop-scale`, `--layout fill\|split-vertical`, `--split-ratio`, `--split-speaker top\|bottom`. |
 | `openklip asset-flags <slug> <assetId>` | Set `mustUse` or `avoid` on a registered asset (`--must-use`, `--avoid`, or `--clear`). Avoid wins if both are set. |
 | `openklip vision-focus <slug>` | On macOS, sample ingest frames with Apple Vision (face, saliency fallback, OCR text) and write `focusX`/`focusY` onto speaker `sceneLog` segments. GUI: Reframe **Vision focus** button. |

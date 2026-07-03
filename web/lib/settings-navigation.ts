@@ -1,7 +1,11 @@
 import type { ComponentType } from "react";
-import { Bot, Download, Palette } from "@/lib/icon";
+import { Bot, Download, Palette, PlugConnected } from "@/lib/icon";
 
-export type SettingsSectionId = "appearance" | "export" | "agent";
+export type SettingsSectionId =
+  | "appearance"
+  | "export"
+  | "agent"
+  | "integrations";
 
 export interface SettingsNavItem {
   description: string;
@@ -40,12 +44,19 @@ export const SETTINGS_NAV_ITEMS: ReadonlyArray<SettingsNavItem> = [
     description: "Default model for new chats.",
     icon: Bot,
   },
+  {
+    id: "integrations",
+    group: "app",
+    label: "Integrations",
+    description: "Connected services and API keys.",
+    icon: PlugConnected,
+  },
 ];
 
 export function normalizeSettingsSection(
   value: string | null | undefined
 ): SettingsSectionId {
-  if (value === "export" || value === "agent") {
+  if (value === "export" || value === "agent" || value === "integrations") {
     return value;
   }
   return "appearance";
