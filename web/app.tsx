@@ -157,6 +157,7 @@ import {
   toastPromise,
   toastSaveError,
   toastSuccess,
+  toastTransitionFallback,
 } from "@/lib/app-toast";
 import type { AssetBinUpdate } from "@/lib/asset-bin-update";
 import { type DeadAirItem, reconcileDeadAirItems } from "@/lib/dead-air-state";
@@ -2034,6 +2035,7 @@ export function App({
 
       void toastPromise(exportRun, exportPromiseMessages());
       const result = await exportRun;
+      toastTransitionFallback(result.transition);
       if (options?.destination === "clipboard") {
         toastInfo("Export path ready", result.out, {
           duration: 15_000,

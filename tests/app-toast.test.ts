@@ -7,6 +7,7 @@ import {
   setToastBackendForTests,
   toastError,
   toastInfo,
+  toastTransitionFallback,
 } from "../web/lib/app-toast.ts";
 import {
   exportSuccessToast,
@@ -71,4 +72,37 @@ test("toastInfo can include an action", () => {
   assert.equal(recorder.calls[0]?.title, "Export path ready");
   assert.equal(recorder.calls[0]?.description, "output/out.gif");
   assert.equal(recorder.calls[0]?.action, action);
+});
+
+test("toastTransitionFallback stays quiet when no transition was requested", () => {
+  const recorder = createToastRecorder();
+  setToastBackendForTests(recorder.backend);
+
+  toastTransitionFallback({ type: "none", applied: false });
+
+  assert.deepEqual(recorder.calls, []);
+});
+
+test("toastTransitionFallback stays quiet when the transition applied", () => {
+  const recorder = createToastRecorder();
+  setToastBackendForTests(recorder.backend);
+
+  toastTransitionFallback({ type: "dip", applied: true });
+
+  assert.deepEqual(recorder.calls, []);
+});
+
+test("toastTransitionFallback surfaces an info toast when the transition fell back", () => {
+  const recorder = createToastRecorder();
+  setToastBackendForTests(recorder.backend);
+
+  toastTransitionFallback({
+    type: "crossfade",
+    applied: false,
+    reason: "overlays-present",
+  });
+
+  assert.equal(recorder.calls[0]?.method, "info");
+  assert.equal(recorder.calls[0]?.title, "Transition not applied");
+  assert.match(recorder.calls[0]?.description ?? "", /crossfade/);
 });

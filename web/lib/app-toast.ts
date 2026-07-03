@@ -12,6 +12,7 @@ import {
   chatRenameFailedToast,
   chatSendFailedToast,
   chatUnarchiveFailedToast,
+  type ExportTransitionResultData,
   nothingToPlayToast,
   playbackFailedToast,
   projectCreateFailedToast,
@@ -22,6 +23,7 @@ import {
   revertSucceededToast,
   saveFailedToast,
   type ToastPayload,
+  transitionFallbackToast,
   workspacePickFailedToast,
 } from "@/lib/toast-notifications";
 
@@ -277,4 +279,13 @@ export function toastPlaybackFailed(error: string): void {
 
 export function toastChatAssetUploadSuccess(count: number): void {
   show(chatAssetUploadSuccessToast(count));
+}
+
+export function toastTransitionFallback(
+  transition: ExportTransitionResultData
+): void {
+  const payload = transitionFallbackToast(transition);
+  if (payload) {
+    show(payload);
+  }
 }

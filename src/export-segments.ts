@@ -146,6 +146,55 @@ export function shouldApplyCutTransition(
 }
 
 /**
+ * Why a requested (non-"none") transition would fall back to a hard cut,
+ * for a gate where shouldApplyCutTransition(type, gate) is false. Mirrors
+ * that function's checks in the same order so the reported reason always
+ * matches the real cause; undefined means the gate would allow it (only
+ * meaningful to call this when the caller already knows type !== "none").
+ */
+export type CutTransitionFallbackReason =
+  | "too-few-ranges"
+  | "overlays-present"
+  | "too-many-ranges";
+
+export function cutTransitionFallbackReason(
+  gate: SegmentExportGate
+): CutTransitionFallbackReason | undefined {
+  if (gate.ranges.length < 2) {
+    return "too-few-ranges";
+  }
+  if (
+    gate.hasBroll ||
+    gate.hasStills ||
+    gate.hasRichGraphics ||
+    gate.hasMusic
+  ) {
+    return "overlays-present";
+  }
+  if (gate.ranges.length > SEGMENT_EXPORT_MAX_RANGES) {
+    return "too-many-ranges";
+  }
+  return;
+}
+
+/** Human-readable explanation, shared by the CLI export summary and the GUI
+ * export toast so the wording stays in one place. */
+export function cutTransitionFallbackReasonLabel(
+  reason: CutTransitionFallbackReason
+): string {
+  switch (reason) {
+    case "too-few-ranges":
+      return "fewer than two kept ranges";
+    case "overlays-present":
+      return "b-roll, stills, music, or graphics present";
+    case "too-many-ranges":
+      return "too many kept ranges";
+    default:
+      return "not supported for this export";
+  }
+}
+
+/**
  * Build a video filter chain that applies a crossfade (xfade) transition
  * between all segment inputs. Each segment must already be prepared as
  * `[vseg0]`, `[vseg1]`, ... by the caller.
