@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.36.0.0 - 2026-07-04
+
+Agent-native skills: the edit agent now sees the skill index up front and loads full procedures on demand (progressive disclosure), instead of only discovering templates by chance.
+
+### Added
+- **Skill index in the edit prompt** (`src/agent-driver.ts`): `buildEditPrompt` gained an optional `ctx.skills` field and a `skillsBlock` helper that advertises every skill as `- id: description` with a call-to-action to use `load_skill`, capped at 20 entries with a `template_list` overflow note. The single call site (`app/agent-actions.ts`) passes `listTemplates()`. The chat-only prompt path is unchanged (read-only Q&A needs no edit procedures).
+- **`load_skill` agent tool** (`src/agent-tools.ts`): read-only query tool (surfaces `cli`, `mcp`) that returns a skill's full markdown by id via the existing `loadTemplateSkill`, decoupling "read the procedure" from "set the project template" (`template_set`). Unknown ids surface the loader error.
+- **Optional YAML frontmatter in `skill.md`** (`src/templates.ts`): `parseSkillMeta` now strips a leading frontmatter block and prefers `description:` (and `label:`/`name:`) from it, falling back to the existing heading/first-body-line heuristics. Existing files without frontmatter parse identically; this keeps `skill.md` portable with the wider SKILL.md convention.
+
+### Changed
+- **Version**: bumped OpenKlip to `0.36.0.0`.
+
 ## 0.35.0.0 - 2026-07-03
 
 Paper Shaders are now first-class rich graphics in preview and export.

@@ -315,6 +315,33 @@ ${truncated}
 `;
 }
 
+const SKILLS_MAX_COUNT = 20;
+
+// Render the skill index (edit procedures the agent can load with load_skill)
+// for a prompt, or "" when the list is empty. Capped so a large skill catalog
+// can't blow out prompt latency/cost; the model can still discover the rest
+// via template_list.
+export function skillsBlock(
+  skills?: Array<{ description: string; id: string; label: string }>
+): string {
+  if (!skills || skills.length === 0) {
+    return "";
+  }
+  const shown = skills.slice(0, SKILLS_MAX_COUNT);
+  const lines = shown.map(
+    (skill) => `- ${skill.id}: ${skill.description.trim() || skill.label}`
+  );
+  if (skills.length > SKILLS_MAX_COUNT) {
+    lines.push(
+      `- (${skills.length - SKILLS_MAX_COUNT} more skills are listed by template_list)`
+    );
+  }
+  return `Available skills (edit procedures). When the request matches one, call load_skill with its id and follow the procedure:
+${lines.join("\n")}
+
+`;
+}
+
 // Edit prompt for the tool-calling path: the model has the openklip MCP tools
 // and is expected to DO the edit (not describe it). Reply is a short past-tense
 // confirmation of what changed, never CLI commands or how-to.
@@ -323,6 +350,7 @@ export function buildEditPrompt(
     assetCards?: string;
     brief?: string;
     sceneLog?: string;
+    skills?: Array<{ description: string; id: string; label: string }>;
     template?: string;
     words: Array<{ deleted?: boolean; text: string }>;
   },
@@ -355,7 +383,7 @@ For product announcement videos with technical or abstract content, use json-gra
 
 When the user asks for a change, DO it by calling the tools. Never print CLI commands and never explain how to do it yourself. After editing, reply with ONE short past-tense sentence naming exactly what you changed (e.g. "Cut 3 filler words." or "Added a push-in zoom on 'hello world'."). If you could not do it, say why in one line. If the user only asks a question, answer briefly from the transcript and make no edits.${templateLine}
 ${taskBlock}
-${briefBlock(ctx.brief)}Transcript:
+${skillsBlock(ctx.skills)}${briefBlock(ctx.brief)}Transcript:
 """
 ${transcript}
 """

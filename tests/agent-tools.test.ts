@@ -167,6 +167,27 @@ test("callAgentTool template_show returns skill markdown", async () => {
   assert.ok(result.skill.includes("talking-head") || result.skill.length > 20);
 });
 
+test("callAgentTool load_skill returns skill markdown for a real template id", async () => {
+  const result = (await callAgentTool("load_skill", {
+    id: "make-short",
+  })) as { id: string; skill: string };
+  assert.equal(result.id, "make-short");
+  assert.equal(typeof result.skill, "string");
+  assert.ok(result.skill.length > 0);
+});
+
+test("callAgentTool load_skill throws for an unknown skill id", async () => {
+  await assert.rejects(
+    () => callAgentTool("load_skill", { id: "not-a-real-skill-id" }),
+    /template not found/i
+  );
+});
+
+test("load_skill is included in agentToolNames for mcp surface", () => {
+  const names = agentToolNames("mcp");
+  assert.ok(names.includes("load_skill"));
+});
+
 test("registry mcp mutations are included in agent tools", () => {
   const names = new Set(agentToolNames("mcp"));
   for (const action of actions.filter((a) => a.surfaces.includes("mcp"))) {

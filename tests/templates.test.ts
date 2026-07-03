@@ -6,6 +6,7 @@ import {
   defaultTemplateId,
   listTemplates,
   loadTemplateSkill,
+  parseSkillMeta,
   templateSkillPath,
 } from "../src/templates.ts";
 import { makeProject } from "./helpers/projectFixture.ts";
@@ -81,4 +82,63 @@ test("applyProjectEdits sets template on project", () => {
 
 test("defaultTemplateId prefers talking-head", () => {
   assert.equal(defaultTemplateId(), "talking-head");
+});
+
+test("parseSkillMeta with no frontmatter behaves as before", () => {
+  const raw = "# My Heading\n\nSome first body line.\n\nMore text.";
+  const meta = parseSkillMeta(raw, "fallback-id");
+  assert.equal(meta.label, "My Heading");
+  assert.equal(meta.description, "Some first body line.");
+});
+
+test("parseSkillMeta with frontmatter description only uses heading for label", () => {
+  const raw =
+    "---\ndescription: A frontmatter description.\n---\n# My Heading\n\nBody line.";
+  const meta = parseSkillMeta(raw, "fallback-id");
+  assert.equal(meta.label, "My Heading");
+  assert.equal(meta.description, "A frontmatter description.");
+});
+
+test("parseSkillMeta with frontmatter description and label uses both from frontmatter", () => {
+  const raw =
+    "---\ndescription: A frontmatter description.\nlabel: Frontmatter Label\n---\n# My Heading\n\nBody line.";
+  const meta = parseSkillMeta(raw, "fallback-id");
+  assert.equal(meta.label, "Frontmatter Label");
+  assert.equal(meta.description, "A frontmatter description.");
+});
+
+test("parseSkillMeta with frontmatter description and name uses name as label alias", () => {
+  const raw =
+    "---\ndescription: A frontmatter description.\nname: Frontmatter Name\n---\n# My Heading\n\nBody line.";
+  const meta = parseSkillMeta(raw, "fallback-id");
+  assert.equal(meta.label, "Frontmatter Name");
+  assert.equal(meta.description, "A frontmatter description.");
+});
+
+test("parseSkillMeta with frontmatter but no description key falls back to first body line", () => {
+  const raw =
+    "---\nlabel: Frontmatter Label\n---\n# My Heading\n\nFirst body line here.";
+  const meta = parseSkillMeta(raw, "fallback-id");
+  assert.equal(meta.label, "Frontmatter Label");
+  assert.equal(meta.description, "First body line here.");
+});
+
+test("parseSkillMeta strips matching single and double quotes from frontmatter values", () => {
+  const rawSingle =
+    "---\ndescription: 'Single quoted description.'\n---\n# Heading\n";
+  const metaSingle = parseSkillMeta(rawSingle, "fallback-id");
+  assert.equal(metaSingle.description, "Single quoted description.");
+
+  const rawDouble =
+    '---\ndescription: "Double quoted description."\n---\n# Heading\n';
+  const metaDouble = parseSkillMeta(rawDouble, "fallback-id");
+  assert.equal(metaDouble.description, "Double quoted description.");
+});
+
+test("parseSkillMeta with malformed frontmatter (no closing ---) treats whole content as body", () => {
+  const raw =
+    "---\ndescription: never closed\n# My Heading\n\nFirst real body line.";
+  const meta = parseSkillMeta(raw, "fallback-id");
+  assert.equal(meta.label, "My Heading");
+  assert.equal(meta.description, "---");
 });

@@ -11,6 +11,7 @@ import {
   parseCutIds,
   resolveAgent,
   signInCommand,
+  skillsBlock,
   stripBunNodeOptions,
   supportsToolEditing,
 } from "../src/agent-driver.ts";
@@ -405,4 +406,68 @@ test("buildEditPrompt includes task progress instructions only when asked", () =
   const withoutTask = buildEditPrompt(ctx, "demo", "cut filler");
   assert.equal(withoutTask.includes("task_step"), false);
   assert.equal(withoutTask.includes("task_complete"), false);
+});
+
+// ---- skillsBlock ----
+
+test("skillsBlock renders each skill id and description", () => {
+  const block = skillsBlock([
+    {
+      id: "cut-filler",
+      label: "Cut filler",
+      description: "Remove filler words.",
+    },
+    { id: "add-titles", label: "Add titles", description: "Add title cards." },
+  ]);
+  assert.match(block, /Available skills \(edit procedures\)/);
+  assert.match(block, /load_skill/);
+  assert.match(block, /- cut-filler: Remove filler words\./);
+  assert.match(block, /- add-titles: Add title cards\./);
+});
+
+test("skillsBlock falls back to the label when description is empty", () => {
+  const block = skillsBlock([
+    { id: "cut-filler", label: "Cut filler", description: "" },
+  ]);
+  assert.match(block, /- cut-filler: Cut filler/);
+});
+
+test("skillsBlock returns empty string for an empty list", () => {
+  assert.equal(skillsBlock([]), "");
+  assert.equal(skillsBlock(undefined), "");
+});
+
+test("skillsBlock caps at 20 skills and notes the rest are in template_list", () => {
+  const skills = Array.from({ length: 25 }, (_, i) => ({
+    id: `skill-${i}`,
+    label: `Skill ${i}`,
+    description: `Description ${i}`,
+  }));
+  const block = skillsBlock(skills);
+  assert.match(block, /- skill-0: Description 0/);
+  assert.match(block, /- skill-19: Description 19/);
+  assert.equal(block.includes("skill-20:"), false);
+  assert.match(block, /template_list/);
+});
+
+test("buildEditPrompt includes the skills block when ctx.skills is passed", () => {
+  const ctx = {
+    words: [{ text: "Hello" }],
+    skills: [
+      {
+        id: "cut-filler",
+        label: "Cut filler",
+        description: "Remove filler words.",
+      },
+    ],
+  };
+  const prompt = buildEditPrompt(ctx, "demo", "cut filler");
+  assert.match(prompt, /Available skills \(edit procedures\)/);
+  assert.match(prompt, /- cut-filler: Remove filler words\./);
+});
+
+test("buildEditPrompt omits the skills block when ctx.skills is absent", () => {
+  const ctx = { words: [{ text: "Hello" }] };
+  const prompt = buildEditPrompt(ctx, "demo", "cut filler");
+  assert.equal(prompt.includes("Available skills"), false);
 });

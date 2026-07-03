@@ -25,6 +25,7 @@ import { projectsRoot } from "@engine/paths";
 import { loadProject, mutateProject } from "@engine/projectStore";
 import { cwdPath } from "@engine/repo-paths";
 import { analyzeSceneLog, sceneLogLines } from "@engine/scene-log";
+import { listTemplates } from "@engine/templates";
 import { type VerifyReport, verifyCut, verifyVerdict } from "@engine/verify";
 
 // Re-export the type from source (type-only, never emits runtime code) so client
@@ -210,6 +211,7 @@ export async function chatWithAgent(
           assetCards,
           sceneLog,
           brief,
+          skills: listTemplates(),
         },
         slug,
         message,
