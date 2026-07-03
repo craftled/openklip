@@ -12,6 +12,7 @@ export const KEYFRAME_EASINGS: Keyframe["easing"][] = [
   "easeIn",
   "easeOut",
   "easeInOut",
+  "spring",
 ];
 
 export function keyframePositionFraction(
