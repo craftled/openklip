@@ -32,7 +32,9 @@ export async function fetchIntegrationsStatus(): Promise<IntegrationsStatus> {
     error?: string;
   };
   if (!res.ok) {
-    throw new Error(data.error ?? `Integrations request failed (${res.status})`);
+    throw new Error(
+      data.error ?? `Integrations request failed (${res.status})`
+    );
   }
   return {
     elevenLabs: {
@@ -86,9 +88,7 @@ export async function testElevenLabsApiKey(
   const res = await fetch("/api/integrations", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(
-      elevenLabsApiKey?.trim() ? { elevenLabsApiKey } : {}
-    ),
+    body: JSON.stringify(elevenLabsApiKey?.trim() ? { elevenLabsApiKey } : {}),
   });
   const data = (await res.json()) as Partial<IntegrationTestStatus> & {
     error?: string;
@@ -112,7 +112,9 @@ export async function fetchElevenLabsDetails(): Promise<ElevenLabsDetails> {
     error?: string;
   };
   if (!res.ok) {
-    throw new Error(data.error ?? `Load integration details failed (${res.status})`);
+    throw new Error(
+      data.error ?? `Load integration details failed (${res.status})`
+    );
   }
   return {
     characterCount: data.elevenLabs?.characterCount ?? null,

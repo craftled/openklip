@@ -1,22 +1,22 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   SettingsRow,
   SettingsSection,
 } from "@/components/settings/settings-panel-primitives";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   clearElevenLabsApiKey,
+  type ElevenLabsDetails,
   fetchElevenLabsDetails,
   fetchIntegrationsStatus,
+  type IntegrationsStatus,
+  type IntegrationTestStatus,
   saveElevenLabsApiKey,
   testElevenLabsApiKey,
-  type ElevenLabsDetails,
-  type IntegrationTestStatus,
-  type IntegrationsStatus,
 } from "@/lib/integrations-client";
 
 function formatUpdatedAt(value: string | null): string {
@@ -73,8 +73,9 @@ export function SettingsIntegrationsPanel() {
   const [status, setStatus] = useState<IntegrationsStatus>({
     elevenLabs: { hasApiKey: false, updatedAt: null },
   });
-  const [testStatus, setTestStatus] =
-    useState<IntegrationTestStatus["elevenLabs"] | null>(null);
+  const [testStatus, setTestStatus] = useState<
+    IntegrationTestStatus["elevenLabs"] | null
+  >(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -233,7 +234,7 @@ export function SettingsIntegrationsPanel() {
                 disabled={
                   isSaving ||
                   isTesting ||
-                  (!trimmedApiKey && !status.elevenLabs.hasApiKey)
+                  !(trimmedApiKey || status.elevenLabs.hasApiKey)
                 }
                 onClick={onTest}
                 size="sm"
@@ -243,9 +244,7 @@ export function SettingsIntegrationsPanel() {
                 {isTesting ? "Testing" : "Test"}
               </Button>
               <Button
-                disabled={
-                  !status.elevenLabs.hasApiKey || isSaving || isTesting
-                }
+                disabled={!status.elevenLabs.hasApiKey || isSaving || isTesting}
                 onClick={onClear}
                 size="sm"
                 type="button"
@@ -299,7 +298,7 @@ export function SettingsIntegrationsPanel() {
                   ? "text-[12px] text-destructive"
                   : testStatus?.ok
                     ? "text-[12px] text-emerald-700 dark:text-emerald-300"
-                  : "text-[12px] text-muted-foreground"
+                    : "text-[12px] text-muted-foreground"
               }
             >
               {error ?? testStatus?.message ?? updatedAt}
