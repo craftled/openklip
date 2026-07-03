@@ -1453,8 +1453,7 @@ export function setAudio(
     : current.loudness;
   const noiseReduction = input.noiseReduction
     ? {
-        enabled:
-          input.noiseReduction.enabled ?? current.noiseReduction.enabled,
+        enabled: input.noiseReduction.enabled ?? current.noiseReduction.enabled,
         nr: clampNum(
           input.noiseReduction.nr ?? current.noiseReduction.nr,
           1,

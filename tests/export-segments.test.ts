@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import type { Range } from "../src/edl.ts";
 import {
   buildSegmentAudioConcatFilter,
   buildSegmentInputArgs,
@@ -7,7 +8,6 @@ import {
   SEGMENT_EXPORT_KEPT_RATIO,
   shouldUseSegmentExport,
 } from "../src/export-segments.ts";
-import type { Range } from "../src/edl.ts";
 
 const ranges: Range[] = [
   { startSec: 10, endSec: 20 },
