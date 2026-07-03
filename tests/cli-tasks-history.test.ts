@@ -82,6 +82,96 @@ test("CLI tasks: a --status filter matching nothing prints a distinct filtered-e
   });
 });
 
+test("CLI tasks: --actor filters correctly", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const prev = process.env.OPENKLIP_ACTOR;
+    let agentTask: Awaited<ReturnType<typeof createAgentTask>>;
+    try {
+      process.env.OPENKLIP_ACTOR = "agent";
+      agentTask = await createAgentTask(slug, { request: "agent request" });
+      process.env.OPENKLIP_ACTOR = "human";
+      await createAgentTask(slug, { request: "human request" });
+    } finally {
+      if (prev === undefined) {
+        delete process.env.OPENKLIP_ACTOR;
+      } else {
+        process.env.OPENKLIP_ACTOR = prev;
+      }
+    }
+
+    const r = await runCli(["tasks", slug, "--actor", "agent"]);
+    assert.equal(r.code, 0, r.out);
+    assert.match(r.out, new RegExp(agentTask.id));
+    assert.match(r.out, /1 task/);
+  });
+});
+
+test("CLI tasks: combining --actor with --status narrows correctly", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const prev = process.env.OPENKLIP_ACTOR;
+    let agentCompleted: Awaited<ReturnType<typeof createAgentTask>>;
+    try {
+      // Same shape as the history combining test: --status alone would match
+      // two (both completed), --actor alone would match two (both agent).
+      // Only combining both narrows to exactly one.
+      process.env.OPENKLIP_ACTOR = "agent";
+      agentCompleted = await createAgentTask(slug, {
+        request: "agent completed",
+      });
+      await completeAgentTask(slug, agentCompleted.id, { kind: "completed" });
+      await createAgentTask(slug, { request: "agent still running" });
+      process.env.OPENKLIP_ACTOR = "human";
+      const humanCompleted = await createAgentTask(slug, {
+        request: "human completed",
+      });
+      await completeAgentTask(slug, humanCompleted.id, { kind: "completed" });
+    } finally {
+      if (prev === undefined) {
+        delete process.env.OPENKLIP_ACTOR;
+      } else {
+        process.env.OPENKLIP_ACTOR = prev;
+      }
+    }
+
+    const r = await runCli([
+      "tasks",
+      slug,
+      "--actor",
+      "agent",
+      "--status",
+      "completed",
+    ]);
+    assert.equal(r.code, 0, r.out);
+    assert.match(r.out, /1 task/);
+    assert.match(r.out, new RegExp(agentCompleted.id));
+  });
+});
+
+test("CLI tasks: an --actor filter matching nothing prints a distinct filtered-empty message", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const prev = process.env.OPENKLIP_ACTOR;
+    try {
+      process.env.OPENKLIP_ACTOR = "agent";
+      await createAgentTask(slug, { request: "agent request" });
+    } finally {
+      if (prev === undefined) {
+        delete process.env.OPENKLIP_ACTOR;
+      } else {
+        process.env.OPENKLIP_ACTOR = prev;
+      }
+    }
+
+    const r = await runCli(["tasks", slug, "--actor", "human"]);
+    assert.equal(r.code, 0, r.out);
+    assert.doesNotMatch(r.out, new RegExp(`no tasks for ${slug}\\.`));
+    assert.match(r.out, /no tasks match the filter/);
+    assert.match(r.out, /--actor=human/);
+  });
+});
+
 test("CLI history: genuinely no history prints the plain empty message", async () => {
   await withTempProjectsRoot(async ({ slug }) => {
     writeFixtureProject(slug, makeProject({ slug }));

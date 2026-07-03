@@ -2746,7 +2746,7 @@ try {
     case "tasks": {
       if (!rest[0]) {
         throw new Error(
-          "usage: openklip tasks <slug> [--limit N] [--status <status>]"
+          "usage: openklip tasks <slug> [--limit N] [--status <status>] [--actor <name>]"
         );
       }
       const tasksSlug = rest[0];
@@ -2764,20 +2764,33 @@ try {
           `--status must be one of: ${AGENT_TASK_STATUSES.join(", ")}`
         );
       }
+      const actorFilter = flagValue(rest, "--actor");
       const tasks = await listAgentTasks(tasksSlug, {
-        limit: statusFilter === undefined ? limit : Number.MAX_SAFE_INTEGER,
+        limit:
+          statusFilter === undefined && actorFilter === undefined
+            ? limit
+            : Number.MAX_SAFE_INTEGER,
       });
-      const filtered = (
-        statusFilter === undefined
-          ? tasks
-          : tasks.filter((t) => t.status === statusFilter)
-      ).slice(0, limit);
+      let allFiltered = tasks;
+      if (statusFilter !== undefined) {
+        allFiltered = allFiltered.filter((t) => t.status === statusFilter);
+      }
+      if (actorFilter !== undefined) {
+        allFiltered = allFiltered.filter((t) => t.actor === actorFilter);
+      }
+      const filtered = allFiltered.slice(0, limit);
       if (filtered.length === 0) {
-        // Distinguish "genuinely no tasks" from "a --status filter matched
-        // nothing" (Finding 6), same as the history command above.
-        if (statusFilter !== undefined && tasks.length > 0) {
+        // Distinguish "genuinely no tasks" from "a --status/--actor filter
+        // matched nothing" (Finding 6), same as the history command above.
+        const anyFilterActive =
+          statusFilter !== undefined || actorFilter !== undefined;
+        if (anyFilterActive && tasks.length > 0) {
+          const activeFilters = [
+            statusFilter === undefined ? undefined : `--status=${statusFilter}`,
+            actorFilter === undefined ? undefined : `--actor=${actorFilter}`,
+          ].filter((f): f is string => f !== undefined);
           console.log(
-            `no tasks match the filter (--status=${statusFilter}) for ${tasksSlug}.`
+            `no tasks match the filter (${activeFilters.join(", ")}) for ${tasksSlug}.`
           );
         } else {
           console.log(`no tasks for ${tasksSlug}.`);

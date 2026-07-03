@@ -400,17 +400,31 @@ const queryTools: AgentToolDef[] = [
       slug,
       limit: z.number().int().positive().max(100).default(20),
       status: z.enum(AGENT_TASK_STATUSES).optional(),
+      actor: z
+        .enum(HISTORY_ACTORS)
+        .optional()
+        .describe(
+          "Filter to tasks created by this actor (human, agent, cli, mcp, or system)."
+        ),
     }),
-    run: async ({ slug: projectSlug, limit, status }) => {
-      // The store has no status filter, so when one is requested we fetch
-      // beyond the store's own default limit, filter, THEN cap to the
+    run: async ({ slug: projectSlug, limit, status, actor }) => {
+      // The store has no status/actor filter, so when either is requested we
+      // fetch beyond the store's own default limit, filter, THEN cap to the
       // caller's limit: filtering after an already-limited fetch could
       // silently return fewer matches than actually exist.
       const tasks = await listAgentTasks(projectSlug, {
-        limit: status === undefined ? limit : Number.MAX_SAFE_INTEGER,
+        limit:
+          status === undefined && actor === undefined
+            ? limit
+            : Number.MAX_SAFE_INTEGER,
       });
-      const filtered =
-        status === undefined ? tasks : tasks.filter((t) => t.status === status);
+      let filtered = tasks;
+      if (status !== undefined) {
+        filtered = filtered.filter((t) => t.status === status);
+      }
+      if (actor !== undefined) {
+        filtered = filtered.filter((t) => t.actor === actor);
+      }
       return { tasks: filtered.slice(0, limit) };
     },
   }),
