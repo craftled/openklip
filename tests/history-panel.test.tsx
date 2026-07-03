@@ -26,6 +26,7 @@ import {
   parseSnapshotRevisions,
   revertErrorNeedsForce,
   revisionSpanLabel,
+  shouldShowTruncationWarning,
 } from "../web/components/history-panel.tsx";
 
 const older: ActionLogEntry = {
@@ -570,6 +571,100 @@ test("HistoryList disables a task revert with a 'history truncated' hint when th
     <HistoryList entries={entries} snapshotRevisions={snapshotRevisions} />
   );
   assert.match(html, /history truncated/i);
+});
+
+// ── G5: the truncation warning must read the RAW fetched count, never a
+// client-side filtered/displayed count. A filter can only narrow what's
+// shown from what was already fetched; it can never prove there isn't more
+// matching history further back that was never fetched at all. ────────────
+
+test("shouldShowTruncationWarning is true exactly when the raw fetched count hits the page limit", () => {
+  assert.equal(
+    shouldShowTruncationWarning(HISTORY_PAGE_LIMIT, HISTORY_PAGE_LIMIT),
+    true
+  );
+  assert.equal(
+    shouldShowTruncationWarning(HISTORY_PAGE_LIMIT - 1, HISTORY_PAGE_LIMIT),
+    false
+  );
+  assert.equal(shouldShowTruncationWarning(0, HISTORY_PAGE_LIMIT), false);
+});
+
+test("HistoryList's truncation hint fires with no filter active, entries and rawEntries equal at the page limit (already worked, must keep working)", () => {
+  const entries = makeChainEntries(HISTORY_PAGE_LIMIT);
+  const snapshotRevisions = entries.map((e) => e.revisionBefore);
+  const html = renderToStaticMarkup(
+    <HistoryList
+      entries={entries}
+      rawEntries={entries}
+      snapshotRevisions={snapshotRevisions}
+    />
+  );
+  assert.match(html, /history truncated/i);
+});
+
+test("HistoryList's truncation hint still fires when a filter narrows the displayed entries well below the page limit, because it reads the raw fetched count, not the filtered display count", () => {
+  const raw = makeChainEntries(HISTORY_PAGE_LIMIT);
+  // Simulates what filterHistoryEntries would hand back: a narrower subarray
+  // that still contains the true oldest entry by reference, standing in for
+  // a filter that happens to keep the tail of the chain.
+  const narrowed = raw.slice(-5);
+  const snapshotRevisions = raw.map((e) => e.revisionBefore);
+  const html = renderToStaticMarkup(
+    <HistoryList
+      entries={narrowed}
+      rawEntries={raw}
+      snapshotRevisions={snapshotRevisions}
+    />
+  );
+  assert.match(html, /history truncated/i);
+});
+
+test("HistoryList's truncation hint does not false-positive when the raw fetch is genuinely under the page limit, even with a filter narrowing the display further", () => {
+  const raw = makeChainEntries(50);
+  const narrowed = raw.slice(-5);
+  const snapshotRevisions = raw.map((e) => e.revisionBefore);
+  const html = renderToStaticMarkup(
+    <HistoryList
+      entries={narrowed}
+      rawEntries={raw}
+      snapshotRevisions={snapshotRevisions}
+    />
+  );
+  assert.doesNotMatch(html, /history truncated/i);
+});
+
+test("history-truncated hint wording distinguishes an active filter from the plain no-filter case, without claiming certainty either way", () => {
+  const raw = makeChainEntries(HISTORY_PAGE_LIMIT);
+  const narrowed = raw.slice(-5);
+  const snapshotRevisions = raw.map((e) => e.revisionBefore);
+
+  const noFilterHtml = renderToStaticMarkup(
+    <HistoryList
+      entries={raw}
+      rawEntries={raw}
+      snapshotRevisions={snapshotRevisions}
+    />
+  );
+  const filteredHtml = renderToStaticMarkup(
+    <HistoryList
+      entries={narrowed}
+      filterActive
+      rawEntries={raw}
+      snapshotRevisions={snapshotRevisions}
+    />
+  );
+
+  assert.match(noFilterHtml, /history truncated/i);
+  assert.match(filteredHtml, /history truncated/i);
+  // The filtered variant calls out the filter explicitly; the plain variant
+  // does not, so the two labels must differ.
+  assert.match(filteredHtml, /filter/i);
+  const noFilterLabel = noFilterHtml.match(/aria-label="([^"]*)"/)?.[1];
+  const filteredLabel = filteredHtml.match(/aria-label="([^"]*)"/)?.[1];
+  assert.ok(noFilterLabel);
+  assert.ok(filteredLabel);
+  assert.notEqual(noFilterLabel, filteredLabel);
 });
 
 // ── History panel filter UI: actor/action/task, AND semantics, empty states ─
