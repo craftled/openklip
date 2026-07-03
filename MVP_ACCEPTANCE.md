@@ -26,7 +26,7 @@ OpenKlip MVP is complete when a local user can turn a talking-head video into an
 ## Verification Evidence
 
 - `bun install --frozen-lockfile`: no changes needed.
-- `bun run ci`: check, typecheck, 411 tests (the count at MVP acceptance; 1117 now), and production build passed.
+- `bun run ci`: check, typecheck, 411 tests (the count at MVP acceptance; 1590 now), and production build passed.
 - Ingest smoke: `/tmp/openklip-ingest-smoke.mp4` created `projects/openklip-ingest-smoke` with 34 transcribed words.
 - Media smoke: `/media/proxy.mp4?slug=ok-sample` returned `206 Partial Content` for `Range: bytes=0-99`.
 - Browser smoke: local editor loaded, preview video advanced, transcript click persisted, export completed, and add-flow created zoom/title/b-roll entries.

@@ -165,7 +165,7 @@ Legend: Full means the surface can achieve the same outcome. Partial means the s
 | Chat threads | Full | Missing | Missing | Full chats route | UI/API only, acceptable but history should become agent-readable. |
 | Agent chat edits | Full for Claude MCP edits, read-only or CLI hints for others | N/A | Full tool surface for MCP clients | N/A | Codex/Grok/Cursor chat mutation parity still missing. |
 | Action manifest | Missing UI except implicit | Full: `actions`, `tools` | N/A | Missing route | CLI is source of truth. |
-| OS-level write safety | In-process lock only | In-process only per command | In-process only through server | In-process lock only | Cross-process races remain. |
+| OS-level write safety | Project writes use in-process serialization plus `project.json.lock` | Same `mutateProject` path for registry writes | Same lock through MCP mutations | Server actions share the same `mutateProject` lock | `project.json` cross-process safety shipped v0.28.0.0; unrelated files still use separate locks. |
 
 ### 0.2 Current CRUD completeness audit
 
@@ -176,15 +176,15 @@ Legend: Full means the surface can achieve the same outcome. Partial means the s
 | B-roll asset | UI/API upload, CLI register | UI, CLI, MCP | Asset card via analyze only, metadata edit missing | UI/API only | Add CLI/MCP delete and asset-card edit if needed. |
 | Still asset | UI/API upload, CLI register | UI, CLI, MCP | Asset card via analyze only, metadata edit missing | UI/API only | Same asset CRUD gap. |
 | Music asset | UI/API upload, CLI register | UI, CLI, MCP | Placement via `music-add`/`music-set`/`music-rm` | UI/API only | Music placement, export mix, ducking, loudness, and voice highpass shipped; timeline drag-trim remains open. |
-| Titles | UI, CLI, MCP | UI, CLI, MCP | UI, CLI, MCP | UI, CLI, MCP | Good parity. Needs richer styles. |
+| Titles | UI, CLI, MCP | UI, CLI, MCP | UI, CLI, MCP | UI, CLI, MCP | Good parity. Quote, divider, and callout styles shipped v0.20.0.0. |
 | Zooms | UI, CLI, MCP | UI, CLI, MCP | UI, CLI, MCP | UI, CLI, MCP | Good parity. Needs target point/crop variants. |
-| B-roll overlays | UI, CLI, MCP | UI, CLI, MCP | UI, CLI, MCP | UI, CLI, MCP | Needs PiP/audio modes. |
+| B-roll overlays | UI, CLI, MCP | UI, CLI, MCP | UI, CLI, MCP | UI, CLI, MCP | Cover, PiP, split, and b-roll audio modes shipped v0.17-v0.19. |
 | Still overlays | UI, CLI, MCP | UI, CLI, MCP | UI, CLI, MCP | UI, CLI, MCP | Needs richer motion modes. |
 | Graphics | UI, CLI, MCP | UI, CLI, MCP | UI, CLI, MCP | UI, CLI, MCP | Good parity. |
 | Captions | Ingest default | UI, CLI, MCP | UI, CLI, MCP | Off toggle, not deleted | Style presets shipped (2026-07-02); per-platform safe-area preview guides shipped (2026-07-03). |
 | Look and color | Project defaults | UI, CLI, MCP | UI, CLI, MCP | Reset by setting neutral values | Needs vignette strength/blur controls. |
 | Takes | CLI/MCP add, and (v0.34.0.0) GUI upload via `POST /api/projects/[slug]/takes` | CLI/MCP, and (v0.33.0.0) a GUI browse-and-assemble panel (`web/components/takes-panel.tsx`, Config sidebar between Highlights and Music) | Assemble creates new source | File-level only | UI take browser shipped 2026-07-03: browse/select/assemble existing takes. Browser upload for a NEW take shipped v0.34.0.0 (`app/api/projects/[slug]/takes/route.ts`, reusing the whole-project upload's background-job infrastructure); list/transcript/assemble still have no dedicated public route (GUI reads them through server actions). |
-| Exports | UI, CLI, MCP, API | File output, status, verify | Re-export overwrites | Manual file delete only | Needs presets, settings, history. |
+| Exports | UI, CLI, MCP, API | File output, status, verify | Re-export overwrites | Manual file delete only | Platform presets, frame rate, compression, MP4/GIF format, and GIF caps ship across surfaces; file lifecycle is still manual. |
 | Agent chats | UI/API | UI/API | UI/API rename/archive/append | UI/API | Not exposed to CLI/MCP as context or task log. |
 | Brief/context | UI, CLI, MCP | UI, CLI, MCP | CLI/MCP/UI save paths | File delete clears manually | `brief.md` shipped; CLI/GUI/MCP saves all history-log (2026-07-02). |
 | Action history | Append-only log on every user-facing mutation | History route + Config panel section with actor/action/task filter UI (v0.33.0.0); `openklip history` / MCP `history_list` (2026-07-02) | `openklip revert` / MCP `revert` / GUI History panel | Not applicable (append-only) | Task-level revert exists (2026-07-02); agent-facing history/task query tools added (2026-07-02, filter by task id or action name); actor filter added v0.32.0.0 for history (`--actor`/MCP `history_list` `actor`) and v0.33.0.0 for tasks (`openklip tasks --actor`/MCP `task_list` `actor`); GUI History panel filter UI shipped v0.33.0.0. |
@@ -196,15 +196,15 @@ The current architecture is strong where it uses the registry: cuts by id, capti
 The biggest blockers to a capable agent-first editor are:
 
 1. Cross-surface parity holes remain: project create/delete, asset delete/register, inbox scan, analysis triggers, chat context, and task logs are not all available on UI, CLI, MCP, and HTTP.
-2. Manual correction gaps remain: music timeline drag-trim, richer title styles, and visual export transitions (b-roll PiP/split/audio modes shipped v0.17-0.18; caption style presets shipped 2026-07-02).
-3. Agent recovery gaps remain: resumable checkpoints (task-level revert and undo shipped 2026-07-02; agent-facing history/task query tools shipped 2026-07-02; actor filter on history shipped v0.32.0.0, on tasks shipped v0.33.0.0).
+2. Manual correction gaps remain: music timeline drag-trim, title/zoom phrase placement in the UI, richer still motion, and preview/export transition visual parity. B-roll PiP/split/audio modes, richer title styles, caption presets, and exported transitions have shipped.
+3. Agent recovery gaps remain around resumable checkpoints and process restart recovery. Task-level revert, agent-facing history/task query tools, and actor filters have shipped.
 4. Context gaps remain: style recipes, brand-kit ingestion, and script/document ingestion beyond the free-form project brief.
 5. Shorts and reframing shipped v0.21-0.25 (manual/scene/vision crop, highlights, make-short/make-highlights playbooks).
 6. Process safety: cross-process `project.json` advisory lock shipped v0.28.0.0; revision conflict detection and machine-readable errors remain open.
 
 2026-07-03 update: shorts track through v0.28.0.0 (reframe, highlights, safe-area guides, split export layout, segment seeking, two-pass loudnorm, noise reduction, file locking, demo GIF). v0.32.0.0 closed the cinema player cut-skip bug, GIF export caps, de-essing, and the history actor filter. v0.33.0.0 closed the task actor filter, a GIF export cap width override, the multi-take GUI browser, and the GUI History panel filter UI. v0.34.0.0 closed the last multi-take gap, GUI upload for a new take. Remaining gaps are deeper cross-surface parity, agent recovery, and HTTP API surface.
 
-Recommended next code task: **highlight-row export in GUI**. Visual overlay primitives and shorts infrastructure are in place; polish export verification and remaining manual-correction gaps (music timeline drag-trim, richer title styles) next.
+Recommended next code task: **highlight-row export in GUI**. Visual overlay primitives and shorts infrastructure are in place; polish export verification and remaining manual-correction gaps such as music timeline drag-trim next.
 
 ## Milestone 1: Frictionless project intake
 
@@ -508,14 +508,14 @@ Goal: the UI can correct any agent edit precisely.
   - [x] Mix with voice.
   - [x] Duck source or duck b-roll.
   - Verification: export includes expected audio mix (v0.18.0.0, `tests/broll-audio.test.ts`).
-- [ ] Add richer title styles.
-  - [ ] Lower third.
-  - [ ] Center title.
-  - [ ] Hero title.
-  - [ ] Quote card.
-  - [ ] Section divider.
-  - [ ] Callout label.
-  - Verification: all styles render in preview and export.
+- [x] Add richer title styles.
+  - [x] Lower third.
+  - [x] Center title.
+  - [x] Hero title.
+  - [x] Quote card.
+  - [x] Section divider.
+  - [x] Callout label.
+  - Verification: all styles render in preview and export (v0.20.0.0).
 - [ ] Add keyframe-like property changes where needed.
   - [ ] Keep MVP scoped to opacity, scale, position if added.
   - [ ] Store as simple keyframes, not arbitrary code.
@@ -1034,7 +1034,7 @@ These tracks can run in parallel as long as each PR keeps `project.json` migrati
 
 - Owners can work mostly in timeline UI, overlay schemas, preview overlays, and exporter filters.
 - First shippable slice: b-roll PiP mode. **Shipped v0.17.0.0.**
-- Next slice: split screen and richer title styles. **Split screen shipped v0.19.0.0; richer title styles partial (v0.20.0.0).**
+- Next slice: split screen and richer title styles. **Split screen shipped v0.19.0.0; quote/divider/callout title styles shipped v0.20.0.0.**
 - Acceptance: user can fix the most common visual agent mistakes manually.
 
 ### Track F: Shorts and reframing

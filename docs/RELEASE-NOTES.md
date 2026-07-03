@@ -6,6 +6,152 @@ Publishing status checked on 2026-07-03 (`gh release list`): GitHub releases are
 
 ---
 
+## v0.34.0.0
+
+**Browser upload for multi-take ingest.**
+
+### Highlights
+- **Add take from the browser**: the Takes panel can upload a new take with a file picker and optional label.
+- **Durable take ingest**: uploads are copied into the project's `takes/` directory before `ingestTake`, so recorded source paths do not point at temporary upload files.
+- **Shared ingest jobs**: take uploads reuse `startIngestJob`, `getIngestJob`, and `/api/projects/ingest/[jobId]`; composite job keys keep take uploads from colliding with whole-project ingest for the same slug.
+- **Verification**: PR #52 CI passed; current codebase verification is 1590 tests.
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#03400---2026-07-03)
+
+---
+
+## v0.33.0.1
+
+**CLI actor validation, GUI GIF cap control, and a History truncation-warning fix.**
+
+### Highlights
+- **Validated `--actor` flags**: `openklip history` and `openklip tasks` now reject invalid actors instead of silently returning no matches.
+- **GIF max-width input**: the export dialog exposes the existing per-export GIF width override, clamped to the 1920px hard ceiling.
+- **History warning fix**: task revert warnings now read the raw fetched history count, not the filtered visible count.
+- **Verification**: PR #51 CI passed.
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#03301---2026-07-03)
+
+---
+
+## v0.33.0.0
+
+**Task actor filtering, GIF width override, multi-take browser, and GUI History filters.**
+
+### Highlights
+- **Task actor filter**: `task_list` and `openklip tasks --actor` mirror history actor filtering; tasks now record an optional actor.
+- **GIF width override**: CLI, MCP, route, and server action callers can raise GIF width above the 960px default up to 1920px for one export.
+- **Takes panel**: the GUI can browse ingested takes, select word ranges, build a multi-segment assembly, and overwrite with confirmation.
+- **History filters**: the GUI History panel gained actor, action, and task filters with a distinct filtered-empty state.
+- **Verification**: PR #50 CI passed.
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#03300---2026-07-03)
+
+---
+
+## v0.32.0.0
+
+**Cinema preview cut-skip fix, GIF caps, audio de-essing, and history actor filtering.**
+
+### Highlights
+- **CinemaPlayer cut-skip**: fullscreen playback now uses its own `CutScheduler`, so it skips deleted ranges like the inline preview and keeps overlays aligned to cut-space time.
+- **GIF guardrails**: GIF exports are capped at 960px width, 15fps, and 300 seconds kept duration; MP4 export is unchanged.
+- **Audio de-essing**: ffmpeg's `deesser` filter runs on the voice bus after highpass and noise reduction, wired through CLI, MCP, GUI, and export paths.
+- **History actor filter**: `openklip history --actor` and MCP `history_list.actor` filter by `human`, `agent`, `cli`, `mcp`, or `system`.
+- **Verification**: PR #49 CI passed.
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#03200---2026-07-03)
+
+---
+
+## v0.31.0.0
+
+**Real Glimm preview cut transitions.**
+
+### Highlights
+- **Preview sweep**: `CutScheduler` fires a cut-boundary callback only on auto-advance, not manual seeking.
+- **Transition plans**: `project.look.transition` maps to Glimm sweep options for crossfade-like and dip-like preview cues.
+- **Graceful fallback**: reduced-motion and unavailable WebGL both degrade to no visual effect.
+- **Verification**: PR #48 CI passed.
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#03100---2026-07-03)
+
+---
+
+## v0.30.0.0
+
+**Exported cut transitions and GUI dead-air removal, plus visible transition fallback reporting.**
+
+### Highlights
+- **Export cut transitions**: `project.look.transition` supports `crossfade` and `dip` for voice-only segment exports.
+- **Dead-air remove in GUI**: the Cleanup panel can remove registered dead-air spans instead of relying on CLI/MCP or revert.
+- **Fallback reporting**: export results, CLI output, and GUI toasts now say when a requested transition falls back to a hard cut.
+- **Verification**: PR #46 and PR #47 CI passed.
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#03000---2026-07-03)
+
+---
+
+## v0.29.0.1
+
+**CLI/MCP export format parity.**
+
+### Highlights
+- **CLI `--format`**: `openklip export <slug> --format mp4|gif` uses the same guard style as `--platform` and `--loudness`.
+- **MCP `format` input**: the `export` tool accepts the same `mp4`/`gif` choice as the GUI and server route.
+- **Destination boundary**: clipboard remains GUI-only because it is a client-side browser API call.
+- **Verification**: PR #45 CI passed.
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#02901---2026-07-03)
+
+---
+
+## v0.29.0.0
+
+**Export format and destination controls.**
+
+### Highlights
+- **MP4/GIF export format**: GUI, server action, and export route can render GIF by running a second ffmpeg palette pass over the MP4 render and dropping audio.
+- **File/clipboard destination**: the GUI can copy the exported file's absolute path to the OS clipboard as text after export.
+- **MP4 regression guard**: omitted or explicit `mp4` format keeps the existing MP4 path unchanged.
+- **Verification**: PR #44 CI passed.
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#02900---2026-07-03)
+
+---
+
 ## v0.28.0.0
 
 **Export performance, two-pass loudnorm, noise reduction, OS file locking, and demo GIF.**
@@ -15,11 +161,11 @@ Publishing status checked on 2026-07-03 (`gh release list`): GitHub releases are
 - **Two-pass loudnorm** and **noise reduction**: exact loudness targeting and light afftdn cleanup on the voice bus.
 - **OS file lock**: `project.json.lock` advisory lock inside `mutateProject` for CLI + server safety.
 - **Demo GIF**: `bun run demo-gif` → `docs/demo.gif` in README.
-- Current codebase verification: 1389 tests.
+- Release-time verification: 1389 tests.
 
 ### Known gaps
 
-See [TODO.md](../TODO.md#known-limitations). Segment mode does not run with b-roll, stills, music, or seam crossfades; de-essing is not implemented.
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
 
 **Full changelog:** [CHANGELOG.md](../CHANGELOG.md#02800---2026-07-03)
 
@@ -33,11 +179,11 @@ See [TODO.md](../TODO.md#known-limitations). Segment mode does not run with b-ro
 - **Safe-area guides**: portrait preview overlays for TikTok, Reels, YouTube Shorts, and generic vertical; preference toggle in the editor (not stored on `project.json`).
 - **Split vertical layout**: export `fill` or `split-vertical` with configurable speaker pane ratio and top/bottom position; GUI Reframe controls and `export-set --layout`.
 - **Asset flags**: `mustUse` / `avoid` on assets; `openklip asset-flags`, GUI badges, agents respect flags in `make-draft`.
-- Current codebase verification: 1368 tests.
+- Release-time verification: 1368 tests.
 
 ### Known gaps
 
-See [TODO.md](../TODO.md#known-limitations). Safe areas are preview guides only (export does not auto-inset captions); b-roll `display: split` remains the landscape side-by-side mode.
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
 
 **Full changelog:** [CHANGELOG.md](../CHANGELOG.md#02700---2026-07-03)
 
@@ -51,11 +197,11 @@ See [TODO.md](../TODO.md#known-limitations). Safe areas are preview guides only 
 - **`openklip export-highlight`**: renders one or all stored clips to `output/highlights/{id}.mp4` via `sourceSpan` (no word cuts on `project.json`).
 - **`bun run agent-make-highlights`**: batch export with the `shorts` preset.
 - **GUI**: Config **Highlights** section lists candidates, seeks on click, **Detect clips** runs LLM detection.
-- Current codebase verification: 1348 tests.
+- Release-time verification: 1348 tests.
 
 ### Known gaps
 
-See [TODO.md](../TODO.md#known-limitations). Per-clip verify still targets `output/out.mp4` only; GUI has no per-row Export button yet.
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
 
 **Full changelog:** [CHANGELOG.md](../CHANGELOG.md#02600---2026-07-03)
 
@@ -69,11 +215,11 @@ See [TODO.md](../TODO.md#known-limitations). Per-clip verify still targets `outp
 - **Highlight clips**: `openklip highlights-detect` finds short-form clip spans from the timed transcript; MCP `highlights_list` reads them back.
 - **Vision saliency + OCR**: face detection falls back to attention saliency; OCR text rides in the sidecar JSON for on-screen labels.
 - **GUI**: macOS Reframe panel gets a one-click Vision focus button.
-- Current codebase verification: 1334 tests.
+- Release-time verification: 1334 tests.
 
 ### Known gaps
 
-See [TODO.md](../TODO.md#known-limitations) for the current list. Highlight detection requires an external LLM agent; OpenCLIP semantic b-roll matching is still deferred.
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
 
 **Full changelog:** [CHANGELOG.md](../CHANGELOG.md#02500---2026-07-03)
 
@@ -88,11 +234,11 @@ See [TODO.md](../TODO.md#known-limitations) for the current list. Highlight dete
 - **`openklip vision-focus <slug>`**: writes `focusX`/`focusY` onto speaker sceneLog segments before scene crop mode runs.
 - **`cropMode: vision`**: CLI `export-set --crop-mode vision` samples frames directly when no sceneLog exists.
 - **`agent-make-short`**: on macOS, enriches sceneLog via Vision before export-set.
-- Current codebase verification: run `bun test` after merge.
+- Release-time verification was not recorded in this draft.
 
 ### Known gaps
 
-See [TODO.md](../TODO.md#known-limitations) for the current list. Vision focus is macOS-only and requires ingest frames; saliency/OCR sidecar is not implemented.
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
 
 **Full changelog:** [CHANGELOG.md](../CHANGELOG.md#02400---2026-07-03)
 
@@ -106,11 +252,11 @@ See [TODO.md](../TODO.md#known-limitations) for the current list. Vision focus i
 - **Speaker focus in scene log**: analyze can now persist `focusX`/`focusY` per speaker span; scene crop mode duration-weights them into export reframe.
 - **`bun run agent-make-short`**: one command to set 9:16, pick scene/manual crop, export with the `shorts` preset, and verify.
 - **Live check**: `edgaras-raw` via `agent-make-short` produced 1080x1920, `cropMode: scene`, verify passed.
-- Current codebase verification: 1318 tests.
+- Release-time verification: 1318 tests.
 
 ### Known gaps
 
-See [TODO.md](../TODO.md#known-limitations) for the current list. Focus coords depend on scene analysis quality; Vision/saliency sidecar is not implemented.
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
 
 **Full changelog:** [CHANGELOG.md](../CHANGELOG.md#02300---2026-07-03)
 
@@ -124,11 +270,11 @@ See [TODO.md](../TODO.md#known-limitations) for the current list. Focus coords d
 - **`cropMode: scene`**: after `openklip analyze`, export-set can derive crop focus from the scene log's speaker spans (GUI Manual/Scene toggle, MCP `export-set`, CLI `--crop-mode`).
 - **`revise-draft`**: new "Convert to short" path (section 3b) reframes and exports with the `shorts` preset without undoing the draft.
 - **Live verification**: `edgaras-raw` exported at 1080x1920 via `export-set --aspect 9:16` + `export --platform shorts`; verify passed.
-- Current codebase verification: 1303 tests.
+- Release-time verification: 1303 tests.
 
 ### Known gaps
 
-See [TODO.md](../TODO.md#known-limitations) for the current list. Scene mode weights speaker spans but still centers at 0.5/0.5 until per-segment focus coordinates exist. Face/saliency tracking is not implemented.
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
 
 **Full changelog:** [CHANGELOG.md](../CHANGELOG.md#02200---2026-07-03)
 
@@ -142,11 +288,11 @@ See [TODO.md](../TODO.md#known-limitations) for the current list. Scene mode wei
 - **`project.export`**: aspect (`source`, `16:9`, `9:16`, `1:1`) and manual crop (focus X/Y, zoom) persist on `project.json` and drive the same math in the GUI preview and ffmpeg export (`src/export-aspect.ts`).
 - **`export-set` + `shorts` preset**: `openklip export-set`, MCP `export-set`, and `openklip export --platform shorts` (or GUI Platform picker) land a vertical export without hand-rolling four separate flags. One-off `--aspect` / `--crop-*` flags override for a single export only.
 - **GUI**: Reframe sliders in Config, orientation toggle writes aspect, export dialog shows correct vertical dimensions when Shorts is selected.
-- Current codebase verification: 1294 tests.
+- Release-time verification: 1294 tests.
 
 ### Known gaps
 
-See [TODO.md](../TODO.md#known-limitations) for the current list. Reframe is manual (focus/zoom sliders); auto subject tracking is not implemented yet. Caption safe areas per platform are still not modeled.
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
 
 **Full changelog:** [CHANGELOG.md](../CHANGELOG.md#02100---2026-07-03)
 
@@ -162,7 +308,7 @@ See [TODO.md](../TODO.md#known-limitations) for the current list. Reframe is man
 
 ### Known gaps
 
-See [TODO.md](../TODO.md#known-limitations). Lower text card choreography, word-by-word reveal captions, and blurred-background screenshot composition are not implemented.
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
 
 **Full changelog:** [CHANGELOG.md](../CHANGELOG.md#02000---2026-07-03)
 
@@ -178,7 +324,7 @@ See [TODO.md](../TODO.md#known-limitations). Lower text card choreography, word-
 
 ### Known gaps
 
-See [TODO.md](../TODO.md#known-limitations). Background blur with foreground crop is not implemented.
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
 
 **Full changelog:** [CHANGELOG.md](../CHANGELOG.md#01900---2026-07-03)
 
@@ -194,7 +340,7 @@ See [TODO.md](../TODO.md#known-limitations). Background blur with foreground cro
 
 ### Known gaps
 
-See [TODO.md](../TODO.md#known-limitations). Preview does not yet play b-roll audio modes.
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
 
 **Full changelog:** [CHANGELOG.md](../CHANGELOG.md#01800---2026-07-03)
 
@@ -210,7 +356,7 @@ See [TODO.md](../TODO.md#known-limitations). Preview does not yet play b-roll au
 
 ### Known gaps
 
-See [TODO.md](../TODO.md#known-limitations). Split screen and audio modes ship in v0.19 and v0.18 respectively.
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
 
 **Full changelog:** [CHANGELOG.md](../CHANGELOG.md#01700---2026-07-03)
 
@@ -223,11 +369,11 @@ See [TODO.md](../TODO.md#known-limitations). Split screen and audio modes ship i
 ### Highlights
 - **Export platform presets**: `youtube` (1080p, -14 LUFS), `youtube-4k` (2160p, -14 LUFS), `x` (1080p/30fps, -14 LUFS), and `linkedin` (1080p/30fps, -14 LUFS), defined once in `src/export-platforms.ts`. A preset fills in defaults only: any compression/fps/maxHeight/loudness value passed explicitly still wins, and `maxHeight` never upscales past the source. `openklip export --platform <id>` (plus a new `--loudness <lufs>` override), the export API route, the `exportProject` server action, and the MCP `export` tool all share the same resolution logic; a Platform picker in the GUI export dialog sets the visible controls to match.
 - **Export dialog resolution fix**: the dialog's "4K" control could previously submit the source height instead of the intended output ceiling; the displayed dimensions, size/time estimate, and the actual export now always agree.
-- Current codebase verification: 1243 tests.
+- Release-time verification: 1243 tests.
 
 ### Known gaps
 
-See [TODO.md](../TODO.md#known-limitations) for the current list. Platform presets are landscape-only (no vertical/9:16 destinations yet); a platform's fps is a hard pin, not a cap, so retiming footage shot at a different frame rate can duplicate frames; loudness normalization stays single-pass (lands near, not exactly at, the target).
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
 
 **Full changelog:** [CHANGELOG.md](../CHANGELOG.md#01600---2026-07-03)
 
@@ -241,11 +387,11 @@ See [TODO.md](../TODO.md#known-limitations) for the current list. Platform prese
 - **Caption style presets**: `boxed`, `clean`, `karaoke`, `bold-caps`, and `minimal`, defined once in `src/caption-styles.ts` and rendered identically by the cinema preview and the ASS export burn-in. A "Caption style" picker in the Config sidebar switches presets live; `openklip captions-style <slug> <style>` and the `captions-style` action (cli/gui/mcp) do the same from the terminal or an agent. Unknown or missing style ids fall back to `boxed` on read, so older or newer projects never fail to load.
 - **Portrait caption clipping fix**: export now wraps long caption lines (`WrapStyle: 0`) instead of letting them run off-frame, most visible in portrait/narrow exports.
 - **Agent history and task query tools**: MCP `history_list` / `task_list` and CLI `openklip history` / `openklip tasks` let an agent read action history and past task records instead of only being able to revert blind. `templates/revise-draft/skill.md` uses them to find the task that produced a draft before reverting it.
-- Current codebase verification: 1187 tests.
+- Release-time verification: 1187 tests.
 
 ### Known gaps
 
-See [TODO.md](../TODO.md#known-limitations) for the current list. Caption presets are v1: fixed definitions, Arial only, no custom fonts or per-project colors yet.
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
 
 **Full changelog:** [CHANGELOG.md](../CHANGELOG.md#01500---2026-07-02)
 
@@ -258,11 +404,11 @@ See [TODO.md](../TODO.md#known-limitations) for the current list. Caption preset
 ### Highlights
 - **Transcript reconcile fix**: the contentEditable transcript editor no longer risks restoring a cut word on a stray edit. A word only comes back through an explicit action (timeline toggle, search restore, cleanup, revert); typing its text back into the transcript no longer restores it.
 - **`revise-draft` playbook**: a new skill (`templates/revise-draft/skill.md`, auto-listed alongside `make-draft`) lets an agent apply targeted edits or a whole-task revert to an existing draft, with safety rails around `--force` and re-export.
-- Current codebase verification: 1131 tests.
+- Release-time verification: 1131 tests.
 
 ### Known gaps
 
-See [TODO.md](../TODO.md#known-limitations) for the current list. `make-short` (vertical reframe) is still not implemented; agents still have no dedicated tool to query past action or task history (GUI History panel only).
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
 
 **Full changelog:** [CHANGELOG.md](../CHANGELOG.md#01410---2026-07-02)
 
@@ -277,11 +423,11 @@ See [TODO.md](../TODO.md#known-limitations) for the current list. `make-short` (
 - **Pre-mutation snapshots**: every logged mutation now keeps the project state from just before the change in `working/history/`, pruned to the newest 100 revisions.
 - **Revert**: `openklip revert <slug> (--to <rev> | --task <id> | --last) [--force]`, the MCP `revert` tool, and a GUI History panel revert action restore `project.json` to an earlier snapshot as a normal logged mutation, so the revision counter stays monotonic and a revert is itself revertible. Guards refuse a revert that would silently discard another task's work (without `--force`) or cross a multi-take assembly boundary.
 - **Forward-compatible schema**: `ProjectSchema` is now `.passthrough()`, so unknown top-level keys survive a load/save round-trip instead of being dropped by an older build.
-- Current codebase verification: 1117 tests.
+- Release-time verification: 1117 tests.
 
 ### Known gaps
 
-See [TODO.md](../TODO.md#known-limitations) for the current list. Revert restores `project.json` only, not export artifacts, `brief.md`, chats, tasks, or asset files.
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
 
 **Full changelog:** [CHANGELOG.md](../CHANGELOG.md#01400---2026-07-02)
 
@@ -299,11 +445,11 @@ See [TODO.md](../TODO.md#known-limitations) for the current list. Revert restore
 - **Dead-air spans**: explicit source-time spans can be removed from otherwise kept ranges via `dead-air-add` and `dead-air-rm`, with coalescing, caps, and action-history logging.
 - **Transcript correction parity**: `openklip word-text` and the `word-text` action let CLI/MCP/UI paths correct one word without touching timing, while preserving the original text on first edit.
 - **Caption and assembly fixes**: captions now match kept output by overlap so snapped/dead-air-shifted boundaries do not drop live words; multi-take assembly regenerates analysis audio so VAD and cleanup read the assembled source.
-- Current codebase verification: 1017 tests.
+- Release-time verification: 1017 tests.
 
 ### Known gaps
 
-See [TODO.md](../TODO.md#known-limitations) for the current list.
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
 
 **Full changelog:** [CHANGELOG.md](../CHANGELOG.md#01300---2026-07-02)
 
@@ -323,7 +469,7 @@ See [TODO.md](../TODO.md#known-limitations) for the current list.
 
 ### Known gaps
 
-See [TODO.md](../TODO.md#known-limitations) for the current list.
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
 
 **Full changelog:** [CHANGELOG.md](../CHANGELOG.md#01200---2026-07-02)
 
@@ -344,7 +490,7 @@ See [TODO.md](../TODO.md#known-limitations) for the current list.
 
 ### Known gaps
 
-See [TODO.md](../TODO.md#known-limitations) for the current list.
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
 
 **Full changelog:** [CHANGELOG.md](../CHANGELOG.md#01100---2026-07-02)
 
@@ -364,7 +510,7 @@ See [TODO.md](../TODO.md#known-limitations) for the current list.
 
 ### Known gaps
 
-See [TODO.md](../TODO.md#known-limitations) for the current list.
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
 
 **Full changelog:** [CHANGELOG.md](../CHANGELOG.md#01001---2026-07-01)
 
@@ -385,7 +531,7 @@ See [TODO.md](../TODO.md#known-limitations) for the current list.
 
 ### Known gaps
 
-See [TODO.md](../TODO.md#known-limitations) for the full list (current).
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
 
 **Full changelog:** [CHANGELOG.md](../CHANGELOG.md#01000---2026-07-01)
 
@@ -403,7 +549,7 @@ See [TODO.md](../TODO.md#known-limitations) for the full list (current).
 
 ### Known gaps
 
-See [TODO.md](../TODO.md#known-limitations) for the full list (current).
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
 
 **Full changelog:** [CHANGELOG.md](../CHANGELOG.md#0900---2026-06-30)
 
@@ -422,7 +568,7 @@ See [TODO.md](../TODO.md#known-limitations) for the full list (current).
 
 ### Known gaps
 
-See [TODO.md](../TODO.md#known-limitations) for the full list (current).
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
 
 **Full changelog:** [CHANGELOG.md](../CHANGELOG.md#08100---2026-06-29)
 
@@ -440,7 +586,7 @@ See [TODO.md](../TODO.md#known-limitations) for the full list (current).
 
 ### Known gaps
 
-See [TODO.md](../TODO.md#known-limitations) for the full list (current).
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
 
 **Full changelog:** [CHANGELOG.md](../CHANGELOG.md#0890---2026-06-28)
 
@@ -461,7 +607,7 @@ See [TODO.md](../TODO.md#known-limitations) for the full list (current).
 
 ### Known gaps
 
-See [TODO.md](../TODO.md#known-limitations) for the full list (current).
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
 
 **Full changelog:** [CHANGELOG.md](../CHANGELOG.md#085---2026-06-28)
 
@@ -483,7 +629,7 @@ See [TODO.md](../TODO.md#known-limitations) for the full list (current).
 
 ### Known gaps
 
-See [TODO.md](../TODO.md#known-limitations) for the full list (current).
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
 
 **Full changelog:** [CHANGELOG.md](../CHANGELOG.md#082---2026-06-28)
 
@@ -517,7 +663,7 @@ See [TODO.md](../TODO.md#known-limitations) for the full list (current).
 
 ### Known gaps
 
-See [TODO.md](../TODO.md#known-limitations) for the full list (current).
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
 
 **Full changelog:** [CHANGELOG.md](../CHANGELOG.md#080---2026-06-28)
 
@@ -536,7 +682,7 @@ See [TODO.md](../TODO.md#known-limitations) for the full list (current).
 
 ### Known gaps
 
-See [TODO.md](../TODO.md#known-limitations) (as of v0.7.0).
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
 
 **Full changelog:** [CHANGELOG.md](../CHANGELOG.md#070---2026-06-28)
 
@@ -556,7 +702,7 @@ See [TODO.md](../TODO.md#known-limitations) (as of v0.7.0).
 
 ### Known gaps
 
-See [TODO.md](../TODO.md#known-limitations) (as of v0.6.2).
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
 
 **Full changelog:** [CHANGELOG.md](../CHANGELOG.md#062---2026-06-28)
 
@@ -575,7 +721,7 @@ See [TODO.md](../TODO.md#known-limitations) (as of v0.6.2).
 
 ### Known gaps
 
-See [TODO.md](../TODO.md#known-limitations) (as of v0.6.1).
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
 
 **Full changelog:** [CHANGELOG.md](../CHANGELOG.md#061---2026-06-28)
 

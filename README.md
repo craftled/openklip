@@ -1,7 +1,5 @@
 # OpenKlip
 
-![OpenKlip demo](docs/demo.gif)
-
 **Agent-native video toolchain**
 
 ![OpenKlip demo](docs/demo.gif)
@@ -29,7 +27,7 @@ These follow from how the repo is actually built:
 
 **Local-first.** Projects live under `projects/<slug>/` as plain files. Ingest transcribes with Transformers.js (Whisper). Export and proxies use bundled `ffmpeg-static` / `ffprobe-static`.
 
-**One edit, one file.** `project.json` holds the edit: words, cuts, asset registry, overlays, captions, look flags. Paths under `working/` and `output/` are derived (proxy, transcript, ffmpeg asset proxies, `chats.json`, export).
+**One edit, one file.** `project.json` holds the edit: words, cuts, asset registry, overlays, captions, look flags. `brief.md` is adjacent project context. Paths under `working/` and `output/` are derived (proxy, transcript, ffmpeg asset proxies, `chats.json`, `actions.jsonl`, `tasks.json`, exports).
 
 **Same file, two surfaces.** The CLI applies edits through `runAction()` in `src/registry.ts`. The GUI applies edits through Next.js server actions in `app/actions.ts` (via `mutateProject()` for serialized read-modify-write). Both persist to the same `project.json`. Reload the browser after external CLI edits.
 
@@ -52,6 +50,7 @@ The user picks the projects folder in the GUI. Resolution order:
 ```text
 projects/<slug>/
   project.json       ← edit (EDL)
+  brief.md           ← optional project brief
   assets/            ← user originals (flat)
   working/           ← generated cache
   output/out.mp4     ← export
@@ -65,6 +64,9 @@ projects/<slug>/
 | `working/transcript.json` | Whisper output |
 | `working/assets/` | ffmpeg proxies for video/audio assets |
 | `working/chats.json` | Agent sidebar threads (`src/chats.ts`, `/api/projects/[slug]/chats`) |
+| `working/actions.jsonl` | Append-only action history |
+| `working/tasks.json` | Agent task progress records |
+| `working/history/` | Revert snapshots, newest 100 revisions |
 | `output/out.mp4` | `openklip export` / export API |
 
 Agent sidebar chats use `working/chats.json`, not `localStorage` (color scheme and default-agent preferences still use `localStorage` in the browser).
@@ -112,7 +114,7 @@ Verified against the current codebase (`VERSION` / `package.json` `0.34.0.0`, 15
 - **Browser project creation**: upload a video in the New Project dialog or drop one onto the empty workspace; format-validated on client and server, source persisted into the project folder, explicit overwrite confirm on name collisions, ingest progress overlay, editor opens on completion
 - **Workspace**: macOS folder picker on empty landing; inline project create; projects root persisted in `.openklip/projects-root`
 - **CLI**: full edit surface; `openklip actions --json` mutations manifest; `openklip tools --json` full agent tool list
-- **MCP server**: `openklip mcp` (stdio) exposes 75 tools with CLI/GUI parity; `.cursor/mcp.json` wired for Cursor
+- **MCP server**: `openklip mcp` (stdio) exposes 75 tools across query, mutation, task progress, revert, and export surfaces; `.cursor/mcp.json` wired for Cursor
 - **Edit templates**: `templates/<id>/skill.md` playbooks; `openklip template set`; brand presets at ingest (`openklip brand`)
 - **Agent selector**: drive filler cuts via Claude Code, Codex, Cursor, or Grok subscription CLIs
 - **Design system**: default shadcn/ui tokens with Base UI primitives (`app/globals.css`, `components.json`); light/dark via `.dark` class; icons via `web/lib/icon.tsx`
