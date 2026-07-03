@@ -12,6 +12,7 @@ function mockGraphicRoot(): HTMLElement {
   const style: Record<string, string> = {};
   return {
     matches: (selector: string) => selector === "[data-graphic-root]",
+    getAttribute: () => null,
     querySelector: () => null,
     style,
     querySelectorAll: () => [],
@@ -22,6 +23,7 @@ function mockGraphicRootWithChild(child: HTMLElement): HTMLElement {
   const style: Record<string, string> = {};
   return {
     matches: (selector: string) => selector === "[data-graphic-root]",
+    getAttribute: () => null,
     querySelector: () => null,
     style,
     querySelectorAll: (selector: string) =>

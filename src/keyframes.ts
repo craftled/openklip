@@ -1,3 +1,4 @@
+import { cubicBezier } from "motion";
 import { z } from "zod";
 
 export const KeyframeSchema = z.object({
@@ -5,7 +6,7 @@ export const KeyframeSchema = z.object({
   property: z.enum(["opacity", "scale", "x", "y"]),
   value: z.number(),
   easing: z
-    .enum(["linear", "easeIn", "easeOut", "easeInOut"])
+    .enum(["linear", "easeIn", "easeOut", "easeInOut", "spring"])
     .default("linear"),
 });
 
@@ -14,9 +15,16 @@ export type KeyframeProps = Partial<
   Record<"opacity" | "scale" | "x" | "y", number>
 >;
 
+// Same spring-feel curve as web/lib/graphic-runtime.ts: a pure fn of progress,
+// deterministic at any sampleOffset (a real time-stepping spring is not).
+// Keep the two constants in sync: cubicBezier(0.34, 1.56, 0.64, 1).
+const springEase = cubicBezier(0.34, 1.56, 0.64, 1);
+
 function applyEasing(easing: Keyframe["easing"], rawProgress: number): number {
   const t = Math.max(0, Math.min(1, rawProgress));
   switch (easing) {
+    case "spring":
+      return springEase(t);
     case "easeIn":
       return t ** 3;
     case "easeOut":

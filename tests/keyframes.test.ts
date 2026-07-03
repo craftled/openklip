@@ -193,3 +193,36 @@ test("evaluateKeyframes: accepts unsorted input keyframes", () => {
   ];
   assert.deepEqual(evaluateKeyframes(keyframes, 50), { y: 0.5 });
 });
+
+test("evaluateKeyframes: spring easing overshoots the target mid-segment then settles", () => {
+  const keyframes = [
+    {
+      sampleOffset: 0,
+      property: "scale" as const,
+      value: 0,
+      easing: "linear" as const,
+    },
+    {
+      sampleOffset: 100,
+      property: "scale" as const,
+      value: 1,
+      easing: "spring" as const,
+    },
+  ];
+  // cubicBezier(0.34, 1.56, 0.64, 1) overshoots past the target before settling.
+  const late = evaluateKeyframes(keyframes, 70).scale ?? 0;
+  assert.ok(late > 1, `expected overshoot past 1, got ${late}`);
+  // Endpoints stay exact.
+  assert.equal(evaluateKeyframes(keyframes, 0).scale, 0);
+  assert.equal(evaluateKeyframes(keyframes, 100).scale, 1);
+});
+
+test("KeyframeSchema: accepts spring easing", () => {
+  const parsed = KeyframeSchema.parse({
+    sampleOffset: 0,
+    property: "opacity",
+    value: 1,
+    easing: "spring",
+  });
+  assert.equal(parsed.easing, "spring");
+});
