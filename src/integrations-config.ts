@@ -28,8 +28,8 @@ export interface IntegrationStatus {
 }
 
 export interface IntegrationTestResult {
-  ok: boolean;
   message: string;
+  ok: boolean;
   status: number | null;
 }
 
@@ -104,7 +104,7 @@ export function setElevenLabsApiKey(apiKey: string): IntegrationStatus {
 
 export function clearElevenLabsApiKey(): IntegrationStatus {
   const config = loadConfig();
-  delete config.elevenLabs;
+  config.elevenLabs = undefined;
   saveConfig(config);
   return readIntegrationsStatus();
 }
@@ -227,7 +227,9 @@ export async function fetchElevenLabsDetails(): Promise<ElevenLabsDetails> {
   return {
     characterCount: numberOrNull(subscription?.character_count),
     characterLimit: numberOrNull(subscription?.character_limit),
-    characterResetAt: resetUnix ? new Date(resetUnix * 1000).toISOString() : null,
+    characterResetAt: resetUnix
+      ? new Date(resetUnix * 1000).toISOString()
+      : null,
     modelCount: Array.isArray(modelsRaw) ? modelsRaw.length : null,
     status: stringOrNull(subscription?.status),
     tier: stringOrNull(subscription?.tier),

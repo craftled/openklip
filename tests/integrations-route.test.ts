@@ -2,8 +2,8 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DELETE, GET, POST, PUT } from "../app/api/integrations/route.ts";
 import { GET as GET_DETAILS } from "../app/api/integrations/details/route.ts";
+import { DELETE, GET, POST, PUT } from "../app/api/integrations/route.ts";
 
 const realFetch = globalThis.fetch;
 
@@ -76,6 +76,7 @@ describe("/api/integrations", () => {
     await withTempRepo(async () => {
       const seenKeys: string[] = [];
       globalThis.fetch = (async (_input, init) => {
+        await Promise.resolve();
         seenKeys.push(new Headers(init?.headers).get("xi-api-key") ?? "");
         return Response.json([]);
       }) as typeof fetch;
@@ -94,6 +95,7 @@ describe("/api/integrations", () => {
     await withTempRepo(async () => {
       await PUT(jsonRequest({ elevenLabsApiKey: "saved-key" }));
       globalThis.fetch = (async (input) => {
+        await Promise.resolve();
         const url = String(input);
         if (url.endsWith("/v1/user")) {
           return Response.json({

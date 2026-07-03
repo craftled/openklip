@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -17,7 +23,9 @@ afterEach(() => {
   globalThis.fetch = realFetch;
 });
 
-async function withTempRepo<T>(fn: (root: string) => T | Promise<T>): Promise<T> {
+async function withTempRepo<T>(
+  fn: (root: string) => T | Promise<T>
+): Promise<T> {
   const prevCwd = process.cwd();
   const temp = mkdtempSync(join(tmpdir(), "openklip-integrations-"));
   process.chdir(temp);
@@ -38,9 +46,7 @@ describe("integrations config", () => {
 
       expect(status.elevenLabs.hasApiKey).toBe(true);
       expect(readElevenLabsApiKey()).toBe("test-key");
-      expect(readIntegrationsStatus()).not.toHaveProperty(
-        "elevenLabs.apiKey"
-      );
+      expect(readIntegrationsStatus()).not.toHaveProperty("elevenLabs.apiKey");
 
       const configPath = join(root, ".openklip", "integrations.json");
       expect(existsSync(configPath)).toBe(true);
@@ -62,7 +68,11 @@ describe("integrations config", () => {
 
   test("tests a key against ElevenLabs using xi-api-key", async () => {
     const calls: Array<{ headers: Headers; url: string }> = [];
-    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    globalThis.fetch = (async (
+      input: RequestInfo | URL,
+      init?: RequestInit
+    ) => {
+      await Promise.resolve();
       calls.push({
         url: String(input),
         headers: new Headers(init?.headers),
@@ -84,7 +94,10 @@ describe("integrations config", () => {
 
   test("maps rejected ElevenLabs keys to a clear failure", async () => {
     globalThis.fetch = (async () =>
-      Response.json({ detail: "invalid api key" }, { status: 401 })) as typeof fetch;
+      Response.json(
+        { detail: "invalid api key" },
+        { status: 401 }
+      )) as typeof fetch;
 
     const result = await testElevenLabsApiKey("bad-key");
 
@@ -102,6 +115,7 @@ describe("integrations config", () => {
         input: RequestInfo | URL,
         init?: RequestInit
       ) => {
+        await Promise.resolve();
         const headers = new Headers(init?.headers);
         expect(headers.get("xi-api-key")).toBe("saved-key");
         const url = String(input);
