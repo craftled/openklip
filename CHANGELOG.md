@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.33.0.1 - 2026-07-03
+
+Three narrow fixes: CLI `--actor` enum validation, a GIF export cap override GUI control, and a GUI History panel truncation-warning fix.
+
+### Fixed
+- **CLI `--actor` enum validation** (`src/cli.ts`): `openklip history <slug> --actor <name>` and `openklip tasks <slug> --actor <name>` previously accepted any string with no validation, so a typo silently matched zero entries instead of erroring, unlike `--status` in the same `tasks` command. Both now validate against the existing `HISTORY_ACTORS` tuple (`human | agent | cli | mcp | system`, from `src/agent-tools.ts`) and throw `--actor must be one of: human, agent, cli, mcp, system` on an invalid value, matching `--status`'s error style exactly.
+- **GUI History panel truncation warning read the wrong count** (`web/components/history-panel.tsx`): the per-task-group "Revert task" disabled-affordance hint (`groupTouchesTruncationBoundary`) compared the FILTERED (displayed) entry count against the 200-entry page limit instead of the RAW fetched count, so an active actor/action/task filter that narrowed the visible list below 200 could make a real truncation warning silently disappear even though the underlying fetch actually hit the cap. `shouldShowTruncationWarning(rawFetchedCount, limit)` is now the single source of truth; `HistoryList`/`HistoryPanel` thread the true unfiltered `rawEntries` alongside the filtered `entries`, and the warning's copy now names the active filter as a reason the narrow view can still undercount.
+
+### Added
+- **GIF export cap override GUI control** (`web/components/export-dialog.tsx`, `web/components/export-options-form.tsx`): the CLI/MCP/route/action `gifMaxWidth` override (up to the existing 1920px hard ceiling on the 960px default) now has a GUI control too: a numeric input next to the "GIF exports have no audio." hint when GIF format is selected, clamped client-side to `[1, GIF_MAX_WIDTH_CEILING_PX]`, and only submitted when it differs from the 960px default (`resolveGifMaxWidthSubmission`, a new pure exported function) so an unchanged request stays byte-identical to before.
+
+### Changed
+- **Version**: bumped OpenKlip to `0.33.0.1`.
+
 ## 0.33.0.0 - 2026-07-03
 
 Task actor filter, GIF export cap override, multi-take GUI browser, and GUI history filter UI.
