@@ -1,5 +1,12 @@
 # Changelog
 
+## Documentation correction - 2026-07-03
+
+No code changed in this entry; it corrects the record left by earlier entries below.
+
+### Corrected
+- Entries below describing "Glimm WebGL sweep" preview transitions as shipped (starting 2026-06-26) were incorrect. The `glimm` package was added to `package.json` as a dependency but never integrated into the preview: no shader canvas, no scheduler cut-boundary hook exists anywhere in `web/`. No such visual effect exists in the codebase as of this correction; preview cuts jump hard between kept ranges with no transition of any kind. See `TODO.md#known-limitations`.
+
 ## 0.30.0.0 - 2026-07-03
 
 Exported cut transitions and GUI dead-air removal.
