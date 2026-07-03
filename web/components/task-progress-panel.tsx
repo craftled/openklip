@@ -22,7 +22,7 @@ export type {
 } from "@engine/agent-task-types";
 
 const BADGE_BASE =
-  "inline-flex shrink-0 items-center rounded-sm px-1.5 py-0.5 font-medium text-[10px] uppercase tracking-wide";
+  "inline-flex shrink-0 items-center rounded-sm px-1.5 py-0.5 font-medium text-xs uppercase tracking-wide";
 
 const TASK_STATUS_BADGES: Record<AgentTaskStatus, string> = {
   pending: "bg-muted text-muted-foreground",
@@ -126,9 +126,7 @@ function TaskStepRow({ step }: { step: AgentTaskStep }) {
         </span>
       </div>
       {step.note ? (
-        <p className="pl-[18px] text-[11px] text-muted-foreground">
-          {step.note}
-        </p>
+        <p className="pl-[18px] text-muted-foreground text-xs">{step.note}</p>
       ) : null}
     </li>
   );
@@ -161,13 +159,13 @@ function TaskRow({
         </p>
         <span className={taskStatusBadgeClass(task.status)}>{task.status}</span>
       </div>
-      <div className="text-[11px] text-muted-foreground tabular-nums">
+      <div className="text-muted-foreground text-xs tabular-nums">
         {formatTaskRelativeTime(task, now)}
       </div>
       {visibleSteps.length > 0 ? (
         <>
           {earlierSteps > 0 ? (
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-muted-foreground text-xs">
               {earlierSteps} earlier step{earlierSteps === 1 ? "" : "s"}
             </p>
           ) : null}
@@ -187,7 +185,7 @@ function TaskRow({
         <p className="text-muted-foreground text-xs">{task.summary}</p>
       ) : null}
       {task.remaining && task.remaining.length > 0 ? (
-        <ul className="list-disc pl-4 text-[11px] text-muted-foreground">
+        <ul className="list-disc pl-4 text-muted-foreground text-xs">
           {task.remaining.map((item) => (
             <li key={item}>{item}</li>
           ))}
@@ -233,7 +231,7 @@ export function TaskList({
         ))}
       </ul>
       {olderCount > 0 ? (
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-muted-foreground text-xs">
           {olderCount} older task{olderCount === 1 ? "" : "s"}
         </p>
       ) : null}

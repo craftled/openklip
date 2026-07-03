@@ -124,7 +124,7 @@ function AssetBinRow({
   return (
     <AssetPreviewRow
       asset={asset}
-      className="group/asset relative flex items-center gap-1 rounded px-1.5 py-1 text-sm hover:bg-foreground/5"
+      className="group/asset relative flex items-center gap-1 rounded px-2 py-1.5 text-sm hover:bg-foreground/5"
       mediaVersion={mediaVersion}
       slug={slug}
     >
@@ -141,7 +141,7 @@ function AssetBinRow({
       </span>
       {confirmDelete ? (
         <span className="flex shrink-0 items-center gap-1">
-          <span className="text-[11px] text-muted-foreground">Delete?</span>
+          <span className="text-muted-foreground text-xs">Delete?</span>
           <Button
             aria-label={`Confirm delete ${asset.name}`}
             className="rounded-sm text-destructive hover:bg-destructive/10"
@@ -182,7 +182,7 @@ function AssetBinRow({
               }
               aria-pressed={asset.mustUse === true}
               className={cn(
-                "h-5 rounded px-1.5 text-[10px] uppercase tracking-wide",
+                "h-5 rounded px-1.5 text-xs uppercase tracking-wide",
                 asset.mustUse
                   ? "bg-primary/15 text-primary hover:bg-primary/20"
                   : "text-muted-foreground opacity-0 hover:bg-foreground/5 group-hover/asset:opacity-100"
@@ -205,7 +205,7 @@ function AssetBinRow({
               }
               aria-pressed={asset.avoid === true}
               className={cn(
-                "h-5 rounded px-1.5 text-[10px] uppercase tracking-wide",
+                "h-5 rounded px-1.5 text-xs uppercase tracking-wide",
                 asset.avoid
                   ? "bg-destructive/15 text-destructive hover:bg-destructive/20"
                   : "text-muted-foreground opacity-0 hover:bg-foreground/5 group-hover/asset:opacity-100"
@@ -481,7 +481,7 @@ export function AssetBin({
               className="min-w-0 overflow-hidden rounded-md border border-border bg-foreground/3 p-2.5"
               key={kind}
             >
-              <div className="mb-2 flex items-center gap-1.5 font-medium text-muted-foreground text-xs uppercase tracking-wide">
+              <div className="mb-2 flex items-center gap-2 font-medium text-muted-foreground text-xs uppercase tracking-wide">
                 <Icon className={APP_ICON_CLASS} />
                 {meta.label}
                 <Badge

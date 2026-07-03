@@ -68,15 +68,15 @@ export function BriefEditor({
         value={text}
       />
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[11px] text-muted-foreground tabular-nums">
+        <span className="text-muted-foreground text-xs tabular-nums">
           {text.length} characters
         </span>
         <div className="flex items-center gap-2">
           {note === "saved" ? (
-            <span className="text-[11px] text-muted-foreground">Saved</span>
+            <span className="text-muted-foreground text-xs">Saved</span>
           ) : null}
           {note === "error" ? (
-            <span className="text-[11px] text-destructive">
+            <span className="text-destructive text-xs">
               {errorMessage ?? "Save failed"}
             </span>
           ) : null}

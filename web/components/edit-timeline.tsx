@@ -841,7 +841,7 @@ export function EditTimeline({
               style={{ left: playheadPx }}
             />
             <div
-              className="absolute top-0 -translate-x-1/2 rounded-sm bg-primary px-1.5 py-0.5 font-medium text-[10px] text-primary-foreground tabular-nums"
+              className="absolute top-0 -translate-x-1/2 rounded-sm bg-primary px-1.5 py-0.5 font-medium text-primary-foreground text-xs tabular-nums"
               style={{ left: playheadPx }}
             >
               {fmtTime(curSec)}

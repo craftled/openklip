@@ -176,7 +176,7 @@ export function ProjectSwitcher({
                     {active.slug}
                   </span>
                   {creating ? (
-                    <span className="shrink-0 text-[12px] text-muted-foreground/58">
+                    <span className="shrink-0 text-muted-foreground/58 text-xs">
                       Creating…
                     </span>
                   ) : null}

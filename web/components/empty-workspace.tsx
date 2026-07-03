@@ -210,7 +210,7 @@ export function EmptyWorkspace() {
                       <span className="min-w-0 flex-1 truncate text-foreground/95">
                         No project yet
                       </span>
-                      <span className="shrink-0 text-[12px] text-muted-foreground/40">
+                      <span className="shrink-0 text-muted-foreground/40 text-xs">
                         {folderReady ? "Add a video" : "Choose folder"}
                       </span>
                     </SidebarMenuButton>

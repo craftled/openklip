@@ -33,7 +33,7 @@ export function SettingsView({
             <h1 className="font-medium text-foreground text-xl tracking-tight">
               {section.label}
             </h1>
-            <p className="mt-1.5 text-[13px] text-muted-foreground leading-relaxed">
+            <p className="mt-1.5 text-muted-foreground text-sm leading-relaxed">
               {section.description}
             </p>
           </header>

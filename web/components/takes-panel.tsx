@@ -314,7 +314,7 @@ export function TakesPanelView({
 
       {forceArmed ? (
         <div className="flex items-center gap-1.5" data-takes-force-confirm>
-          <span className="text-[11px] text-muted-foreground">
+          <span className="text-muted-foreground text-xs">
             Overwrite existing edit?
           </span>
           <Button

@@ -29,7 +29,7 @@ export function ProjectDeleteAction({
         className={cn("ml-auto flex shrink-0 items-center gap-1", className)}
         onClick={(e) => e.stopPropagation()}
       >
-        <span className="text-[11px] text-muted-foreground">Delete?</span>
+        <span className="text-muted-foreground text-xs">Delete?</span>
         <Button
           aria-label={`Confirm delete project ${slug}`}
           className="rounded-sm text-destructive hover:bg-destructive/10"

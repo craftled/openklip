@@ -41,7 +41,7 @@ function InfoRow({
       <div className="min-w-0">
         <p className="truncate text-foreground text-xs">{label}</p>
         {detail ? (
-          <p className="truncate text-[11px] text-muted-foreground">{detail}</p>
+          <p className="truncate text-muted-foreground text-xs">{detail}</p>
         ) : null}
       </div>
     </div>

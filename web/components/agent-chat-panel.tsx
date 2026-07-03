@@ -284,14 +284,14 @@ function AgentChatTrail({
               width: TRAIL_PREVIEW_WIDTH,
             }}
           >
-            <p className="truncate font-semibold text-[13px] leading-none">
+            <p className="truncate font-semibold text-sm leading-none">
               {chatTrailLabel(hoveredMessage, agentLabel)}
             </p>
-            <p className="mt-2 max-h-20 overflow-hidden text-[13px] text-muted-foreground leading-relaxed">
+            <p className="mt-2 max-h-20 overflow-hidden text-muted-foreground text-sm leading-relaxed">
               {chatTrailPreview(hoveredMessage.content)}
             </p>
             {hoveredStats ? (
-              <div className="mt-3 flex justify-end gap-4 font-medium text-[12px] text-muted-foreground leading-none">
+              <div className="mt-3 flex justify-end gap-4 font-medium text-muted-foreground text-xs leading-none">
                 <span>{pluralizeMetric(hoveredStats.words, "word")}</span>
                 <span>
                   {pluralizeMetric(hoveredStats.characters, "character")}
@@ -326,7 +326,7 @@ export function AgentChatPanel({
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
       <div className="mx-auto flex min-h-0 w-full min-w-0 max-w-2xl flex-1 flex-col">
-        <div className="flex min-w-0 shrink-0 items-center justify-between gap-3 border-border border-b px-6 py-3">
+        <div className="flex min-w-0 shrink-0 items-center justify-between gap-2 border-border border-b px-6 py-3">
           <span className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
             Chat
           </span>

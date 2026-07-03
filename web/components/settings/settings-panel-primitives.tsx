@@ -8,10 +8,10 @@ export const SETTINGS_CARD_CLASS =
 export const SETTINGS_CARD_ROW_CLASS = "px-3 py-2.5";
 
 export const SETTINGS_CARD_ROW_TITLE_CLASS =
-  "text-[12px] font-medium text-foreground";
+  "text-xs font-medium text-foreground";
 
 export const SETTINGS_CARD_ROW_DESCRIPTION_CLASS =
-  "text-[12px] text-muted-foreground leading-relaxed";
+  "text-xs text-muted-foreground leading-relaxed";
 
 export const SETTINGS_PANEL_SECTION_CLASS =
   "flex flex-col gap-1.5 not-first:mt-4";
