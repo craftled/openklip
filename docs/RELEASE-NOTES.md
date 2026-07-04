@@ -6,6 +6,23 @@ Publishing status checked on 2026-07-04 (`gh release list`): GitHub releases are
 
 ---
 
+## v0.39.0.0
+
+**Motion text pack for graphic overlays.**
+
+### Highlights
+- **Eight motion templates**: `motion-typewriter`, `motion-blur-reveal`, `motion-shimmer`, `motion-glitch`, `motion-kinetic-build`, `motion-roll-number`, `motion-word-cascade`, and `motion-highlight-pop` ship as ready-to-use `kind: "rich"` graphic templates, added through the existing `graphic-add`/`graphic-set` flow like any other template.
+- **New `data-anim` runtime effects**: six new animation effects plus split/stagger support on the existing `fade`/`slideUp` effects, all seeded and frame-pure in the shared `web/lib/graphic-runtime.ts`, so the browser preview and the headless-Chrome export render identically.
+- **Agent authoring contract**: `graphics/AUTHORING.md` documents the manifest schema, the full `data-anim`/split/stagger attribute reference, and frame-purity rules, so an agent can drop a new `graphics/<id>/` folder and have it auto-discovered with no code changes.
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#03900---2026-07-04)
+
+---
+
 ## v0.38.0.0
 
 **Keyframe animation for graphic overlays.**
