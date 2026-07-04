@@ -1,0 +1,39 @@
+<div data-fps="30" data-graphic-root data-height="1080" data-width="1920">
+  <style>
+  .kb {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 6%;
+    text-align: center;
+  }
+  .kb h1 {
+    margin: 0;
+    font-family: -apple-system, "Helvetica Neue", Arial, sans-serif;
+    font-size: 176px;
+    font-weight: 900;
+    line-height: 1;
+    color: #fff;
+    text-shadow: 0 4px 32px rgba(0, 0, 0, 0.5);
+  }
+  .kb h1 :is([data-unit]) {
+    color: var(--accent, oklch(0.809 0.1 284.59));
+  }
+  </style>
+  <div class="kb">
+    <h1
+      data-anim="kineticBuild"
+      data-bind="text"
+      data-in-dur="10"
+      data-in-frame="0"
+      data-out-dur="6"
+      data-out-frame="-8"
+      data-split="word"
+      data-stagger="4"
+    >
+      Ship it
+    </h1>
+  </div>
+</div>

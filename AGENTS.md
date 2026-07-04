@@ -187,6 +187,8 @@ Add `--note "<why>"` to any `cut` or overlay-add to record the rationale on the 
 
 The `*-add-phrase` helpers remember the spoken phrase as an **anchor** on the overlay, so a later cut re-snaps the overlay's window onto the words it belongs to instead of stranding it. If you manually move a phrase-placed overlay with `*-set` (`--from`/`--to`), that span may be re-moved by the next word-deletion (the anchor still wins); place anchorless overlays with the plain `*-add` if you want the span pinned. When the anchored phrase is deleted the overlay is flagged `stale` and keeps its last good span (the exporter still renders it); restoring the words clears `stale`.
 
+**Authoring graphic templates**: `graphic-add`'s `<template>` argument is any `graphics/<id>/` folder (a `manifest.json` + `composition.html` pair, auto-discovered, no code registration). This includes the bundled `motion-*` pack (`motion-typewriter`, `motion-blur-reveal`, `motion-shimmer`, `motion-glitch`, `motion-kinetic-build`, `motion-roll-number`, `motion-word-cascade`, `motion-highlight-pop`), rich text templates driven by the shared `data-anim` runtime contract. To add a new template, read `graphics/AUTHORING.md` first: it documents the manifest schema, the full `data-anim`/split/stagger attribute reference, and frame-purity rules.
+
 ### Multi-take assembly
 
 Pick the best lines across several recordings of the same script, then splice them into one clean source the rest of the engine treats normally (single `source`/`proxy`, all overlays/look/captions apply on top).

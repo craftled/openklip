@@ -1,0 +1,39 @@
+<div data-fps="30" data-graphic-root data-height="1080" data-width="1920">
+  <style>
+  .rn {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 8%;
+  }
+  .rn .num {
+    display: inline-flex;
+    align-items: baseline;
+    font-family: -apple-system, "Helvetica Neue", Arial, sans-serif;
+    font-size: 168px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    color: #fff;
+    text-shadow: 0 4px 32px rgba(0, 0, 0, 0.5);
+  }
+  .rn .prefix,
+  .rn .suffix {
+    color: var(--accent, oklch(0.809 0.1 284.59));
+  }
+  </style>
+  <div class="rn">
+    <div class="num" data-anim="fade" data-in-dur="8" data-in-frame="0">
+      <span class="prefix" data-bind="prefix"></span
+      ><span
+        data-anim="rollNumber"
+        data-bind="value"
+        data-in-dur="24"
+        data-in-frame="0"
+        data-roll-from="0"
+        >1000</span
+      ><span class="suffix" data-bind="suffix">+</span>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,43 @@
+<div data-fps="30" data-graphic-root data-height="1080" data-width="1920">
+  <style>
+  .mt {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 10%;
+  }
+  .mt .line {
+    display: inline-flex;
+    align-items: baseline;
+    font-family: "SF Mono", "Menlo", "Consolas", monospace;
+    font-size: 96px;
+    font-weight: 600;
+    color: #fff;
+    letter-spacing: 0.01em;
+    text-shadow: 0 2px 24px rgba(0, 0, 0, 0.45);
+  }
+  .mt .caret {
+    display: inline-block;
+    width: 10px;
+    height: 88px;
+    margin-left: 10px;
+    background: var(--accent, oklch(0.809 0.1 284.59));
+    border-radius: 2px;
+  }
+  </style>
+  <div class="mt">
+    <span
+      class="line"
+      data-anim="typewriter"
+      data-bind="text"
+      data-in-dur="1"
+      data-in-frame="0"
+      data-out-dur="6"
+      data-out-frame="-8"
+      data-split="char"
+      >Building in public</span
+    ><span class="caret" data-caret data-caret-period="16"></span>
+  </div>
+</div>
