@@ -16,7 +16,7 @@ See `AGENTS.md` for the full OpenKlip edit loop, CLI commands, MCP tools, and gu
 
 - Code truth checked on 2026-07-04: `VERSION` and `package.json` are `0.39.0.0`; `bun test` has 1680 tests (0 fail); `openklip tools --json --surface mcp` lists 76 MCP tools; `openklip actions --json` lists 42 registry actions.
 - Release docs: `CHANGELOG.md` is authoritative history, `docs/RELEASE-NOTES.md` holds GitHub release bodies, and `TODO.md#known-limitations` is the single current gaps list.
-- Published GitHub releases run through `v0.38.0.0` (backlog `v0.29.0.0`–`v0.38.0.0` published 2026-07-04 via `gh release create`, each tagged at its version commit; `v0.36.0.1` is tagged at `3d13dc8`, its last content commit, since that documenting release never bumped `VERSION`); `v0.39.0.0` publishes after its docs PR merges. Release bodies live in `docs/RELEASE-NOTES.md`.
+- Published GitHub releases run through `v0.39.0.0` (backlog `v0.29.0.0`–`v0.39.0.0` published 2026-07-04 via `gh release create`, each tagged at its version commit; `v0.36.0.1` is tagged at `3d13dc8`, its last content commit, since that documenting release never bumped `VERSION`). Release bodies live in `docs/RELEASE-NOTES.md`.
 
 ## Subagent fleet (cost routing)
 

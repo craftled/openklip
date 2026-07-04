@@ -2,7 +2,7 @@
 
 Use these bodies when publishing releases. Each section matches a tag in `CHANGELOG.md` without duplicating the full changelog. **Known gaps:** always link to [TODO.md](../TODO.md#known-limitations); do not duplicate the list here.
 
-Publishing status checked on 2026-07-04 (`gh release list`): GitHub releases are published through `v0.38.0.0` (the `v0.29.0.0`–`v0.38.0.0` backlog was published 2026-07-04 from these bodies, each tagged at its version's own commit); `v0.39.0.0` publishes once its docs PR merges.
+Publishing status checked on 2026-07-04 (`gh release list`): GitHub releases are published through `v0.39.0.0` (the `v0.29.0.0`–`v0.39.0.0` backlog was published 2026-07-04 from these bodies, each tagged at its version's own commit).
 
 ---
 
