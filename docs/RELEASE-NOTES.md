@@ -2,7 +2,26 @@
 
 Use these bodies when publishing releases. Each section matches a tag in `CHANGELOG.md` without duplicating the full changelog. **Known gaps:** always link to [TODO.md](../TODO.md#known-limitations); do not duplicate the list here.
 
-Publishing status checked on 2026-07-04 (`gh release list`): GitHub releases are published through `v0.40.0.0` (the `v0.29.0.0`–`v0.40.0.0` backlog was published 2026-07-04 from these bodies, each tagged at its version's own commit).
+Publishing status checked on 2026-07-04 (`gh release list`): GitHub releases are published through `v0.40.0.0`. **`v0.40.0.1` is tagged locally at `main` but not yet published** (includes per-slug editor URLs and script-first provenance UX polish shipped after the `v0.40.0.0` tag).
+
+---
+
+## v0.40.0.1
+
+**Per-slug URLs, script-first editing, and optional edit attribution.**
+
+### Highlights
+- **Per-slug editor URLs**: open `http://localhost:<port>/<slug>` directly; `openklip serve` prints the path URL.
+- **Script-first editor**: transcript reads as an editable script ("Edit the script to edit the video"); Config sidebar closed by default; Delete/Backspace cuts selected words.
+- **Edit attribution (optional)**: Settings → Appearance → **Show edit attribution** (default off). When on: transcript hover provenance with **View in history**, History author badges/filter, b-roll list author suffix. Backend always logs `authorId` / `model` / `agentSurface`.
+- **Overlay provenance**: b-roll, titles, zooms, stills, music, and graphics stamp `authoredBy` on add/set mutations.
+- **History task drill-down**: click a task id in History to filter to that agent run.
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#04001---2026-07-04)
 
 ---
 
