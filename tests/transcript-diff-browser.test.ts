@@ -5,7 +5,7 @@ import puppeteer from "puppeteer-core";
 
 const CHROME_PATH =
   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-const PROD_EDITOR_URL = "http://localhost:4399/?slug=edgaras-raw";
+const PROD_EDITOR_URL = "http://localhost:4399/edgaras-raw";
 
 function chromeAvailable(): boolean {
   return existsSync(CHROME_PATH);
@@ -20,6 +20,17 @@ async function serverAvailable(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+async function ensureHistoryPanelReady(page: import("puppeteer-core").Page) {
+  await page.waitForFunction(
+    () => Boolean(document.querySelector('[aria-label="Toggle config"]')),
+    { timeout: 30_000 }
+  );
+  await page.evaluate(() => {
+    document.querySelector('[aria-label="Toggle config"]')?.click();
+  });
+  await page.waitForSelector("[data-history-entry-key]", { timeout: 90_000 });
 }
 
 async function openTranscriptDiffWithChanges(
@@ -92,14 +103,15 @@ test("editor History panel shows transcript diff for transcript actions", {
     await page.setViewport({ width: 1600, height: 1000 });
     const response = await page.goto(PROD_EDITOR_URL, {
       timeout: 90_000,
-      waitUntil: "domcontentloaded",
+      waitUntil: "networkidle2",
     });
     assert.equal(response?.status(), 200);
 
-    await page.waitForFunction(
-      () => document.body.textContent?.includes("Show transcript diff"),
-      { timeout: 60_000 }
-    );
+    await page.waitForSelector('[aria-label="Transcript editor"]', {
+      timeout: 60_000,
+    });
+
+    await ensureHistoryPanelReady(page);
 
     const state = await openTranscriptDiffWithChanges(page);
     assert.ok(state, "found a history entry with kept-word changes");

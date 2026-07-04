@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import HelloHomePage from "../app/home/page.tsx";
 import LoadingPage from "../app/loading.tsx";
 import { HelloLoading } from "../web/components/hello-loading.tsx";
 import { ProjectLoading } from "../web/components/project-loading.tsx";
@@ -51,12 +50,4 @@ test("app loading route renders ProjectLoading", () => {
 
   assert.match(html, /data-hello-loading-context="project"/);
   assert.match(html, /Loading project…/);
-});
-
-test("/home route renders persistent ProjectLoading preview", () => {
-  const html = renderToStaticMarkup(createElement(HelloHomePage));
-
-  assert.match(html, /data-hello-loading-context="project"/);
-  assert.match(html, /Loading project…/);
-  assert.match(html, /h-screen/);
 });

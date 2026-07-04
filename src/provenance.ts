@@ -297,11 +297,9 @@ export function agentGuiMutateMeta(
   extra?: Partial<ProvenanceMutateMeta>
 ): ProvenanceMutateMeta {
   const provenance = resolveProvenance({
-    action,
     actor: "agent",
     model,
     agentSurface: "gui",
-    input,
   });
   return {
     action,

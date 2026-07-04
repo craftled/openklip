@@ -277,6 +277,10 @@ interface Asset {
 interface BrollItem {
   assetId: string;
   audioMode?: "broll" | "duck-broll" | "duck-voice" | "mix" | "silent";
+  authoredAt?: number;
+  authoredBy?: string;
+  authoredRevision?: number;
+  authoredTaskId?: string;
   display?: "cover" | "pip" | "split";
   endSample: number;
   id: string;
