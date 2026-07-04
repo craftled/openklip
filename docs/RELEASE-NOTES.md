@@ -2,7 +2,94 @@
 
 Use these bodies when publishing releases. Each section matches a tag in `CHANGELOG.md` without duplicating the full changelog. **Known gaps:** always link to [TODO.md](../TODO.md#known-limitations); do not duplicate the list here.
 
-Publishing status checked on 2026-07-03 (`gh release list`): GitHub releases are published through `v0.28.0.0`.
+Publishing status checked on 2026-07-04 (`gh release list`): GitHub releases are published through `v0.28.0.0`.
+
+---
+
+## v0.38.0.0
+
+**Keyframe animation for graphic overlays.**
+
+### Highlights
+- **Simple declarative keyframes**: graphic overlays animate opacity, scale, and x/y position over time via a `keyframes` array — seven easings (`linear`, `easeIn`, `easeOut`, `easeInOut`, `spring`, `backOut`, `anticipate`), stored as data, not code.
+- **Preview/export parity by construction**: keyframes are evaluated frame-pure in the shared graphic runtime, so the browser preview and the headless export raster run the same code path.
+- **Editor UI**: diamond markers on graphic timeline clips plus a Keyframes inspector section (add at playhead, edit value/easing, delete).
+- **Agent surface**: `graphic-set` accepts keyframes, the CLI gains `--keyframes-file` / `--clear-keyframes`, and query views expose keyframes; undo/history cover keyframe edits automatically.
+- **Verification**: PRs #60/#61/#62/#65 CI passed; current codebase verification is 1661 tests.
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#03800---2026-07-04)
+
+---
+
+## v0.37.0.0
+
+**Full Paper Shaders template set.**
+
+### Highlights
+- **21 new shader templates**: every non-image shader in `@paper-design/shaders@0.0.77` ships as a bundled rich graphic template (metaballs, god rays, liquid metal, voronoi, water, waves, and more).
+- **Centralized shader specs**: all 24 shader ids live in `web/lib/paper-shader-specs.ts` with uniform mapping aligned to the React wrapper defaults, shared by preview and export.
+- **Template generator**: `scripts/generate-shader-templates.ts` regenerates manifest + composition pairs from one config list.
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#03700---2026-07-04)
+
+---
+
+## v0.36.0.1
+
+**UI-audit remediation batch.**
+
+### Highlights
+- **Chat panel width fix**: chat content no longer paints under the config sidebar at narrow widths.
+- **Slash-skills menu focus fix**: the skills popup keeps focus in the prompt textarea, restoring type-to-filter and Escape-to-close.
+- **shadcn primitive adoption**: hand-rolled toggles, selects, overlays, and focus rings across the editor replaced with stock primitives; typography, list-row spacing, z-index, and motion tokens standardized.
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#03601---2026-07-04)
+
+---
+
+## v0.36.0.0
+
+**Agent-native skills with progressive disclosure.**
+
+### Highlights
+- **Skill index in the edit prompt**: the edit agent sees every skill as `id: description` up front (capped at 20 with an overflow note) instead of discovering templates by chance.
+- **`load_skill` agent tool**: read-only tool that returns a skill's full markdown by id, decoupling "read the procedure" from "set the project template".
+- **YAML frontmatter in `skill.md`**: optional frontmatter (`description:`, `label:`/`name:`) keeps skills portable with the wider SKILL.md convention; existing files parse unchanged.
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#03600---2026-07-04)
+
+---
+
+## v0.35.0.0
+
+**Paper Shaders as first-class rich graphics.**
+
+### Highlights
+- **Three shader templates**: `shader-mesh-gradient`, `shader-grain-gradient`, and `shader-dithering` ship as `kind: "rich"` graphic templates with manifest-driven params through the existing `graphic-add` / `graphic-set` flow.
+- **Deterministic shader animation**: `data-shader` hosts in the shared graphic runtime are frame-driven by `setFrame()` from the timeline frame, keeping preview and export in sync.
+- **Headless WebGL export**: the export renderer's Chrome launch enables SwiftShader WebGL so shader templates render in headless export.
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#03500---2026-07-03)
 
 ---
 
