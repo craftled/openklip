@@ -218,7 +218,7 @@ Workflow: `take-add` each recording, read `take_transcript <slug> <takeId>` to f
 | `openklip pad <slug> <ms>` | Symmetric padding around kept ranges (0–500 ms). |
 | `openklip brand <slug> <name>` | Apply a brand preset (`brands/<name>.json`): sets caption/vignette/pad **defaults** only. `project.json` stays the edit; words and overlays are untouched. Also available at ingest: `openklip ingest <video> --brand <name>`. |
 | `openklip template list` | List edit templates (`templates/<id>/skill.md`): agent playbooks for cuts, overlays, and export. |
-| `openklip template show <id>` | Print a template skill file. |
+| `openklip template show <id>` | Print a template skill file. Same underlying lookup as the MCP-only `load_skill` tool, which returns a skill's markdown by id without touching `project.json`'s `template` field (unlike `template set`). |
 | `openklip template set <slug> <id>` | Attach a template id to `project.json` (GUI template dropdown writes the same field). |
 
 ### Review & export
@@ -265,13 +265,15 @@ Workflow: `take-add` each recording, read `take_transcript <slug> <takeId>` to f
 
 All MCP tools route through `src/agent-tools.ts` → `mutateProject` / `runAction` / query helpers. The browser GUI writes the same `project.json`; reload the editor after MCP edits.
 
+The tool-calling edit prompt (`buildEditPrompt` in `src/agent-driver.ts`) advertises a skill index built from `listTemplates()`: each entry's id and description (capped at 20, with a "more skills are listed by template_list" note beyond that), so the model can spot a matching skill and call `load_skill` with its id to read the full procedure, instead of needing a human to have already run `template set`. `templates/<id>/skill.md` files may carry optional YAML frontmatter (`description:`, `label:`/`name:`) to control what shows up in that index and in `template_list`/`openklip template list`; without frontmatter, the description falls back to the first non-heading body line and the label to the H1.
+
 **Enable in Cursor:** the repo ships `.cursor/mcp.json`. Restart MCP or reload the window after pulling.
 
 **Tool layers:**
 
 | Layer | MCP tool names | Same as CLI |
 | --- | --- | --- |
-| Query | `list_projects`, `transcript_grep`, `transcript_phrase`, `scene_log`, `highlights_list`, `project_status`, `project_overlays`, `cleanup_report`, `history_list`, `task_list`, … | `openklip transcript grep`, `status --json`, `overlays --json`, `highlights`, `cleanup --json`, `openklip history`, `openklip tasks` |
+| Query | `list_projects`, `transcript_grep`, `transcript_phrase`, `scene_log`, `highlights_list`, `project_status`, `project_overlays`, `cleanup_report`, `history_list`, `task_list`, `template_list`, `load_skill`, … | `openklip transcript grep`, `status --json`, `overlays --json`, `highlights`, `cleanup --json`, `openklip history`, `openklip tasks`, `openklip template list` |
 | Mutate | `cut`, `cut-text`, `broll-add`, `title-set`, `word-text`, `dead-air-add`, `dead-air-rm`, `audio`, `captions-style`, … | `openklip cut`, `broll-add`, `word-text`, `dead-air-rm`, `audio`, `captions-style`, … |
 | Phrase compose | `title-add-phrase`, `zoom-add-phrase`, `broll-add-phrase` | `openklip title-add-phrase`, … |
 | Brief | `brief_get`, `brief_set` | `openklip brief`, `openklip brief --set` |
