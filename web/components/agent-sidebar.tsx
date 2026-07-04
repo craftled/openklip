@@ -11,6 +11,7 @@ import {
 } from "@/components/asset-bin";
 import { ChatListItem } from "@/components/chat-list-item";
 import { CollapsibleSidebarSection } from "@/components/collapsible-sidebar";
+import { GitHubStars } from "@/components/github-stars";
 import { ProjectInlineFolderAction } from "@/components/project-folder-action";
 import { ProjectSwitcher } from "@/components/project-switcher";
 import { RelativeTimeLabel } from "@/components/relative-time-label";
@@ -353,6 +354,9 @@ export function AgentSidebar({
                   <SettingsIcon className={SIDEBAR_LEADING_GLYPH_CLASS} />
                   <span className={SIDEBAR_ROW_LABEL_TEXT_CLASS}>Settings</span>
                 </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <GitHubStars repo="craftled/openklip" stargazersCount={1} />
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarFooter>

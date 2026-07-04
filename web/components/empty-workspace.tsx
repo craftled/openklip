@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import type { DragEvent } from "react";
 import { useCallback, useEffect, useState } from "react";
 import { EmptyWorkspaceMain } from "@/components/empty-workspace-main";
+import { GitHubStars } from "@/components/github-stars";
 import { NewProjectDialog } from "@/components/new-project-dialog";
 import { ProjectCreateOverlay } from "@/components/project-create-overlay";
 import { ProjectOverwriteDialog } from "@/components/project-overwrite-dialog";
@@ -244,6 +245,9 @@ export function EmptyWorkspace() {
                         Settings
                       </span>
                     </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <GitHubStars repo="craftled/openklip" stargazersCount={1} />
                   </SidebarMenuItem>
                 </SidebarMenu>
               </SidebarFooter>
