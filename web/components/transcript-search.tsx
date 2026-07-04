@@ -76,7 +76,7 @@ export function TranscriptSearch({
           <Search className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
             aria-label="Search transcript"
-            className="h-8 pr-12 pl-7"
+            className="h-11 pr-12 pl-7 sm:h-8"
             onChange={(event) => onQueryChange(event.target.value)}
             onKeyDown={onQueryKeyDown}
             placeholder="Search transcript"

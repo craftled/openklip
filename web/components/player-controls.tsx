@@ -197,7 +197,7 @@ export function PlayerControls({
   return (
     <div
       className={cn(
-        "flex items-center gap-2.5 bg-gradient-to-t from-black/65 to-transparent px-4 pt-12 pb-3",
+        "flex flex-wrap items-center gap-2 bg-gradient-to-t from-black/65 to-transparent px-3 pt-10 pb-3 sm:flex-nowrap sm:gap-2.5 sm:px-4 sm:pt-12",
         className
       )}
       data-preview-chrome
@@ -216,7 +216,7 @@ export function PlayerControls({
           aria-label={musicMuted ? "Unmute music" : "Mute music"}
           aria-pressed={musicMuted}
           className={cn(
-            "size-7 shrink-0 rounded-full text-white/75 fine-hover:hover:bg-white/10 fine-hover:hover:text-white active:scale-[0.97]",
+            "size-11 shrink-0 rounded-full text-white/75 fine-hover:hover:bg-white/10 fine-hover:hover:text-white active:scale-[0.97] sm:size-7",
             musicMuted && "text-white/40"
           )}
           data-music-mute
@@ -240,7 +240,7 @@ export function PlayerControls({
         aria-valuemax={Math.round(duration)}
         aria-valuemin={0}
         aria-valuenow={Math.round(current)}
-        className="group/scrub relative flex min-w-16 flex-1 cursor-pointer items-center py-2"
+        className="group/scrub relative order-first flex min-h-11 min-w-full basis-full cursor-pointer items-center py-5 sm:order-none sm:min-h-0 sm:min-w-16 sm:basis-auto sm:py-2"
         onPointerDown={onScrubDown}
         onPointerEnter={(e) => updateHoverFromPointer(e.clientX)}
         onPointerLeave={onScrubLeave}
@@ -299,7 +299,7 @@ export function PlayerControls({
         aria-label="Playback speed"
         className={cn(
           TRANSPORT_NUM,
-          "h-auto rounded-md px-1 py-0.5 text-white/90 fine-hover:hover:bg-white/10 fine-hover:hover:text-white active:scale-[0.97]"
+          "h-11 min-w-11 rounded-full px-2 py-0 text-white/90 fine-hover:hover:bg-white/10 fine-hover:hover:text-white active:scale-[0.97] sm:h-auto sm:min-w-0 sm:rounded-md sm:px-1 sm:py-0.5"
         )}
         onClick={onCycleSpeed}
         type="button"
@@ -356,7 +356,7 @@ export function CtrlButton({
       aria-label={label}
       aria-pressed={active}
       className={cn(
-        "size-7 shrink-0 rounded-full text-white/75 fine-hover:hover:bg-white/10 fine-hover:hover:text-white active:scale-[0.97]",
+        "size-11 shrink-0 rounded-full text-white/75 fine-hover:hover:bg-white/10 fine-hover:hover:text-white active:scale-[0.97] sm:size-7",
         active && "text-white ring-1 ring-white/40 ring-inset"
       )}
       onClick={onClick}

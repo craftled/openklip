@@ -145,7 +145,7 @@ export function ColorTempPad({
 
   return (
     <div className="space-y-1.5">
-      <div className="flex h-7 items-center gap-2">
+      <div className="flex min-h-11 items-center gap-2 sm:h-7 sm:min-h-0">
         <div className="min-w-0 flex-1 text-muted-foreground text-xs">
           Temp / tint
         </div>
@@ -154,7 +154,7 @@ export function ColorTempPad({
         </div>
         <Button
           aria-label="Reset color temperature"
-          className="size-6 text-muted-foreground"
+          className="size-11 text-muted-foreground sm:size-6"
           onClick={reset}
           size="icon-sm"
           title="Reset color temperature"

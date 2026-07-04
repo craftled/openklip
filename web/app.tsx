@@ -3423,7 +3423,7 @@ export function App({
                   />
                 ) : (
                   <>
-                    <div className="flex h-12 shrink-0 items-center gap-2 border-border border-b px-3">
+                    <div className="flex min-h-12 shrink-0 flex-wrap items-center gap-2 border-border border-b px-3 py-2 sm:h-12 sm:flex-nowrap sm:py-0">
                       {agentSidebar.isMobile || !agentSidebar.open ? (
                         <AgentSidebarToolbarTrigger
                           onToggle={agentSidebar.toggleSidebar}
@@ -3439,7 +3439,7 @@ export function App({
                           · {fmt(keptDuration)} / {fmt(fullDur)}
                         </div>
                       </div>
-                      <div className="ml-auto flex items-center gap-2">
+                      <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
                         <ExportDialog
                           defaultResolution={export1080 ? "1080" : "4k"}
                           disabled={exportDisabled}
@@ -3500,7 +3500,7 @@ export function App({
                           >
                             <SelectTrigger
                               aria-label="Safe area guides"
-                              className="h-8 w-[9.5rem] text-xs"
+                              className="h-11 w-[9.5rem] text-xs sm:h-8"
                               size="sm"
                             >
                               <SelectValue placeholder="Safe areas" />
@@ -3978,7 +3978,7 @@ function AgentSidebarToolbarTrigger({ onToggle }: { onToggle: () => void }) {
   return (
     <Button
       aria-label={label}
-      className="size-7 shrink-0 text-muted-foreground/75 hover:text-foreground"
+      className="size-11 shrink-0 text-muted-foreground/75 hover:text-foreground sm:size-7"
       onClick={onToggle}
       size="icon-xs"
       title={label}
@@ -4004,7 +4004,7 @@ function Section({
         <CollapsibleTrigger
           render={
             <Button
-              className="h-9 w-full justify-start rounded-none px-3 font-medium text-[0.82rem] text-foreground/85 tracking-normal hover:bg-muted/35 [&[data-panel-open]>svg.chevron]:rotate-90"
+              className="h-11 w-full justify-start rounded-none px-3 font-medium text-[0.82rem] text-foreground/85 tracking-normal hover:bg-muted/35 sm:h-9 [&[data-panel-open]>svg.chevron]:rotate-90"
               type="button"
               variant="ghost"
             >
@@ -4033,7 +4033,7 @@ function PropRow({
   children: ReactNode;
 }) {
   return (
-    <Field className="grid h-7 grid-cols-[4.35rem_1fr_2.75rem] items-center gap-2">
+    <Field className="grid min-h-11 grid-cols-[4.35rem_1fr_2.75rem] items-center gap-2 sm:h-7 sm:min-h-0">
       <FieldLabel className="truncate text-muted-foreground text-xs">
         {label}
       </FieldLabel>
