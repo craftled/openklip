@@ -7,9 +7,13 @@ import { cn } from "@/lib/utils";
 import { THEME_NO_FLASH_SCRIPT } from "../web/lib/theme-preferences";
 import { geistMono } from "./fonts";
 import "./globals.css";
-import { Geist } from "next/font/google";
+import { Inter } from "next/font/google";
 
-const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
+const inter = Inter({
+  display: "swap",
+  subsets: ["latin"],
+  variable: "--font-sans",
+});
 
 export const metadata: Metadata = {
   title: "OpenKlip",
@@ -23,7 +27,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         "antialiased",
         geistMono.variable,
         "font-sans",
-        geist.variable
+        inter.variable
       )}
       lang="en"
       suppressHydrationWarning

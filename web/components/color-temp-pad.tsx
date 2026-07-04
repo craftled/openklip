@@ -144,17 +144,17 @@ export function ColorTempPad({
   );
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-2">
+    <div className="space-y-1.5">
+      <div className="flex h-7 items-center gap-2">
         <div className="min-w-0 flex-1 text-muted-foreground text-xs">
-          Color
+          Temp / tint
         </div>
         <div className="shrink-0 text-muted-foreground text-xs tabular-nums">
           {formatColor(draft.temperature)}, {formatColor(draft.tint)}
         </div>
         <Button
           aria-label="Reset color temperature"
-          className="size-7 text-muted-foreground"
+          className="size-6 text-muted-foreground"
           onClick={reset}
           size="icon-sm"
           title="Reset color temperature"
@@ -166,7 +166,7 @@ export function ColorTempPad({
       </div>
       <button
         aria-label={`Color temperature ${formatColor(draft.temperature)}, tint ${formatColor(draft.tint)}`}
-        className="relative h-32 w-full touch-none overflow-hidden rounded-lg border border-border/80 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+        className="relative h-24 w-full touch-none overflow-hidden rounded-lg border border-border/80 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
         onKeyDown={onKeyDown}
         onPointerCancel={() => setDragging(false)}
         onPointerDown={(event) => {

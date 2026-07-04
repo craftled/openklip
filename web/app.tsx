@@ -38,7 +38,6 @@ import {
 } from "@engine/safe-areas";
 import { useRouter } from "next/navigation";
 import {
-  type ComponentType,
   type CSSProperties,
   type MouseEvent,
   type ReactNode,
@@ -104,6 +103,7 @@ import { SafeAreaGuides } from "@/components/safe-area-guides";
 import { SettingsView } from "@/components/settings/settings-view";
 import { TakesPanel } from "@/components/takes-panel";
 import { TranscriptSearch } from "@/components/transcript-search";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Collapsible,
@@ -131,15 +131,7 @@ import {
   SidebarContent,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarInset,
-  SidebarMenu,
-  SidebarMenuBadge,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
   SidebarProvider,
   useSidebar,
 } from "@/components/ui/sidebar";
@@ -2478,8 +2470,8 @@ export function App({
   const configPanel = (
     <div className="flex min-h-0 flex-1 overflow-y-auto bg-background">
       <div className="flex w-full flex-col overflow-hidden bg-background">
-        <div className="flex h-12 shrink-0 items-center gap-2 border-border border-b px-3">
-          <div className="min-w-0 flex-1 truncate font-semibold text-base">
+        <div className="flex h-10 shrink-0 items-center gap-2 border-border border-b px-3">
+          <div className="min-w-0 flex-1 truncate font-semibold text-[0.98rem] tracking-tight">
             Config
           </div>
           <Button
@@ -2499,31 +2491,38 @@ export function App({
             <PanelRight />
           </Button>
         </div>
-        <SidebarContent className="gap-0 overflow-visible">
-          <SidebarGroup>
-            <SidebarGroupLabel>Inspector</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton tooltip={inspectorLabel}>
-                    <InspectorIcon />
-                    <span>{inspectorLabel}</span>
-                  </SidebarMenuButton>
-                  <SidebarMenuBadge>{inspectorBadge}</SidebarMenuBadge>
-                  <SidebarMenuSub>
-                    {inspectorMeta.map((item) => (
-                      <InfoSubItem
-                        icon={item.icon}
-                        key={item.label}
-                        label={item.label}
-                        value={item.value}
-                      />
-                    ))}
-                  </SidebarMenuSub>
-                </SidebarMenuItem>
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
+        <SidebarContent className="gap-0 overflow-visible bg-background">
+          <div className="border-border/80 border-b px-3 py-2.5">
+            <div className="flex h-7 items-center gap-2">
+              <InspectorIcon className="size-3.5 shrink-0 text-muted-foreground" />
+              <span className="min-w-0 flex-1 truncate font-medium text-[0.88rem]">
+                {inspectorLabel}
+              </span>
+              <Badge className="shrink-0" variant="secondary">
+                {inspectorBadge}
+              </Badge>
+            </div>
+            <div className="mt-1.5 ml-[0.42rem] border-border/70 border-l pl-3">
+              {inspectorMeta.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <div
+                    className="flex h-6 min-w-0 items-center gap-2 text-[0.78rem]"
+                    key={item.label}
+                    title={`${item.label}: ${item.value}`}
+                  >
+                    <Icon className="size-3 shrink-0 text-muted-foreground" />
+                    <span className="min-w-0 flex-1 truncate text-muted-foreground">
+                      {item.label}
+                    </span>
+                    <span className="min-w-0 max-w-[55%] truncate text-muted-foreground tabular-nums">
+                      {item.value}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
           {selected &&
           (selZoom || selTitle || selBroll || selStill || selGraphic) ? (
             <div className="group-data-[collapsible=icon]:hidden">
@@ -3256,10 +3255,6 @@ export function App({
                   />
                 </PropRow>
               </Section>
-              <p className="px-3 py-3 text-muted-foreground text-xs leading-relaxed">
-                Select a word range in the transcript to add a push-in, b-roll,
-                or title. Click an effect to edit it here.
-              </p>
             </div>
           )}
           <div className="group-data-[collapsible=icon]:hidden">
@@ -3968,32 +3963,6 @@ export function App({
   );
 }
 
-function InfoSubItem({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: ComponentType<{ className?: string }>;
-  label: string;
-  value: string;
-}) {
-  return (
-    <SidebarMenuSubItem>
-      <SidebarMenuSubButton
-        render={
-          <span>
-            <Icon className={APP_ICON_CLASS} />
-            <span className="min-w-0 flex-1 truncate">{label}</span>
-            <span className="ml-auto shrink-0 text-muted-foreground text-xs tabular-nums">
-              {value}
-            </span>
-          </span>
-        }
-      />
-    </SidebarMenuSubItem>
-  );
-}
-
 function SidebarContextBridge({
   children,
 }: {
@@ -4020,25 +3989,25 @@ function AgentSidebarToolbarTrigger({ onToggle }: { onToggle: () => void }) {
   );
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Section({ children, title }: { children: ReactNode; title: string }) {
   return (
-    <SidebarGroup className="border-border border-t p-0">
-      <Collapsible defaultOpen render={<div />}>
+    <SidebarGroup className="border-border/80 border-t p-0">
+      <Collapsible render={<div />}>
         <CollapsibleTrigger
           render={
             <Button
-              className="h-12 w-full justify-start rounded-none px-3 font-semibold text-[0.78rem] text-foreground/75 uppercase tracking-normal hover:bg-muted/60 [&[data-panel-open]>svg.chevron]:rotate-90"
+              className="h-9 w-full justify-start rounded-none px-3 font-medium text-[0.82rem] text-foreground/85 tracking-normal hover:bg-muted/35 [&[data-panel-open]>svg.chevron]:rotate-90"
               type="button"
               variant="ghost"
             >
               <span className="min-w-0 flex-1 truncate text-left">{title}</span>
-              <ChevronRight className="chevron size-4 shrink-0 text-muted-foreground transition-transform duration-200" />
+              <ChevronRight className="chevron size-3 shrink-0 text-muted-foreground transition-transform duration-200" />
             </Button>
           }
         />
         <CollapsibleContent>
-          <SidebarGroupContent className="px-3 pb-4">
-            <FieldGroup className="gap-3">{children}</FieldGroup>
+          <SidebarGroupContent className="px-3 pt-1 pb-3">
+            <FieldGroup className="gap-2">{children}</FieldGroup>
           </SidebarGroupContent>
         </CollapsibleContent>
       </Collapsible>
@@ -4056,8 +4025,10 @@ function PropRow({
   children: ReactNode;
 }) {
   return (
-    <Field className="grid h-7 grid-cols-[4.25rem_1fr_2.5rem] items-center gap-2.5">
-      <FieldLabel className="text-muted-foreground text-xs">{label}</FieldLabel>
+    <Field className="grid h-7 grid-cols-[4.35rem_1fr_2.75rem] items-center gap-2">
+      <FieldLabel className="truncate text-muted-foreground text-xs">
+        {label}
+      </FieldLabel>
       {children}
       <span className="text-right text-xs tabular-nums">{value}</span>
     </Field>
