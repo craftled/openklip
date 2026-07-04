@@ -13,6 +13,22 @@
 
 - **Version**: bumped OpenKlip to `0.37.0.0`.
 
+## 0.36.0.1 - 2026-07-04
+
+UI-audit remediation batch: four editor fixes/refactors (PRs #56, #57, #58, #67) landed without their own version bumps in between the 0.35.0.0 and 0.36.0.0 feature releases; this entry documents and versions them together.
+
+### Fixed
+- **Chat panel width vs. config sidebar** (`web/app.tsx`, `web/components/agent-chat-panel.tsx`, `web/components/agent-prompt-input.tsx`, PR #58): the chat column's `--sidebar-width` CSS variable was set from the raw (pre-clamp) `chatWidth` instead of `visibleChatWidth`, so at narrow chat widths with the config sidebar open, chat content could paint under the config panel. The chat aside and its inner containers gained `min-w-0`/`overflow-hidden` guards. The editor header's cut count now reads "1 cut" instead of "1 cuts" (`ranges.length === 1 ? "cut" : "cuts"`).
+- **Slash-skills menu keyboard focus regression** (`web/components/agent-prompt-input.tsx`, `web/components/agent-skills-menu.tsx`, `web/components/agent-skill-token-field.tsx`, PR #67): the skills popup previously took DOM focus away from the prompt textarea, breaking typing-to-filter and `Escape`-to-close. `AgentSkillsMenu` now renders on `@base-ui/react/popover` instead of the shadcn `DropdownMenu`; focus stays in the prompt textarea while the popup is open (`focusPromptField`), a mouse selection re-focuses the prompt field (`onMouseDown` guard), and `aria-controls`/`aria-expanded` link the prompt to the skill list.
+
+### Changed
+- **shadcn primitive adoption in editor config panels** (`web/components/reframe-controls.tsx`, `web/components/audio-controls.tsx`, `web/components/takes-panel.tsx`, `web/components/history-panel.tsx`, PR #56): hand-rolled reframe toggles, audio/history `<select>`s, and the take label input replaced with stock `ToggleGroup`/`Select`/`Input`. `CommitNumberInput` now always renders dot-decimal values regardless of browser locale.
+- **shadcn overlay primitives** (`web/components/asset-preview-hover.tsx`, `web/components/chat-preview-hover.tsx`, `web/components/agent-skills-menu.tsx`, `web/components/project-create-overlay.tsx`, PR #56): portal-based hover previews, the slash-skills menu's old positioning, and the project-create overlay now use stock `HoverCard`, `DropdownMenu` (later replaced by Popover in PR #67 above), and `Dialog`.
+- **Focus rings and dead code** (PR #56): focus-visible rings across the editor now match the shadcn button pattern; the unused `web/components/ui/tabs.tsx` (never wired up) was deleted; `tests/history-panel.test.tsx` updated for the Select markup.
+- **Typography and panel conventions unified** (17 components including `web/components/asset-bin.tsx`, `web/components/project-delete-action.tsx`, `web/components/chat-preview-hover.tsx`, `web/components/settings/settings-integrations-panel.tsx`, PR #57): arbitrary `text-[10px]`-`text-[13px]` sizes normalized to the standard `text-xs`/`text-sm` scale (`web/components/caption-style-picker.tsx`'s preview chips intentionally stay on computed styles); list rows normalized to `px-2 py-1.5` with `gap-2` header gaps; integration status badges moved from emerald/amber ad hoc colors to stock `Badge` variants and muted tokens.
+- **Z-index and motion tokens standardized** (`web/app.tsx` and preview-layer components, PRs #57 and #67): arbitrary `z-[3]`-`z-[7]` utilities replaced with the standard `z-10`/`z-20`/`z-30` steps (layer order preserved); transcript fade transitions aligned to `duration-200`; button/bubble hovers restored to stock `hover:bg-secondary/80` and `rounded-md` size variants; dark-mode `--sidebar-primary` neutralized to match `--primary`. PR #67 also removed a custom size override from the config header trigger so it follows the shared icon button sizing.
+- **Version**: bumped OpenKlip to `0.36.0.1`.
+
 ## 0.36.0.0 - 2026-07-04
 
 Agent-native skills: the edit agent now sees the skill index up front and loads full procedures on demand (progressive disclosure), instead of only discovering templates by chance.
