@@ -620,7 +620,16 @@ export function App({
     return subscribeDefaultAgent(setDefaultAgent);
   }, []);
   const toggleColorScheme = useCallback(() => {
-    setColorScheme(colorScheme === "dark" ? "light" : "dark");
+    const switchTheme = () => {
+      setColorScheme(colorScheme === "dark" ? "light" : "dark");
+    };
+
+    if (!document.startViewTransition) {
+      switchTheme();
+      return;
+    }
+
+    document.startViewTransition(switchTheme);
   }, [colorScheme]);
   const videoRef = useRef<HTMLVideoElement>(null);
   const brollRef = useRef<HTMLVideoElement>(null);
