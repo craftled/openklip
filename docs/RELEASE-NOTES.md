@@ -16,7 +16,7 @@ Publishing status checked on 2026-07-04 (`gh release list`): GitHub releases are
 - **Edit attribution (optional)**: Settings → Appearance → **Show edit attribution** (default off). When on: transcript hover provenance with **View in history**, History author badges/filter, b-roll list author suffix. Backend always logs `authorId` / `model` / `agentSurface`.
 - **Overlay provenance**: b-roll, titles, zooms, stills, music, and graphics stamp `authoredBy` on add/set mutations.
 - **History task drill-down**: click a task id in History to filter to that agent run.
-- **Symbols Effect playground**: `/home` when `openklip serve` is running; halftone glyph demo with presets and PNG export.
+- **OpenKlip loader**: `/home` previews the full-screen loading shell (theme background, shimmering wordmark) when `openklip serve` is running; same loader on route `loading.tsx` and project waits.
 
 ### Known gaps
 

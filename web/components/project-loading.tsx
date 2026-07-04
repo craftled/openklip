@@ -1,5 +1,6 @@
-import { HelloLoading } from "@/components/hello-loading";
+import { OpenKlipLoader } from "@/components/openklip-loader";
+import { helloLoadingLabel } from "@/lib/hello-loading-labels";
 
 export function ProjectLoading() {
-  return <HelloLoading context="project" fullScreen />;
+  return <OpenKlipLoader label={helloLoadingLabel("project")} />;
 }

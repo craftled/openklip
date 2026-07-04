@@ -7,9 +7,10 @@
 - **Edit attribution toggle** (`web/lib/provenance-preferences.ts`, Settings → Appearance → **Show edit attribution**): provenance UI is advanced and **off by default**. When enabled: transcript hover tooltips with **View in history**, History author badges and Author filter, b-roll paint-order author suffix.
 - **Overlay edit provenance** (`src/edl.ts`, `src/provenance.ts`): b-roll, titles, zooms, stills, music, and graphics optionally carry `authoredBy` / `authoredRevision` / `authoredTaskId`, stamped on `*-add` and `*-set` mutations through `mutateProject`.
 - **History task drill-down** (`web/components/history-panel.tsx`): click a `task …` label on a history row or task group header to filter History to that task.
-- **Symbols Effect playground** (`app/home/page.tsx`, `web/components/ui/symbols-effect.tsx`, `web/components/symbols-effect-playground.tsx`): interactive GPU halftone demo at `/home` with presets, PNG export, and remix controls (Three.js).
+- **OpenKlip loader** (`web/components/openklip-loader.tsx`, `web/components/shimmering-text.tsx`, `web/components/project-loading.tsx`, `app/loading.tsx`, `app/home/page.tsx`): full-screen project loading uses a theme-aware background with centered OpenKlip mark and shimmering wordmark (`ShimmeringText` via `motion`). `/home` previews the same loader when `openklip serve` is running.
 
 ### Changed
+- **Project loading screen** (`web/components/project-loading.tsx`, `app/loading.tsx`): route and project waits use `OpenKlipLoader` (shimmering wordmark on theme background) instead of the hello animation for the main full-screen path. Compact hello animation remains for chat loading (`web/components/hello-loading.tsx`).
 - **Script-first transcript UX** (`web/components/editor-transcript-panel.tsx`, `web/app.tsx`): cleaner script typography, on-screen hint ("Edit the script to edit the video…"), Config sidebar closed by default, playback word highlight without underline clutter.
 - **Friendly author labels** (`src/provenance-display.ts`): `ai:cursor` → "Cursor", `ai:codex` → "Codex", and similar display names.
 - **Version**: bumped OpenKlip to `0.40.0.1`.

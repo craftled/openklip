@@ -40,14 +40,15 @@ test("HelloLoading fullScreen fills the viewport shell", () => {
 test("ProjectLoading is the main project loading screen", () => {
   const html = renderToStaticMarkup(createElement(ProjectLoading));
 
-  assert.match(html, /data-hello-loading-context="project"/);
+  assert.match(html, /data-openklip-loader=""/);
   assert.match(html, /Loading project…/);
+  assert.match(html, /OpenKlip/);
   assert.match(html, /h-screen/);
 });
 
 test("app loading route renders ProjectLoading", () => {
   const html = renderToStaticMarkup(createElement(LoadingPage));
 
-  assert.match(html, /data-hello-loading-context="project"/);
+  assert.match(html, /data-openklip-loader=""/);
   assert.match(html, /Loading project…/);
 });

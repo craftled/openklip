@@ -1,13 +1,8 @@
 "use client";
 
-import dynamic from "next/dynamic";
+import { OpenKlipLoader } from "@/components/openklip-loader";
 
-const SymbolsEffectPlayground = dynamic(
-  () => import("@/components/symbols-effect-playground"),
-  { ssr: false }
-);
-
-/** Interactive Symbols Effect playground at /home. */
+/** Full-screen OpenKlip loader preview at /home. */
 export default function HomePage() {
-  return <SymbolsEffectPlayground />;
+  return <OpenKlipLoader />;
 }
