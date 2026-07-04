@@ -479,7 +479,7 @@ export function ElasticSlider({
   return (
     <div
       className={cn(
-        "[--elastic-slider-height:--spacing(7)] [--elastic-slider-radius:var(--radius-lg)]",
+        "[--elastic-slider-height:1.625rem] [--elastic-slider-radius:var(--radius-lg)]",
         "[--elastic-slider-bg:var(--muted)]",
         "[--elastic-slider-fill:var(--muted-foreground)]/10",
         "[--elastic-slider-fill-active:var(--muted-foreground)]/20",
@@ -563,7 +563,7 @@ export function ElasticSlider({
             scaleY: isActive && valueDodge ? 0.75 : 1,
           }}
           aria-hidden="true"
-          className="pointer-events-none absolute top-1/2 h-3.5 w-1 rounded-full bg-(--elastic-slider-handle)"
+          className="pointer-events-none absolute top-1/2 h-3 w-1 rounded-full bg-(--elastic-slider-handle)"
           data-slot="elastic-slider-handle"
           style={{ left: handleLeft, y: "-50%" }}
           transition={
