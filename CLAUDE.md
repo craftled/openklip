@@ -14,7 +14,7 @@ See `AGENTS.md` for the full OpenKlip edit loop, CLI commands, MCP tools, and gu
 
 ## Current release memory
 
-- Code truth checked on 2026-07-04: `VERSION` and `package.json` are `0.40.0.1`; `bun test` has 1746 tests (1745 pass; `tests/transcript-diff-browser.test.ts` times out without a dev server on port 4399); `openklip tools --json --surface mcp` lists 76 MCP tools; `openklip actions --json` lists 42 registry actions.
+- Code truth checked on 2026-07-04: `VERSION` and `package.json` are `0.40.0.1`; `bun test` has 1747 tests (0 fail); `openklip tools --json --surface mcp` lists 76 MCP tools; `openklip actions --json` lists 42 registry actions.
 - Release docs: `CHANGELOG.md` is authoritative history, `docs/RELEASE-NOTES.md` holds GitHub release bodies, and `TODO.md#known-limitations` is the single current gaps list.
 - Published GitHub releases run through `v0.40.0.0` (`gh release view v0.40.0.0`). **`v0.40.0.1` is on `main` but not yet published** (per-slug URLs, script-first editor, optional edit attribution toggle). Tag at ship: `git tag v0.40.0.1 && gh release create v0.40.0.1 --notes-file docs/RELEASE-NOTES.md` (extract the v0.40.0.1 section). Release bodies live in `docs/RELEASE-NOTES.md`. `v0.36.0.1` is tagged at `3d13dc8`, its last content commit.
 
