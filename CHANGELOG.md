@@ -7,6 +7,7 @@
 - **Edit attribution toggle** (`web/lib/provenance-preferences.ts`, Settings → Appearance → **Show edit attribution**): provenance UI is advanced and **off by default**. When enabled: transcript hover tooltips with **View in history**, History author badges and Author filter, b-roll paint-order author suffix.
 - **Overlay edit provenance** (`src/edl.ts`, `src/provenance.ts`): b-roll, titles, zooms, stills, music, and graphics optionally carry `authoredBy` / `authoredRevision` / `authoredTaskId`, stamped on `*-add` and `*-set` mutations through `mutateProject`.
 - **History task drill-down** (`web/components/history-panel.tsx`): click a `task …` label on a history row or task group header to filter History to that task.
+- **Symbols Effect playground** (`app/home/page.tsx`, `web/components/ui/symbols-effect.tsx`, `web/components/symbols-effect-playground.tsx`): interactive GPU halftone demo at `/home` with presets, PNG export, and remix controls (Three.js).
 
 ### Changed
 - **Script-first transcript UX** (`web/components/editor-transcript-panel.tsx`, `web/app.tsx`): cleaner script typography, on-screen hint ("Edit the script to edit the video…"), Config sidebar closed by default, playback word highlight without underline clutter.
