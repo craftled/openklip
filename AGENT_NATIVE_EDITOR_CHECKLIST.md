@@ -516,11 +516,11 @@ Goal: the UI can correct any agent edit precisely.
   - [x] Section divider.
   - [x] Callout label.
   - Verification: all styles render in preview and export (v0.20.0.0).
-- [ ] Add keyframe-like property changes where needed.
-  - [ ] Keep MVP scoped to opacity, scale, position if added.
-  - [ ] Store as simple keyframes, not arbitrary code.
-  - [ ] Expose through CLI/MCP only if UI ships it.
-  - Verification: export matches preview for one keyframed property.
+- [x] Add keyframe-like property changes where needed.
+  - [x] Keep MVP scoped to opacity, scale, position if added.
+  - [x] Store as simple keyframes, not arbitrary code.
+  - [x] Expose through CLI/MCP only if UI ships it.
+  - Verification: preview and export share one code path (`applyGraphicFrame` + `evaluateKeyframes`, `web/lib/graphic-runtime.ts`), so export matches preview by construction; determinism and interpolation covered by `tests/graphic-runtime-keyframes.test.ts` and `tests/keyframes.test.ts` (v0.38.0.0, graphic overlays only — declarative `keyframes` arrays on `GraphicSchema` with seven easings, GUI diamonds + inspector, `graphic-set` keyframes support, CLI `--keyframes-file`).
 
 ## Milestone 6: Visual intelligence and asset matching
 

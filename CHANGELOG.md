@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.38.0.0 - 2026-07-04
+
+Keyframe animation for graphic overlays. Like 0.36.0.1, this is a documenting release: the feature landed across PRs #60, #61, #62, and #65 without their own version bumps; this entry versions them together.
+
+### Added
+- **Graphic keyframe schema and evaluator** (`src/keyframes.ts`, `src/edl.ts`, PR #60): `GraphicSchema` gains an optional `keyframes` array (max 64) of `{ sampleOffset, property, value, easing }` entries — `sampleOffset` is relative to the overlay's `startSample` on the 48kHz grid so keyframes survive phrase re-anchoring; properties are `opacity` (0–1), `scale` (multiplier), and `x`/`y` (canvas-fraction offsets). The pure `evaluateKeyframes()` holds the first/last value outside the keyframed range and eases into the later keyframe between pairs.
+- **Seven easings** (PRs #60, #61, #65): `linear`, `easeIn`, `easeOut`, `easeInOut` (cubic), plus three deterministic curve imports from `motion` — `spring` (`cubicBezier(0.34, 1.56, 0.64, 1)`, the same curve the graphic runtime's template animations use), `backOut`, and `anticipate`.
+- **Frame-pure keyframe rendering in preview and export** (`web/lib/graphic-runtime.ts`, `web/components/graphic-overlay.tsx`, `src/graphic-render.ts`, `src/headless-render.ts`, `src/exporter.ts`, PR #60): `applyGraphicFrame` accepts keyframes + `sampleOffset` and applies them as a wrapper transform on `[data-graphic-root]` (opacity multiplies, scale multiplies, x/y translate by canvas fraction), composing on top of template-declared `data-anim` animations. Preview (rAF at the playhead sample) and export (headless per-frame raster with `sampleOffset = floor(f * SAMPLE_RATE / fps)`) run the same code path, preserving the runtime's no-wall-clock invariant.
+- **Keyframe editing in the GUI** (`web/components/edit-timeline.tsx`, `web/app.tsx`, `web/lib/keyframe-ui.ts`, PR #60): graphic clips on the timeline render diamond markers at each keyframe's position, and a Keyframes inspector section on selected graphics lists keyframes (time in clip, property, value slider, easing dropdown, delete) with an add-at-playhead control clamped to the clip span. Edits persist through the existing `graphic-set` action path.
+- **Agent surface for keyframes** (`src/registry.ts`, `src/actions.ts`, `src/query.ts`, `src/cli.ts`, PR #60): `graphic-set` accepts a `keyframes` array (empty array or `null` clears), the CLI gains `--keyframes-file <json>` / `--clear-keyframes`, and graphic overlay query views expose the keyframe count and array. Undo/history cover keyframe edits automatically via the existing project snapshots.
+- **Keyframe test suites** (`tests/keyframes.test.ts`, `tests/graphic-runtime-keyframes.test.ts`, `tests/keyframe-ui.test.ts`, plus extensions to `tests/edl.test.ts`, `tests/registry.test.ts`, `tests/query.test.ts`; PRs #60, #61, #65): evaluator semantics (hold/easing/unsorted input/overshoot curves), schema bounds, action set/clear, query exposure, runtime determinism and frame quantization, and UI position math.
+
+### Fixed
+- **Keyframe easing select handler accepts all easings** (`web/app.tsx`, PR #62): the inspector's easing dropdown handler previously narrowed to the original four cubic easings, rejecting `spring`.
+
+### Changed
+- **Version**: bumped OpenKlip to `0.38.0.0`.
+
 ## 0.37.0.0 - 2026-07-04
 
 ### Added
