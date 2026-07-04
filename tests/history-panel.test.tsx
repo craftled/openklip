@@ -19,6 +19,7 @@ import {
   HistoryFilterControls,
   HistoryList,
   historyEntryKey,
+  historyEntryKeyForRevisionAfter,
   newestAssembleIndex,
   newestRevertibleEntry,
   parseHistoryEntries,
@@ -756,6 +757,13 @@ test("filterHistoryEntries returns an empty array cleanly for a value present in
   );
 });
 
+test("historyEntryKeyForRevisionAfter finds the row key for a revision", () => {
+  const entries = [taskCut, taskPad, humanLook];
+  const key = historyEntryKeyForRevisionAfter(entries, taskCut.revisionAfter);
+  assert.equal(key, historyEntryKey(taskCut));
+  assert.equal(historyEntryKeyForRevisionAfter(entries, 999), undefined);
+});
+
 test("distinctActors, distinctActions, and distinctTaskIds derive sorted unique values present in the loaded entries", () => {
   const entries = [taskCut, taskPad, humanLook];
   assert.deepEqual(distinctActors(entries), ["agent", "human"]);
@@ -776,11 +784,12 @@ test("HistoryFilterControls renders an actor, action, and task filter control", 
     <HistoryFilterControls
       actionOptions={["cut", "pad"]}
       actorOptions={["agent", "human"]}
+      authorOptions={["human:local"]}
       onChange={() => {
         // no-op for a static render
       }}
       taskOptions={["task-1"]}
-      value={{ actor: "", action: "", task: "" }}
+      value={{ actor: "", action: "", author: "", task: "" }}
     />
   );
   assert.match(html, /Filter by actor/i);
@@ -795,11 +804,12 @@ test("HistoryFilterControls shows 'Clear filters' only when a filter is active",
     <HistoryFilterControls
       actionOptions={["cut"]}
       actorOptions={["agent"]}
+      authorOptions={[]}
       onChange={() => {
         // no-op
       }}
       taskOptions={[]}
-      value={{ actor: "", action: "", task: "" }}
+      value={{ actor: "", action: "", author: "", task: "" }}
     />
   );
   assert.doesNotMatch(idle, /Clear filters/);
@@ -808,11 +818,12 @@ test("HistoryFilterControls shows 'Clear filters' only when a filter is active",
     <HistoryFilterControls
       actionOptions={["cut"]}
       actorOptions={["agent"]}
+      authorOptions={[]}
       onChange={() => {
         // no-op
       }}
       taskOptions={[]}
-      value={{ actor: "agent", action: "", task: "" }}
+      value={{ actor: "agent", action: "", author: "", task: "" }}
     />
   );
   assert.match(active, /Clear filters/);

@@ -68,7 +68,7 @@ function CleanupRow({
 }) {
   return (
     <li
-      className="flex items-start gap-2 rounded-md border bg-background/50 px-2 py-1.5"
+      className="flex items-start gap-1.5 rounded-md border bg-background/50 px-2 py-1"
       data-cleanup-row
     >
       <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -143,9 +143,9 @@ export function CleanupPanel({
   const hiddenCount = report.candidates.length - rows.length;
 
   return (
-    <div className="flex flex-col gap-2" data-cleanup-panel>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2" data-cleanup-count>
+    <div className="flex flex-col gap-1.5" data-cleanup-panel>
+      <div className="flex flex-wrap items-center justify-between gap-1.5">
+        <div className="flex items-center gap-1.5" data-cleanup-count>
           <Badge variant="secondary">
             {plural(report.fillerCount, "filler", "fillers")}
           </Badge>
@@ -212,7 +212,7 @@ export function CleanupPanel({
           <ul className="flex max-h-32 flex-col gap-1 overflow-y-auto">
             {registeredSpans.map((span) => (
               <li
-                className="flex items-center gap-2 rounded-md border bg-background/50 px-2 py-1.5"
+                className="flex items-center gap-1.5 rounded-md border bg-background/50 px-2 py-1"
                 data-dead-air-span
                 key={span.id}
               >

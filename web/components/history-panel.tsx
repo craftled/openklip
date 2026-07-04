@@ -5,9 +5,11 @@ import {
   isActionLogEntry,
 } from "@engine/action-log-entry";
 import type { Project } from "@engine/edl";
+import { authorDisplayLabel } from "@engine/provenance-display";
 import type { RevertTarget } from "@engine/revert";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { HistoryTranscriptDiffToggle } from "@/components/history-transcript-diff";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
 import {
@@ -19,8 +21,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toastRevertFailed, toastRevertSucceeded } from "@/lib/app-toast";
+import { effectiveCurrentRevision } from "@/lib/history-transcript-diff";
 import { RotateCcw } from "@/lib/icon";
 import { relativeTimeAgo } from "@/lib/relative-time";
+import { cn } from "@/lib/utils";
+import type { TranscriptDiffWord } from "@/lib/transcript-diff";
 import { revertProjectAction } from "../../app/actions.ts";
 
 const BADGE_BASE =
@@ -82,6 +87,7 @@ export function parseMaxHistorySnapshots(value: unknown): number | undefined {
 export interface HistoryFilter {
   action?: string;
   actor?: string;
+  author?: string;
   task?: string;
 }
 
@@ -102,13 +108,16 @@ export function filterHistoryEntries(
     if (filter.task && entry.taskId !== filter.task) {
       return false;
     }
+    if (filter.author && entry.authorId !== filter.author) {
+      return false;
+    }
     return true;
   });
 }
 
 /** True when at least one filter dimension (actor/action/task) is active. */
 export function hasActiveHistoryFilter(filter: HistoryFilter): boolean {
-  return Boolean(filter.actor || filter.action || filter.task);
+  return Boolean(filter.actor || filter.action || filter.task || filter.author);
 }
 
 /** Distinct actors actually present in the loaded entries, sorted. Options
@@ -127,6 +136,16 @@ export function distinctActions(entries: ActionLogEntry[]): string[] {
 /** Distinct task ids actually present in the loaded entries, sorted. Entries
  * with no taskId (most GUI/CLI edits) are excluded, not represented as an
  * empty-string option. */
+export function distinctAuthorIds(entries: ActionLogEntry[]): string[] {
+  return Array.from(
+    new Set(
+      entries
+        .map((e) => e.authorId)
+        .filter((id): id is string => id !== undefined)
+    )
+  ).sort();
+}
+
 export function distinctTaskIds(entries: ActionLogEntry[]): string[] {
   return Array.from(
     new Set(
@@ -189,12 +208,14 @@ function FilterSelect({
 export function HistoryFilterControls({
   actionOptions,
   actorOptions,
+  authorOptions,
   onChange,
   taskOptions,
   value,
 }: {
   actionOptions: string[];
   actorOptions: string[];
+  authorOptions: string[];
   onChange: (next: HistoryFilter) => void;
   taskOptions: string[];
   value: HistoryFilter;
@@ -208,6 +229,13 @@ export function HistoryFilterControls({
         onChange={(actor) => onChange({ ...value, actor })}
         options={actorOptions}
         value={value.actor ?? ""}
+      />
+      <FilterSelect
+        ariaLabel="Filter by author"
+        label="Author"
+        onChange={(author) => onChange({ ...value, author })}
+        options={authorOptions}
+        value={value.author ?? ""}
       />
       <FilterSelect
         ariaLabel="Filter by action"
@@ -226,7 +254,9 @@ export function HistoryFilterControls({
       {hasActiveFilter ? (
         <Button
           className="h-6 rounded-sm px-2 text-muted-foreground text-xs"
-          onClick={() => onChange({ action: "", actor: "", task: "" })}
+          onClick={() =>
+            onChange({ action: "", actor: "", author: "", task: "" })
+          }
           size="sm"
           type="button"
           variant="ghost"
@@ -246,6 +276,15 @@ export function historyEntryKey(
   entry: Pick<ActionLogEntry, "action" | "at" | "revisionAfter">
 ): string {
   return `${entry.at}-${entry.revisionAfter}-${entry.action}`;
+}
+
+/** React key / scroll target for the history row that produced a revision. */
+export function historyEntryKeyForRevisionAfter(
+  entries: readonly ActionLogEntry[],
+  revisionAfter: number
+): string | undefined {
+  const entry = entries.find((row) => row.revisionAfter === revisionAfter);
+  return entry ? historyEntryKey(entry) : undefined;
 }
 
 function bumpsRevision(
@@ -469,7 +508,14 @@ interface RevertControls {
   // always be judged against the true fetch, never the filtered view.
   rawEntries?: ActionLogEntry[];
   revertingKey?: string | null;
+  /** Brief ring highlight on the row matching this historyEntryKey. */
+  highlightKey?: string | null;
   snapshotRevisions?: number[];
+  transcriptDiff?: {
+    currentRevision: number;
+    currentWords: readonly TranscriptDiffWord[];
+    slug: string;
+  };
 }
 
 function RevertButton({
@@ -588,13 +634,31 @@ function HistoryRow({
   const blockedByAssemble = controls?.entries
     ? crossesAssembleBoundary(controls.entries, entry)
     : false;
+  const highlighted =
+    controls?.highlightKey !== undefined &&
+    controls.highlightKey !== null &&
+    controls.highlightKey === key;
   return (
-    <li className="flex flex-col gap-0.5 border-border/60 border-b pb-2 last:border-b-0 last:pb-0">
+    <li
+      className={cn(
+        "flex flex-col gap-0.5 border-border/60 border-b pb-2 last:border-b-0 last:pb-0",
+        highlighted && "rounded-sm bg-primary/10 ring-1 ring-primary/40"
+      )}
+      data-history-entry-key={key}
+    >
       <div className="flex items-center gap-1.5">
         <span className="min-w-0 flex-1 truncate font-medium text-foreground text-xs">
           {entry.action}
         </span>
         <span className={actorBadgeClass(entry.actor)}>{entry.actor}</span>
+        {entry.authorId ? (
+          <span
+            className="max-w-28 truncate rounded-sm bg-muted px-1.5 py-0.5 font-medium text-[10px] text-muted-foreground uppercase tracking-wide"
+            title={entry.authorId}
+          >
+            {authorDisplayLabel(entry.authorId)}
+          </span>
+        ) : null}
         {snapshotRevisions ? (
           <RevertButton
             confirming={controls?.confirmingKey === key}
@@ -631,6 +695,15 @@ function HistoryRow({
         <div className="truncate font-mono text-muted-foreground text-xs">
           out: {entry.result}
         </div>
+      ) : null}
+      {controls?.transcriptDiff && controls.snapshotRevisions ? (
+        <HistoryTranscriptDiffToggle
+          currentRevision={controls.transcriptDiff.currentRevision}
+          currentWords={controls.transcriptDiff.currentWords}
+          entry={entry}
+          slug={controls.transcriptDiff.slug}
+          snapshotRevisions={controls.snapshotRevisions}
+        />
       ) : null}
     </li>
   );
@@ -796,9 +869,18 @@ export function HistoryList({
 // App (web/app.tsx) always passes one, since it's the only surface holding
 // the client-side Project state a GUI revert needs to reseed.
 export function HistoryPanel({
+  currentRevision,
+  currentWords,
+  focusRevision,
+  onFocusRevisionHandled,
   onReverted,
   slug,
 }: {
+  currentRevision?: number;
+  currentWords?: readonly TranscriptDiffWord[];
+  /** Scroll to and highlight the history row for this revisionAfter. */
+  focusRevision?: number | null;
+  onFocusRevisionHandled?: () => void;
   onReverted?: (project: Project) => void;
   slug: string;
 }) {
@@ -813,9 +895,11 @@ export function HistoryPanel({
   const [forceConfirmKey, setForceConfirmKey] = useState<string | null>(null);
   const [revertingKey, setRevertingKey] = useState<string | null>(null);
   const [pendingTarget, setPendingTarget] = useState<RevertTarget | null>(null);
+  const [highlightKey, setHighlightKey] = useState<string | null>(null);
   const [filter, setFilter] = useState<HistoryFilter>({
     action: "",
     actor: "",
+    author: "",
     task: "",
   });
 
@@ -848,6 +932,30 @@ export function HistoryPanel({
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (focusRevision == null || entries.length === 0) {
+      return;
+    }
+    const key = historyEntryKeyForRevisionAfter(entries, focusRevision);
+    if (!key) {
+      onFocusRevisionHandled?.();
+      return;
+    }
+    setFilter({ action: "", actor: "", author: "", task: "" });
+    setHighlightKey(key);
+    requestAnimationFrame(() => {
+      const row = document.querySelector(
+        `[data-history-entry-key="${CSS.escape(key)}"]`
+      );
+      row?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+    const timer = window.setTimeout(() => {
+      setHighlightKey(null);
+      onFocusRevisionHandled?.();
+    }, 2500);
+    return () => window.clearTimeout(timer);
+  }, [entries, focusRevision, onFocusRevisionHandled]);
 
   const cancelRevert = useCallback(() => {
     setConfirmingKey(null);
@@ -917,6 +1025,7 @@ export function HistoryPanel({
   // filtered view): narrowing by one dimension must not make the other
   // dimensions' options disappear out from under the user.
   const actorOptions = useMemo(() => distinctActors(entries), [entries]);
+  const authorOptions = useMemo(() => distinctAuthorIds(entries), [entries]);
   const actionOptions = useMemo(() => distinctActions(entries), [entries]);
   const taskOptions = useMemo(() => distinctTaskIds(entries), [entries]);
   const filteredEntries = useMemo(
@@ -1020,6 +1129,7 @@ export function HistoryPanel({
       <HistoryFilterControls
         actionOptions={actionOptions}
         actorOptions={actorOptions}
+        authorOptions={authorOptions}
         onChange={setFilter}
         taskOptions={taskOptions}
         value={filter}
@@ -1029,6 +1139,7 @@ export function HistoryPanel({
         entries={filteredEntries}
         filterActive={filterActive}
         forceConfirmKey={forceConfirmKey}
+        highlightKey={highlightKey}
         onCancel={cancelRevert}
         onConfirmForce={onConfirmForce}
         onConfirmRevert={onConfirmRevert}
@@ -1037,6 +1148,18 @@ export function HistoryPanel({
         rawEntries={entries}
         revertingKey={revertingKey}
         snapshotRevisions={snapshotRevisions}
+        transcriptDiff={
+          currentWords
+            ? {
+                currentRevision: effectiveCurrentRevision(
+                  currentRevision,
+                  entries
+                ),
+                currentWords,
+                slug,
+              }
+            : undefined
+        }
         unfilteredCount={entries.length}
       />
       {entries.length > 0 && maxHistorySnapshots !== undefined ? (

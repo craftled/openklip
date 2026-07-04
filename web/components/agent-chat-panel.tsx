@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import { useAgentChat } from "@/components/agent-chat-context";
 import { AgentPromptInput } from "@/components/agent-prompt-input";
 import { ChatMarkdown } from "@/components/chat-markdown";
+import { HelloLoading } from "@/components/hello-loading";
 import { TaskProgressPanel } from "@/components/task-progress-panel";
 import {
   Attachment,
@@ -374,88 +375,93 @@ export function AgentChatPanel({
             />
             <MessageScrollerViewport>
               <MessageScrollerContent className="min-w-0 gap-3 px-6 py-4 text-left">
-                {chatsLoading && (
-                  <MessageScrollerItem>
-                    <p className="text-muted-foreground text-sm">
-                      Loading chats…
-                    </p>
+                {chatsLoading ? (
+                  <MessageScrollerItem className="flex flex-1 items-center justify-center py-12">
+                    <HelloLoading context="chats" size="compact" />
                   </MessageScrollerItem>
-                )}
-                {showStaticMockups && (
-                  <MessageScrollerItem>
-                    <Marker>
-                      <MarkerIcon>
-                        <CheckIcon />
-                      </MarkerIcon>
-                      <MarkerContent>Project context ready</MarkerContent>
-                    </Marker>
-                  </MessageScrollerItem>
-                )}
-                {showStaticMockups && (
-                  <MessageScrollerItem>
-                    <Attachment>
-                      <AttachmentMedia>
-                        <FileTextIcon />
-                      </AttachmentMedia>
-                      <AttachmentContent>
-                        <AttachmentTitle>sales-dashboard.pdf</AttachmentTitle>
-                        <AttachmentDescription>
-                          PDF · 2.4 MB
-                        </AttachmentDescription>
-                      </AttachmentContent>
-                      <AttachmentActions>
-                        <AttachmentAction aria-label="Remove sales-dashboard.pdf">
-                          <XIcon />
-                        </AttachmentAction>
-                      </AttachmentActions>
-                    </Attachment>
-                  </MessageScrollerItem>
-                )}
-                {!(chatsLoading || activeThread?.messages.length) && (
-                  <MessageScrollerItem className="flex flex-1 items-center">
-                    <Empty>
-                      <EmptyHeader>
-                        <EmptyTitle>Start a chat</EmptyTitle>
-                        <EmptyDescription>
-                          Type / for edit skills, or ask about cuts, filler, and
-                          overlays.
-                        </EmptyDescription>
-                      </EmptyHeader>
-                    </Empty>
-                  </MessageScrollerItem>
-                )}
-                {activeThread?.messages.map((m) => {
-                  const isUser = m.role === "user";
+                ) : (
+                  <>
+                    {showStaticMockups && (
+                      <MessageScrollerItem>
+                        <Marker>
+                          <MarkerIcon>
+                            <CheckIcon />
+                          </MarkerIcon>
+                          <MarkerContent>Project context ready</MarkerContent>
+                        </Marker>
+                      </MessageScrollerItem>
+                    )}
+                    {showStaticMockups && (
+                      <MessageScrollerItem>
+                        <Attachment>
+                          <AttachmentMedia>
+                            <FileTextIcon />
+                          </AttachmentMedia>
+                          <AttachmentContent>
+                            <AttachmentTitle>
+                              sales-dashboard.pdf
+                            </AttachmentTitle>
+                            <AttachmentDescription>
+                              PDF · 2.4 MB
+                            </AttachmentDescription>
+                          </AttachmentContent>
+                          <AttachmentActions>
+                            <AttachmentAction aria-label="Remove sales-dashboard.pdf">
+                              <XIcon />
+                            </AttachmentAction>
+                          </AttachmentActions>
+                        </Attachment>
+                      </MessageScrollerItem>
+                    )}
+                    {!activeThread?.messages.length && (
+                      <MessageScrollerItem className="flex flex-1 items-center">
+                        <Empty>
+                          <EmptyHeader>
+                            <EmptyTitle>Start a chat</EmptyTitle>
+                            <EmptyDescription>
+                              Type / for edit skills, or ask about cuts, filler,
+                              and overlays.
+                            </EmptyDescription>
+                          </EmptyHeader>
+                        </Empty>
+                      </MessageScrollerItem>
+                    )}
+                    {activeThread?.messages.map((m) => {
+                      const isUser = m.role === "user";
 
-                  return (
-                    <MessageScrollerItem
-                      key={m.id}
-                      messageId={m.id}
-                      scrollAnchor={isUser}
-                    >
-                      <Message align={isUser ? "end" : "start"}>
-                        <MessageAvatar>
-                          <span className="text-muted-foreground text-xs">
-                            {isUser ? "Y" : "A"}
-                          </span>
-                        </MessageAvatar>
-                        <MessageContent>
-                          <Bubble align={isUser ? "end" : "start"}>
-                            <BubbleContent
-                              className={isUser ? "whitespace-pre-wrap" : ""}
-                            >
-                              {isUser ? (
-                                m.content
-                              ) : (
-                                <ChatMarkdown>{m.content}</ChatMarkdown>
-                              )}
-                            </BubbleContent>
-                          </Bubble>
-                        </MessageContent>
-                      </Message>
-                    </MessageScrollerItem>
-                  );
-                })}
+                      return (
+                        <MessageScrollerItem
+                          key={m.id}
+                          messageId={m.id}
+                          scrollAnchor={isUser}
+                        >
+                          <Message align={isUser ? "end" : "start"}>
+                            <MessageAvatar>
+                              <span className="text-muted-foreground text-xs">
+                                {isUser ? "Y" : "A"}
+                              </span>
+                            </MessageAvatar>
+                            <MessageContent>
+                              <Bubble align={isUser ? "end" : "start"}>
+                                <BubbleContent
+                                  className={
+                                    isUser ? "whitespace-pre-wrap" : ""
+                                  }
+                                >
+                                  {isUser ? (
+                                    m.content
+                                  ) : (
+                                    <ChatMarkdown>{m.content}</ChatMarkdown>
+                                  )}
+                                </BubbleContent>
+                              </Bubble>
+                            </MessageContent>
+                          </Message>
+                        </MessageScrollerItem>
+                      );
+                    })}
+                  </>
+                )}
               </MessageScrollerContent>
             </MessageScrollerViewport>
             <MessageScrollerButton />

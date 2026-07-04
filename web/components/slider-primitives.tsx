@@ -30,6 +30,7 @@ export function formatDotDecimal(value: number): string {
 // input). Persisting per keystroke would enqueue one save + history entry per
 // character.
 export function CommitNumberInput({
+  className,
   disabled = false,
   max,
   min,
@@ -37,6 +38,7 @@ export function CommitNumberInput({
   step: _step,
   value,
 }: {
+  className?: string;
   disabled?: boolean;
   max?: number;
   min: number;
@@ -57,6 +59,7 @@ export function CommitNumberInput({
   };
   return (
     <Input
+      className={className}
       disabled={disabled}
       inputMode="decimal"
       lang="en-US"

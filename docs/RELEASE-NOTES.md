@@ -6,6 +6,23 @@ Publishing status checked on 2026-07-04 (`gh release list`): GitHub releases are
 
 ---
 
+## v0.40.0.0
+
+**History transcript diff, author provenance, and loading polish.**
+
+### Highlights
+- **Transcript diff in History**: per-entry **Show transcript diff** on transcript mutations compares kept words before and after each edit, with Inline (default) and Classic layouts via `@pierre/diffs`. Review-only; the main transcript editor is unchanged.
+- **Author provenance**: history entries and transcript words can record which agent or human made an edit; History gets author badges and a filter; the transcript editor shows hover attribution on stamped words.
+- **Hello loading**: project and chat loading states use a compact hello animation instead of plain placeholder text.
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#04000---2026-07-04)
+
+---
+
 ## v0.39.0.0
 
 **Motion text pack for graphic overlays.**

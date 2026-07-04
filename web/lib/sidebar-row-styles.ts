@@ -26,7 +26,7 @@ export const SIDEBAR_ROW_ACTIVE_CLASS =
 
 export const SIDEBAR_HEADER_ROW_CLASS = cn(
   "flex w-full min-w-0 cursor-pointer select-none items-center text-left",
-  "h-8 gap-2 rounded-md px-2 text-sm",
+  "h-7 gap-2 rounded-md px-2 text-[0.8rem]",
   "outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
 );
 
@@ -35,14 +35,14 @@ export const SIDEBAR_HEADER_ROW_CLASS = cn(
  * Active/hover colors come from the button variant + `isActive`.
  */
 export const SIDEBAR_MENU_HEADER_CLASS =
-  "min-w-0 h-8 px-2 text-sm text-sidebar-foreground";
+  "min-w-0 h-7 rounded-md px-2 text-[0.8rem] text-sidebar-foreground";
 
 /**
  * Minimal overrides for `SidebarMenuButton` chat/thread rows.
  * Active colors come from `isActive` on `SidebarMenuButton`.
  */
 export const SIDEBAR_MENU_THREAD_CLASS =
-  "h-8 justify-start pl-2 text-sm text-sidebar-foreground";
+  "h-7 justify-start rounded-md pl-2 text-[0.8rem] text-sidebar-foreground";
 
 /** Primary nav rows: project switcher, New chat, Search. */
 export function sidebarHeaderRowClass(isActive = false): string {

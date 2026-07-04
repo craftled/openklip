@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAgentChat } from "@/components/agent-chat-context";
 import { AnalyzeAssetsButton } from "@/components/analyze-assets-button";
 import {
@@ -88,7 +88,8 @@ export function AgentSidebar({
 }: AgentSidebarProps) {
   const router = useRouter();
   const [search, setSearch] = useState("");
-  const [searchOpen, setSearchOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchShortcut = useModShortcut("k");
   const [sidebarView, setSidebarView] = useState<SidebarSegmentView>("chats");
 
   const {
@@ -146,6 +147,23 @@ export function AgentSidebar({
     [activeSlug, router]
   );
 
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        !(event.altKey || event.shiftKey) &&
+        event.key.toLowerCase() === "k"
+      ) {
+        event.preventDefault();
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
   const filteredChats = useMemo(
     () => filterThreadsByQuery(threads, search),
     [threads, search]
@@ -185,25 +203,57 @@ export function AgentSidebar({
         </SidebarContent>
       ) : (
         <>
-          <SidebarHeader className="gap-0 px-1.5 py-2">
-            <div className="flex w-full items-center gap-1.5">
-              <SidebarTrigger aria-label="Toggle agent sidebar" />
-              <div className="min-w-0 flex-1">
-                <ProjectSwitcher
-                  activeSlug={activeSlug}
-                  onCreateProject={onCreateProject}
-                  onDeleteProject={onDeleteProject}
-                  onProjectCreated={onProjectCreated}
-                  onSelectProject={openProject}
-                  projects={projects}
+          <SidebarHeader className="gap-0.5 border-sidebar-border/60 border-b px-2 pt-1 pb-1">
+            <div className="flex h-6 w-full items-center gap-1.5 pr-0.5 pl-2">
+              <div
+                aria-hidden="true"
+                className="flex min-w-0 flex-1 items-center gap-1.5 text-foreground"
+              >
+                <span
+                  className="block h-5 w-5 shrink-0 bg-current"
+                  style={{
+                    WebkitMask:
+                      "url('/openklip.svg') center / contain no-repeat",
+                    mask: "url('/openklip.svg') center / contain no-repeat",
+                  }}
                 />
+                <span className="truncate font-medium text-[11px] leading-none">
+                  OpenKlip
+                </span>
               </div>
+              <SidebarTrigger aria-label="Toggle agent sidebar" />
+            </div>
+            <div className="min-w-0">
+              <ProjectSwitcher
+                activeSlug={activeSlug}
+                onCreateProject={onCreateProject}
+                onDeleteProject={onDeleteProject}
+                onProjectCreated={onProjectCreated}
+                onSelectProject={openProject}
+                projects={projects}
+              />
             </div>
           </SidebarHeader>
 
           <SidebarContent className="gap-0">
-            <SidebarGroup className="py-0">
-              <SidebarMenu className="gap-0.5">
+            <div className="px-2 pt-1.5 pb-1">
+              <div className="relative">
+                <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                <SidebarInput
+                  aria-label="Search chats"
+                  className="h-7! rounded-md border-input bg-transparent pr-14 pl-9 text-[0.8rem]! shadow-none placeholder:text-muted-foreground/74 focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search"
+                  ref={searchInputRef}
+                  value={search}
+                />
+                <span className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 rounded-full bg-muted/90 px-2 py-0.5 font-medium text-muted-foreground text-xs leading-none">
+                  {searchShortcut}
+                </span>
+              </div>
+            </div>
+            <SidebarGroup className="px-2 pt-0 pb-1">
+              <SidebarMenu className="gap-1">
                 <SidebarMenuItem>
                   <SidebarMenuButton
                     className={SIDEBAR_MENU_HEADER_CLASS}
@@ -213,39 +263,6 @@ export function AgentSidebar({
                     <NewChatIcon className={SIDEBAR_LEADING_GLYPH_CLASS} />
                     <span className="truncate">New chat</span>
                   </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  {searchOpen ? (
-                    <div className="relative">
-                      <Search
-                        className={cn(
-                          "pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2",
-                          SIDEBAR_LEADING_GLYPH_CLASS
-                        )}
-                      />
-                      <SidebarInput
-                        autoFocus
-                        className="pl-8"
-                        onBlur={() => {
-                          if (!search.trim()) {
-                            setSearchOpen(false);
-                          }
-                        }}
-                        onChange={(e) => setSearch(e.target.value)}
-                        placeholder="Search chats"
-                        value={search}
-                      />
-                    </div>
-                  ) : (
-                    <SidebarMenuButton
-                      className={SIDEBAR_MENU_HEADER_CLASS}
-                      onClick={() => setSearchOpen(true)}
-                      size="sm"
-                    >
-                      <Search className={SIDEBAR_LEADING_GLYPH_CLASS} />
-                      <span className="truncate">Search</span>
-                    </SidebarMenuButton>
-                  )}
                 </SidebarMenuItem>
               </SidebarMenu>
             </SidebarGroup>
@@ -257,7 +274,7 @@ export function AgentSidebar({
 
             {sidebarView === "chats" ? (
               <CollapsibleSidebarSection defaultOpen title="Chats">
-                <SidebarMenu>
+                <SidebarMenu className="gap-0.5">
                   {chatEmptyLabel && (
                     <p className="px-2 py-1 text-muted-foreground/58 text-xs">
                       {chatEmptyLabel}
@@ -288,7 +305,7 @@ export function AgentSidebar({
                     <p className="mt-2 mb-1 px-2 text-muted-foreground/58 text-xs">
                       Archived
                     </p>
-                    <SidebarMenu>
+                    <SidebarMenu className="gap-0.5">
                       {filteredArchivedChats.map((t) => (
                         <ChatListItem
                           archived
@@ -343,8 +360,8 @@ export function AgentSidebar({
             )}
           </SidebarContent>
 
-          <SidebarFooter className="px-1.5 py-2">
-            <SidebarMenu>
+          <SidebarFooter className="border-sidebar-border/60 border-t px-2 py-2">
+            <SidebarMenu className="gap-1">
               <SidebarMenuItem>
                 <SidebarMenuButton
                   className={SIDEBAR_MENU_HEADER_CLASS}

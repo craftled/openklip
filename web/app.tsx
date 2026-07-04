@@ -28,6 +28,7 @@ import {
   orientationToExportAspect,
   shouldApplyReframe,
 } from "@engine/export-aspect";
+import { stampGuiWordProvenance } from "@engine/provenance-display";
 import { FILTER_OPTIONS, filterLabel } from "@engine/filter";
 import type { Keyframe } from "@engine/keyframes";
 import { validateProductAnnouncementSpec } from "@engine/product-announcement";
@@ -328,6 +329,7 @@ interface Project {
   motion?: { speed?: number };
   music?: MusicPlacementView[];
   padMs: number;
+  revision?: number;
   sampleRate: number;
   // Rides on the project object from a separate editor-page-data change
   // (VAD silence spans for dead-air detection); absent/undefined/null all
@@ -354,6 +356,12 @@ const ZOOM_PRESETS: Record<string, { scale: number; rampSec: number }> = {
 
 const CONFIG_SIDEBAR_WIDTH = 288;
 const CHAT_WIDTH_WITH_CONFIG = 360;
+const CONFIG_COMPACT_INPUT_CLASS =
+  "h-7! rounded-md! px-2! py-1! text-[0.8rem]!";
+const CONFIG_COMPACT_SELECT_TRIGGER_CLASS =
+  "h-7! rounded-md! px-2! py-0! text-[0.8rem]!";
+const CONFIG_COMPACT_TEXTAREA_CLASS =
+  "min-h-20! rounded-md! px-2! py-1.5! text-[0.8rem]!";
 // F12: mirrors the dead-air-add action's server-side span cap (src/registry.ts).
 const DEAD_AIR_ADD_BATCH_SIZE = 50;
 
@@ -479,6 +487,14 @@ export function App({
   const [mobileRightPanel, setMobileRightPanel] = useState<
     "chat" | "config" | null
   >(null);
+  const [historyFocusRevision, setHistoryFocusRevision] = useState<
+    number | null
+  >(null);
+  const focusWordInHistory = useCallback((revisionAfter: number) => {
+    setConfigOpen(true);
+    setMobileRightPanel("config");
+    setHistoryFocusRevision(revisionAfter);
+  }, []);
   // Chat sidebar width (px), drag-adjustable. Default on server; the stored
   // value is read after mount so SSR and first client render agree.
   const [chatWidth, setChatWidth] = useState(CHAT_WIDTH_DEFAULT);
@@ -930,8 +946,13 @@ export function App({
   const toggleWord = useCallback(
     (id: string) => {
       setProject((prev) => {
-        const words = prev.words.map((w) =>
-          w.id === id ? { ...w, deleted: !w.deleted } : w
+        const revisionAfter = (prev.revision ?? 0) + 1;
+        const words = stampGuiWordProvenance(
+          prev.words.map((w) =>
+            w.id === id ? { ...w, deleted: !w.deleted } : w
+          ),
+          [id],
+          revisionAfter
         );
         enqueueSave(() =>
           saveProjectEdits(prev.slug, {
@@ -947,7 +968,15 @@ export function App({
   const setTranscriptRangeDeleted = useCallback(
     (range: readonly [number, number], deleted: boolean) => {
       setProject((prev) => {
-        const words = setWordRangeDeleted(prev.words, range, deleted);
+        const revisionAfter = (prev.revision ?? 0) + 1;
+        const changedIds = prev.words
+          .slice(range[0], range[1] + 1)
+          .map((w) => w.id);
+        const words = stampGuiWordProvenance(
+          setWordRangeDeleted(prev.words, range, deleted),
+          changedIds,
+          revisionAfter
+        );
         enqueueSave(() =>
           saveProjectEdits(prev.slug, {
             words: words.map((w) => ({
@@ -966,7 +995,12 @@ export function App({
   const reconcileTranscriptEdit = useCallback(
     (editedText: string) => {
       setProject((prev) => {
-        const words = reconcileTranscriptText(prev.words, editedText);
+        const revisionAfter = (prev.revision ?? 0) + 1;
+        const words = stampGuiWordProvenance(
+          reconcileTranscriptText(prev.words, editedText),
+          prev.words.map((w) => w.id),
+          revisionAfter
+        );
         enqueueSave(() =>
           saveProjectEdits(prev.slug, {
             words: words.map((w) => ({
@@ -2485,22 +2519,22 @@ export function App({
           </Button>
         </div>
         <SidebarContent className="gap-0 overflow-visible bg-background">
-          <div className="border-border/80 border-b px-3 py-2.5">
+          <div className="border-border/80 border-b px-2 py-1.5">
             <div className="flex h-7 items-center gap-2">
               <InspectorIcon className="size-3.5 shrink-0 text-muted-foreground" />
-              <span className="min-w-0 flex-1 truncate font-medium text-[0.88rem]">
+              <span className="min-w-0 flex-1 truncate font-medium text-[0.82rem]">
                 {inspectorLabel}
               </span>
               <Badge className="shrink-0" variant="secondary">
                 {inspectorBadge}
               </Badge>
             </div>
-            <div className="mt-1.5 ml-[0.42rem] border-border/70 border-l pl-3">
+            <div className="mt-1 ml-[0.42rem] border-border/70 border-l pl-2.5">
               {inspectorMeta.map((item) => {
                 const Icon = item.icon;
                 return (
                   <div
-                    className="flex h-6 min-w-0 items-center gap-2 text-[0.78rem]"
+                    className="flex h-5 min-w-0 items-center gap-1.5 text-[0.75rem]"
                     key={item.label}
                     title={`${item.label}: ${item.value}`}
                   >
@@ -2519,8 +2553,8 @@ export function App({
           {selected &&
           (selZoom || selTitle || selBroll || selStill || selGraphic) ? (
             <div className="group-data-[collapsible=icon]:hidden">
-              <div className="px-3 py-3">
-                <div className="flex items-center gap-2 font-medium text-sm">
+              <div className="px-2 py-2">
+                <div className="flex items-center gap-1.5 font-medium text-[0.8rem]">
                   {selZoom ? (
                     <ZoomIn className={APP_ICON_CLASS} />
                   ) : selTitle ? (
@@ -2610,6 +2644,7 @@ export function App({
                 <Section defaultOpen title="Title">
                   {selTitle.position === "hero" ? (
                     <Textarea
+                      className={CONFIG_COMPACT_TEXTAREA_CLASS}
                       onChange={(e) =>
                         updateTitle(selTitle.id, {
                           text: e.target.value,
@@ -2621,6 +2656,7 @@ export function App({
                     />
                   ) : (
                     <Input
+                      className={CONFIG_COMPACT_INPUT_CLASS}
                       onChange={(e) =>
                         updateTitle(selTitle.id, {
                           text: e.target.value,
@@ -2641,7 +2677,13 @@ export function App({
                       }}
                       value={selTitle.position}
                     >
-                      <SelectTrigger className="w-full" size="sm">
+                      <SelectTrigger
+                        className={cn(
+                          "w-full",
+                          CONFIG_COMPACT_SELECT_TRIGGER_CLASS
+                        )}
+                        size="sm"
+                      >
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -2707,7 +2749,13 @@ export function App({
                       }}
                       value={selBroll.audioMode ?? "silent"}
                     >
-                      <SelectTrigger className="w-full" size="sm">
+                      <SelectTrigger
+                        className={cn(
+                          "w-full",
+                          CONFIG_COMPACT_SELECT_TRIGGER_CLASS
+                        )}
+                        size="sm"
+                      >
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -2739,7 +2787,13 @@ export function App({
                       }
                       value={selBroll.assetId}
                     >
-                      <SelectTrigger className="w-full" size="sm">
+                      <SelectTrigger
+                        className={cn(
+                          "w-full",
+                          CONFIG_COMPACT_SELECT_TRIGGER_CLASS
+                        )}
+                        size="sm"
+                      >
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -2791,7 +2845,13 @@ export function App({
                       }
                       value={selStill.assetId}
                     >
-                      <SelectTrigger className="w-full" size="sm">
+                      <SelectTrigger
+                        className={cn(
+                          "w-full",
+                          CONFIG_COMPACT_SELECT_TRIGGER_CLASS
+                        )}
+                        size="sm"
+                      >
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -2868,10 +2928,10 @@ export function App({
                       const bounds = keyframeValueBounds(kf.property);
                       return (
                         <div
-                          className="space-y-2 rounded-md border border-border/60 bg-muted/30 p-2"
+                          className="space-y-1.5 rounded-md border border-border/60 bg-muted/30 p-1.5"
                           key={`${kf.sampleOffset}-${kf.property}-${index}`}
                         >
-                          <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center justify-between gap-1.5">
                             <span className="font-medium text-xs">
                               {formatKeyframeProperty(kf.property)}
                             </span>
@@ -2880,7 +2940,7 @@ export function App({
                             </span>
                             <Button
                               aria-label={`Remove keyframe ${formatKeyframeProperty(kf.property)}`}
-                              className="size-7 shrink-0"
+                              className="size-6! shrink-0"
                               onClick={() =>
                                 updateGraphic(selGraphic.id, {
                                   keyframes: removeKeyframeAt(
@@ -2917,7 +2977,7 @@ export function App({
                             step={bounds.step}
                             value={kf.value}
                           />
-                          <Field className="grid h-7 grid-cols-[4.25rem_1fr] items-center gap-2.5">
+                          <Field className="grid h-7 grid-cols-[4.25rem_1fr] items-center gap-1.5">
                             <FieldLabel className="text-muted-foreground text-xs">
                               Easing
                             </FieldLabel>
@@ -2939,7 +2999,13 @@ export function App({
                               }}
                               value={kf.easing}
                             >
-                              <SelectTrigger className="w-full" size="sm">
+                              <SelectTrigger
+                                className={cn(
+                                  "w-full",
+                                  CONFIG_COMPACT_SELECT_TRIGGER_CLASS
+                                )}
+                                size="sm"
+                              >
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
@@ -2957,7 +3023,7 @@ export function App({
                       );
                     })
                   )}
-                  <div className="mt-1 flex gap-2">
+                  <div className="mt-1 flex gap-1.5">
                     <Select
                       onValueChange={(v) => {
                         if (
@@ -2971,7 +3037,13 @@ export function App({
                       }}
                       value={newKeyframeProperty}
                     >
-                      <SelectTrigger className="flex-1" size="sm">
+                      <SelectTrigger
+                        className={cn(
+                          "flex-1",
+                          CONFIG_COMPACT_SELECT_TRIGGER_CLASS
+                        )}
+                        size="sm"
+                      >
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -3016,7 +3088,7 @@ export function App({
                 </Section>
               )}
 
-              <div className="p-3">
+              <div className="p-2">
                 <Button
                   className="w-full"
                   onClick={removeSelected}
@@ -3029,7 +3101,7 @@ export function App({
             </div>
           ) : selRange ? (
             <div className="group-data-[collapsible=icon]:hidden">
-              <div className="px-3 py-3 font-medium text-sm">
+              <div className="px-2 py-2 font-medium text-[0.8rem]">
                 Selection
                 <span className="ml-2 text-muted-foreground text-xs">
                   {selRange[1] - selRange[0] + 1} words
@@ -3044,7 +3116,7 @@ export function App({
                 >
                   <ZoomIn data-icon="inline-start" /> Push in
                 </Button>
-                <div className="mt-2 flex gap-2">
+                <div className="mt-1.5 flex gap-1.5">
                   <Select
                     onValueChange={(value) => {
                       if (value) {
@@ -3054,7 +3126,10 @@ export function App({
                     value={chosenAsset}
                   >
                     <SelectTrigger
-                      className="flex-1"
+                      className={cn(
+                        "flex-1",
+                        CONFIG_COMPACT_SELECT_TRIGGER_CLASS
+                      )}
                       disabled={brollAssets.length === 0}
                       size="sm"
                     >
@@ -3080,7 +3155,7 @@ export function App({
                     <Film />
                   </Button>
                 </div>
-                <div className="mt-2 flex gap-2">
+                <div className="mt-1.5 flex gap-1.5">
                   <Select
                     onValueChange={(value) => {
                       if (value) {
@@ -3090,7 +3165,10 @@ export function App({
                     value={chosenStillAsset}
                   >
                     <SelectTrigger
-                      className="flex-1"
+                      className={cn(
+                        "flex-1",
+                        CONFIG_COMPACT_SELECT_TRIGGER_CLASS
+                      )}
                       disabled={stillAssets.length === 0}
                       size="sm"
                     >
@@ -3120,6 +3198,7 @@ export function App({
               <Section title="Title">
                 {titlePos === "hero" ? (
                   <Textarea
+                    className={CONFIG_COMPACT_TEXTAREA_CLASS}
                     onChange={(e) => setTitleText(e.target.value)}
                     placeholder={"Headline\nSubtitle (optional second line)"}
                     rows={3}
@@ -3127,12 +3206,13 @@ export function App({
                   />
                 ) : (
                   <Input
+                    className={CONFIG_COMPACT_INPUT_CLASS}
                     onChange={(e) => setTitleText(e.target.value)}
                     placeholder="Title text"
                     value={titleText}
                   />
                 )}
-                <div className="mt-2 flex gap-2">
+                <div className="mt-1.5 flex gap-1.5">
                   <Select
                     onValueChange={(v) => {
                       if (v) {
@@ -3141,7 +3221,13 @@ export function App({
                     }}
                     value={titlePos}
                   >
-                    <SelectTrigger className="flex-1" size="sm">
+                    <SelectTrigger
+                      className={cn(
+                        "flex-1",
+                        CONFIG_COMPACT_SELECT_TRIGGER_CLASS
+                      )}
+                      size="sm"
+                    >
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -3163,7 +3249,7 @@ export function App({
                   </Button>
                 </div>
               </Section>
-              <div className="p-3">
+              <div className="p-2">
                 <Button
                   className="text-muted-foreground"
                   onClick={clearSel}
@@ -3287,8 +3373,16 @@ export function App({
                 snap={project.cuts?.snap ?? DEFAULT_CUT_SNAP}
               />
             </Section>
-            <Section title="History">
+            <Section defaultOpen title="History">
               <HistoryPanel
+                currentRevision={project.revision ?? 0}
+                currentWords={project.words.map((word) => ({
+                  deleted: word.deleted,
+                  id: word.id,
+                  text: word.text,
+                }))}
+                focusRevision={historyFocusRevision}
+                onFocusRevisionHandled={() => setHistoryFocusRevision(null)}
                 onReverted={onHistoryReverted}
                 slug={project.slug}
               />
@@ -3831,6 +3925,7 @@ export function App({
                           onRestoreSelection={restoreSelection}
                           onSelectRange={selectTranscriptRange}
                           onTextEdit={reconcileTranscriptEdit}
+                          onViewInHistory={focusWordInHistory}
                           search={
                             <TranscriptSearch
                               activeMatchIndex={activeSearchIndex}
@@ -3961,13 +4056,19 @@ function Section({
   defaultOpen?: boolean;
   title: string;
 }) {
+  const [open, setOpen] = useState(defaultOpen);
+
+  useEffect(() => {
+    setOpen(defaultOpen);
+  }, [defaultOpen, title]);
+
   return (
-    <SidebarGroup className="border-border/80 border-t p-0">
-      <Collapsible defaultOpen={defaultOpen} render={<div />}>
+    <SidebarGroup className="border-border/80 border-t px-2 py-1">
+      <Collapsible onOpenChange={setOpen} open={open} render={<div />}>
         <CollapsibleTrigger
           render={
             <Button
-              className="h-11 w-full justify-start rounded-none px-3 font-medium text-[0.82rem] text-foreground/85 tracking-normal hover:bg-muted/35 sm:h-9 [&[data-panel-open]>svg.chevron]:rotate-90"
+              className="h-7! w-full justify-start rounded-md px-2 font-medium text-[0.8rem] text-foreground/85 tracking-normal hover:bg-muted/45 [&[data-panel-open]>svg.chevron]:rotate-90"
               type="button"
               variant="ghost"
             >
@@ -3977,8 +4078,8 @@ function Section({
           }
         />
         <CollapsibleContent>
-          <SidebarGroupContent className="px-3 pt-1 pb-3">
-            <FieldGroup className="gap-2">{children}</FieldGroup>
+          <SidebarGroupContent className="pt-1.5 pb-1">
+            <FieldGroup className="gap-1.5">{children}</FieldGroup>
           </SidebarGroupContent>
         </CollapsibleContent>
       </Collapsible>
@@ -4027,7 +4128,7 @@ function PropRow({
   children: ReactNode;
 }) {
   return (
-    <Field className="grid min-h-11 grid-cols-[4.35rem_1fr_2.75rem] items-center gap-2 sm:h-7 sm:min-h-0">
+    <Field className="grid h-7 grid-cols-[4.35rem_1fr_2.75rem] items-center gap-1.5">
       <FieldLabel className="truncate text-muted-foreground text-xs">
         {label}
       </FieldLabel>

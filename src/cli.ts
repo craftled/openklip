@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { z } from "zod";
 import { readActionLog } from "./action-log.ts";
+import { matchesAuthorFilter } from "./provenance.ts";
 import { summarize } from "./actions.ts";
 import { listAgentTasks } from "./agent-tasks.ts";
 import {
@@ -2735,7 +2736,7 @@ try {
     case "history": {
       if (!rest[0]) {
         throw new Error(
-          "usage: openklip history <slug> [--limit N] [--task <id>] [--action <name>] [--actor <name>]"
+          "usage: openklip history <slug> [--limit N] [--task <id>] [--action <name>] [--actor <name>] [--author <id>]"
         );
       }
       const historySlug = rest[0];
@@ -2747,6 +2748,7 @@ try {
       const taskFilter = flagValue(rest, "--task");
       const actionFilter = flagValue(rest, "--action");
       const actorFilter = flagValue(rest, "--actor");
+      const authorFilter = flagValue(rest, "--author");
       if (
         actorFilter !== undefined &&
         !(HISTORY_ACTORS as readonly string[]).includes(actorFilter)
@@ -2764,6 +2766,9 @@ try {
       if (actorFilter !== undefined) {
         entries = entries.filter((e) => e.actor === actorFilter);
       }
+      if (authorFilter !== undefined) {
+        entries = entries.filter((e) => matchesAuthorFilter(e, authorFilter));
+      }
       const filteredOutAll = entries.length === 0;
       entries = entries.slice(0, limit);
       const snapshotRevisions = listHistorySnapshotRevisions(historySlug);
@@ -2776,6 +2781,7 @@ try {
             taskFilter === undefined ? undefined : `--task=${taskFilter}`,
             actionFilter === undefined ? undefined : `--action=${actionFilter}`,
             actorFilter === undefined ? undefined : `--actor=${actorFilter}`,
+            authorFilter === undefined ? undefined : `--author=${authorFilter}`,
           ].filter((f): f is string => f !== undefined);
           console.log(
             `no history entries match the filter (${activeFilters.join(", ")}) for ${historySlug}.`
@@ -2787,7 +2793,7 @@ try {
       }
       for (const e of entries) {
         console.log(
-          `${e.action.padEnd(16)}  rev ${e.revisionBefore}->${e.revisionAfter}  ${e.actor}${e.taskId ? `  task ${e.taskId}` : ""}  ${new Date(e.at).toISOString()}`
+          `${e.action.padEnd(16)}  rev ${e.revisionBefore}->${e.revisionAfter}  ${e.actor}${e.authorId ? `  ${e.authorId}` : ""}${e.taskId ? `  task ${e.taskId}` : ""}  ${new Date(e.at).toISOString()}`
         );
       }
       console.log(
@@ -2859,8 +2865,10 @@ try {
         break;
       }
       for (const t of filtered) {
+        const author =
+          t.authorId ?? (t.model ? `model ${t.model}` : undefined);
         console.log(
-          `${t.id}  ${t.status.padEnd(10)}  ${new Date(t.startedAt).toISOString()}  ${t.request.slice(0, 60)}`
+          `${t.id}  ${t.status.padEnd(10)}  ${new Date(t.startedAt).toISOString()}${author ? `  ${author}` : ""}  ${t.request.slice(0, 60)}`
         );
       }
       console.log(

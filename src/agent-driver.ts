@@ -19,6 +19,7 @@ import { existsSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { clearAgentRun, registerAgentRun } from "./agent-run-registry.ts";
+import { resolveProvenance } from "./provenance.ts";
 
 export interface PromptWord {
   id: string;
@@ -605,6 +606,11 @@ export async function runClaudeEdit(
   // same process within the same millisecond, and a shared cfg path would
   // leak one run's OPENKLIP_TASK_ID/OPENKLIP_SLUG into the other.
   const cfgPath = join(tmpdir(), `openklip-mcp-${randomUUID()}.json`);
+  const provenance = resolveProvenance({
+    actor: "agent",
+    model: opts.agent,
+    agentSurface: "claude-code",
+  });
   await Bun.write(
     cfgPath,
     JSON.stringify({
@@ -615,11 +621,10 @@ export async function runClaudeEdit(
           env: {
             OPENKLIP_PROJECTS_ROOT: opts.projectsRoot,
             OPENKLIP_SLUG: opts.slug,
-            // Chat edits run through the user's agent CLI, so the action
-            // history should attribute them to "agent", not raw "mcp".
             OPENKLIP_ACTOR: "agent",
-            // The task tools resolve the active task from env, never from
-            // tool input, so a run can only report on its own task.
+            OPENKLIP_AUTHOR_ID: provenance.authorId,
+            OPENKLIP_AGENT_MODEL: opts.agent,
+            OPENKLIP_AGENT_SURFACE: "claude-code",
             ...(opts.taskId ? { OPENKLIP_TASK_ID: opts.taskId } : {}),
           },
         },

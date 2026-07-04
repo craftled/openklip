@@ -2,6 +2,7 @@
 
 import { ActionStatusButton } from "@/components/action-status-button";
 import { useAgentChat } from "@/components/agent-chat-context";
+import { helloLoadingLabel } from "@/lib/hello-loading-labels";
 import { Sparkles } from "@/lib/icon";
 
 export function FindFillerButton() {
@@ -21,7 +22,7 @@ export function FindFillerButton() {
       return `${providerLabel} is reading…`;
     }
     if (chatsLoading) {
-      return "Loading chats…";
+      return helloLoadingLabel("chats");
     }
     if (!agentUsable) {
       return activeStatus?.installed
@@ -41,7 +42,7 @@ export function FindFillerButton() {
       size="sm"
       title={
         chatsLoading
-          ? "Loading chats…"
+          ? helloLoadingLabel("chats")
           : agentUsable
             ? undefined
             : activeStatus?.installed

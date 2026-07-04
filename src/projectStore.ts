@@ -13,6 +13,10 @@ import { type Project, ProjectSchema } from "./edl.ts";
 import { projectPaths, projectsRoot } from "./paths.ts";
 import { acquireProjectFileLock } from "./project-file-lock.ts";
 import { withProjectLock } from "./project-lock.ts";
+import {
+  resolveProvenance,
+  stampProvenanceFromMutation,
+} from "./provenance.ts";
 
 export interface ProjectListing {
   mtimeMs: number;
@@ -80,7 +84,11 @@ export interface MutateMeta {
   action: string;
   /** Defaults to OPENKLIP_ACTOR when set, else "human". */
   actor?: Actor;
+  agentSurface?: string;
+  /** Override author identity (OPENKLIP_AUTHOR_ID). */
+  authorId?: string;
   input?: unknown;
+  model?: string;
   /** Spawned agent task this mutation ran under, when any (OPENKLIP_TASK_ID). */
   taskId?: string;
 }
@@ -182,10 +190,19 @@ export function mutateProject<T>(
       const result = await fn(project);
       if (meta) {
         project.revision = revisionBefore + 1;
+        const provenance = resolveProvenance(meta);
+        stampProvenanceFromMutation(
+          project,
+          meta,
+          result,
+          provenance,
+          revisionBefore + 1
+        );
       }
       await saveProject(slug, project);
       if (meta) {
         try {
+          const provenance = resolveProvenance(meta);
           await appendActionLog(slug, {
             at: Date.now(),
             action: meta.action,
@@ -195,6 +212,11 @@ export function mutateProject<T>(
             revisionBefore,
             revisionAfter: revisionBefore + 1,
             taskId: meta.taskId,
+            authorId: provenance.authorId,
+            ...(provenance.agentSurface
+              ? { agentSurface: provenance.agentSurface }
+              : {}),
+            ...(provenance.model ? { model: provenance.model } : {}),
           });
         } catch (err) {
           // History is best-effort: a log write failure must never fail an
@@ -225,4 +247,22 @@ export function mutateProject<T>(
       }
     }
   });
+}
+
+/** Load a pre-mutation project.json snapshot from working/history/. */
+export async function loadHistorySnapshot(
+  slug: string,
+  revision: number
+): Promise<Project> {
+  const fp = join(projectPaths(slug).historyDir, `rev-${revision}.json`);
+  if (!existsSync(fp)) {
+    const available = listHistorySnapshotRevisions(slug);
+    throw new Error(
+      `${slug}: no snapshot for revision ${revision}` +
+        (available.length > 0
+          ? ` (available: ${available.join(", ")})`
+          : " (no snapshots exist yet)")
+    );
+  }
+  return ProjectSchema.parse(JSON.parse(await readFile(fp, "utf8")));
 }

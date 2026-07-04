@@ -35,7 +35,7 @@ export function CaptionStylePicker({
           const css = captionStyleCss(def);
           return (
             <ToggleGroupItem
-              className="min-w-0 justify-between border-transparent bg-muted/45 px-2 text-xs hover:bg-muted/70 data-pressed:border-border data-pressed:bg-muted"
+              className="h-7! min-w-0 justify-between rounded-md border-transparent bg-muted/45 px-1.5 text-[0.75rem] hover:bg-muted/70 data-pressed:border-border data-pressed:bg-muted"
               key={def.id}
               title={def.summary}
               value={def.id}

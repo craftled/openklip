@@ -1,5 +1,7 @@
 import type { AgentThread } from "@engine/chats.ts";
 
+import { helloLoadingLabel } from "@/lib/hello-loading-labels";
+
 /** Agent replied at least once and the row is not currently streaming. */
 export function isChatThreadCompleted(thread: AgentThread): boolean {
   return thread.messages.some((message) => message.role === "assistant");
@@ -23,7 +25,7 @@ export function chatListEmptyLabel(input: {
   totalCount: number;
 }): string | null {
   if (input.loading) {
-    return "Loading chats…";
+    return helloLoadingLabel("chats");
   }
   if (input.filteredActiveCount > 0 || input.filteredArchivedCount > 0) {
     return null;

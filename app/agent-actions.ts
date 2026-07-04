@@ -23,6 +23,7 @@ import { loadBrief } from "@engine/brief";
 import type { Project } from "@engine/edl";
 import { projectsRoot } from "@engine/paths";
 import { loadProject, mutateProject } from "@engine/projectStore";
+import { agentGuiMutateMeta } from "@engine/provenance";
 import { cwdPath } from "@engine/repo-paths";
 import { analyzeSceneLog, sceneLogLines } from "@engine/scene-log";
 import { listTemplates } from "@engine/templates";
@@ -75,7 +76,7 @@ export async function suggestFillerCuts(
         }
         return cut;
       },
-      { action: "filler-cuts", actor: "agent", input: { agent } }
+      agentGuiMutateMeta("filler-cuts", agent, { agent })
     );
     return { ok: true, cut: cutWords.length, words: cutWords };
   } catch (e) {
@@ -202,6 +203,8 @@ export async function chatWithAgent(
       // when the agent exits without signaling completion.
       const task = await createAgentTask(slug, {
         request: message,
+        model: agent,
+        agentSurface: "gui",
         ...(opts?.threadId ? { chatId: opts.threadId } : {}),
       });
       const prompt = buildEditPrompt(

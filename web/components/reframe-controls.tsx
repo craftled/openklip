@@ -92,9 +92,9 @@ export function ReframeControls({
   const manualDisabled = applying || isScene || isVision;
 
   return (
-    <div className="flex flex-col gap-2" data-reframe-section>
+    <div className="flex flex-col gap-1.5" data-reframe-section>
       {visionFocusAvailable && onRunVisionFocus && (
-        <div className="flex items-center gap-2 pb-1">
+        <div className="flex items-center gap-1.5 pb-0.5">
           <Button
             disabled={applying || applyingVision}
             onClick={() => onRunVisionFocus()}
@@ -110,7 +110,7 @@ export function ReframeControls({
         </div>
       )}
       {hasSceneLog && (
-        <div className="flex items-center gap-2 pb-1">
+        <div className="flex min-h-7 items-center gap-1.5 pb-0.5">
           <span className="text-muted-foreground text-xs">Crop mode</span>
           <ToggleGroup
             disabled={applying}
@@ -131,8 +131,8 @@ export function ReframeControls({
         </div>
       )}
       {isPortrait && (
-        <div className="flex flex-col gap-2 pb-1">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-1.5 pb-0.5">
+          <div className="flex min-h-7 items-center gap-1.5">
             <span className="text-muted-foreground text-xs">Layout</span>
             <ToggleGroup
               disabled={applying}
@@ -169,7 +169,7 @@ export function ReframeControls({
                 step={0.01}
                 value={splitVertical.ratio}
               />
-              <div className="flex items-center gap-2">
+              <div className="flex min-h-7 items-center gap-1.5">
                 <span className="text-muted-foreground text-xs">Position</span>
                 <ToggleGroup
                   disabled={applying}
@@ -221,7 +221,7 @@ export function ReframeControls({
         step={0.05}
         value={crop.scale}
       />
-      <p className="text-muted-foreground text-xs leading-relaxed">
+      <p className="text-muted-foreground text-xs leading-snug">
         Pan and zoom the source frame before export. Preview uses the same crop
         when a fixed aspect is active.
         {isScene && " Crop focus is derived from scene analysis."}

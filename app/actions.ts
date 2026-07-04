@@ -35,6 +35,7 @@ import {
   type clampZoomItems,
 } from "@engine/projectMutations";
 import { loadProject, mutateProject } from "@engine/projectStore";
+import { guiMutateMeta } from "@engine/provenance";
 import { getAction, runAction } from "@engine/registry";
 import { revealInFileManager } from "@engine/reveal-path";
 import { type RevertTarget, revertProject } from "@engine/revert";
@@ -71,7 +72,7 @@ export async function runGuiAction(
     const result = await mutateProject(
       slug,
       (project) => runAction(actionName, project, input),
-      { action: actionName, actor: "human", input }
+      { ...guiMutateMeta(actionName, input) }
     );
     return { ok: true, data: { result } };
   } catch (e) {
@@ -91,9 +92,7 @@ export async function saveProjectEdits(
 ): Promise<ActionResult> {
   try {
     await mutateProject(slug, (project) => applyProjectEdits(project, body), {
-      action: "edit-words",
-      actor: "human",
-      input: body,
+      ...guiMutateMeta("edit-words", body),
     });
     return { ok: true };
   } catch (e) {
@@ -112,9 +111,7 @@ export async function saveLook(
 ): Promise<ActionResult> {
   try {
     await mutateProject(slug, (project) => applyLook(project, body), {
-      action: "look",
-      actor: "human",
-      input: body,
+      ...guiMutateMeta("look", body),
     });
     return { ok: true };
   } catch (e) {
@@ -128,9 +125,7 @@ export async function saveMotion(
 ): Promise<ActionResult> {
   try {
     await mutateProject(slug, (project) => applyMotion(project, body), {
-      action: "motion",
-      actor: "human",
-      input: body,
+      ...guiMutateMeta("motion", body),
     });
     return { ok: true };
   } catch (e) {
@@ -177,7 +172,7 @@ export async function saveZooms(
         applyZooms(project, zooms);
         return project.zooms;
       },
-      { action: "zooms", actor: "human", input: zooms }
+      { ...guiMutateMeta("zooms", zooms) }
     );
     return { ok: true, data: { zooms: items } };
   } catch (e) {
@@ -196,7 +191,7 @@ export async function saveBroll(
         applyBroll(project, broll);
         return project.broll;
       },
-      { action: "broll", actor: "human", input: broll }
+      { ...guiMutateMeta("broll", broll) }
     );
     return { ok: true, data: { broll: items } };
   } catch (e) {
@@ -215,7 +210,7 @@ export async function saveTitles(
         applyTitles(project, titles);
         return project.titles;
       },
-      { action: "titles", actor: "human", input: titles }
+      { ...guiMutateMeta("titles", titles) }
     );
     return { ok: true, data: { titles: items } };
   } catch (e) {
@@ -234,7 +229,7 @@ export async function saveStills(
         applyStills(project, stills);
         return project.stills;
       },
-      { action: "stills", actor: "human", input: stills }
+      { ...guiMutateMeta("stills", stills) }
     );
     return { ok: true, data: { stills: items } };
   } catch (e) {
@@ -427,7 +422,7 @@ export async function runVisionFocus(
     const segmentsUpdated = await mutateProject(
       slug,
       async (project) => enrichSceneLogWithVisionFocus(slug, project),
-      { action: "vision-focus", actor: "human" }
+      { ...guiMutateMeta("vision-focus") }
     );
     const project = await loadProject(slug);
     return { ok: true, data: { project, segmentsUpdated } };
@@ -461,7 +456,7 @@ export async function runHighlightsDetect(
       (p) => {
         p.highlights = highlights;
       },
-      { action: "highlights-detect", actor: "human" }
+      { ...guiMutateMeta("highlights-detect") }
     );
     const updated = await loadProject(slug);
     return { ok: true, data: { project: updated, highlights } };

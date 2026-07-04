@@ -144,8 +144,8 @@ export function ColorTempPad({
   );
 
   return (
-    <div className="space-y-1.5">
-      <div className="flex min-h-11 items-center gap-2 sm:h-7 sm:min-h-0">
+    <div className="space-y-1">
+      <div className="flex min-h-7 items-center gap-1.5">
         <div className="min-w-0 flex-1 text-muted-foreground text-xs">
           Temp / tint
         </div>
@@ -154,7 +154,7 @@ export function ColorTempPad({
         </div>
         <Button
           aria-label="Reset color temperature"
-          className="size-11 text-muted-foreground sm:size-6"
+          className="size-6! text-muted-foreground"
           onClick={reset}
           size="icon-sm"
           title="Reset color temperature"
@@ -166,7 +166,7 @@ export function ColorTempPad({
       </div>
       <button
         aria-label={`Color temperature ${formatColor(draft.temperature)}, tint ${formatColor(draft.tint)}`}
-        className="relative h-24 w-full touch-none overflow-hidden rounded-lg border border-border/80 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+        className="relative h-20 w-full touch-none overflow-hidden rounded-md border border-border/80 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
         onKeyDown={onKeyDown}
         onPointerCancel={() => setDragging(false)}
         onPointerDown={(event) => {
@@ -209,7 +209,7 @@ export function ColorTempPad({
         />
         <span className="absolute inset-x-0 top-1/2 h-px bg-white/18" />
         <span
-          className="absolute size-5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/10 bg-white shadow-sm ring-1 ring-white/60"
+          className="absolute size-4 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/10 bg-white shadow-sm ring-1 ring-white/60"
           style={markerStyle}
         />
       </button>

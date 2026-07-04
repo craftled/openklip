@@ -3,6 +3,7 @@
 // all read from here so surfaces stay in sync with the GUI's project.json edits.
 import { z } from "zod";
 import { type Actor, actorFromEnv, readActionLog } from "./action-log.ts";
+import { matchesAuthorFilter } from "./provenance.ts";
 import {
   type AgentTaskOutcome,
   type AgentTaskStatus,
@@ -379,8 +380,28 @@ const queryTools: AgentToolDef[] = [
         .describe(
           "Filter to entries logged by this actor (human, agent, cli, mcp, or system)."
         ),
+      author: z
+        .string()
+        .min(1)
+        .optional()
+        .describe(
+          "Filter to entries whose authorId or model contains this substring."
+        ),
+      model: z
+        .string()
+        .min(1)
+        .optional()
+        .describe("Filter to entries with this exact model slug."),
     }),
-    run: async ({ slug: projectSlug, limit, task, action, actor }) => {
+    run: async ({
+      slug: projectSlug,
+      limit,
+      task,
+      action,
+      actor,
+      author,
+      model,
+    }) => {
       let entries = await readActionLog(projectSlug);
       if (task !== undefined) {
         entries = entries.filter((e) => e.taskId === task);
@@ -390,6 +411,12 @@ const queryTools: AgentToolDef[] = [
       }
       if (actor !== undefined) {
         entries = entries.filter((e) => e.actor === actor);
+      }
+      if (author !== undefined) {
+        entries = entries.filter((e) => matchesAuthorFilter(e, author));
+      }
+      if (model !== undefined) {
+        entries = entries.filter((e) => e.model === model);
       }
       return {
         entries: entries.slice(0, limit),

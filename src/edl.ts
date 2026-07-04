@@ -24,6 +24,14 @@ export const WordSchema = z.object({
   deleted: z.boolean().default(false),
   /** F1: why this word was cut/kept; metadata only, never reaches ffmpeg. */
   note: z.string().optional(),
+  /** Author id at last transcript mutation (human:local, ai:claude:…). */
+  authoredBy: z.string().optional(),
+  /** Epoch ms when authoredBy was set. */
+  authoredAt: z.number().int().nonnegative().optional(),
+  /** project.json revision after the mutation that set authoredBy. */
+  authoredRevision: z.number().int().nonnegative().optional(),
+  /** Agent task id when the mutation ran under a spawned task. */
+  authoredTaskId: z.string().optional(),
   /**
    * The transcript text this word had BEFORE its first agent/CLI correction
    * (see setWordText in actions.ts). Set once and never overwritten, so the

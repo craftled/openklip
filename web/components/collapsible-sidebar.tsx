@@ -85,14 +85,15 @@ export function CollapsibleSidebarSection({
   title: ReactNode;
 }) {
   return (
-    <SidebarGroup className={cn("py-1.5", className)}>
+    <SidebarGroup className={cn("px-2 pt-0 pb-1.5", className)}>
       <Collapsible defaultOpen={defaultOpen} render={<div />}>
-        <div className="group/section-header relative my-1">
+        <div className="group/section-header relative mb-1">
           <CollapsibleTrigger
             render={
               <Button
                 className={cn(
-                  "group h-7 w-full min-w-0 justify-start gap-1 px-2 py-0.5 text-left focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 [&[data-panel-open]>svg.chevron]:rotate-90",
+                  "group h-7! w-full min-w-0 justify-start gap-1 px-2 py-0.5 text-left focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 [&[data-panel-open]>svg.chevron]:rotate-90",
+                  "rounded-md",
                   SIDEBAR_SECTION_LABEL_CLASS
                 )}
                 type="button"

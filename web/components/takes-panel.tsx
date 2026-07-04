@@ -46,7 +46,7 @@ function TakeRow({
     <li>
       <button
         className={cn(
-          "flex w-full items-center gap-2 rounded-md border px-2 py-1.5 text-left transition-colors hover:bg-muted/50",
+          "flex w-full items-center gap-1.5 rounded-md border px-2 py-1 text-left transition-colors hover:bg-muted/50",
           active && "border-primary bg-muted/60"
         )}
         data-takes-row
@@ -81,7 +81,7 @@ function SegmentRow({
 }) {
   return (
     <li
-      className="flex items-center gap-2 rounded-md border px-2 py-1 text-xs"
+      className="flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs"
       data-takes-segment
     >
       <span className="min-w-0 flex-1 truncate">
@@ -141,7 +141,7 @@ function AddTakeControl({
 }) {
   return (
     <div
-      className="flex flex-col gap-1.5 rounded-md border border-dashed p-2"
+      className="flex flex-col gap-1.5 rounded-md border border-dashed p-1.5"
       data-takes-add
     >
       <div className="flex items-center gap-1.5">
@@ -176,7 +176,7 @@ function AddTakeControl({
           />
         </label>
         <Input
-          className="h-7 min-w-0 flex-1 text-xs"
+          className="h-7! min-w-0 flex-1 rounded-md! px-2! py-1! text-[0.8rem]!"
           data-takes-add-label
           disabled={busy}
           onChange={(e) => onLabelChange(e.target.value)}
@@ -222,7 +222,7 @@ export function TakesPanelView({
     takes.find((t) => t.id === takeId)?.label || takeId;
 
   return (
-    <div className="flex flex-col gap-2" data-takes-panel>
+    <div className="flex flex-col gap-1.5" data-takes-panel>
       <AddTakeControl
         busy={addTakeBusy}
         error={addTakeError}
@@ -260,7 +260,7 @@ export function TakesPanelView({
 
       {selectedTakeId ? (
         <div
-          className="flex flex-col gap-1 rounded-md border p-2"
+          className="flex flex-col gap-1 rounded-md border p-1.5"
           data-takes-transcript
         >
           <span className="text-muted-foreground text-xs">

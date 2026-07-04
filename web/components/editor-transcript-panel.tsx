@@ -1,5 +1,6 @@
 "use client";
 
+import { authorDisplayLabel, authorToneClass } from "@engine/provenance-display";
 import {
   type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -32,6 +33,10 @@ import {
 import { cn } from "@/lib/utils";
 
 interface TranscriptWord {
+  authoredAt?: number;
+  authoredBy?: string;
+  authoredRevision?: number;
+  authoredTaskId?: string;
   deleted: boolean;
   endSample: number;
   id: string;
@@ -49,6 +54,7 @@ interface EditorTranscriptPanelProps {
   onRestoreSelection: (range?: readonly [number, number] | null) => void;
   onSelectRange: (range: readonly [number, number] | null) => void;
   onTextEdit: (text: string) => void;
+  onViewInHistory?: (revisionAfter: number) => void;
   search?: ReactNode;
   selRange: readonly [number, number] | null;
   words: TranscriptWord[];
@@ -64,6 +70,7 @@ export function EditorTranscriptPanel({
   onRestoreSelection,
   onSelectRange,
   onTextEdit,
+  onViewInHistory,
   search,
   selRange,
   words,
@@ -192,102 +199,102 @@ export function EditorTranscriptPanel({
   };
 
   return (
-    <ScrollArea className="h-full min-h-0" ref={scrollAreaRef}>
-      <div className="flex min-h-full flex-col px-4 pt-4 pb-12 sm:px-6">
-        <header className="mx-auto mb-4 flex w-full max-w-[78ch] flex-col gap-2 sm:flex-row sm:items-center">
-          <div className="min-w-0">
-            <h2 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
-              Transcript
-            </h2>
-          </div>
-          <div className="flex flex-wrap items-center gap-1.5 sm:ml-auto sm:justify-end">
-            <Badge variant="outline">{plural(words.length, "word")}</Badge>
-            {cutCount > 0 ? (
-              <Badge variant="secondary">{cutCount} cut</Badge>
-            ) : null}
-            {selection.total > 0 ? (
-              <Badge variant="secondary">{selection.total} selected</Badge>
-            ) : null}
-          </div>
-        </header>
+    <TooltipProvider>
+      <ScrollArea className="h-full min-h-0" ref={scrollAreaRef}>
+        <div className="flex min-h-full flex-col px-4 pt-4 pb-12 sm:px-6">
+          <header className="mx-auto mb-4 flex w-full max-w-[78ch] flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="min-w-0">
+              <h2 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
+                Transcript
+              </h2>
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5 sm:ml-auto sm:justify-end">
+              <Badge variant="outline">{plural(words.length, "word")}</Badge>
+              {cutCount > 0 ? (
+                <Badge variant="secondary">{cutCount} cut</Badge>
+              ) : null}
+              {selection.total > 0 ? (
+                <Badge variant="secondary">{selection.total} selected</Badge>
+              ) : null}
+            </div>
+          </header>
 
-        {search ? (
-          <div className="mx-auto mb-3 w-full max-w-[80ch]">{search}</div>
-        ) : null}
+          {search ? (
+            <div className="mx-auto mb-3 w-full max-w-[80ch]">{search}</div>
+          ) : null}
 
-        {selection.total > 0 ? (
-          <TranscriptSelectionToolbar
-            copySelection={copySelection}
-            cutSelection={() => onCutSelection(selRange)}
-            onClear={() => {
-              window.getSelection()?.removeAllRanges();
-              onSelectRange(null);
-            }}
-            restoreSelection={() => onRestoreSelection(selRange)}
-            selection={selection}
-          />
-        ) : null}
+          {selection.total > 0 ? (
+            <TranscriptSelectionToolbar
+              copySelection={copySelection}
+              cutSelection={() => onCutSelection(selRange)}
+              onClear={() => {
+                window.getSelection()?.removeAllRanges();
+                onSelectRange(null);
+              }}
+              restoreSelection={() => onRestoreSelection(selRange)}
+              selection={selection}
+            />
+          ) : null}
 
-        {words.length === 0 ? (
-          <Empty className="min-h-48 border border-dashed bg-muted/20">
-            <EmptyHeader>
-              <EmptyTitle>No transcript yet</EmptyTitle>
-              <EmptyDescription>
-                Ingested projects show their word-level transcript here.
-              </EmptyDescription>
-            </EmptyHeader>
-          </Empty>
-        ) : (
-          // biome-ignore lint/a11y/useSemanticElements: contenteditable keeps per-word timing spans; a textarea cannot carry word ids.
-          <div
-            aria-label="Transcript editor"
-            aria-multiline="true"
-            className="mx-auto w-full max-w-[80ch] rounded-md text-left text-foreground text-sm leading-7 tracking-normal outline-none selection:bg-primary/20 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 sm:text-[0.95rem]"
-            contentEditable={editorMounted ? true : undefined}
-            onBlur={commitEditedText}
-            onKeyDown={onEditorKeyDown}
-            ref={editorRef}
-            role="textbox"
-            suppressContentEditableWarning
-            tabIndex={0}
-          >
-            {paragraphs.map((paragraph) => (
-              <p
-                className="text-pretty [&:not(:first-child)]:mt-4"
-                key={paragraph[0]?.word.id}
-              >
-                {paragraph.map(({ index, word }) => (
-                  <TranscriptWordButton
-                    active={
-                      curSample >= word.startSample &&
-                      curSample < word.endSample &&
-                      !word.deleted
-                    }
-                    inBroll={inBroll(word)}
-                    index={index}
-                    inZoom={inZoom(word)}
-                    isActiveMatch={activeMatchIndices.has(index)}
-                    isMatch={matchedWordIndices.has(index)}
-                    isSelected={
-                      selRange != null &&
-                      index >= selRange[0] &&
-                      index <= selRange[1]
-                    }
-                    key={word.id}
+          {words.length === 0 ? (
+            <Empty className="min-h-48 border border-dashed bg-muted/20">
+              <EmptyHeader>
+                <EmptyTitle>No transcript yet</EmptyTitle>
+                <EmptyDescription>
+                  Ingested projects show their word-level transcript here.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          ) : (
+            // biome-ignore lint/a11y/useSemanticElements: contenteditable keeps per-word timing spans; a textarea cannot carry word ids.
+            <div
+              aria-label="Transcript editor"
+              aria-multiline="true"
+              className="prose dark:prose-invert mx-auto w-full rounded-md text-left font-medium outline-none selection:bg-primary/20 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+              contentEditable={editorMounted ? true : undefined}
+              onBlur={commitEditedText}
+              onKeyDown={onEditorKeyDown}
+              ref={editorRef}
+              role="textbox"
+              suppressContentEditableWarning
+              tabIndex={0}
+            >
+              {paragraphs.map((paragraph) => (
+                <p key={paragraph[0]?.word.id}>
+                  {paragraph.map(({ index, word }) => (
+                    <TranscriptWordButton
+                      active={
+                        curSample >= word.startSample &&
+                        curSample < word.endSample &&
+                        !word.deleted
+                      }
+                      inBroll={inBroll(word)}
+                      index={index}
+                      inZoom={inZoom(word)}
+                      isActiveMatch={activeMatchIndices.has(index)}
+                      isMatch={matchedWordIndices.has(index)}
+                      isSelected={
+                        selRange != null &&
+                        index >= selRange[0] &&
+                        index <= selRange[1]
+                      }
+                      key={word.id}
                     onSelect={() => {
                       editorRef.current?.focus();
                       onSelectRange([index, index]);
                     }}
+                    onViewInHistory={onViewInHistory}
                     word={word}
-                  />
-                ))}
-              </p>
-            ))}
-          </div>
-        )}
-      </div>
-      <TranscriptScrollFade scrollAreaRef={scrollAreaRef} />
-    </ScrollArea>
+                    />
+                  ))}
+                </p>
+              ))}
+            </div>
+          )}
+        </div>
+        <TranscriptScrollFade scrollAreaRef={scrollAreaRef} />
+      </ScrollArea>
+    </TooltipProvider>
   );
 }
 
@@ -467,6 +474,7 @@ function TranscriptWordButton({
   isMatch,
   isSelected,
   onSelect,
+  onViewInHistory,
   word,
 }: {
   active: boolean;
@@ -477,28 +485,42 @@ function TranscriptWordButton({
   isMatch: boolean;
   isSelected: boolean;
   onSelect: () => void;
+  onViewInHistory?: (revisionAfter: number) => void;
   word: TranscriptWord;
 }) {
-  return (
+  const tone = word.authoredBy ? authorToneClass(word.authoredBy) : null;
+  const provenanceTitle = word.authoredBy
+    ? `${authorDisplayLabel(word.authoredBy)}${word.authoredRevision === undefined ? "" : ` · rev ${word.authoredRevision}`}`
+    : word.deleted
+      ? "Deleted word"
+      : "Kept word";
+
+  const span = (
     <span
       aria-current={active ? "true" : undefined}
       className={cn(
-        "inline cursor-text rounded-[2px] border border-transparent px-0.5 py-0 text-left align-baseline leading-[inherit] transition-colors hover:bg-muted focus-visible:border-ring focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 active:bg-muted/80",
+        "transcript-word cursor-text text-left leading-[inherit] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
         word.deleted &&
           "text-muted-foreground line-through decoration-1 hover:text-foreground",
         active &&
-          "bg-transparent text-primary underline decoration-primary/50 underline-offset-4 hover:bg-primary/5",
+          "text-primary underline decoration-primary/50 underline-offset-4",
         inBroll &&
           "underline decoration-2 decoration-border underline-offset-4",
-        inZoom && "bg-muted hover:bg-muted/80",
+        inZoom && "bg-muted",
         isMatch && "bg-primary/10",
         isActiveMatch && "bg-primary/15 ring-1 ring-primary/40 ring-inset",
-        isSelected && "bg-accent ring-1 ring-ring/40 ring-inset"
+        tone === "human" &&
+          "underline decoration-primary/40 decoration-dotted underline-offset-4",
+        tone === "agent" &&
+          "underline decoration-accent-foreground/50 decoration-dashed underline-offset-4",
+        tone === "cli" &&
+          "underline decoration-muted-foreground/60 decoration-dotted underline-offset-4"
       )}
       data-search-match={
         isMatch ? (isActiveMatch ? "active" : "true") : undefined
       }
       data-word-index={index}
+      data-word-selected={isSelected ? "true" : undefined}
       onDoubleClick={onSelect}
       onMouseDown={(event) => {
         if (event.detail === 2) {
@@ -506,10 +528,39 @@ function TranscriptWordButton({
           onSelect();
         }
       }}
-      title={word.deleted ? "Deleted word" : "Kept word"}
+      title={word.authoredBy ? undefined : provenanceTitle}
     >
-      {word.text}{" "}
+      {word.text}
     </span>
+  );
+
+  if (!word.authoredBy) {
+    return <>{span} </>;
+  }
+
+  return (
+    <>
+      <Tooltip>
+        <TooltipTrigger asChild>{span}</TooltipTrigger>
+        <TooltipContent className="flex flex-col gap-1" side="top">
+          <span>{provenanceTitle}</span>
+          {word.authoredRevision !== undefined && onViewInHistory ? (
+            <Button
+              className="h-auto self-start px-0 text-xs"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onViewInHistory(word.authoredRevision as number);
+              }}
+              type="button"
+              variant="link"
+            >
+              View in history
+            </Button>
+          ) : null}
+        </TooltipContent>
+      </Tooltip>{" "}
+    </>
   );
 }
 

@@ -58,8 +58,9 @@ export function BriefEditor({
   }, [onSave, text]);
 
   return (
-    <div className="flex flex-col gap-2" data-brief-editor>
+    <div className="flex flex-col gap-1.5" data-brief-editor>
       <Textarea
+        className="min-h-20! rounded-md! px-2! py-1.5! text-[0.8rem]!"
         onChange={(event) => {
           setText(event.target.value);
           setNote(null);
@@ -67,11 +68,11 @@ export function BriefEditor({
         placeholder="Audience, goal, tone, must-use assets, avoid list, target length, export formats…"
         value={text}
       />
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center justify-between gap-1.5">
         <span className="text-muted-foreground text-xs tabular-nums">
           {text.length} characters
         </span>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           {note === "saved" ? (
             <span className="text-muted-foreground text-xs">Saved</span>
           ) : null}

@@ -7,16 +7,12 @@
 // it can mutate anything, which doesn't fit that contract, so it's its own
 // module that calls mutateProject directly (see src/agent-tools.ts, where it
 // is registered as a manual tool alongside brief_set for the same reason).
-import { existsSync } from "node:fs";
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import type { Actor } from "./action-log.ts";
 import { readActionLog } from "./action-log.ts";
 import type { ActionLogEntry } from "./action-log-entry.ts";
-import { type Project, ProjectSchema } from "./edl.ts";
-import { projectPaths } from "./paths.ts";
+import type { Project } from "./edl.ts";
 import {
-  listHistorySnapshotRevisions,
+  loadHistorySnapshot,
   loadProject,
   mutateProject,
 } from "./projectStore.ts";
@@ -94,25 +90,11 @@ export async function resolveRevertTarget(
   return { revision: earliestTaskEntry.revisionBefore };
 }
 
-function historySnapshotPath(slug: string, revision: number): string {
-  return join(projectPaths(slug).historyDir, `rev-${revision}.json`);
-}
-
-async function readHistorySnapshot(
+function readHistorySnapshot(
   slug: string,
   revision: number
 ): Promise<Project> {
-  const fp = historySnapshotPath(slug, revision);
-  if (!existsSync(fp)) {
-    const available = listHistorySnapshotRevisions(slug);
-    throw new Error(
-      `${slug}: no snapshot for revision ${revision}` +
-        (available.length > 0
-          ? ` (available: ${available.join(", ")})`
-          : " (no snapshots exist yet)")
-    );
-  }
-  return ProjectSchema.parse(JSON.parse(await readFile(fp, "utf8")));
+  return loadHistorySnapshot(slug, revision);
 }
 
 // Resolving {last} / {task} reads the log and answers purely from it

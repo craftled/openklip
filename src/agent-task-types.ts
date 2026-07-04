@@ -40,6 +40,12 @@ export interface AgentTask {
   steps: AgentTaskStep[];
   /** The agent's own completion summary. */
   summary?: string;
+  /** Proof-style author id for the agent that ran this task. */
+  authorId?: string;
+  /** Surface that spawned the task: gui, claude-code, etc. */
+  agentSurface?: string;
+  /** Raw model slug when an LLM drove the task. */
+  model?: string;
   updatedAt: number;
 }
 
@@ -128,6 +134,15 @@ export function isAgentTask(value: unknown): value is AgentTask {
     return false;
   }
   if (row.summary !== undefined && typeof row.summary !== "string") {
+    return false;
+  }
+  if (row.authorId !== undefined && typeof row.authorId !== "string") {
+    return false;
+  }
+  if (row.agentSurface !== undefined && typeof row.agentSurface !== "string") {
+    return false;
+  }
+  if (row.model !== undefined && typeof row.model !== "string") {
     return false;
   }
   if (

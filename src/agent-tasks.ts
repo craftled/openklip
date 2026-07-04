@@ -15,6 +15,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { actorFromEnv } from "./action-log.ts";
+import { resolveProvenance } from "./provenance.ts";
 import {
   type AgentTask,
   type AgentTaskStatus,
@@ -293,22 +294,37 @@ function capSteps(steps: AgentTaskStep[]): AgentTaskStep[] {
 
 export function createAgentTask(
   slug: string,
-  input: { request: string; chatId?: string }
+  input: {
+    request: string;
+    chatId?: string;
+    model?: string;
+    authorId?: string;
+    agentSurface?: string;
+  }
 ): Promise<AgentTask> {
   return withTasksStoreLock(slug, async () => {
     const data = await loadAgentTasks(slug);
     const now = Date.now();
+    const actor = input.model ? ("agent" as const) : (actorFromEnv() ?? "human");
+    const provenance = resolveProvenance({
+      actor,
+      model: input.model,
+      authorId: input.authorId,
+      agentSurface: input.agentSurface ?? (input.model ? "gui" : undefined),
+    });
     const task: AgentTask = {
       id: nextTaskId("t"),
       slug,
       request: truncate(input.request, REQUEST_MAX_CHARS),
       ...(input.chatId === undefined ? {} : { chatId: input.chatId }),
-      // Every current call site (the GUI chat's spawned tool-editing run,
-      // app/agent-actions.ts) creates a task from a human-initiated request
-      // with no OPENKLIP_ACTOR set on the Next server process, so "human" is
-      // the right default; a future CLI/MCP-initiated task creator would set
-      // OPENKLIP_ACTOR and be recorded correctly without any change here.
-      actor: actorFromEnv() ?? "human",
+      actor,
+      ...(provenance.authorId ? { authorId: provenance.authorId } : {}),
+      ...(provenance.agentSurface
+        ? { agentSurface: provenance.agentSurface }
+        : {}),
+      ...(provenance.model ?? input.model
+        ? { model: provenance.model ?? input.model }
+        : {}),
       status: "running",
       steps: [],
       startedAt: now,

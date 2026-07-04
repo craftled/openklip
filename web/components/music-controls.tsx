@@ -19,9 +19,14 @@ import {
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Music, Trash2 } from "@/lib/icon";
 import { firstToggleValue } from "@/lib/toggle-value";
+import { cn } from "@/lib/utils";
 
 /** Default span (seconds) for a bed placed at the playhead. */
 export const DEFAULT_MUSIC_BED_SEC = 30;
+const CONFIG_COMPACT_INPUT_CLASS =
+  "h-7! rounded-md! px-2! py-1! text-[0.8rem]!";
+const CONFIG_COMPACT_SELECT_TRIGGER_CLASS =
+  "h-7! rounded-md! px-2! py-0! text-[0.8rem]!";
 
 export interface MusicAssetOption {
   id: string;
@@ -69,8 +74,8 @@ function MusicPlacementRow({
   const fromSec = m.startSample / sampleRate;
   const toSec = m.endSample / sampleRate;
   return (
-    <div className="flex flex-col gap-2" data-music-row>
-      <div className="flex items-center gap-2 text-xs">
+    <div className="flex flex-col gap-1.5" data-music-row>
+      <div className="flex min-h-6 items-center gap-1.5 text-xs">
         <Music className="size-3.5 shrink-0 text-muted-foreground" />
         <span className="min-w-0 flex-1 truncate">{name}</span>
         <span className="shrink-0 text-muted-foreground tabular-nums">
@@ -91,12 +96,13 @@ function MusicPlacementRow({
         step={0.05}
         value={gain}
       />
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-1.5">
         <Field>
           <FieldLabel className="text-muted-foreground text-xs">
             From (s)
           </FieldLabel>
           <CommitNumberInput
+            className={CONFIG_COMPACT_INPUT_CLASS}
             min={0}
             onCommit={(n) => onPatch(m.id, { fromSec: n })}
             step={0.5}
@@ -108,6 +114,7 @@ function MusicPlacementRow({
             To (s)
           </FieldLabel>
           <CommitNumberInput
+            className={CONFIG_COMPACT_INPUT_CLASS}
             min={0}
             onCommit={(n) => onPatch(m.id, { toSec: n })}
             step={0.5}
@@ -115,12 +122,13 @@ function MusicPlacementRow({
           />
         </Field>
       </div>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-1.5">
         <Field>
           <FieldLabel className="text-muted-foreground text-xs">
             Fade in (s)
           </FieldLabel>
           <CommitNumberInput
+            className={CONFIG_COMPACT_INPUT_CLASS}
             max={10}
             min={0}
             onCommit={(n) => onPatch(m.id, { fadeInSec: n })}
@@ -133,6 +141,7 @@ function MusicPlacementRow({
             Fade out (s)
           </FieldLabel>
           <CommitNumberInput
+            className={CONFIG_COMPACT_INPUT_CLASS}
             max={10}
             min={0}
             onCommit={(n) => onPatch(m.id, { fadeOutSec: n })}
@@ -200,10 +209,10 @@ export function MusicSectionControls({
   sampleRate: number;
 }) {
   return (
-    <div className="flex flex-col gap-3" data-music-section>
+    <div className="flex flex-col gap-2" data-music-section>
       {placements.length === 0 ? (
         <>
-          <div className="flex gap-2">
+          <div className="flex gap-1.5">
             <Select
               onValueChange={(value) => {
                 if (value) {
@@ -213,7 +222,7 @@ export function MusicSectionControls({
               value={chosenAssetId}
             >
               <SelectTrigger
-                className="flex-1"
+                className={cn("flex-1", CONFIG_COMPACT_SELECT_TRIGGER_CLASS)}
                 data-music-asset-select
                 disabled={assets.length === 0}
                 size="sm"
@@ -241,7 +250,7 @@ export function MusicSectionControls({
               <Music data-icon="inline-start" /> Place at playhead
             </Button>
           </div>
-          <p className="text-muted-foreground text-xs leading-relaxed">
+          <p className="text-muted-foreground text-xs leading-snug">
             {assets.length === 0
               ? "Drop an audio file into the asset bin to add music."
               : `Places a ${DEFAULT_MUSIC_BED_SEC}s bed at the playhead. Trim, fade, and loop it here.`}

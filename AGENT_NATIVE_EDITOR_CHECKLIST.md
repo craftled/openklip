@@ -187,7 +187,7 @@ Legend: Full means the surface can achieve the same outcome. Partial means the s
 | Exports | UI, CLI, MCP, API | File output, status, verify | Re-export overwrites | Manual file delete only | Platform presets, frame rate, compression, MP4/GIF format, and GIF caps ship across surfaces; file lifecycle is still manual. |
 | Agent chats | UI/API | UI/API | UI/API rename/archive/append | UI/API | Not exposed to CLI/MCP as context or task log. |
 | Brief/context | UI, CLI, MCP | UI, CLI, MCP | CLI/MCP/UI save paths | File delete clears manually | `brief.md` shipped; CLI/GUI/MCP saves all history-log (2026-07-02). |
-| Action history | Append-only log on every user-facing mutation | History route + Config panel section with actor/action/task filter UI (v0.33.0.0); `openklip history` / MCP `history_list` (2026-07-02) | `openklip revert` / MCP `revert` / GUI History panel | Not applicable (append-only) | Task-level revert exists (2026-07-02); agent-facing history/task query tools added (2026-07-02, filter by task id or action name); actor filter added v0.32.0.0 for history (`--actor`/MCP `history_list` `actor`) and v0.33.0.0 for tasks (`openklip tasks --actor`/MCP `task_list` `actor`); GUI History panel filter UI shipped v0.33.0.0. |
+| Action history | Append-only log on every user-facing mutation | History route + Config panel section with actor/action/task/author filter UI (v0.33.0.0 author filter v0.40.0.0); per-entry transcript diff review for transcript mutations (v0.40.0.0); `openklip history` / MCP `history_list` (2026-07-02) | `openklip revert` / MCP `revert` / GUI History panel | Not applicable (append-only) | Task-level revert exists (2026-07-02); agent-facing history/task query tools added (2026-07-02, filter by task id or action name); actor filter added v0.32.0.0 for history (`--actor`/MCP `history_list` `actor`) and v0.33.0.0 for tasks (`openklip tasks --actor`/MCP `task_list` `actor`); GUI History panel filter UI shipped v0.33.0.0; GUI History transcript diff (kept words, `@pierre/diffs`) shipped v0.40.0.0. |
 
 ### 0.3 Baseline audit conclusion
 
@@ -703,7 +703,7 @@ Goal: users trust agents because every change is inspectable, reversible, and re
 ### 9.2 Diff and review
 
 - [ ] Add edit diff summary.
-  - [ ] Words cut and restored.
+  - [x] Words cut and restored. Verified 2026-07-04: History panel **Show transcript diff** on transcript mutations (`cut`, `cut-text`, `restore`, `edit-words`, `word-text`) compares kept words before/after via `@pierre/diffs` (`web/lib/transcript-diff.ts`, `web/components/history-transcript-diff.tsx`); pinned by `tests/transcript-diff*.test.ts`, `tests/history-transcript-diff*.test.tsx`, and `tests/transcript-diff-browser.test.ts`. Review-only; overlays/look/music/export diffs remain open.
   - [ ] Overlays added, removed, moved.
   - [ ] Look changes.
   - [ ] Music changes.

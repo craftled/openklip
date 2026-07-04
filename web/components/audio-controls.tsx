@@ -69,8 +69,8 @@ function ToggleRow({
   snapToggle?: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between gap-2">
-      <FieldLabel className="text-xs" htmlFor={htmlId}>
+    <div className="flex min-h-6 items-center justify-between gap-1.5">
+      <FieldLabel className="text-[0.75rem]" htmlFor={htmlId}>
         {label}
       </FieldLabel>
       {snapToggle ? (
@@ -128,8 +128,8 @@ export function AudioControls({
   snap,
 }: AudioControlsProps) {
   return (
-    <div className="flex flex-col gap-4" data-audio-section>
-      <div className="flex flex-col gap-2" data-audio-duck>
+    <div className="flex flex-col gap-2.5" data-audio-section>
+      <div className="flex flex-col gap-1.5" data-audio-duck>
         <ToggleRow
           checked={audio.ducking.enabled}
           disabled={applying}
@@ -168,13 +168,13 @@ export function AudioControls({
             />
           </>
         ) : null}
-        <p className="text-muted-foreground text-xs leading-relaxed">
+        <p className="text-muted-foreground text-xs leading-snug">
           Ducking lowers music under speech on export; preview audio is
           unprocessed.
         </p>
       </div>
 
-      <div className="flex flex-col gap-2" data-audio-loudness>
+      <div className="flex flex-col gap-1.5" data-audio-loudness>
         <ToggleRow
           checked={audio.loudness.enabled}
           disabled={applying}
@@ -193,7 +193,7 @@ export function AudioControls({
               step={1}
               value={audio.loudness.targetLufs}
             />
-            <Field className="grid h-7 grid-cols-[5.5rem_1fr] items-center gap-2.5">
+            <Field className="grid h-7 grid-cols-[5.25rem_1fr] items-center gap-1.5">
               <FieldLabel className="text-muted-foreground text-xs">
                 Loudness mode
               </FieldLabel>
@@ -207,7 +207,11 @@ export function AudioControls({
                 }}
                 value={audio.loudness.mode ?? "single"}
               >
-                <SelectTrigger className="w-full" disabled={applying} size="sm">
+                <SelectTrigger
+                  className="h-7! w-full rounded-md! px-2! py-0! text-[0.8rem]!"
+                  disabled={applying}
+                  size="sm"
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -220,12 +224,12 @@ export function AudioControls({
             </Field>
           </>
         ) : null}
-        <p className="text-muted-foreground text-xs leading-relaxed">
+        <p className="text-muted-foreground text-xs leading-snug">
           Applied at export; preview audio is unprocessed.
         </p>
       </div>
 
-      <div className="flex flex-col gap-2" data-audio-noise>
+      <div className="flex flex-col gap-1.5" data-audio-noise>
         <ToggleRow
           checked={audio.noiseReduction.enabled}
           disabled={applying}
@@ -246,12 +250,12 @@ export function AudioControls({
             value={audio.noiseReduction.nr}
           />
         ) : null}
-        <p className="text-muted-foreground text-xs leading-relaxed">
+        <p className="text-muted-foreground text-xs leading-snug">
           Light afftdn cleanup on the voice bus at export only.
         </p>
       </div>
 
-      <div className="flex flex-col gap-2" data-audio-highpass>
+      <div className="flex flex-col gap-1.5" data-audio-highpass>
         <ToggleRow
           checked={audio.voiceHighpass.enabled}
           disabled={applying}
@@ -272,12 +276,12 @@ export function AudioControls({
             value={audio.voiceHighpass.hz}
           />
         ) : null}
-        <p className="text-muted-foreground text-xs leading-relaxed">
+        <p className="text-muted-foreground text-xs leading-snug">
           Applied at export; preview audio is unprocessed.
         </p>
       </div>
 
-      <div className="flex flex-col gap-2" data-audio-deess>
+      <div className="flex flex-col gap-1.5" data-audio-deess>
         <ToggleRow
           checked={audio.deEsser.enabled}
           disabled={applying}
@@ -296,13 +300,13 @@ export function AudioControls({
             value={audio.deEsser.intensity}
           />
         ) : null}
-        <p className="text-muted-foreground text-xs leading-relaxed">
+        <p className="text-muted-foreground text-xs leading-snug">
           Tames harsh sibilants ("s", "sh" sounds) on the voice bus at export
           only.
         </p>
       </div>
 
-      <div className="flex flex-col gap-2" data-audio-snap>
+      <div className="flex flex-col gap-1.5" data-audio-snap>
         <ToggleRow
           checked={snap.enabled}
           disabled={applying}
@@ -335,7 +339,7 @@ export function AudioControls({
             />
           </>
         ) : null}
-        <p className="text-muted-foreground text-xs leading-relaxed">
+        <p className="text-muted-foreground text-xs leading-snug">
           Snap moves cut edges to nearby silence; crossfade smooths cut seams
           and reuses a few milliseconds of the removed audio.
         </p>

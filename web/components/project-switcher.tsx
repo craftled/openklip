@@ -24,13 +24,7 @@ import {
 } from "@/components/ui/sidebar";
 import { useProjectCreate } from "@/hooks/use-project-create";
 import { toastProjectDeleted, toastProjectDeleteFailed } from "@/lib/app-toast";
-import {
-  APP_ICON_CLASS,
-  Check,
-  ChevronsUpDown,
-  FolderOpen,
-  Plus,
-} from "@/lib/icon";
+import { Check, ChevronsUpDown, FolderOpen, Plus } from "@/lib/icon";
 import type {
   IngestProgressView,
   ProjectCreateOptions,
@@ -42,7 +36,6 @@ import {
   projectInitial,
 } from "@/lib/project-list";
 import {
-  SIDEBAR_HEADER_ICON_CLASS,
   SIDEBAR_MENU_HEADER_CLASS,
   SIDEBAR_ROW_LABEL_TEXT_CLASS,
 } from "@/lib/sidebar-row-styles";
@@ -162,14 +155,15 @@ export function ProjectSwitcher({
                 <SidebarMenuButton
                   className={cn(
                     SIDEBAR_MENU_HEADER_CLASS,
+                    "gap-1.5 pr-7",
                     "data-popup-open:bg-sidebar-accent data-popup-open:text-sidebar-accent-foreground"
                   )}
                   size="sm"
                 >
-                  <FolderOpen className={SIDEBAR_HEADER_ICON_CLASS} />
+                  <FolderOpen className="size-3.5! shrink-0" />
                   <span
                     className={cn(
-                      "min-w-0 flex-1 truncate pr-6",
+                      "min-w-0 flex-1 truncate",
                       SIDEBAR_ROW_LABEL_TEXT_CLASS
                     )}
                   >
@@ -181,24 +175,29 @@ export function ProjectSwitcher({
                     </span>
                   ) : null}
                   <ChevronsUpDown
-                    className={cn("absolute right-2", APP_ICON_CLASS)}
+                    className={cn(
+                      "absolute right-2 size-3.5! text-muted-foreground/70"
+                    )}
                   />
                 </SidebarMenuButton>
               }
             />
             <DropdownMenuContent
               align="start"
-              className="w-(--anchor-width) min-w-56 rounded-lg data-instant:animate-none data-instant:duration-[0.01ms]"
+              className="w-(--anchor-width) min-w-48 rounded-md p-0.5 shadow-sm ring-border/80 data-instant:animate-none data-instant:duration-[0.01ms]"
               data-instant={menuInstant ? "" : undefined}
               side={isMobile ? "bottom" : "right"}
               sideOffset={4}
             >
               <DropdownMenuGroup>
-                <DropdownMenuLabel className="text-muted-foreground text-xs">
+                <DropdownMenuLabel className="px-1.5 py-0.5 text-[0.7rem] text-muted-foreground">
                   Projects
                 </DropdownMenuLabel>
                 {projects.length === 0 && (
-                  <DropdownMenuItem className="text-muted-foreground" disabled>
+                  <DropdownMenuItem
+                    className="h-7 rounded-md px-1.5 py-0 text-[0.8rem] text-muted-foreground"
+                    disabled
+                  >
                     No projects yet
                   </DropdownMenuItem>
                 )}
@@ -208,7 +207,7 @@ export function ProjectSwitcher({
                   const deleting = deletingSlug === project.slug;
                   return (
                     <DropdownMenuItem
-                      className="group/project relative gap-2 p-2"
+                      className="group/project relative h-7 gap-1.5 rounded-md px-1.5 py-0 text-[0.8rem]"
                       key={project.slug}
                       onClick={(e) => {
                         if (
@@ -228,12 +227,13 @@ export function ProjectSwitcher({
                         }
                       }}
                     >
-                      <div className="flex size-6 items-center justify-center rounded-md bg-foreground/5 font-medium text-xs">
+                      <div className="flex size-5 items-center justify-center rounded-sm bg-foreground/5 font-medium text-[11px]">
                         {projectInitial(project.slug)}
                       </div>
                       <span className="flex min-w-0 flex-1 items-center gap-0.5">
                         <span className="truncate">{project.slug}</span>
                         <ProjectInlineFolderAction
+                          className="size-5! rounded-sm [&_svg]:size-3!"
                           revealGroup="project"
                           slug={project.slug}
                         />
@@ -254,17 +254,16 @@ export function ProjectSwitcher({
                           {selected ? (
                             <Check
                               className={cn(
-                                "ml-auto group-hover/project:invisible",
-                                APP_ICON_CLASS
+                                "ml-auto size-3.5! group-hover/project:invisible"
                               )}
                             />
                           ) : (
-                            <DropdownMenuShortcut className="ml-auto group-hover/project:invisible">
+                            <DropdownMenuShortcut className="ml-auto text-[11px] tracking-normal group-hover/project:invisible">
                               ⌘{index + 1}
                             </DropdownMenuShortcut>
                           )}
                           <ProjectDeleteAction
-                            className="absolute right-2 opacity-0 group-hover/project:opacity-100"
+                            className="absolute right-1 size-5! opacity-0 group-hover/project:opacity-100 [&_svg]:size-3!"
                             confirming={false}
                             deleting={false}
                             onCancel={() => setConfirmDeleteSlug(null)}
@@ -280,18 +279,18 @@ export function ProjectSwitcher({
                   );
                 })}
               </DropdownMenuGroup>
-              <DropdownMenuSeparator />
+              <DropdownMenuSeparator className="-mx-0.5 my-0.5" />
               <DropdownMenuGroup>
                 <DropdownMenuItem
-                  className="gap-2 p-2"
+                  className="h-7 gap-1.5 rounded-md px-1.5 py-0 text-[0.8rem]"
                   disabled={creating}
                   onClick={() => {
                     setMenuOpen(false);
                     setNewProjectOpen(true);
                   }}
                 >
-                  <div className="flex size-6 items-center justify-center rounded-md bg-foreground/5">
-                    <Plus className={APP_ICON_CLASS} />
+                  <div className="flex size-5 items-center justify-center rounded-sm bg-foreground/5">
+                    <Plus className="size-3.5!" />
                   </div>
                   <span className="font-medium text-muted-foreground">
                     {creating ? "Creating…" : "Create new project"}

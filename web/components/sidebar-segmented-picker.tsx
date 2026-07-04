@@ -24,7 +24,7 @@ export function SidebarSegmentedPicker({
   }
 
   return (
-    <div className="w-full px-1.5 pt-0.5 pb-1">
+    <div className="w-full px-2 pt-0 pb-1.5">
       <ToggleGroup
         aria-label="Sidebar view"
         className={cn(
@@ -44,7 +44,11 @@ export function SidebarSegmentedPicker({
         variant="outline"
       >
         {views.map((view) => (
-          <ToggleGroupItem className="w-full" key={view} value={view}>
+          <ToggleGroupItem
+            className="h-7! w-full first:rounded-r-none! first:rounded-l-md! last:rounded-r-md! last:rounded-l-none!"
+            key={view}
+            value={view}
+          >
             {VIEW_LABELS[view]}
           </ToggleGroupItem>
         ))}

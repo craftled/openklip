@@ -2,6 +2,8 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+@plugin "@tailwindcss/typography";
+
 @custom-variant dark (&:is(.dark *));
 @custom-variant fine-hover (@media (hover: hover) and (pointer: fine));
 
@@ -200,6 +202,42 @@
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
+  }
+}
+
+.transcript-word {
+  position: relative;
+  display: inline-block;
+  vertical-align: baseline;
+  isolation: isolate;
+  transition: color 140ms var(--ease-out);
+}
+
+.transcript-word::before {
+  position: absolute;
+  inset-inline: -4px;
+  top: 50%;
+  z-index: -1;
+  height: calc(1lh - 4px);
+  content: "";
+  background-color: color-mix(in oklch, var(--foreground) 7.1%, transparent);
+  border-radius: 8px;
+  opacity: 0;
+  transform: translateY(-50%);
+  transition: opacity 300ms var(--ease-out);
+}
+
+.dark .transcript-word::before {
+  background-color: color(display-p3 1 1 1 / 0.071);
+}
+
+.transcript-word[data-word-selected="true"]::before {
+  opacity: 1;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .transcript-word:hover::before {
+    opacity: 1;
   }
 }
 

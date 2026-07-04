@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.40.0.0 - 2026-07-04
+
+### Added
+- **Edit provenance** (`src/provenance.ts`, `src/provenance-display.ts`, `src/action-log-entry.ts`, `src/projectStore.ts`, `web/components/history-panel.tsx`, `web/components/editor-transcript-panel.tsx`, `web/app.tsx`): action history now records optional `authorId`, `model`, and `agentSurface` on every logged mutation (Proof-inspired ids such as `human:local`, `ai:claude:claude-sonnet-4-6`, `ai:cursor`). Set `OPENKLIP_AUTHOR_ID`, `OPENKLIP_AGENT_MODEL`, and `OPENKLIP_AGENT_SURFACE` alongside existing `OPENKLIP_ACTOR` / `OPENKLIP_TASK_ID`. GUI human edits stamp `human:local`; chat MCP runs derive model-specific author ids. Transcript words optionally carry `authoredBy` / `authoredRevision` with hover tooltips and author-toned underlines. Optimistic client stamping (`stampGuiWordProvenance`) keeps provenance visible immediately after a GUI cut without reload.
+- **Provenance queries**: History panel Author filter; `openklip history --author`; MCP `history_list` `author` and `model` filters; `openklip tasks` shows task `authorId` / `model`. Agent tasks store model and author at spawn time.
+- **View in history from transcript** (`web/components/editor-transcript-panel.tsx`, `web/components/history-panel.tsx`): provenance tooltips on transcript words include a **View in history** link that opens the Config History section, clears filters, scrolls to the matching revision row, and briefly highlights it.
+- **History transcript diff** (`web/lib/transcript-diff.ts`, `web/components/transcript-diff-view.tsx`, `web/components/history-transcript-diff.tsx`, `web/components/history-panel.tsx`, `app/api/projects/[slug]/history/snapshot/route.ts`): the Config panel History section now offers a per-entry **Show transcript diff** toggle on transcript mutations (`cut`, `cut-text`, `restore`, `edit-words`, `word-text`). Diffs compare kept words only, sentence by sentence, via `@pierre/diffs` with Inline (default) and Classic layout choices persisted in `localStorage`. Review-only: the main transcript editor is unchanged. Snapshot words load through `GET /api/projects/<slug>/history/snapshot?revision=<n>` backed by `working/history/rev-<n>.json`.
+- **Author provenance** (`src/provenance.ts`, `src/provenance-display.ts`): action history and transcript words can record `authorId`, `model`, and `agentSurface` (via `OPENKLIP_AUTHOR_ID`, `OPENKLIP_AGENT_MODEL`, `OPENKLIP_AGENT_SURFACE`). The History panel shows author badges and an author filter; the transcript editor shows hover attribution on stamped words. Client UI imports `authorDisplayLabel` from the fs-free `provenance-display` module so the browser bundle stays clean.
+- **Hello loading animation** (`web/components/hello-loading.tsx`, `web/components/apple-hello-effect/`, `web/components/project-loading.tsx`, `app/loading.tsx`): project and chat loading states use a compact Apple-style hello animation with contextual labels.
+
+### Changed
+- **Config panel density**: compact input/select/textarea sizing classes applied across Config sidebar sections for tighter alignment with sidebar row height.
+- **History section default**: the Config panel History section opens expanded by default so transcript diff and revert controls are visible on first open.
+- **Version**: bumped OpenKlip to `0.40.0.0`.
+
 ## 0.39.0.0 - 2026-07-04
 
 ### Added
