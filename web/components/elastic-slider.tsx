@@ -22,8 +22,8 @@ const DEAD_ZONE = 32;
 const MAX_CURSOR_RANGE = 200;
 const MAX_STRETCH = 8;
 const HANDLE_BUFFER = 8;
-const LABEL_OFFSET = 14;
-const VALUE_OFFSET = 2;
+const LABEL_OFFSET = 12;
+const VALUE_OFFSET = 0;
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
@@ -479,7 +479,7 @@ export function ElasticSlider({
   return (
     <div
       className={cn(
-        "[--elastic-slider-height:--spacing(8)] [--elastic-slider-radius:var(--radius-lg)]",
+        "[--elastic-slider-height:--spacing(7)] [--elastic-slider-radius:var(--radius-lg)]",
         "[--elastic-slider-bg:var(--muted)]",
         "[--elastic-slider-fill:var(--muted-foreground)]/10",
         "[--elastic-slider-fill-active:var(--muted-foreground)]/20",
@@ -563,7 +563,7 @@ export function ElasticSlider({
             scaleY: isActive && valueDodge ? 0.75 : 1,
           }}
           aria-hidden="true"
-          className="pointer-events-none absolute top-1/2 h-4 w-1 rounded-full bg-(--elastic-slider-handle)"
+          className="pointer-events-none absolute top-1/2 h-3.5 w-1 rounded-full bg-(--elastic-slider-handle)"
           data-slot="elastic-slider-handle"
           style={{ left: handleLeft, y: "-50%" }}
           transition={
@@ -587,7 +587,7 @@ export function ElasticSlider({
 
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute top-1/2 left-2.5 inline-flex -translate-y-1/2 items-center font-medium text-(--elastic-slider-label) text-[11px]/none transition-colors"
+          className="pointer-events-none absolute top-1/2 left-2 inline-flex -translate-y-1/2 items-center font-medium text-(--elastic-slider-label) text-[11px]/none transition-colors"
           data-slot="elastic-slider-label"
           ref={labelRef}
         >
@@ -597,7 +597,7 @@ export function ElasticSlider({
         <span
           aria-hidden="true"
           className={cn(
-            "pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 font-medium font-mono text-(--elastic-slider-label) text-[11px]/none transition-colors",
+            "pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 font-medium font-mono text-(--elastic-slider-label) text-[11px]/none transition-colors",
             "group-data-[active=true]/elastic-slider:text-(--elastic-slider-focus)"
           )}
           data-slot="elastic-slider-value"
