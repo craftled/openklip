@@ -2565,7 +2565,7 @@ export function App({
 
               {selZoom && (
                 <>
-                  <Section title="Parameters">
+                  <Section defaultOpen title="Parameters">
                     <PropRow
                       label="Scale"
                       value={`${selZoom.scale.toFixed(2)}×`}
@@ -2626,7 +2626,7 @@ export function App({
               )}
 
               {selTitle && (
-                <Section title="Title">
+                <Section defaultOpen title="Title">
                   {selTitle.position === "hero" ? (
                     <Textarea
                       onChange={(e) =>
@@ -2682,7 +2682,7 @@ export function App({
 
               {selBroll && brollAssets.length > 0 && (
                 <>
-                  <Section title="Display">
+                  <Section defaultOpen title="Display">
                     <ToggleGroup
                       className="w-full"
                       onValueChange={(value) => {
@@ -2748,7 +2748,7 @@ export function App({
                       </SelectContent>
                     </Select>
                   </Section>
-                  <Section title="Source">
+                  <Section defaultOpen title="Source">
                     <Select
                       onValueChange={(v) =>
                         v &&
@@ -2847,7 +2847,7 @@ export function App({
               )}
 
               {selGraphic && (
-                <Section title="Graphic">
+                <Section defaultOpen title="Graphic">
                   <PropRow
                     label={
                       selGraphic.type === "json-render" ? "Catalog" : "Template"
@@ -3065,7 +3065,7 @@ export function App({
                   {selRange[1] - selRange[0] + 1} words
                 </span>
               </div>
-              <Section title="Add effect">
+              <Section defaultOpen title="Add effect">
                 <Button
                   className="w-full justify-start"
                   onClick={addZoom}
@@ -3989,10 +3989,18 @@ function AgentSidebarToolbarTrigger({ onToggle }: { onToggle: () => void }) {
   );
 }
 
-function Section({ children, title }: { children: ReactNode; title: string }) {
+function Section({
+  children,
+  defaultOpen = false,
+  title,
+}: {
+  children: ReactNode;
+  defaultOpen?: boolean;
+  title: string;
+}) {
   return (
     <SidebarGroup className="border-border/80 border-t p-0">
-      <Collapsible render={<div />}>
+      <Collapsible defaultOpen={defaultOpen} render={<div />}>
         <CollapsibleTrigger
           render={
             <Button
