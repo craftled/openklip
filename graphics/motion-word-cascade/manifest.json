@@ -1,0 +1,20 @@
+{
+  "id": "motion-word-cascade",
+  "name": "Motion: Word Cascade",
+  "kind": "rich",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "params": {
+    "text": {
+      "type": "string",
+      "default": "One word at a time",
+      "label": "Text"
+    },
+    "accent": {
+      "type": "color",
+      "default": "oklch(0.809 0.1 284.59)",
+      "label": "Accent"
+    }
+  }
+}

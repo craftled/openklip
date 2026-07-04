@@ -1,0 +1,30 @@
+{
+  "id": "motion-roll-number",
+  "name": "Motion: Roll Number",
+  "kind": "rich",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "params": {
+    "value": {
+      "type": "number",
+      "default": 1000,
+      "label": "Value"
+    },
+    "prefix": {
+      "type": "string",
+      "default": "",
+      "label": "Prefix"
+    },
+    "suffix": {
+      "type": "string",
+      "default": "+",
+      "label": "Suffix"
+    },
+    "accent": {
+      "type": "color",
+      "default": "oklch(0.809 0.1 284.59)",
+      "label": "Accent"
+    }
+  }
+}

@@ -192,6 +192,38 @@ test("rich-kind graphic errors clearly when composition.html is missing", async 
   }
 });
 
+// Same Chrome-absent planning path as the title-card test above, exercised
+// against a Motion pack template (motion-typewriter): confirms the new
+// template's manifest/composition resolve far enough to reach the
+// chrome-headless-shell check without launching a real browser.
+test("Motion pack rich-kind graphic (motion-typewriter) throws the same actionable error when Chrome is absent", async () => {
+  if (chromeHeadlessInstalled()) {
+    return;
+  }
+
+  const dir = tmp();
+  try {
+    const manifest = loadGraphicManifest("motion-typewriter");
+    await assert.rejects(
+      () =>
+        renderGraphicOverlay({
+          manifest,
+          id: "g8",
+          template: "motion-typewriter",
+          params: { text: "Building in public" },
+          durationSamples: SAMPLE_RATE,
+          fps: 30,
+          width: 1920,
+          height: 1080,
+          outDir: dir,
+        }),
+      /chrome-headless-shell/
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("rich-kind graphic accepts inline composition HTML", async () => {
   if (chromeHeadlessInstalled()) {
     return;

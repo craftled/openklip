@@ -54,6 +54,39 @@ test("shader manifests are rich-kind templates", () => {
   }
 });
 
+const MOTION_TEMPLATE_IDS = [
+  "motion-typewriter",
+  "motion-blur-reveal",
+  "motion-shimmer",
+  "motion-glitch",
+  "motion-kinetic-build",
+  "motion-roll-number",
+  "motion-word-cascade",
+  "motion-highlight-pop",
+];
+
+test("listGraphics includes the bundled Motion text pack", () => {
+  const ids = listGraphics().map((g) => g.id);
+  for (const id of MOTION_TEMPLATE_IDS) {
+    assert.ok(ids.includes(id), `expected listGraphics to include ${id}`);
+  }
+});
+
+test("Motion pack manifests parse and are rich-kind", () => {
+  for (const id of MOTION_TEMPLATE_IDS) {
+    const m = loadGraphicManifest(id);
+    assert.equal(m.id, id);
+    assert.equal(m.kind, "rich");
+    assert.equal(m.width, 1920);
+    assert.equal(m.height, 1080);
+    assert.equal(m.fps, 30);
+    assert.ok(
+      m.name.startsWith("Motion: "),
+      `expected ${id} name to start with "Motion: "`
+    );
+  }
+});
+
 test("loadGraphicManifest throws for an unknown template", () => {
   assert.throws(() => loadGraphicManifest("does-not-exist"), /not found/i);
 });

@@ -1,0 +1,73 @@
+<!--
+  Motion: Word Cascade — the canonical minimal authoring example.
+
+  This template uses ONLY the pre-existing effects (fade, slideUp) combined
+  with the split/stagger mechanism: no new effect logic is needed. The
+  runtime splits the bound text into one <span data-unit> per word
+  (data-split="word") and animates each unit's own fade+slideUp instance
+  with a per-index delay (data-stagger="3" frames), producing a cascading
+  reveal. See graphics/AUTHORING.md for the full attribute reference.
+-->
+<div data-fps="30" data-graphic-root data-height="1080" data-width="1920">
+  <style>
+  .wc {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 8%;
+    text-align: center;
+  }
+  .wc h1 {
+    margin: 0;
+    font-family: -apple-system, "Helvetica Neue", Arial, sans-serif;
+    font-size: 120px;
+    font-weight: 800;
+    line-height: 1.1;
+    color: #fff;
+    text-shadow: 0 2px 28px rgba(0, 0, 0, 0.5);
+  }
+  /* Split units render inline so wrapped words keep normal line flow. */
+  .wc h1 [data-unit] {
+    display: inline-block;
+  }
+  .wc .rule {
+    width: 160px;
+    height: 3px;
+    margin: 32px auto 0;
+    background: var(--accent, oklch(0.809 0.1 284.59));
+    border-radius: 2px;
+  }
+  </style>
+  <div class="wc">
+    <div>
+      <!--
+        data-anim="fade,slideUp": the same two effects title-card uses on
+        its headline. data-split="word" fans them out per word; data-stagger
+        delays each successive word by 3 frames (0.1s at 30fps).
+      -->
+      <h1
+        data-anim="fade,slideUp"
+        data-bind="text"
+        data-ease="easeOut"
+        data-in-dur="8"
+        data-in-frame="0"
+        data-out-dur="6"
+        data-out-frame="-8"
+        data-slide="40"
+        data-split="word"
+        data-stagger="3"
+      >
+        One word at a time
+      </h1>
+      <div
+        class="rule"
+        data-anim="wipe"
+        data-ease="easeInOut"
+        data-in-dur="10"
+        data-in-frame="14"
+      ></div>
+    </div>
+  </div>
+</div>
