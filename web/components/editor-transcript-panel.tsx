@@ -541,7 +541,7 @@ function TranscriptWordButton({
   return (
     <>
       <Tooltip>
-        <TooltipTrigger asChild>{span}</TooltipTrigger>
+        <TooltipTrigger render={span} />
         <TooltipContent className="flex flex-col gap-1" side="top">
           <span>{provenanceTitle}</span>
           {word.authoredRevision !== undefined && onViewInHistory ? (

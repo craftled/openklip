@@ -2,17 +2,19 @@
 
 Use these bodies when publishing releases. Each section matches a tag in `CHANGELOG.md` without duplicating the full changelog. **Known gaps:** always link to [TODO.md](../TODO.md#known-limitations); do not duplicate the list here.
 
-Publishing status checked on 2026-07-04 (`gh release list`): GitHub releases are published through `v0.39.0.0` (the `v0.29.0.0`–`v0.39.0.0` backlog was published 2026-07-04 from these bodies, each tagged at its version's own commit).
+Publishing status checked on 2026-07-04 (`gh release list`): GitHub releases are published through `v0.40.0.0` (the `v0.29.0.0`–`v0.40.0.0` backlog was published 2026-07-04 from these bodies, each tagged at its version's own commit).
 
 ---
 
 ## v0.40.0.0
 
-**History transcript diff, author provenance, and loading polish.**
+**History transcript diff, edit provenance, and loading polish.**
 
 ### Highlights
 - **Transcript diff in History**: per-entry **Show transcript diff** on transcript mutations compares kept words before and after each edit, with Inline (default) and Classic layouts via `@pierre/diffs`. Review-only; the main transcript editor is unchanged.
-- **Author provenance**: history entries and transcript words can record which agent or human made an edit; History gets author badges and a filter; the transcript editor shows hover attribution on stamped words.
+- **Edit provenance**: action history records optional `authorId`, `model`, and `agentSurface` on every logged mutation. GUI human edits stamp `human:local`; chat MCP runs derive model-specific author ids. Transcript words carry `authoredBy` / `authoredRevision` with hover tooltips and author-toned underlines.
+- **Provenance queries**: History panel Author filter; `openklip history --author`; MCP `history_list` `author` and `model` filters; `openklip tasks` shows task `authorId` / `model`.
+- **View in history from transcript**: provenance tooltips include a **View in history** link that opens Config History, clears filters, scrolls to the matching revision row, and briefly highlights it.
 - **Hello loading**: project and chat loading states use a compact hello animation instead of plain placeholder text.
 
 ### Known gaps

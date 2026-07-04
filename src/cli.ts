@@ -693,7 +693,7 @@ try {
       }
       const port = process.env.PORT ?? "4399";
       console.log(
-        `[serve] project: ${slug}\n\n  OpenKlip ready  ->  http://localhost:${port}\n`
+        `[serve] project: ${slug}\n\n  OpenKlip ready  ->  http://localhost:${port}/${slug}\n`
       );
       const proc = Bun.spawn(
         [
