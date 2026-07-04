@@ -2,15 +2,16 @@ import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import type { Word } from "../src/edl.ts";
 import {
-  authorDisplayLabel,
-  authorToneClass,
-} from "../src/provenance-display.ts";
-import {
   guiMutateMeta,
   matchesAuthorFilter,
   resolveProvenance,
+  stampOverlayProvenanceFromMutation,
   stampWordProvenance,
 } from "../src/provenance.ts";
+import {
+  authorDisplayLabel,
+  authorToneClass,
+} from "../src/provenance-display.ts";
 
 const ENV_KEYS = [
   "OPENKLIP_AUTHOR_ID",
@@ -32,10 +33,7 @@ afterEach(() => {
 test("resolveProvenance prefers OPENKLIP_AUTHOR_ID", () => {
   process.env.OPENKLIP_AUTHOR_ID = "ai:cursor";
   process.env.OPENKLIP_ACTOR = "agent";
-  assert.equal(
-    resolveProvenance({ actor: "agent" }).authorId,
-    "ai:cursor"
-  );
+  assert.equal(resolveProvenance({ actor: "agent" }).authorId, "ai:cursor");
 });
 
 test("resolveProvenance derives ai:claude model authorId", () => {
@@ -58,11 +56,14 @@ test("guiMutateMeta sets human:local", () => {
 
 test("authorDisplayLabel maps known models", () => {
   assert.equal(authorDisplayLabel("claude-sonnet-4-6"), "Sonnet 4.6");
-  assert.equal(
-    authorDisplayLabel("ai:claude:claude-sonnet-4-6"),
-    "Sonnet 4.6"
-  );
+  assert.equal(authorDisplayLabel("ai:claude:claude-sonnet-4-6"), "Sonnet 4.6");
   assert.equal(authorDisplayLabel("human:local"), "You (editor)");
+  assert.equal(authorDisplayLabel("ai:cursor"), "Cursor");
+  assert.equal(
+    authorDisplayLabel("ai:cursor:composer-2-5"),
+    "Cursor · Composer 2.5"
+  );
+  assert.equal(authorDisplayLabel("ai:codex"), "Codex");
 });
 
 test("authorToneClass classifies author ids", () => {
@@ -115,4 +116,30 @@ test("stampWordProvenance writes optional word fields", () => {
   assert.equal(words[1].authoredRevision, 3);
   assert.equal(words[1].authoredTaskId, "t1");
   assert.equal(typeof words[1].authoredAt, "number");
+});
+
+test("stampOverlayProvenanceFromMutation stamps b-roll on add", () => {
+  const project = {
+    words: [] as Word[],
+    broll: [
+      {
+        id: "br1",
+        assetId: "a1",
+        startSample: 0,
+        endSample: 100,
+      },
+    ],
+  };
+  stampOverlayProvenanceFromMutation(
+    project,
+    "broll-add",
+    {},
+    { id: "br1" },
+    { authorId: "ai:cursor" },
+    4,
+    "task-abc"
+  );
+  assert.equal(project.broll[0]?.authoredBy, "ai:cursor");
+  assert.equal(project.broll[0]?.authoredRevision, 4);
+  assert.equal(project.broll[0]?.authoredTaskId, "task-abc");
 });

@@ -11,6 +11,15 @@ const MODEL_LABELS: Readonly<Record<string, string>> = {
   "grok-build": "Grok Build",
 };
 
+/** Friendly labels for ai:<surface> author ids without a model slug. */
+const SURFACE_LABELS: Readonly<Record<string, string>> = {
+  cursor: "Cursor",
+  codex: "Codex",
+  claude: "Claude Code",
+  grok: "Grok",
+  agent: "Agent",
+};
+
 /** Human-readable label for an authorId or model slug. */
 export function authorDisplayLabel(authorIdOrModel: string): string {
   if (MODEL_LABELS[authorIdOrModel]) {
@@ -19,6 +28,9 @@ export function authorDisplayLabel(authorIdOrModel: string): string {
   const parts = authorIdOrModel.split(":");
   const last = parts.at(-1);
   if (last && MODEL_LABELS[last]) {
+    if (authorIdOrModel.startsWith("ai:cursor:")) {
+      return `Cursor · ${MODEL_LABELS[last]}`;
+    }
     return MODEL_LABELS[last];
   }
   if (authorIdOrModel.startsWith("human:")) {
@@ -32,8 +44,18 @@ export function authorDisplayLabel(authorIdOrModel: string): string {
     return name || "Human";
   }
   if (authorIdOrModel.startsWith("ai:")) {
+    const surface = parts[1];
+    if (surface && parts.length === 2 && SURFACE_LABELS[surface]) {
+      return SURFACE_LABELS[surface];
+    }
     const model = parts.at(-1) ?? authorIdOrModel;
     return MODEL_LABELS[model] ?? model;
+  }
+  if (authorIdOrModel.startsWith("cli:")) {
+    return "CLI";
+  }
+  if (authorIdOrModel.startsWith("mcp:")) {
+    return "MCP";
   }
   return authorIdOrModel;
 }
@@ -73,12 +95,12 @@ export function stampGuiWordProvenance<
     if (!idSet.has(word.id)) {
       return word;
     }
-    const { authoredTaskId: _drop, ...rest } = word;
     return {
-      ...rest,
+      ...word,
       authoredBy: GUI_HUMAN_AUTHOR_ID,
       authoredAt: at,
       authoredRevision: revisionAfter,
+      authoredTaskId: undefined,
     };
   });
 }

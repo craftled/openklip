@@ -20,6 +20,7 @@ import {
   HistoryList,
   historyEntryKey,
   historyEntryKeyForRevisionAfter,
+  historyFilterForTask,
   newestAssembleIndex,
   newestRevertibleEntry,
   parseHistoryEntries,
@@ -755,6 +756,20 @@ test("filterHistoryEntries returns an empty array cleanly for a value present in
     filterHistoryEntries(entries, { actor: "agent", action: "look-vignette" }),
     []
   );
+});
+
+test("historyFilterForTask clears other dimensions and sets task", () => {
+  assert.deepEqual(historyFilterForTask("task-42"), {
+    action: "",
+    actor: "",
+    author: "",
+    task: "task-42",
+  });
+  const filtered = filterHistoryEntries(
+    [taskCut, taskPad, humanLook],
+    historyFilterForTask("task-1")
+  );
+  assert.deepEqual(filtered, [taskCut, taskPad]);
 });
 
 test("historyEntryKeyForRevisionAfter finds the row key for a revision", () => {

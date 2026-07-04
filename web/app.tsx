@@ -28,10 +28,13 @@ import {
   orientationToExportAspect,
   shouldApplyReframe,
 } from "@engine/export-aspect";
-import { stampGuiWordProvenance } from "@engine/provenance-display";
 import { FILTER_OPTIONS, filterLabel } from "@engine/filter";
 import type { Keyframe } from "@engine/keyframes";
 import { validateProductAnnouncementSpec } from "@engine/product-announcement";
+import {
+  authorDisplayLabel,
+  stampGuiWordProvenance,
+} from "@engine/provenance-display";
 import {
   SAFE_AREA_PLATFORMS,
   type SafeAreaPlatform,
@@ -210,6 +213,10 @@ import {
 } from "@/lib/preview-layout";
 import { buildProjectHoverContext } from "@/lib/project-context";
 import type { ProjectListing } from "@/lib/project-list";
+import {
+  readProvenanceDisplayEnabled,
+  subscribeProvenanceDisplay,
+} from "@/lib/provenance-preferences";
 import {
   getSafeAreaGuidePlatform,
   setSafeAreaGuidePlatform,
@@ -483,7 +490,7 @@ export function App({
     useState<SettingsSectionId>("appearance");
   const [defaultAgent, setDefaultAgent] =
     useState<AgentModelId>(DEFAULT_AGENT_MODEL);
-  const [configOpen, setConfigOpen] = useState(true);
+  const [configOpen, setConfigOpen] = useState(false);
   const [mobileRightPanel, setMobileRightPanel] = useState<
     "chat" | "config" | null
   >(null);
@@ -624,11 +631,17 @@ export function App({
   const [pendingSaves, setPendingSaves] = useState(0);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [colorScheme, setColorSchemeState] = useState<ColorScheme>("light");
+  const [provenanceDisplay, setProvenanceDisplay] = useState(false);
   useEffect(() => {
     const storedColorScheme = getColorScheme();
     setColorSchemeState(storedColorScheme);
     applyColorScheme(storedColorScheme);
     return subscribeColorScheme(setColorSchemeState);
+  }, []);
+
+  useEffect(() => {
+    setProvenanceDisplay(readProvenanceDisplayEnabled());
+    return subscribeProvenanceDisplay(setProvenanceDisplay);
   }, []);
 
   useEffect(() => {
@@ -2822,7 +2835,10 @@ export function App({
                             }
                             rows={(project.broll ?? []).map((b) => ({
                               id: b.id,
-                              label: assetName(b.assetId),
+                              label:
+                                provenanceDisplay && b.authoredBy
+                                  ? `${assetName(b.assetId)} · ${authorDisplayLabel(b.authoredBy)}`
+                                  : assetName(b.assetId),
                             }))}
                             selectedId={selected?.id}
                           />
@@ -3384,6 +3400,7 @@ export function App({
                 focusRevision={historyFocusRevision}
                 onFocusRevisionHandled={() => setHistoryFocusRevision(null)}
                 onReverted={onHistoryReverted}
+                showProvenance={provenanceDisplay}
                 slug={project.slug}
               />
             </Section>
@@ -3925,7 +3942,9 @@ export function App({
                           onRestoreSelection={restoreSelection}
                           onSelectRange={selectTranscriptRange}
                           onTextEdit={reconcileTranscriptEdit}
-                          onViewInHistory={focusWordInHistory}
+                          onViewInHistory={
+                            provenanceDisplay ? focusWordInHistory : undefined
+                          }
                           search={
                             <TranscriptSearch
                               activeMatchIndex={activeSearchIndex}
@@ -3947,6 +3966,7 @@ export function App({
                             />
                           }
                           selRange={selRange}
+                          showProvenance={provenanceDisplay}
                           words={project.words}
                         />
                       </div>

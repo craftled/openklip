@@ -1,6 +1,6 @@
 "use client";
 
-import { authorDisplayLabel, authorToneClass } from "@engine/provenance-display";
+import { authorDisplayLabel } from "@engine/provenance-display";
 import {
   type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -57,6 +57,8 @@ interface EditorTranscriptPanelProps {
   onViewInHistory?: (revisionAfter: number) => void;
   search?: ReactNode;
   selRange: readonly [number, number] | null;
+  /** Advanced: hover attribution and View in history on words. */
+  showProvenance?: boolean;
   words: TranscriptWord[];
 }
 
@@ -71,6 +73,7 @@ export function EditorTranscriptPanel({
   onSelectRange,
   onTextEdit,
   onViewInHistory,
+  showProvenance = false,
   search,
   selRange,
   words,
@@ -202,21 +205,20 @@ export function EditorTranscriptPanel({
     <TooltipProvider>
       <ScrollArea className="h-full min-h-0" ref={scrollAreaRef}>
         <div className="flex min-h-full flex-col px-4 pt-4 pb-12 sm:px-6">
-          <header className="mx-auto mb-4 flex w-full max-w-[78ch] flex-col gap-2 sm:flex-row sm:items-center">
-            <div className="min-w-0">
-              <h2 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
-                Transcript
-              </h2>
-            </div>
-            <div className="flex flex-wrap items-center gap-1.5 sm:ml-auto sm:justify-end">
-              <Badge variant="outline">{plural(words.length, "word")}</Badge>
-              {cutCount > 0 ? (
-                <Badge variant="secondary">{cutCount} cut</Badge>
-              ) : null}
-              {selection.total > 0 ? (
-                <Badge variant="secondary">{selection.total} selected</Badge>
-              ) : null}
-            </div>
+          <header className="mx-auto mb-4 w-full max-w-[78ch]">
+            <p className="text-muted-foreground text-sm leading-snug">
+              Edit the script to edit the video. Select words and press{" "}
+              <kbd className="rounded border bg-muted/40 px-1 font-mono text-[0.6875rem]">
+                Delete
+              </kbd>{" "}
+              to cut.
+            </p>
+            {cutCount > 0 ? (
+              <p className="mt-1.5 text-muted-foreground text-xs tabular-nums">
+                {cutCount} {cutCount === 1 ? "word" : "words"} cut from the
+                video
+              </p>
+            ) : null}
           </header>
 
           {search ? (
@@ -239,9 +241,10 @@ export function EditorTranscriptPanel({
           {words.length === 0 ? (
             <Empty className="min-h-48 border border-dashed bg-muted/20">
               <EmptyHeader>
-                <EmptyTitle>No transcript yet</EmptyTitle>
+                <EmptyTitle>No script yet</EmptyTitle>
                 <EmptyDescription>
-                  Ingested projects show their word-level transcript here.
+                  After ingest, your spoken words appear here. Edit text to
+                  shape the cut; deleted words are removed from the video.
                 </EmptyDescription>
               </EmptyHeader>
             </Empty>
@@ -250,7 +253,7 @@ export function EditorTranscriptPanel({
             <div
               aria-label="Transcript editor"
               aria-multiline="true"
-              className="prose dark:prose-invert mx-auto w-full rounded-md text-left font-medium outline-none selection:bg-primary/20 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+              className="mx-auto w-full max-w-[78ch] rounded-md text-left text-[1.0625rem] leading-[1.75] tracking-[0.01em] outline-none selection:bg-primary/20 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
               contentEditable={editorMounted ? true : undefined}
               onBlur={commitEditedText}
               onKeyDown={onEditorKeyDown}
@@ -279,12 +282,15 @@ export function EditorTranscriptPanel({
                         index <= selRange[1]
                       }
                       key={word.id}
-                    onSelect={() => {
-                      editorRef.current?.focus();
-                      onSelectRange([index, index]);
-                    }}
-                    onViewInHistory={onViewInHistory}
-                    word={word}
+                      onSelect={() => {
+                        editorRef.current?.focus();
+                        onSelectRange([index, index]);
+                      }}
+                      onViewInHistory={
+                        showProvenance ? onViewInHistory : undefined
+                      }
+                      showProvenance={showProvenance}
+                      word={word}
                     />
                   ))}
                 </p>
@@ -475,6 +481,7 @@ function TranscriptWordButton({
   isSelected,
   onSelect,
   onViewInHistory,
+  showProvenance = false,
   word,
 }: {
   active: boolean;
@@ -486,14 +493,15 @@ function TranscriptWordButton({
   isSelected: boolean;
   onSelect: () => void;
   onViewInHistory?: (revisionAfter: number) => void;
+  showProvenance?: boolean;
   word: TranscriptWord;
 }) {
-  const tone = word.authoredBy ? authorToneClass(word.authoredBy) : null;
-  const provenanceTitle = word.authoredBy
-    ? `${authorDisplayLabel(word.authoredBy)}${word.authoredRevision === undefined ? "" : ` · rev ${word.authoredRevision}`}`
-    : word.deleted
-      ? "Deleted word"
-      : "Kept word";
+  const provenanceTitle =
+    showProvenance && word.authoredBy
+      ? `${authorDisplayLabel(word.authoredBy)}${word.authoredRevision === undefined ? "" : ` · rev ${word.authoredRevision}`}`
+      : word.deleted
+        ? "Cut from video"
+        : undefined;
 
   const span = (
     <span
@@ -501,24 +509,18 @@ function TranscriptWordButton({
       className={cn(
         "transcript-word cursor-text text-left leading-[inherit] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
         word.deleted &&
-          "text-muted-foreground line-through decoration-1 hover:text-foreground",
-        active &&
-          "text-primary underline decoration-primary/50 underline-offset-4",
+          "text-muted-foreground/80 line-through decoration-1 decoration-muted-foreground/50",
+        active && !word.deleted && "text-foreground",
         inBroll &&
-          "underline decoration-2 decoration-border underline-offset-4",
-        inZoom && "bg-muted",
+          "underline decoration-1 decoration-border/60 underline-offset-[0.2em] opacity-95",
+        inZoom && !word.deleted && "rounded-sm bg-muted/30",
         isMatch && "bg-primary/10",
-        isActiveMatch && "bg-primary/15 ring-1 ring-primary/40 ring-inset",
-        tone === "human" &&
-          "underline decoration-primary/40 decoration-dotted underline-offset-4",
-        tone === "agent" &&
-          "underline decoration-accent-foreground/50 decoration-dashed underline-offset-4",
-        tone === "cli" &&
-          "underline decoration-muted-foreground/60 decoration-dotted underline-offset-4"
+        isActiveMatch && "bg-primary/15 ring-1 ring-primary/40 ring-inset"
       )}
       data-search-match={
         isMatch ? (isActiveMatch ? "active" : "true") : undefined
       }
+      data-word-active={active && !word.deleted ? "true" : undefined}
       data-word-index={index}
       data-word-selected={isSelected ? "true" : undefined}
       onDoubleClick={onSelect}
@@ -528,13 +530,13 @@ function TranscriptWordButton({
           onSelect();
         }
       }}
-      title={word.authoredBy ? undefined : provenanceTitle}
+      title={provenanceTitle}
     >
       {word.text}
     </span>
   );
 
-  if (!word.authoredBy) {
+  if (!(showProvenance && word.authoredBy)) {
     return <>{span} </>;
   }
 
@@ -664,8 +666,4 @@ function transcriptParagraphs(words: TranscriptWord[]) {
 
 function shouldEndParagraph(paragraphLength: number, sentenceCount: number) {
   return sentenceCount >= 3 || paragraphLength >= 90;
-}
-
-function plural(count: number, singular: string): string {
-  return `${count} ${count === 1 ? singular : `${singular}s`}`;
 }

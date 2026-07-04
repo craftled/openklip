@@ -15,7 +15,6 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { actorFromEnv } from "./action-log.ts";
-import { resolveProvenance } from "./provenance.ts";
 import {
   type AgentTask,
   type AgentTaskStatus,
@@ -26,6 +25,7 @@ import {
 } from "./agent-task-types.ts";
 import { projectPaths } from "./paths.ts";
 import { withTasksLock } from "./project-lock.ts";
+import { resolveProvenance } from "./provenance.ts";
 
 export type {
   AgentTask,
@@ -305,7 +305,9 @@ export function createAgentTask(
   return withTasksStoreLock(slug, async () => {
     const data = await loadAgentTasks(slug);
     const now = Date.now();
-    const actor = input.model ? ("agent" as const) : (actorFromEnv() ?? "human");
+    const actor = input.model
+      ? ("agent" as const)
+      : (actorFromEnv() ?? "human");
     const provenance = resolveProvenance({
       actor,
       model: input.model,
@@ -322,7 +324,7 @@ export function createAgentTask(
       ...(provenance.agentSurface
         ? { agentSurface: provenance.agentSurface }
         : {}),
-      ...(provenance.model ?? input.model
+      ...((provenance.model ?? input.model)
         ? { model: provenance.model ?? input.model }
         : {}),
       status: "running",

@@ -4,24 +4,28 @@
 import { actorFromEnv } from "./action-log.ts";
 import type { Actor } from "./action-log-entry.ts";
 import type { Word } from "./edl.ts";
-export { authorDisplayLabel, authorToneClass } from "./provenance-display.ts";
 
 /** Meta passed to mutateProject (subset for provenance helpers). */
-export type ProvenanceMutateMeta = {
+export interface ProvenanceMutateMeta {
   action: string;
   actor?: Actor;
+  agentSurface?: string;
+  authorId?: string;
   input?: unknown;
+  model?: string;
   taskId?: string;
-  authorId?: string;
-  agentSurface?: string;
-  model?: string;
-};
+}
 
-export type ProvenanceFields = {
-  authorId?: string;
+export interface ProvenanceFields {
   agentSurface?: string;
+  authorId?: string;
   model?: string;
-};
+}
+
+export type ResolveProvenanceInput = Pick<
+  ProvenanceMutateMeta,
+  "actor" | "authorId" | "agentSurface" | "model"
+>;
 
 export type ResolvedProvenance = ProvenanceFields & {
   authorId: string;
@@ -92,7 +96,7 @@ function deriveAuthorId(
 
 /** Resolve provenance for a logged mutation from meta + environment. */
 export function resolveProvenance(
-  meta?: ProvenanceMutateMeta
+  meta?: ResolveProvenanceInput
 ): ResolvedProvenance {
   const actor = meta?.actor ?? actorFromEnv() ?? "human";
   const explicitAuthor = meta?.authorId ?? authorIdFromEnv();
@@ -116,23 +120,118 @@ export const GUI_HUMAN_PROVENANCE: ResolvedProvenance = {
 
 /** Stamp word-level provenance after a logged transcript mutation. */
 export function stampProvenanceFromMutation(
-  project: { words: Word[] },
+  project: { words: Word[] } & OverlayProvenanceProject,
   meta: { action: string; input?: unknown; taskId?: string },
   result: unknown,
   provenance: ResolvedProvenance,
   revisionAfter: number
 ): void {
   const wordIds = wordIdsFromMutation(meta.action, meta.input, result, project);
-  if (wordIds.length === 0) {
-    return;
+  if (wordIds.length > 0) {
+    stampWordProvenance(
+      project.words,
+      wordIds,
+      provenance,
+      revisionAfter,
+      meta.taskId
+    );
   }
-  stampWordProvenance(
-    project.words,
-    wordIds,
+  stampOverlayProvenanceFromMutation(
+    project,
+    meta.action,
+    meta.input,
+    result,
     provenance,
     revisionAfter,
     meta.taskId
   );
+}
+
+interface OverlayWithAuth {
+  authoredAt?: number;
+  authoredBy?: string;
+  authoredRevision?: number;
+  authoredTaskId?: string;
+  id: string;
+}
+
+interface OverlayProvenanceProject {
+  broll?: OverlayWithAuth[];
+  graphics?: OverlayWithAuth[];
+  music?: OverlayWithAuth[];
+  stills?: OverlayWithAuth[];
+  titles?: OverlayWithAuth[];
+  zooms?: OverlayWithAuth[];
+}
+
+const OVERLAY_MUTATION_RE =
+  /^(?:broll|title|zoom|still|music|graphic|json-graphic)-(?:add|set)$/;
+
+function overlayIdFromMutation(
+  action: string,
+  input: unknown,
+  result: unknown
+): string | undefined {
+  const r = result as { id?: string } | undefined;
+  if (r?.id) {
+    return r.id;
+  }
+  if (action.endsWith("-set")) {
+    const i = input as { id?: string } | undefined;
+    return i?.id;
+  }
+  return;
+}
+
+function findOverlay(
+  project: OverlayProvenanceProject,
+  id: string
+): OverlayWithAuth | undefined {
+  for (const arr of [
+    project.broll,
+    project.titles,
+    project.zooms,
+    project.stills,
+    project.music,
+    project.graphics,
+  ]) {
+    const found = arr?.find((item) => item.id === id);
+    if (found) {
+      return found;
+    }
+  }
+  return;
+}
+
+/** Stamp overlay-level provenance after add/set mutations. */
+export function stampOverlayProvenanceFromMutation(
+  project: OverlayProvenanceProject,
+  action: string,
+  input: unknown,
+  result: unknown,
+  provenance: ResolvedProvenance,
+  revisionAfter: number,
+  taskId?: string
+): void {
+  if (!OVERLAY_MUTATION_RE.test(action)) {
+    return;
+  }
+  const overlayId = overlayIdFromMutation(action, input, result);
+  if (!overlayId) {
+    return;
+  }
+  const overlay = findOverlay(project, overlayId);
+  if (!overlay) {
+    return;
+  }
+  overlay.authoredBy = provenance.authorId;
+  overlay.authoredAt = Date.now();
+  overlay.authoredRevision = revisionAfter;
+  if (taskId) {
+    overlay.authoredTaskId = taskId;
+  } else {
+    overlay.authoredTaskId = undefined;
+  }
 }
 
 function wordIdsFromMutation(
@@ -235,7 +334,7 @@ export function stampWordProvenance(
     if (taskId) {
       word.authoredTaskId = taskId;
     } else {
-      delete word.authoredTaskId;
+      word.authoredTaskId = undefined;
     }
   }
 }

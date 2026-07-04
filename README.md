@@ -174,6 +174,18 @@ openklip export <slug> --platform youtube-4k --loudness -13
 
 In Cursor, enable the bundled MCP server (`.cursor/mcp.json`) and call the same tools without shelling out. Tool manifest: `openklip tools --json --surface mcp`.
 
+**Agent provenance (optional env):** set these when spawning agent edits so History and transcript hover show who changed what:
+
+| Variable | Example | Purpose |
+| --- | --- | --- |
+| `OPENKLIP_ACTOR` | `agent` | Log actor: `human`, `agent`, `cli`, `mcp`, or `system` |
+| `OPENKLIP_AUTHOR_ID` | `ai:cursor` | Stable author id (`human:local`, `ai:claude:claude-sonnet-4-6`, …) |
+| `OPENKLIP_AGENT_MODEL` | `claude-sonnet-4-6` | Model slug for display and derived author ids |
+| `OPENKLIP_AGENT_SURFACE` | `cursor` | Host surface: `cursor`, `codex`, `claude-code`, `gui` |
+| `OPENKLIP_TASK_ID` | task uuid | Groups one agent run's edits in History |
+
+GUI human edits use `human:local` automatically. Full detail: **[AGENTS.md](./AGENTS.md)**.
+
 Deterministic script:
 
 ```bash

@@ -16,6 +16,14 @@ import {
 // derive seconds from this one grid via samplesToSec() so they cannot drift.
 export const SAMPLE_RATE = 48_000;
 
+/** Optional provenance fields shared by words and overlays. */
+export const AuthorshipFieldsSchema = {
+  authoredBy: z.string().optional(),
+  authoredAt: z.number().int().nonnegative().optional(),
+  authoredRevision: z.number().int().nonnegative().optional(),
+  authoredTaskId: z.string().optional(),
+};
+
 export const WordSchema = z.object({
   id: z.string(),
   text: z.string(),
@@ -25,13 +33,7 @@ export const WordSchema = z.object({
   /** F1: why this word was cut/kept; metadata only, never reaches ffmpeg. */
   note: z.string().optional(),
   /** Author id at last transcript mutation (human:local, ai:claude:…). */
-  authoredBy: z.string().optional(),
-  /** Epoch ms when authoredBy was set. */
-  authoredAt: z.number().int().nonnegative().optional(),
-  /** project.json revision after the mutation that set authoredBy. */
-  authoredRevision: z.number().int().nonnegative().optional(),
-  /** Agent task id when the mutation ran under a spawned task. */
-  authoredTaskId: z.string().optional(),
+  ...AuthorshipFieldsSchema,
   /**
    * The transcript text this word had BEFORE its first agent/CLI correction
    * (see setWordText in actions.ts). Set once and never overwritten, so the
@@ -168,6 +170,7 @@ export const BrollSchema = z.object({
   audioMode: BrollAudioModeSchema.default("silent"),
   note: z.string().optional(),
   anchor: PhraseAnchorSchema.optional(),
+  ...AuthorshipFieldsSchema,
 });
 export type Broll = z.infer<typeof BrollSchema>;
 
@@ -189,6 +192,7 @@ export const MusicPlacementSchema = z.object({
   /** trim: end clamps to the asset remainder; loop: repeats to cover the span. */
   mode: z.enum(["trim", "loop"]).default("trim"),
   note: z.string().optional(),
+  ...AuthorshipFieldsSchema,
 });
 export type MusicPlacement = z.infer<typeof MusicPlacementSchema>;
 
@@ -201,6 +205,7 @@ export const ZoomSchema = z.object({
   rampSec: z.number().min(0).max(5).default(0.6),
   note: z.string().optional(),
   anchor: PhraseAnchorSchema.optional(),
+  ...AuthorshipFieldsSchema,
 });
 export type Zoom = z.infer<typeof ZoomSchema>;
 
@@ -217,6 +222,7 @@ export const StillSchema = z.object({
   focusY: z.number().min(0).max(1).default(0.5),
   note: z.string().optional(),
   anchor: PhraseAnchorSchema.optional(),
+  ...AuthorshipFieldsSchema,
 });
 export type Still = z.infer<typeof StillSchema>;
 
@@ -231,6 +237,7 @@ export const TitleSchema = z.object({
     .default("lower"),
   note: z.string().optional(),
   anchor: PhraseAnchorSchema.optional(),
+  ...AuthorshipFieldsSchema,
 });
 export type Title = z.infer<typeof TitleSchema>;
 
@@ -255,6 +262,7 @@ export const GraphicSchema = z
     keyframes: KeyframeSchema.array().max(64).optional(),
     note: z.string().optional(),
     anchor: PhraseAnchorSchema.optional(),
+    ...AuthorshipFieldsSchema,
   })
   .superRefine((graphic, ctx) => {
     const hasJsonRenderFields =

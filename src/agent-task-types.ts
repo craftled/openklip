@@ -26,11 +26,17 @@ export interface AgentTask {
    * absent on read means "unknown" (a pre-existing task, never filterable
    * by actor). Set once at creation, never mutated afterward. */
   actor?: Actor;
+  /** Surface that spawned the task: gui, claude-code, etc. */
+  agentSurface?: string;
+  /** Proof-style author id for the agent that ran this task. */
+  authorId?: string;
   /** Set when status === "blocked": the question the agent is waiting on. */
   blockedQuestion?: string;
   chatId?: string;
   completedAt?: number;
   id: string;
+  /** Raw model slug when an LLM drove the task. */
+  model?: string;
   /** Partial completion: what is left (status stays "completed"). */
   remaining?: string[];
   request: string;
@@ -40,12 +46,6 @@ export interface AgentTask {
   steps: AgentTaskStep[];
   /** The agent's own completion summary. */
   summary?: string;
-  /** Proof-style author id for the agent that ran this task. */
-  authorId?: string;
-  /** Surface that spawned the task: gui, claude-code, etc. */
-  agentSurface?: string;
-  /** Raw model slug when an LLM drove the task. */
-  model?: string;
   updatedAt: number;
 }
 

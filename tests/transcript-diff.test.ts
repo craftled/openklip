@@ -22,7 +22,12 @@ test("transcriptDiffLines joins kept words into one line per sentence", () => {
   assert.equal(result.contents, "Hello world.\nThis is fine.");
   assert.deepEqual(result.lines, [
     { lineNumber: 1, wordStartIndex: 0, wordEndIndex: 1, text: "Hello world." },
-    { lineNumber: 2, wordStartIndex: 2, wordEndIndex: 4, text: "This is fine." },
+    {
+      lineNumber: 2,
+      wordStartIndex: 2,
+      wordEndIndex: 4,
+      text: "This is fine.",
+    },
   ]);
 });
 

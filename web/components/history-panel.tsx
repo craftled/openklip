@@ -24,8 +24,8 @@ import { toastRevertFailed, toastRevertSucceeded } from "@/lib/app-toast";
 import { effectiveCurrentRevision } from "@/lib/history-transcript-diff";
 import { RotateCcw } from "@/lib/icon";
 import { relativeTimeAgo } from "@/lib/relative-time";
-import { cn } from "@/lib/utils";
 import type { TranscriptDiffWord } from "@/lib/transcript-diff";
+import { cn } from "@/lib/utils";
 import { revertProjectAction } from "../../app/actions.ts";
 
 const BADGE_BASE =
@@ -120,6 +120,11 @@ export function hasActiveHistoryFilter(filter: HistoryFilter): boolean {
   return Boolean(filter.actor || filter.action || filter.task || filter.author);
 }
 
+/** Filter History to a single agent task (clears other dimensions). */
+export function historyFilterForTask(taskId: string): HistoryFilter {
+  return { action: "", actor: "", author: "", task: taskId };
+}
+
 /** Distinct actors actually present in the loaded entries, sorted. Options
  * are sourced from the data itself rather than the full Actor union: an
  * option that always yields zero results (an actor with no entries in the
@@ -210,6 +215,7 @@ export function HistoryFilterControls({
   actorOptions,
   authorOptions,
   onChange,
+  showAuthorFilter = false,
   taskOptions,
   value,
 }: {
@@ -217,6 +223,8 @@ export function HistoryFilterControls({
   actorOptions: string[];
   authorOptions: string[];
   onChange: (next: HistoryFilter) => void;
+  /** Advanced: author attribution filter (off by default). */
+  showAuthorFilter?: boolean;
   taskOptions: string[];
   value: HistoryFilter;
 }) {
@@ -230,13 +238,15 @@ export function HistoryFilterControls({
         options={actorOptions}
         value={value.actor ?? ""}
       />
-      <FilterSelect
-        ariaLabel="Filter by author"
-        label="Author"
-        onChange={(author) => onChange({ ...value, author })}
-        options={authorOptions}
-        value={value.author ?? ""}
-      />
+      {showAuthorFilter ? (
+        <FilterSelect
+          ariaLabel="Filter by author"
+          label="Author"
+          onChange={(author) => onChange({ ...value, author })}
+          options={authorOptions}
+          value={value.author ?? ""}
+        />
+      ) : null}
       <FilterSelect
         ariaLabel="Filter by action"
         label="Action"
@@ -497,9 +507,13 @@ interface RevertControls {
   // silently reusing the plain no-filter phrasing.
   filterActive?: boolean;
   forceConfirmKey?: string | null;
+  /** Brief ring highlight on the row matching this historyEntryKey. */
+  highlightKey?: string | null;
   onCancel?: () => void;
   onConfirmForce?: (key: string) => void;
   onConfirmRevert?: (key: string) => void;
+  /** Narrow History to one agent task (same as the task filter dropdown). */
+  onFilterByTask?: (taskId: string) => void;
   onRequestGroupRevert?: (group: HistoryGroup, key: string) => void;
   onRequestRevert?: (entry: ActionLogEntry, key: string) => void;
   // G5: the RAW fetched entries (before any client-side filter), used only
@@ -508,8 +522,8 @@ interface RevertControls {
   // always be judged against the true fetch, never the filtered view.
   rawEntries?: ActionLogEntry[];
   revertingKey?: string | null;
-  /** Brief ring highlight on the row matching this historyEntryKey. */
-  highlightKey?: string | null;
+  /** Advanced: show author badges on rows. */
+  showProvenance?: boolean;
   snapshotRevisions?: number[];
   transcriptDiff?: {
     currentRevision: number;
@@ -651,7 +665,7 @@ function HistoryRow({
           {entry.action}
         </span>
         <span className={actorBadgeClass(entry.actor)}>{entry.actor}</span>
-        {entry.authorId ? (
+        {controls?.showProvenance && entry.authorId ? (
           <span
             className="max-w-28 truncate rounded-sm bg-muted px-1.5 py-0.5 font-medium text-[10px] text-muted-foreground uppercase tracking-wide"
             title={entry.authorId}
@@ -695,6 +709,15 @@ function HistoryRow({
         <div className="truncate font-mono text-muted-foreground text-xs">
           out: {entry.result}
         </div>
+      ) : null}
+      {entry.taskId && controls?.onFilterByTask ? (
+        <button
+          className="self-start text-left text-primary text-xs underline-offset-2 hover:underline"
+          onClick={() => controls.onFilterByTask?.(entry.taskId as string)}
+          type="button"
+        >
+          task {entry.taskId}
+        </button>
       ) : null}
       {controls?.transcriptDiff && controls.snapshotRevisions ? (
         <HistoryTranscriptDiffToggle
@@ -752,9 +775,19 @@ function HistoryGroupBlock({
     <li className="flex flex-col gap-2">
       {showGroupRevert ? (
         <div className="flex items-center justify-between gap-2 rounded-sm bg-muted/50 px-1.5 py-1">
-          <span className="truncate text-muted-foreground text-xs">
-            task {group.taskId}
-          </span>
+          {controls?.onFilterByTask && group.taskId ? (
+            <button
+              className="min-w-0 truncate text-left text-primary text-xs underline-offset-2 hover:underline"
+              onClick={() => controls.onFilterByTask?.(group.taskId as string)}
+              type="button"
+            >
+              task {group.taskId}
+            </button>
+          ) : (
+            <span className="truncate text-muted-foreground text-xs">
+              task {group.taskId}
+            </span>
+          )}
           <RevertButton
             caveat={briefCaveat}
             confirming={controls?.confirmingKey === groupKey}
@@ -842,7 +875,7 @@ export function HistoryList({
           snapshotRevisions,
         };
   return (
-    <ul className="flex list-none flex-col gap-2 p-0">
+    <ul className="flex list-none flex-col gap-2 p-0" data-history-list>
       {groups.map((group) => (
         <HistoryGroupBlock
           controls={passedControls}
@@ -874,6 +907,7 @@ export function HistoryPanel({
   focusRevision,
   onFocusRevisionHandled,
   onReverted,
+  showProvenance = false,
   slug,
 }: {
   currentRevision?: number;
@@ -882,6 +916,8 @@ export function HistoryPanel({
   focusRevision?: number | null;
   onFocusRevisionHandled?: () => void;
   onReverted?: (project: Project) => void;
+  /** Advanced: author badges and author filter in History. */
+  showProvenance?: boolean;
   slug: string;
 }) {
   const router = useRouter();
@@ -932,6 +968,15 @@ export function HistoryPanel({
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (showProvenance) {
+      return;
+    }
+    setFilter((current) =>
+      current.author ? { ...current, author: "" } : current
+    );
+  }, [showProvenance]);
 
   useEffect(() => {
     if (focusRevision == null || entries.length === 0) {
@@ -1062,6 +1107,15 @@ export function HistoryPanel({
     [pendingTarget, runRevert]
   );
 
+  const onFilterByTask = useCallback((taskId: string) => {
+    setFilter(historyFilterForTask(taskId));
+    requestAnimationFrame(() => {
+      document
+        .querySelector("[data-history-list]")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, []);
+
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between gap-2">
@@ -1131,6 +1185,7 @@ export function HistoryPanel({
         actorOptions={actorOptions}
         authorOptions={authorOptions}
         onChange={setFilter}
+        showAuthorFilter={showProvenance}
         taskOptions={taskOptions}
         value={filter}
       />
@@ -1143,10 +1198,12 @@ export function HistoryPanel({
         onCancel={cancelRevert}
         onConfirmForce={onConfirmForce}
         onConfirmRevert={onConfirmRevert}
+        onFilterByTask={onFilterByTask}
         onRequestGroupRevert={onRequestGroupRevert}
         onRequestRevert={onRequestRevert}
         rawEntries={entries}
         revertingKey={revertingKey}
+        showProvenance={showProvenance}
         snapshotRevisions={snapshotRevisions}
         transcriptDiff={
           currentWords

@@ -90,10 +90,7 @@ export async function resolveRevertTarget(
   return { revision: earliestTaskEntry.revisionBefore };
 }
 
-function readHistorySnapshot(
-  slug: string,
-  revision: number
-): Promise<Project> {
+function readHistorySnapshot(slug: string, revision: number): Promise<Project> {
   return loadHistorySnapshot(slug, revision);
 }
 

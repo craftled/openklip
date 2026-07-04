@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  helloLoadingLabel,
   type HelloLoadingContext,
+  helloLoadingLabel,
 } from "../web/lib/hello-loading-labels.ts";
 
 const CONTEXTS: HelloLoadingContext[] = ["project", "chats"];

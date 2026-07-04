@@ -231,6 +231,11 @@
   background-color: color(display-p3 1 1 1 / 0.071);
 }
 
+.transcript-word[data-word-active="true"]::before {
+  background-color: color-mix(in oklch, var(--primary) 12%, transparent);
+  opacity: 1;
+}
+
 .transcript-word[data-word-selected="true"]::before {
   opacity: 1;
 }

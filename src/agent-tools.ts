@@ -3,7 +3,6 @@
 // all read from here so surfaces stay in sync with the GUI's project.json edits.
 import { z } from "zod";
 import { type Actor, actorFromEnv, readActionLog } from "./action-log.ts";
-import { matchesAuthorFilter } from "./provenance.ts";
 import {
   type AgentTaskOutcome,
   type AgentTaskStatus,
@@ -33,6 +32,7 @@ import {
   loadProject,
   mutateProject,
 } from "./projectStore.ts";
+import { matchesAuthorFilter } from "./provenance.ts";
 import {
   grepTranscript,
   listOverlays,

@@ -5,7 +5,13 @@ import {
   SettingsRow,
   SettingsSection,
 } from "@/components/settings/settings-panel-primitives";
+import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import {
+  readProvenanceDisplayEnabled,
+  subscribeProvenanceDisplay,
+  writeProvenanceDisplayEnabled,
+} from "@/lib/provenance-preferences";
 import {
   applyColorScheme,
   type ColorScheme,
@@ -17,12 +23,18 @@ import { firstToggleValue } from "@/lib/toggle-value";
 
 export function SettingsAppearancePanel() {
   const [colorScheme, setColorSchemeState] = useState<ColorScheme>("light");
+  const [provenanceDisplay, setProvenanceDisplay] = useState(false);
 
   useEffect(() => {
     const storedColorScheme = getColorScheme();
     setColorSchemeState(storedColorScheme);
     applyColorScheme(storedColorScheme);
     return subscribeColorScheme(setColorSchemeState);
+  }, []);
+
+  useEffect(() => {
+    setProvenanceDisplay(readProvenanceDisplayEnabled());
+    return subscribeProvenanceDisplay(setProvenanceDisplay);
   }, []);
 
   return (
@@ -52,6 +64,19 @@ export function SettingsAppearancePanel() {
         }
         description="Choose the editor color mode."
         title="Color scheme"
+      />
+      <SettingsRow
+        control={
+          <Switch
+            aria-label="Show edit attribution"
+            checked={provenanceDisplay}
+            onCheckedChange={(checked) =>
+              writeProvenanceDisplayEnabled(checked === true)
+            }
+          />
+        }
+        description="Show who changed each word or overlay in the script, history, and b-roll list."
+        title="Show edit attribution"
       />
     </SettingsSection>
   );

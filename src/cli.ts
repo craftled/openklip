@@ -3,7 +3,6 @@ import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { z } from "zod";
 import { readActionLog } from "./action-log.ts";
-import { matchesAuthorFilter } from "./provenance.ts";
 import { summarize } from "./actions.ts";
 import { listAgentTasks } from "./agent-tasks.ts";
 import {
@@ -94,6 +93,7 @@ import {
   mutateProject,
   loadProject as storeLoadProject,
 } from "./projectStore.ts";
+import { matchesAuthorFilter } from "./provenance.ts";
 import { expandWordTokens } from "./query.ts";
 import { placeFromPhrase } from "./reanchor.ts";
 import {
@@ -2865,8 +2865,7 @@ try {
         break;
       }
       for (const t of filtered) {
-        const author =
-          t.authorId ?? (t.model ? `model ${t.model}` : undefined);
+        const author = t.authorId ?? (t.model ? `model ${t.model}` : undefined);
         console.log(
           `${t.id}  ${t.status.padEnd(10)}  ${new Date(t.startedAt).toISOString()}${author ? `  ${author}` : ""}  ${t.request.slice(0, 60)}`
         );

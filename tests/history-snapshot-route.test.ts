@@ -14,10 +14,7 @@ function ctx(slug: string) {
 
 function get(slug: string, revision: number) {
   const url = `http://localhost/api/projects/${slug}/history/snapshot?revision=${revision}`;
-  return GET(
-    new Request(url) as Parameters<typeof GET>[0],
-    ctx(slug)
-  );
+  return GET(new Request(url) as Parameters<typeof GET>[0], ctx(slug));
 }
 
 test("GET history snapshot returns words at the requested revision", async () => {
