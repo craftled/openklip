@@ -620,16 +620,7 @@ export function App({
     return subscribeDefaultAgent(setDefaultAgent);
   }, []);
   const toggleColorScheme = useCallback(() => {
-    const switchTheme = () => {
-      setColorScheme(colorScheme === "dark" ? "light" : "dark");
-    };
-
-    if (!document.startViewTransition) {
-      switchTheme();
-      return;
-    }
-
-    document.startViewTransition(switchTheme);
+    setColorScheme(colorScheme === "dark" ? "light" : "dark");
   }, [colorScheme]);
   const videoRef = useRef<HTMLVideoElement>(null);
   const brollRef = useRef<HTMLVideoElement>(null);

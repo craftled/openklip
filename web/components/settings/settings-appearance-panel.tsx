@@ -15,19 +15,6 @@ import {
 } from "@/lib/theme-preferences";
 import { firstToggleValue } from "@/lib/toggle-value";
 
-function setColorSchemeWithTransition(colorScheme: ColorScheme) {
-  const switchTheme = () => {
-    setColorScheme(colorScheme);
-  };
-
-  if (!document.startViewTransition) {
-    switchTheme();
-    return;
-  }
-
-  document.startViewTransition(switchTheme);
-}
-
 export function SettingsAppearancePanel() {
   const [colorScheme, setColorSchemeState] = useState<ColorScheme>("light");
 
@@ -48,7 +35,7 @@ export function SettingsAppearancePanel() {
             onValueChange={(value) => {
               const colorSchemeValue = firstToggleValue(value);
               if (colorSchemeValue) {
-                setColorSchemeWithTransition(colorSchemeValue as ColorScheme);
+                setColorScheme(colorSchemeValue as ColorScheme);
               }
             }}
             spacing={0}

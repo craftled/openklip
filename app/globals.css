@@ -6,8 +6,6 @@
 @custom-variant fine-hover (@media (hover: hover) and (pointer: fine));
 
 :root {
-  --theme-toggle-duration: 120ms;
-  --theme-toggle-ease: cubic-bezier(0.23, 1, 0.32, 1);
   --primary: oklch(0.205 0 0);
   --primary-foreground: oklch(0.985 0 0);
   --background: oklch(1 0 0);
@@ -40,49 +38,6 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
-}
-
-@layer base {
-  ::view-transition-group(root) {
-    animation-duration: var(--theme-toggle-duration);
-    animation-timing-function: var(--theme-toggle-ease);
-  }
-
-  ::view-transition-new(root) {
-    mask:
-      url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><circle cx="0" cy="0" r="20" fill="white"/></svg>')
-      top left / 0 no-repeat;
-    mask-origin: content-box;
-    transform-origin: top left;
-    animation: theme-toggle-reveal var(--theme-toggle-duration)
-      var(--theme-toggle-ease);
-    animation-fill-mode: both;
-  }
-
-  ::view-transition-old(root),
-  .dark::view-transition-old(root) {
-    z-index: -1;
-    animation: none;
-    animation-fill-mode: both;
-  }
-
-  @keyframes theme-toggle-reveal {
-    to {
-      mask-size: 140vmax;
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    ::view-transition-group(root),
-    ::view-transition-new(root),
-    ::view-transition-old(root) {
-      animation-duration: 1ms;
-    }
-
-    ::view-transition-new(root) {
-      mask: none;
-    }
-  }
 }
 
 .hero-bg-fade {
