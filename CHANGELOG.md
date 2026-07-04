@@ -1,11 +1,14 @@
 # Changelog
 
-## Unreleased
+## 0.39.0.0 - 2026-07-04
 
 ### Added
 - **Motion text pack** (`graphics/motion-typewriter`, `graphics/motion-blur-reveal`, `graphics/motion-shimmer`, `graphics/motion-glitch`, `graphics/motion-kinetic-build`, `graphics/motion-roll-number`, `graphics/motion-word-cascade`, `graphics/motion-highlight-pop`): eight new `kind: "rich"` graphic templates ported from the "Remocn" shadcn-style Remotion motion component registry concept, exposed through the existing `graphic-add`/`graphic-set` flow like any other rich template. They author against the shared runtime's `data-anim`/`data-split`/`data-stagger` attribute contract (`typewriter`, `blurReveal`, `shimmer`, `glitch`, `kineticBuild`, `rollNumber`, plus split/stagger on the existing `fade`/`slideUp` effects); `motion-word-cascade` is the minimal reference composition.
 - **Graphic template authoring contract** (`graphics/AUTHORING.md`): a new on-demand doc for agents adding `graphics/<id>/` templates: folder layout and discovery, the manifest schema, `kind: "rich"` vs `kind: "text"` guidance, the full `data-anim` attribute reference (existing and new effects), split/stagger semantics, param binding, frame-purity rules, and a test checklist. `AGENTS.md` now points at it from the Overlays commands section.
 - **Motion pack test coverage** (`tests/graphics.test.ts`, `tests/graphic-render.test.ts`): manifest/discovery assertions for all 8 new templates, plus a Chrome-absent rich-path planning test for `motion-typewriter`.
+
+### Changed
+- **Version**: bumped OpenKlip to `0.39.0.0`.
 
 ## 0.38.0.0 - 2026-07-04
 
