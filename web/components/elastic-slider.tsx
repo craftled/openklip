@@ -587,7 +587,7 @@ export function ElasticSlider({
 
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute top-1/2 left-3 inline-flex -translate-y-1/2 items-center font-medium text-(--elastic-slider-label) text-sm/none transition-colors"
+          className="pointer-events-none absolute top-1/2 left-3 inline-flex -translate-y-1/2 items-center font-medium text-(--elastic-slider-label) text-xs/none transition-colors"
           data-slot="elastic-slider-label"
           ref={labelRef}
         >
@@ -597,7 +597,7 @@ export function ElasticSlider({
         <span
           aria-hidden="true"
           className={cn(
-            "pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 font-medium font-mono text-(--elastic-slider-label) text-sm/none transition-colors",
+            "pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 font-medium font-mono text-(--elastic-slider-label) text-xs/none transition-colors",
             "group-data-[active=true]/elastic-slider:text-(--elastic-slider-focus)"
           )}
           data-slot="elastic-slider-value"
