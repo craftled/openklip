@@ -4,6 +4,7 @@ import { NEUTRAL_COLOR } from "@engine/color-adjust";
 import type { ColorAdjust, Filter } from "@engine/edl";
 import { FILTER_OPTIONS, filterLabel } from "@engine/filter";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { ElasticSlider } from "@/components/elastic-slider";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -16,7 +17,6 @@ import {
 } from "@/components/ui/dialog";
 import {
   Field,
-  FieldContent,
   FieldDescription,
   FieldGroup,
   FieldLabel,
@@ -29,7 +29,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Slider } from "@/components/ui/slider";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Palette, RotateCcw } from "@/lib/icon";
 
@@ -96,10 +95,6 @@ const KNOBS: KnobDef[] = [
     kind: "mult",
   },
 ];
-
-function firstSliderValue(value: number | readonly number[]): number {
-  return typeof value === "number" ? value : value[0];
-}
 
 function formatKnob(knob: KnobDef, value: number): string {
   if (knob.kind === "mult") {
@@ -323,30 +318,22 @@ export function FilterControls({
           </div>
 
           {/* Knobs */}
-          <FieldGroup className="min-w-0 gap-5">
+          <FieldGroup className="min-w-0 gap-4">
             {KNOBS.map((knob) => (
-              <Field className="gap-2" key={knob.key}>
-                <div className="grid grid-cols-[minmax(0,1fr)_4.75rem] items-start gap-3">
-                  <FieldContent>
-                    <FieldLabel>{knob.label}</FieldLabel>
-                    <FieldDescription className="truncate text-xs">
-                      {knob.hint}
-                    </FieldDescription>
-                  </FieldContent>
-                  <div className="text-right font-mono text-sm tabular-nums">
-                    {formatKnob(knob, live[knob.key])}
-                  </div>
-                </div>
-                <Slider
+              <Field className="gap-1.5" key={knob.key}>
+                <ElasticSlider
+                  formatValue={(value) => formatKnob(knob, value)}
+                  label={knob.label}
                   max={knob.max}
                   min={knob.min}
-                  onValueChange={(v) => onKnob(knob.key, firstSliderValue(v))}
-                  onValueCommitted={(v) =>
-                    commit(knob.key, firstSliderValue(v))
-                  }
+                  onValueChange={(value) => onKnob(knob.key, value)}
+                  onValueCommit={(value) => commit(knob.key, value)}
                   step={knob.step}
-                  value={[live[knob.key]]}
+                  value={live[knob.key]}
                 />
+                <FieldDescription className="truncate px-1 text-xs">
+                  {knob.hint}
+                </FieldDescription>
               </Field>
             ))}
           </FieldGroup>

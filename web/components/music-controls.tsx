@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { ElasticSlider } from "@/components/elastic-slider";
 import {
   CommitNumberInput,
-  firstSliderValue,
-  THIN_SLIDER,
+  formatDotDecimal,
 } from "@/components/slider-primitives";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
@@ -16,7 +16,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Slider } from "@/components/ui/slider";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Music, Trash2 } from "@/lib/icon";
 import { firstToggleValue } from "@/lib/toggle-value";
@@ -50,9 +49,8 @@ export interface MusicPlacementPatch {
   toSec?: number;
 }
 
-// One placement's editor. Slider drags update local state only and persist on
-// onValueCommitted (the filter-controls precedent at web/components/
-// filter-controls.tsx), so a drag is one save instead of dozens.
+// One placement's editor. Gain drags update local state only and persist on
+// release, so a drag is one save instead of dozens.
 function MusicPlacementRow({
   m,
   name,
@@ -79,27 +77,20 @@ function MusicPlacementRow({
           {fromSec.toFixed(1)}s–{toSec.toFixed(1)}s
         </span>
       </div>
-      <Field
-        className="grid h-7 grid-cols-[4.25rem_1fr_2.5rem] items-center gap-2.5"
+      <ElasticSlider
         data-music-gain
-      >
-        <FieldLabel className="text-muted-foreground text-xs">Gain</FieldLabel>
-        <Slider
-          className={THIN_SLIDER}
-          max={2}
-          min={0}
-          onValueChange={(value) => setGainDraft(firstSliderValue(value))}
-          onValueCommitted={(value) => {
-            setGainDraft(null);
-            onPatch(m.id, { gain: firstSliderValue(value) });
-          }}
-          step={0.05}
-          value={[gain]}
-        />
-        <span className="text-right text-xs tabular-nums">
-          {gain.toFixed(2)}
-        </span>
-      </Field>
+        formatValue={formatDotDecimal}
+        label="Gain"
+        max={2}
+        min={0}
+        onValueChange={setGainDraft}
+        onValueCommit={(value) => {
+          setGainDraft(null);
+          onPatch(m.id, { gain: value });
+        }}
+        step={0.05}
+        value={gain}
+      />
       <div className="grid grid-cols-2 gap-2">
         <Field>
           <FieldLabel className="text-muted-foreground text-xs">

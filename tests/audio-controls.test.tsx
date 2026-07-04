@@ -30,6 +30,18 @@ const noop = () => {
   // presentational test: callbacks are not exercised
 };
 
+function sliderTags(html: string): string[] {
+  return html.match(/<div[^>]*role="slider"[^>]*>/g) ?? [];
+}
+
+function sliderTag(html: string, label: string): string {
+  const tag = sliderTags(html).find((candidate) =>
+    candidate.includes(`aria-label="${label}"`)
+  );
+  assert.ok(tag, `expected slider for ${label}`);
+  return tag;
+}
+
 function render(
   overrides: Partial<ComponentProps<typeof AudioControls>> = {}
 ): string {
@@ -90,21 +102,22 @@ test("applying disables all toggles and numeric controls", () => {
     .split("<button")
     .filter((b) => b.includes('role="switch"') && !b.includes("disabled"));
   assert.equal(enabledSwitches.length, 0, "expected every switch disabled");
-  // Number inputs are disabled too.
-  const inputs = html.split("<input").slice(1);
-  const enabledInputs = inputs.filter(
-    (i) => i.includes('type="number"') && !i.includes("disabled")
+  // Enabled numeric groups render elastic sliders, and they are disabled too.
+  const sliders = sliderTags(html);
+  assert.equal(sliders.length, 5);
+  const enabledSliders = sliders.filter(
+    (slider) => !slider.includes('aria-disabled="true"')
   );
-  assert.equal(enabledInputs.length, 0, "expected every number input disabled");
+  assert.equal(enabledSliders.length, 0, "expected every slider disabled");
 });
 
 // C6: the UI max must match CutSnapSchema's 500ms bound, not stop at 300.
 test("max shift row allows the schema's full 500ms range", () => {
   const html = render({ snap: snap({ enabled: true }) });
-  assert.match(html, /max="500"/);
+  assert.match(sliderTag(html, "Max shift (ms)"), /aria-valuemax="500"/);
 });
 
-test("enabled groups render their commit-on-release sliders and number inputs", () => {
+test("enabled groups render their commit-on-release elastic sliders", () => {
   const html = render({
     audio: audio({
       ducking: { enabled: true, amountDb: 12, attackMs: 25, releaseMs: 250 },
@@ -113,18 +126,17 @@ test("enabled groups render their commit-on-release sliders and number inputs", 
     }),
     snap: snap({ enabled: true }),
   });
-  // Slider tracks for each numeric control (3 duck + 1 loudness + 1 highpass
-  // + 2 snap = 7) plus their paired number inputs.
-  const sliderCount = html.split('data-slot="slider"').length - 1;
-  assert.ok(
-    sliderCount >= 7,
-    `expected at least 7 sliders, saw ${sliderCount}`
-  );
-  assert.match(html, /value="12"/);
-  assert.match(html, /value="-16"/);
-  assert.match(html, /value="80"/);
-  assert.match(html, /value="120"/);
-  assert.match(html, /value="24"/);
+  // One slider per enabled numeric control: 3 duck + 1 loudness + 1 highpass
+  // + 2 snap.
+  const sliders = sliderTags(html);
+  assert.equal(sliders.length, 7);
+  assert.match(sliderTag(html, "Amount (dB)"), /aria-valuenow="12"/);
+  assert.match(sliderTag(html, "Attack (ms)"), /aria-valuenow="25"/);
+  assert.match(sliderTag(html, "Release (ms)"), /aria-valuenow="250"/);
+  assert.match(sliderTag(html, "Target (LUFS)"), /aria-valuenow="-16"/);
+  assert.match(sliderTag(html, "Cutoff (Hz)"), /aria-valuenow="80"/);
+  assert.match(sliderTag(html, "Max shift (ms)"), /aria-valuenow="120"/);
+  assert.match(sliderTag(html, "Crossfade (ms)"), /aria-valuenow="24"/);
 });
 
 test("de-essing group toggle and intensity slider render when enabled, with an honest caption", () => {
@@ -133,7 +145,7 @@ test("de-essing group toggle and intensity slider render when enabled, with an h
   });
   assert.match(html, /data-audio-deess/);
   assert.match(html, /De-essing/);
-  assert.match(html, /value="0.5"/);
+  assert.match(sliderTag(html, "Intensity"), /aria-valuenow="0.5"/);
   assert.match(html, /Tames harsh sibilants/);
 });
 

@@ -9,14 +9,9 @@ import type {
   SplitVertical,
 } from "@engine/edl";
 import { useState } from "react";
-import {
-  CommitNumberInput,
-  firstSliderValue,
-  THIN_SLIDER,
-} from "@/components/slider-primitives";
+import { ElasticSlider } from "@/components/elastic-slider";
+import { formatDotDecimal } from "@/components/slider-primitives";
 import { Button } from "@/components/ui/button";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { Slider } from "@/components/ui/slider";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { firstToggleValue } from "@/lib/toggle-value";
 
@@ -39,30 +34,20 @@ function ControlRow({
 }) {
   const [draft, setDraft] = useState<number | null>(null);
   return (
-    <Field className="grid h-7 grid-cols-[5.5rem_1fr_4rem] items-center gap-2.5">
-      <FieldLabel className="text-muted-foreground text-xs">{label}</FieldLabel>
-      <Slider
-        className={THIN_SLIDER}
-        disabled={disabled}
-        max={max}
-        min={min}
-        onValueChange={(v) => setDraft(firstSliderValue(v))}
-        onValueCommitted={(v) => {
-          setDraft(null);
-          onCommit(firstSliderValue(v));
-        }}
-        step={step}
-        value={[draft ?? value]}
-      />
-      <CommitNumberInput
-        disabled={disabled}
-        max={max}
-        min={min}
-        onCommit={onCommit}
-        step={step}
-        value={draft ?? value}
-      />
-    </Field>
+    <ElasticSlider
+      disabled={disabled}
+      formatValue={formatDotDecimal}
+      label={label}
+      max={max}
+      min={min}
+      onValueChange={setDraft}
+      onValueCommit={(nextValue) => {
+        setDraft(null);
+        onCommit(nextValue);
+      }}
+      step={step}
+      value={draft ?? value}
+    />
   );
 }
 

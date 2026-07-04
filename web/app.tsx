@@ -77,6 +77,7 @@ import {
 } from "@/components/edit-timeline";
 import { EditorSidebarShortcuts } from "@/components/editor-sidebar-shortcuts";
 import { EditorTranscriptPanel } from "@/components/editor-transcript-panel";
+import { ElasticSlider } from "@/components/elastic-slider";
 import {
   ExportDialog,
   type ExportDialogOptions,
@@ -135,7 +136,6 @@ import {
   SidebarProvider,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
 import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -352,9 +352,6 @@ const ZOOM_PRESETS: Record<string, { scale: number; rampSec: number }> = {
   Hold: { scale: 1.25, rampSec: 1.2 },
 };
 
-// Thin Paper-style slider: short track, small thumb, soft gray fill.
-const SLIDER =
-  "[&_[data-slot=slider-track]]:h-1 [&_[data-slot=slider-thumb]]:size-3 [&_[data-slot=slider-range]]:bg-foreground/35";
 const CONFIG_SIDEBAR_WIDTH = 288;
 const CHAT_WIDTH_WITH_CONFIG = 360;
 // F12: mirrors the dead-air-add action's server-side span cap (src/registry.ts).
@@ -390,10 +387,6 @@ function mergeAudioPatch(current: Audio | undefined, patch: AudioPatch): Audio {
       ? { ...base.deEsser, ...patch.deEsser }
       : base.deEsser,
   };
-}
-
-function firstSliderValue(value: number | readonly number[]): number {
-  return typeof value === "number" ? value : value[0];
 }
 
 // Kept-range math itself now lives in one place (src/edl.ts effectiveRanges),
@@ -2566,40 +2559,28 @@ export function App({
               {selZoom && (
                 <>
                   <Section defaultOpen title="Parameters">
-                    <PropRow
+                    <SliderRow
+                      formatValue={(value) => `${value.toFixed(2)}×`}
                       label="Scale"
-                      value={`${selZoom.scale.toFixed(2)}×`}
-                    >
-                      <Slider
-                        className={SLIDER}
-                        max={3}
-                        min={1}
-                        onValueChange={(value) =>
-                          updateZoom(selZoom.id, {
-                            scale: firstSliderValue(value),
-                          })
-                        }
-                        step={0.05}
-                        value={[selZoom.scale]}
-                      />
-                    </PropRow>
-                    <PropRow
+                      max={3}
+                      min={1}
+                      onValueChange={(value) =>
+                        updateZoom(selZoom.id, { scale: value })
+                      }
+                      step={0.05}
+                      value={selZoom.scale}
+                    />
+                    <SliderRow
+                      formatValue={(value) => `${value.toFixed(1)}s`}
                       label="Ramp"
-                      value={`${selZoom.rampSec.toFixed(1)}s`}
-                    >
-                      <Slider
-                        className={SLIDER}
-                        max={5}
-                        min={0}
-                        onValueChange={(value) =>
-                          updateZoom(selZoom.id, {
-                            rampSec: firstSliderValue(value),
-                          })
-                        }
-                        step={0.1}
-                        value={[selZoom.rampSec]}
-                      />
-                    </PropRow>
+                      max={5}
+                      min={0}
+                      onValueChange={(value) =>
+                        updateZoom(selZoom.id, { rampSec: value })
+                      }
+                      step={0.1}
+                      value={selZoom.rampSec}
+                    />
                   </Section>
                   <Section title="Preset">
                     <ToggleGroup
@@ -2825,23 +2806,17 @@ export function App({
                     </Select>
                   </Section>
                   <Section title="Ken Burns">
-                    <PropRow
+                    <SliderRow
+                      formatValue={(value) => `${value.toFixed(2)}×`}
                       label="Scale"
-                      value={`${selStill.scale.toFixed(2)}×`}
-                    >
-                      <Slider
-                        className={SLIDER}
-                        max={3}
-                        min={1}
-                        onValueChange={(value) =>
-                          updateStill(selStill.id, {
-                            scale: firstSliderValue(value),
-                          })
-                        }
-                        step={0.05}
-                        value={[selStill.scale]}
-                      />
-                    </PropRow>
+                      max={3}
+                      min={1}
+                      onValueChange={(value) =>
+                        updateStill(selStill.id, { scale: value })
+                      }
+                      step={0.05}
+                      value={selStill.scale}
+                    />
                   </Section>
                 </>
               )}
@@ -2891,12 +2866,6 @@ export function App({
                   ) : (
                     selGraphicKeyframes.map((kf, index) => {
                       const bounds = keyframeValueBounds(kf.property);
-                      const valueLabel =
-                        kf.property === "opacity"
-                          ? kf.value.toFixed(2)
-                          : kf.property === "scale"
-                            ? `${kf.value.toFixed(2)}×`
-                            : kf.value.toFixed(2);
                       return (
                         <div
                           className="space-y-2 rounded-md border border-border/60 bg-muted/30 p-2"
@@ -2927,26 +2896,27 @@ export function App({
                               <Trash2 className="size-3.5" />
                             </Button>
                           </div>
-                          <PropRow label="Value" value={valueLabel}>
-                            <Slider
-                              className={SLIDER}
-                              max={bounds.max}
-                              min={bounds.min}
-                              onValueChange={(value) =>
-                                updateGraphic(selGraphic.id, {
-                                  keyframes: updateKeyframeAt(
-                                    selGraphicKeyframes,
-                                    index,
-                                    {
-                                      value: firstSliderValue(value),
-                                    }
-                                  ),
-                                })
-                              }
-                              step={bounds.step}
-                              value={[kf.value]}
-                            />
-                          </PropRow>
+                          <SliderRow
+                            formatValue={(value) =>
+                              kf.property === "scale"
+                                ? `${value.toFixed(2)}×`
+                                : value.toFixed(2)
+                            }
+                            label="Value"
+                            max={bounds.max}
+                            min={bounds.min}
+                            onValueChange={(value) =>
+                              updateGraphic(selGraphic.id, {
+                                keyframes: updateKeyframeAt(
+                                  selGraphicKeyframes,
+                                  index,
+                                  { value }
+                                ),
+                              })
+                            }
+                            step={bounds.step}
+                            value={kf.value}
+                          />
                           <Field className="grid h-7 grid-cols-[4.25rem_1fr] items-center gap-2.5">
                             <FieldLabel className="text-muted-foreground text-xs">
                               Easing
@@ -3210,21 +3180,15 @@ export function App({
                 <ColorTempPad color={color} onColorChange={changeColor} />
               </Section>
               <Section title="Captions">
-                <PropRow
+                <SliderRow
+                  formatValue={(value) => String(Math.round(value))}
                   label="Per line"
-                  value={String(project.captions?.maxWords ?? 6)}
-                >
-                  <Slider
-                    className={SLIDER}
-                    max={12}
-                    min={1}
-                    onValueChange={(value) =>
-                      setMaxWords(firstSliderValue(value))
-                    }
-                    step={1}
-                    value={[project.captions?.maxWords ?? 6]}
-                  />
-                </PropRow>
+                  max={12}
+                  min={1}
+                  onValueChange={setMaxWords}
+                  step={1}
+                  value={project.captions?.maxWords ?? 6}
+                />
               </Section>
               <Section title="Caption style">
                 <CaptionStylePicker
@@ -3244,16 +3208,15 @@ export function App({
                 />
               </Section>
               <Section title="Timing">
-                <PropRow label="Pad" value={`${project.padMs ?? 50}ms`}>
-                  <Slider
-                    className={SLIDER}
-                    max={200}
-                    min={0}
-                    onValueChange={(value) => setPad(firstSliderValue(value))}
-                    step={5}
-                    value={[project.padMs ?? 50]}
-                  />
-                </PropRow>
+                <SliderRow
+                  formatValue={(value) => `${Math.round(value)}ms`}
+                  label="Pad"
+                  max={200}
+                  min={0}
+                  onValueChange={setPad}
+                  step={5}
+                  value={project.padMs ?? 50}
+                />
               </Section>
             </div>
           )}
@@ -4020,6 +3983,37 @@ function Section({
         </CollapsibleContent>
       </Collapsible>
     </SidebarGroup>
+  );
+}
+
+function SliderRow({
+  formatValue,
+  label,
+  max,
+  min,
+  onValueChange,
+  step,
+  value,
+}: {
+  formatValue?: (value: number) => string;
+  label: string;
+  max: number;
+  min: number;
+  onValueChange: (value: number) => void;
+  step: number;
+  value: number;
+}) {
+  return (
+    <ElasticSlider
+      className="w-full"
+      formatValue={formatValue}
+      label={label}
+      max={max}
+      min={min}
+      onValueChange={onValueChange}
+      step={step}
+      value={value}
+    />
   );
 }
 

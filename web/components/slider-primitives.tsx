@@ -3,17 +3,6 @@
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 
-// M6: shared by audio-controls.tsx and music-controls.tsx, which both hand-
-// duplicated these exact helpers/components. filter-controls.tsx and
-// app.tsx have their own independent copies of the same shapes (SLIDER,
-// firstSliderValue) and are intentionally left alone here - they predate this
-// extraction and aren't part of the audio/music config-panel family this
-// module serves.
-
-export function firstSliderValue(value: number | readonly number[]): number {
-  return typeof value === "number" ? value : value[0];
-}
-
 export function clampNumber(
   raw: string,
   min: number,
@@ -35,9 +24,6 @@ export function formatDotDecimal(value: number): string {
     useGrouping: false,
   });
 }
-
-export const THIN_SLIDER =
-  "[&_[data-slot=slider-track]]:h-1 [&_[data-slot=slider-thumb]]:size-3 [&_[data-slot=slider-range]]:bg-foreground/35";
 
 // Number input that keeps keystrokes local and persists only on blur or Enter
 // (the filter-controls onValueChange/onValueCommitted split, applied to typed
