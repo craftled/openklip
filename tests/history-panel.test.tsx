@@ -811,6 +811,7 @@ test("HistoryFilterControls renders an actor, action, and task filter control", 
   assert.match(html, /Filter by action/i);
   assert.match(html, /Filter by task/i);
   assert.match(html, /role="combobox"/);
+  assert.match(html, /data-slot="select-trigger"/);
   assert.match(html, /aria-label="Filter by task"/);
 });
 

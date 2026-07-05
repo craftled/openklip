@@ -9,6 +9,7 @@ import { authorDisplayLabel } from "@engine/provenance-display";
 import type { RevertTarget } from "@engine/revert";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { CONFIG_COMPACT_SELECT_TRIGGER_CLASS } from "@/components/config/config-section";
 import { HistoryTranscriptDiffToggle } from "@/components/history-transcript-diff";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
@@ -186,7 +187,7 @@ function FilterSelect({
       >
         <SelectTrigger
           aria-label={ariaLabel}
-          className="h-6 max-w-32 rounded-sm px-1 text-xs"
+          className={cn("w-full max-w-36", CONFIG_COMPACT_SELECT_TRIGGER_CLASS)}
           size="sm"
         >
           <SelectValue />

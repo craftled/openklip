@@ -23,27 +23,17 @@ import {
   effectiveRanges,
 } from "@engine/edl";
 import {
-  cropObjectPosition,
   exportAspectToOrientation,
   orientationToExportAspect,
   shouldApplyReframe,
 } from "@engine/export-aspect";
-import { FILTER_OPTIONS, filterLabel } from "@engine/filter";
 import type { Keyframe } from "@engine/keyframes";
 import { validateProductAnnouncementSpec } from "@engine/product-announcement";
-import {
-  authorDisplayLabel,
-  stampGuiWordProvenance,
-} from "@engine/provenance-display";
-import {
-  SAFE_AREA_PLATFORMS,
-  type SafeAreaPlatform,
-  safeAreaGuideLabel,
-} from "@engine/safe-areas";
+import { stampGuiWordProvenance } from "@engine/provenance-display";
+import type { SafeAreaPlatform } from "@engine/safe-areas";
 import { useRouter } from "next/navigation";
 import {
   type CSSProperties,
-  type MouseEvent,
   type ReactNode,
   useCallback,
   useEffect,
@@ -51,110 +41,47 @@ import {
   useRef,
   useState,
 } from "react";
-import { ActionStatusButton } from "@/components/action-status-button";
 import { AgentChatProvider } from "@/components/agent-chat-context";
-import { AgentChatPanel } from "@/components/agent-chat-panel";
 import { AgentSidebar } from "@/components/agent-sidebar";
 import { withAssetKind } from "@/components/asset-bin";
-import {
-  AudioControls,
-  type AudioMeasureView,
-  type AudioPatch,
-} from "@/components/audio-controls";
-import { BriefEditor } from "@/components/brief-editor";
-import { CaptionStylePicker } from "@/components/caption-style-picker";
+import type { AudioMeasureView, AudioPatch } from "@/components/audio-controls";
 import {
   CHAT_WIDTH_DEFAULT,
-  ChatResizeHandle,
   readStoredChatWidth,
 } from "@/components/chat-resize-handle";
 import { CinemaPlayer } from "@/components/cinema-player";
-import {
-  buildCleanupCandidates,
-  CleanupPanel,
-} from "@/components/cleanup-panel";
-import { ColorTempPad } from "@/components/color-temp-pad";
-import {
-  CutTransitionSweep,
-  type CutTransitionSweepHandle,
-} from "@/components/cut-transition-sweep";
-import {
-  EditTimeline,
-  type TimelineClipKind,
-  type TimelineTiming,
+import { buildCleanupCandidates } from "@/components/cleanup-panel";
+import { ConfigPanel } from "@/components/config/config-panel";
+import { ZOOM_PRESETS } from "@/components/config/config-section";
+import type {
+  TimelineClipKind,
+  TimelineTiming,
 } from "@/components/edit-timeline";
+import { EditorColumn } from "@/components/editor/editor-column";
+import { EditorRightRail } from "@/components/editor/editor-right-rail";
 import { EditorSidebarShortcuts } from "@/components/editor-sidebar-shortcuts";
-import { EditorTranscriptPanel } from "@/components/editor-transcript-panel";
-import { ElasticSlider } from "@/components/elastic-slider";
-import {
-  ExportDialog,
-  type ExportDialogOptions,
-} from "@/components/export-dialog";
-import { FilterControls } from "@/components/filter-controls";
-import { FindFillerButton } from "@/components/find-filler-button";
+import type { ExportDialogOptions } from "@/components/export-dialog";
 import type { GraphicItem } from "@/components/graphic-overlay";
 import {
   DEFAULT_GRAPHIC_SPAN_SEC,
-  GraphicSectionControls,
   type GraphicSpanMode,
   useGraphicTemplates,
 } from "@/components/graphic-picker-controls";
-import { HighlightsPanel } from "@/components/highlights-panel";
-import { HistoryPanel } from "@/components/history-panel";
 import {
   DEFAULT_MUSIC_BED_SEC,
   type MusicPlacementPatch,
   type MusicPlacementView,
-  MusicSectionControls,
 } from "@/components/music-controls";
-import { OverlaySortable } from "@/components/overlay-sortable";
-import { PLAYER_SPEEDS, PlayerControls } from "@/components/player-controls";
 import { PreviewOverlays } from "@/components/preview-overlays";
+import type { ExportPatch } from "@/components/reframe-controls";
+import { SidebarProvider, useSidebar } from "@/components/ui/sidebar";
+import { useEditorTimeline } from "@/hooks/use-editor-timeline";
+import { usePreviewPlayback } from "@/hooks/use-preview-playback";
+import { useProjectSaves } from "@/hooks/use-project-saves";
 import {
-  type ExportPatch,
-  ReframeControls,
-} from "@/components/reframe-controls";
-import { SafeAreaGuides } from "@/components/safe-area-guides";
-import { SettingsView } from "@/components/settings/settings-view";
-import { TakesPanel } from "@/components/takes-panel";
-import { TranscriptSearch } from "@/components/transcript-search";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import {
-  Drawer,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerTrigger,
-} from "@/components/ui/drawer";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarInset,
-  SidebarProvider,
-  useSidebar,
-} from "@/components/ui/sidebar";
-import { Textarea } from "@/components/ui/textarea";
-import { Toggle } from "@/components/ui/toggle";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { VerifyCutButton } from "@/components/verify-cut-button";
-import { useModShortcut } from "@/hooks/use-mod-shortcut";
+  type UseTranscriptSearchParams,
+  useTranscriptSearch,
+} from "@/hooks/use-transcript-search";
 import {
   type AgentModelId,
   DEFAULT_AGENT_MODEL,
@@ -165,68 +92,27 @@ import {
 import {
   toastError,
   toastInfo,
-  toastNothingToPlay,
-  toastPlaybackFailed,
   toastPromise,
-  toastSaveError,
   toastSuccess,
   toastTransitionFallback,
 } from "@/lib/app-toast";
 import type { AssetBinUpdate } from "@/lib/asset-bin-update";
+import { buildConfigInspectorSummary } from "@/lib/config-inspector";
+import { shouldAutoOpenConfig } from "@/lib/config-panel-behavior";
+import type { ConfigTabId } from "@/lib/config-tabs";
 import { type DeadAirItem, reconcileDeadAirItems } from "@/lib/dead-air-state";
 import { resolveExportMaxHeight } from "@/lib/export-max-height";
-import {
-  APP_ICON_CLASS,
-  Captions,
-  ChevronRight,
-  Clock3,
-  Download,
-  Film,
-  ImageIcon,
-  MessageSquare,
-  Moon,
-  PanelLeft,
-  PanelRight,
-  Plus,
-  Scan,
-  Sparkles,
-  Sun,
-  Trash2,
-  Type,
-  Volume2,
-  ZoomIn,
-} from "@/lib/icon";
-import { isModKeyOnly, isTypingTarget } from "@/lib/keyboard-shortcuts";
-import {
-  addKeyframe,
-  clampKeyframeSampleOffset,
-  defaultKeyframeValue,
-  formatKeyframeProperty,
-  KEYFRAME_EASINGS,
-  KEYFRAME_PROPERTIES,
-  keyframeValueBounds,
-  playheadOffsetInClip,
-  removeKeyframeAt,
-  updateKeyframeAt,
-} from "@/lib/keyframe-ui";
-import { musicPreviewTime } from "@/lib/music-preview";
-import {
-  type PhraseSearchMatch,
-  type PhraseSearchMode,
-  phraseSearchMatches,
-} from "@/lib/phrase-search";
-import {
-  clampLoopRegion,
-  ORIENTATION_LABEL,
-  ORIENTATION_RATIO,
-  type Orientation,
-} from "@/lib/preview-layout";
+import { formatEditorTime } from "@/lib/format-time";
+import { playheadOffsetInClip } from "@/lib/keyframe-ui";
+import type { Orientation } from "@/lib/preview-layout";
 import { buildProjectHoverContext } from "@/lib/project-context";
 import type { ProjectListing } from "@/lib/project-list";
 import {
   readProvenanceDisplayEnabled,
   subscribeProvenanceDisplay,
 } from "@/lib/provenance-preferences";
+import { reanchoredWordUpdate } from "@/lib/reanchored-word-update";
+import { visibleChatWidth } from "@/lib/right-rail-layout";
 import {
   getSafeAreaGuidePlatform,
   setSafeAreaGuidePlatform,
@@ -240,13 +126,10 @@ import {
   subscribeColorScheme,
 } from "@/lib/theme-preferences";
 import { exportPromiseMessages } from "@/lib/toast-notifications";
-import { firstToggleValue } from "@/lib/toggle-value";
 import {
   reconcileTranscriptText,
   setWordRangeDeleted,
 } from "@/lib/transcript-edit";
-import { cn } from "@/lib/utils";
-import type { ActionResult } from "../app/actions.ts";
 import {
   exportProject,
   runGuiAction,
@@ -261,13 +144,7 @@ import {
   saveZooms,
 } from "../app/actions.ts";
 import { type CaptionWord, groupCaptions } from "../src/captions.ts";
-import { reanchorProject } from "../src/reanchor.ts";
-import {
-  outputPositionSec,
-  sourceSecForOutputPosition,
-} from "../src/schedulerLogic.ts";
-import { type ZoomWindow, zoomFactorAtSec } from "../src/zoom-ramp.ts";
-import { CutScheduler } from "./scheduler.ts";
+import { sourceSecForOutputPosition } from "../src/schedulerLogic.ts";
 
 interface Word {
   deleted: boolean;
@@ -369,20 +246,6 @@ interface Project {
 
 type Selected = { kind: TimelineClipKind; id: string } | null;
 
-const ZOOM_PRESETS: Record<string, { scale: number; rampSec: number }> = {
-  Subtle: { scale: 1.15, rampSec: 0.6 },
-  Punch: { scale: 1.4, rampSec: 0.35 },
-  Hold: { scale: 1.25, rampSec: 1.2 },
-};
-
-const CONFIG_SIDEBAR_WIDTH = 288;
-const CHAT_WIDTH_WITH_CONFIG = 360;
-const CONFIG_COMPACT_INPUT_CLASS =
-  "h-7! rounded-md! px-2! py-1! text-[0.8rem]!";
-const CONFIG_COMPACT_SELECT_TRIGGER_CLASS =
-  "h-7! rounded-md! px-2! py-0! text-[0.8rem]!";
-const CONFIG_COMPACT_TEXTAREA_CLASS =
-  "min-h-20! rounded-md! px-2! py-1.5! text-[0.8rem]!";
 // F12: mirrors the dead-air-add action's server-side span cap (src/registry.ts).
 const DEAD_AIR_ADD_BATCH_SIZE = 50;
 
@@ -427,43 +290,6 @@ function mergeAudioPatch(current: Audio | undefined, patch: AudioPatch): Audio {
 // shared with CinemaPlayer so the inline preview and the fullscreen player
 // cannot drift on what "current time" means.
 
-const fmt = (s: number): string =>
-  `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
-
-// reanchorOverlay mutates overlays and their anchors in place, so every overlay
-// list is cloned before the optimistic client-side reanchor below: React state
-// must never alias objects that are about to be mutated.
-function cloneAnchoredOverlays<T extends object>(list: readonly T[]): T[] {
-  return list.map((item) => {
-    const anchor = (item as { anchor?: { phrase: string } }).anchor;
-    return anchor ? { ...item, anchor: { ...anchor } } : { ...item };
-  });
-}
-
-// Optimistic mirror of the server-side cut/cut-text registry actions: flip
-// `deleted` on the affected words, then re-resolve phrase-anchored overlays
-// with the SAME engine reanchorProject the registry runs, so the preview and
-// the saved project agree before the save round-trip lands.
-function reanchoredWordUpdate(
-  prev: Project,
-  ids: ReadonlySet<string>,
-  deleted: boolean
-): Project {
-  const next: Project = {
-    ...prev,
-    words: prev.words.map((w) => (ids.has(w.id) ? { ...w, deleted } : w)),
-    broll: cloneAnchoredOverlays(prev.broll),
-    titles: cloneAnchoredOverlays(prev.titles),
-    zooms: cloneAnchoredOverlays(prev.zooms),
-    stills: prev.stills ? cloneAnchoredOverlays(prev.stills) : prev.stills,
-    graphics: prev.graphics
-      ? cloneAnchoredOverlays(prev.graphics)
-      : prev.graphics,
-  };
-  reanchorProject(next as unknown as EngineProject);
-  return next;
-}
-
 import type { EditorChatsSnapshot } from "../app/lib/editor-chats.ts";
 
 export function App({
@@ -478,9 +304,15 @@ export function App({
   visionFocusAvailable?: boolean;
 }) {
   const router = useRouter();
+  const {
+    enqueueSave,
+    pendingSaves,
+    saveChainRef,
+    saveError,
+    saveErrorRef,
+    setSaveError,
+  } = useProjectSaves();
   const [project, setProject] = useState<Project>(initialProject);
-  const [playing, setPlaying] = useState(false);
-  const [curSample, setCurSample] = useState(0);
   const [newKeyframeProperty, setNewKeyframeProperty] =
     useState<Keyframe["property"]>("opacity");
   const [captionsOn, setCaptionsOn] = useState(
@@ -505,6 +337,7 @@ export function App({
   const [defaultAgent, setDefaultAgent] =
     useState<AgentModelId>(DEFAULT_AGENT_MODEL);
   const [configOpen, setConfigOpen] = useState(false);
+  const [configTab, setConfigTab] = useState<ConfigTabId>("look");
   const [mobileRightPanel, setMobileRightPanel] = useState<
     "chat" | "config" | null
   >(null);
@@ -514,6 +347,7 @@ export function App({
   const focusWordInHistory = useCallback((revisionAfter: number) => {
     setConfigOpen(true);
     setMobileRightPanel("config");
+    setConfigTab("history");
     setHistoryFocusRevision(revisionAfter);
   }, []);
   // Chat sidebar width (px), drag-adjustable. Default on server; the stored
@@ -522,26 +356,11 @@ export function App({
   useEffect(() => {
     setChatWidth(readStoredChatWidth());
   }, []);
-  const visibleChatWidth = configOpen
-    ? Math.min(chatWidth, CHAT_WIDTH_WITH_CONFIG)
-    : chatWidth;
-  const [timelineOpen, setTimelineOpen] = useState(false);
+  const resolvedChatWidth = visibleChatWidth(chatWidth, configOpen);
   const [cinema, setCinema] = useState(false);
-  const [previewMuted, setPreviewMuted] = useState(false);
-  const [musicMuted, setMusicMuted] = useState(false);
-  const [previewRate, setPreviewRate] = useState(1);
-  const [previewPip, setPreviewPip] = useState(false);
   const [selAnchor, setSelAnchor] = useState<number | null>(null);
   const [selFocus, setSelFocus] = useState<number | null>(null);
   const [selected, setSelected] = useState<Selected>(null);
-  // Transcript phrase search (Milestone 3.1): query, kept/cut scope, optional
-  // cut rationale, and which match is active (seek target / highlight).
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchMode, setSearchMode] = useState<PhraseSearchMode>("kept");
-  const [searchNote, setSearchNote] = useState("");
-  const [activeMatchIndex, setActiveMatchIndex] = useState<number | null>(null);
-  const transcriptSearchInputRef = useRef<HTMLInputElement>(null);
-  const searchShortcutLabel = useModShortcut("f");
   const [chosenAsset, setChosenAsset] = useState(
     initialProject.assets?.find((a) => (a.kind ?? "broll") === "broll")?.id ??
       ""
@@ -651,18 +470,6 @@ export function App({
     setSafeAreaGuide(platform);
     setSafeAreaGuidePlatform(platform);
   }, []);
-  // In/out work area: when set, playback loops within [inSec, outSec] (source
-  // time) so a single b-roll span or transition can be tightened on repeat.
-  const [loop, setLoop] = useState<{ inSec: number; outSec: number } | null>(
-    null
-  );
-  const [loopInPending, setLoopInPending] = useState<number | null>(null);
-  const loopRef = useRef<{ inSec: number; outSec: number } | null>(null);
-  useEffect(() => {
-    loopRef.current = loop;
-  }, [loop]);
-  const [pendingSaves, setPendingSaves] = useState(0);
-  const [saveError, setSaveError] = useState<string | null>(null);
   const [colorScheme, setColorSchemeState] = useState<ColorScheme>("light");
   const [provenanceDisplay, setProvenanceDisplay] = useState(false);
   useEffect(() => {
@@ -684,14 +491,7 @@ export function App({
   const toggleColorScheme = useCallback(() => {
     setColorScheme(colorScheme === "dark" ? "light" : "dark");
   }, [colorScheme]);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const brollRef = useRef<HTMLVideoElement>(null);
-  const musicRef = useRef<HTMLAudioElement>(null);
-  const schedRef = useRef<CutScheduler | null>(null);
-  const sweepRef = useRef<CutTransitionSweepHandle>(null);
   const projectRef = useRef<Project | null>(null);
-  const saveChainRef = useRef<Promise<void>>(Promise.resolve());
-  const saveErrorRef = useRef<string | null>(null);
   projectRef.current = project;
 
   // F5: ranges feeds both the render path below and the CutScheduler's 60Hz
@@ -710,36 +510,50 @@ export function App({
         : [],
     [project]
   );
-  const rangesRef = useRef(ranges);
-  rangesRef.current = ranges;
 
-  useEffect(() => {
-    if (!(videoRef.current && project) || schedRef.current) {
-      return;
-    }
-    const sched = new CutScheduler(
-      videoRef.current,
-      () => rangesRef.current,
-      () =>
-        projectRef.current?.look?.transition ?? {
-          type: "none",
-          durationMs: 500,
-        }
-    );
-    sched.onTick = (sourceSec) => {
-      const lr = loopRef.current;
-      if (lr && videoRef.current && sourceSec >= lr.outSec - 0.03) {
-        videoRef.current.currentTime = lr.inSec;
-        setCurSample(Math.round(lr.inSec * project.sampleRate));
-        return;
-      }
-      setCurSample(Math.round(sourceSec * project.sampleRate));
-    };
-    sched.onEnd = () => setPlaying(false);
-    sched.onCutBoundary = (transition) => sweepRef.current?.play(transition);
-    schedRef.current = sched;
-  }, [project]);
+  const playback = usePreviewPlayback({
+    assets: project.assets,
+    broll: project.broll ?? [],
+    cinema,
+    mediaVersion: project.mediaVersion,
+    music: project.music,
+    project: project as unknown as EngineProject,
+    ranges,
+    sampleRate: project.sampleRate,
+    zooms: project.zooms ?? [],
+  });
+  const {
+    activeCoverBroll,
+    activePipBroll,
+    activeSplitBroll,
+    brollRef,
+    curSample,
+    curSec,
+    cyclePreviewRate,
+    keptDuration,
+    loop,
+    musicMuted,
+    musicRef,
+    onPlay,
+    onPreviewClick,
+    onSeek,
+    onTimelineSelect: seekTimelineClip,
+    outPos,
+    playing,
+    previewMuted,
+    previewPip,
+    previewRate,
+    rangesRef,
+    setLoop,
+    sweepRef,
+    toggleMusicMute,
+    togglePreviewMute,
+    togglePreviewPip,
+    videoRef,
+    zoomScale,
+  } = playback;
 
+  const sr = project.sampleRate;
   const projectHover = useMemo(
     () => buildProjectHoverContext(project, project.dirPath),
     [project]
@@ -765,18 +579,7 @@ export function App({
     },
     [chosenAsset, chosenMusicAsset]
   );
-  const keptDuration = ranges.reduce((a, r) => a + (r.endSec - r.startSec), 0);
-  const sr = project?.sampleRate ?? 48_000;
-  const curSec = curSample / sr;
-  const outPos = useMemo(
-    () => outputPositionSec(ranges, curSec),
-    [ranges, curSec]
-  );
-
   const captionGroups = useMemo(() => {
-    if (!project) {
-      return [];
-    }
     const kept: CaptionWord[] = project.words
       .filter((w) => !w.deleted)
       .map((w) => ({
@@ -786,58 +589,20 @@ export function App({
       }));
     return groupCaptions(kept, project.captions?.maxWords ?? 6);
   }, [project, sr]);
-  const activeBroll = project?.broll?.find(
-    (b) => curSample >= b.startSample && curSample < b.endSample
-  );
-  const activeBrollDisplay = activeBroll?.display ?? "cover";
-  const activeCoverBroll =
-    activeBroll && activeBrollDisplay === "cover" ? activeBroll : undefined;
-  const activePipBroll =
-    activeBroll && activeBrollDisplay === "pip" ? activeBroll : undefined;
-  const activeSplitBroll =
-    activeBroll && activeBrollDisplay === "split" ? activeBroll : undefined;
-  const zoomWindows = useMemo<ZoomWindow[]>(
-    () =>
-      project
-        ? (project.zooms ?? [])
-            .map((z) => ({
-              endSec: outputPositionSec(ranges, z.endSample / sr),
-              rampSec: z.rampSec,
-              scale: z.scale,
-              startSec: outputPositionSec(ranges, z.startSample / sr),
-            }))
-            .filter((z) => z.endSec - z.startSec > 0.05)
-        : [],
-    [project, ranges, sr]
-  );
-  const zoomScale = activeCoverBroll ? 1 : zoomFactorAtSec(outPos, zoomWindows);
   const assetName = (id: string) =>
-    project?.assets.find((a) => a.id === id)?.name ?? id;
+    project.assets.find((a) => a.id === id)?.name ?? id;
   const brollAssets = useMemo(
-    () => project?.assets.filter((a) => (a.kind ?? "broll") === "broll") ?? [],
-    [project?.assets]
+    () => project.assets.filter((a) => (a.kind ?? "broll") === "broll"),
+    [project.assets]
   );
   const stillAssets = useMemo(
-    () => project?.assets.filter((a) => a.kind === "still") ?? [],
-    [project?.assets]
+    () => project.assets.filter((a) => a.kind === "still"),
+    [project.assets]
   );
   const musicAssets = useMemo(
-    () => project?.assets.filter((a) => a.kind === "music") ?? [],
-    [project?.assets]
+    () => project.assets.filter((a) => a.kind === "music"),
+    [project.assets]
   );
-  const activeMusic = project?.music?.find(
-    (m) => curSample >= m.startSample && curSample < m.endSample
-  );
-  // Filler + dead-air candidates for the Cleanup config section. Degrades to
-  // filler-only (with a warning) until project.silences is populated by the
-  // editor-page-data change that loads audio analysis for this page. Cast
-  // like reanchorProject above: this file's local Project is a narrower UI
-  // shape than the engine's, missing fields (version, proxy, ...) the pure
-  // engine helpers don't read. F6: deps are narrowed to what
-  // buildCleanupCandidates/cleanupReport actually read (words, cuts,
-  // silences, and the overlay arrays it checks for proximity warnings) so an
-  // unrelated project.json field (look, motion, assets, ...) doesn't force a
-  // recompute on every edit.
   const cleanupReportView = useMemo(
     () =>
       buildCleanupCandidates(
@@ -856,138 +621,6 @@ export function App({
       project.graphics,
     ]
   );
-
-  useEffect(() => {
-    const v = brollRef.current;
-    if (!v) {
-      return;
-    }
-    const brollForPreview =
-      activeCoverBroll ?? activePipBroll ?? activeSplitBroll;
-    if (!brollForPreview) {
-      if (!v.paused) {
-        v.pause();
-      }
-      return;
-    }
-    const url = `/media/asset/${brollForPreview.assetId}?v=${projectRef.current?.mediaVersion ?? 0}`;
-    if (v.getAttribute("src") !== url) {
-      v.src = url;
-    }
-    const want =
-      brollForPreview.srcInSample / sr +
-      (curSample - brollForPreview.startSample) / sr;
-    if (Number.isFinite(want) && Math.abs(v.currentTime - want) > 0.25) {
-      v.currentTime = Math.max(0, want);
-    }
-    if (playing && v.paused) {
-      void v.play().catch(() => {
-        // Playback can be rejected when the browser blocks autoplay.
-      });
-    }
-    if (!(playing || v.paused)) {
-      v.pause();
-    }
-  }, [
-    activeCoverBroll,
-    activePipBroll,
-    activeSplitBroll,
-    curSample,
-    playing,
-    sr,
-  ]);
-
-  // Music bed under the voice (brollRef sibling pattern): a hidden <audio>
-  // follows the active placement. Its desired position is CONTINUOUS on the
-  // output timeline (cuts collapse; the bed never restarts), matching the
-  // exporter's one-window-per-placement semantics. Preview fades are skipped;
-  // the export is the source of truth for fades.
-  useEffect(() => {
-    const el = musicRef.current;
-    if (!el) {
-      return;
-    }
-    if (!activeMusic) {
-      if (!el.paused) {
-        el.pause();
-      }
-      return;
-    }
-    const url = `/media/asset/${activeMusic.assetId}?v=${projectRef.current?.mediaVersion ?? 0}`;
-    if (el.getAttribute("src") !== url) {
-      el.src = url;
-    }
-    const asset = projectRef.current?.assets.find(
-      (a) => a.id === activeMusic.assetId
-    );
-    const want = musicPreviewTime({
-      assetDurationSec: (asset?.durationSamples ?? 0) / sr,
-      curSec: curSample / sr,
-      placement: {
-        mode: activeMusic.mode,
-        srcInSec: activeMusic.srcInSample / sr,
-        startSec: activeMusic.startSample / sr,
-      },
-      ranges,
-    });
-    if (Number.isFinite(want) && Math.abs(el.currentTime - want) > 0.25) {
-      el.currentTime = want;
-    }
-    // Match the video element's rate; a slower/faster bed would drift past the
-    // 0.25s reseek guard several times a second and stutter with seeks.
-    if (el.playbackRate !== previewRate) {
-      el.playbackRate = previewRate;
-    }
-    // The master mute silences the whole preview, music bed included; the
-    // music-only toggle just drops the bed.
-    el.volume = musicMuted || previewMuted ? 0 : Math.min(1, activeMusic.gain);
-    if (playing && el.paused) {
-      void el.play().catch(() => {
-        // Playback can be rejected when the browser blocks autoplay.
-      });
-    }
-    if (!(playing || el.paused)) {
-      el.pause();
-    }
-  }, [
-    activeMusic,
-    curSample,
-    musicMuted,
-    playing,
-    previewMuted,
-    previewRate,
-    ranges,
-    sr,
-  ]);
-
-  const enqueueSave = useCallback((task: () => Promise<ActionResult>) => {
-    const run = saveChainRef.current
-      .catch(() => {
-        // Keep later saves moving after one failed request.
-      })
-      .then(async () => {
-        setPendingSaves((n) => n + 1);
-        setSaveError(null);
-        saveErrorRef.current = null;
-        try {
-          const data = await task();
-          if (!data.ok) {
-            throw new Error(data.error ?? "save failed");
-          }
-        } catch (e) {
-          const message = (e as Error).message;
-          saveErrorRef.current = message;
-          setSaveError(message);
-          toastSaveError(message);
-          throw e;
-        } finally {
-          setPendingSaves((n) => Math.max(0, n - 1));
-        }
-      });
-    saveChainRef.current = run.catch(() => {
-      // The visible error state above is the user-facing failure path.
-    });
-  }, []);
 
   const toggleWord = useCallback(
     (id: string) => {
@@ -1102,6 +735,21 @@ export function App({
     },
     [selRange, setTranscriptRangeDeleted]
   );
+
+  const {
+    activeSearchIndex,
+    activeSearchRange,
+    searchField,
+    searchMatchRanges,
+  } = useTranscriptSearch({
+    enqueueSave,
+    onSeek,
+    selectTranscriptRange,
+    setProject:
+      setProject as unknown as UseTranscriptSearchParams["setProject"],
+    slug: project.slug,
+    words: project.words,
+  });
 
   const addZoom = () => {
     if (!selRange) {
@@ -1474,8 +1122,13 @@ export function App({
   // music-add precedent).
   const applyCleanupCandidate = (candidate: CleanupCandidate) => {
     if (candidate.kind === "filler") {
-      setProject((prev) =>
-        reanchoredWordUpdate(prev, new Set(candidate.wordIds), true)
+      setProject(
+        (prev) =>
+          reanchoredWordUpdate(
+            prev as unknown as EngineProject,
+            new Set(candidate.wordIds),
+            true
+          ) as unknown as Project
       );
       enqueueSave(() =>
         runGuiAction(project.slug, "cut", {
@@ -1537,8 +1190,13 @@ export function App({
       return;
     }
     if (fillerIds.length > 0) {
-      setProject((prev) =>
-        reanchoredWordUpdate(prev, new Set(fillerIds), true)
+      setProject(
+        (prev) =>
+          reanchoredWordUpdate(
+            prev as unknown as EngineProject,
+            new Set(fillerIds),
+            true
+          ) as unknown as Project
       );
       enqueueSave(() =>
         runGuiAction(project.slug, "cut", {
@@ -1984,270 +1642,15 @@ export function App({
     enqueueSave(() => saveProjectEdits(project.slug, { padMs: n }));
   };
 
-  const onPlay = useCallback(async () => {
-    const s = schedRef.current;
-    if (!s) {
-      return;
-    }
-    if (playing) {
-      s.pause();
-      setPlaying(false);
-    } else {
-      try {
-        const didStart = await s.play();
-        setPlaying(didStart);
-        if (!didStart) {
-          toastNothingToPlay();
-        }
-      } catch (e) {
-        setPlaying(false);
-        toastPlaybackFailed((e as Error).message);
-      }
-    }
-  }, [playing]);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (cinema || (e.key !== " " && e.key !== "Spacebar")) {
-        return;
-      }
-      const el = e.target as HTMLElement | null;
-      if (!el) {
-        return;
-      }
-      const tag = el.tagName;
-      if (
-        tag === "INPUT" ||
-        tag === "TEXTAREA" ||
-        tag === "SELECT" ||
-        el.isContentEditable
-      ) {
-        return;
-      }
-      e.preventDefault();
-      void onPlay();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [cinema, onPlay]);
-
-  const onPreviewClick = useCallback(
-    (e: MouseEvent<HTMLDivElement>) => {
-      if ((e.target as HTMLElement).closest("[data-preview-chrome]")) {
-        return;
-      }
-      void onPlay();
+  const onTimelineSelect = useCallback(
+    (kind: TimelineClipKind, id: string) => {
+      setSelAnchor(null);
+      setSelFocus(null);
+      setSelected({ kind, id });
+      seekTimelineClip(kind, id);
     },
-    [onPlay]
+    [seekTimelineClip]
   );
-
-  const onSeek = useCallback(
-    (sourceSec: number) => {
-      schedRef.current?.seek(sourceSec);
-      setCurSample(
-        Math.round(sourceSec * (projectRef.current?.sampleRate ?? 48_000))
-      );
-      if (playing) {
-        schedRef.current?.pause();
-        setPlaying(false);
-      }
-    },
-    [playing]
-  );
-
-  // ── Transcript phrase search + batch cuts (Milestone 3.1). Matching runs
-  // through the SAME engine phrase matcher the CLI uses (phraseSearchMatches
-  // wraps findPhraseRuns), so UI spans are identical to `openklip cut --text`.
-  const searchMatches = useMemo(
-    () =>
-      phraseSearchMatches({ words: project.words }, searchQuery, {
-        mode: searchMode,
-      }),
-    [project.words, searchQuery, searchMode]
-  );
-  const activeSearchIndex =
-    activeMatchIndex != null && activeMatchIndex < searchMatches.length
-      ? activeMatchIndex
-      : null;
-  const activeSearchRange =
-    activeSearchIndex == null ? null : searchMatches[activeSearchIndex].range;
-  const searchMatchRanges = useMemo(
-    () => searchMatches.map((m) => m.range),
-    [searchMatches]
-  );
-  const changeSearchQuery = useCallback((query: string) => {
-    setSearchQuery(query);
-    setActiveMatchIndex(null);
-  }, []);
-  const changeSearchMode = useCallback((mode: PhraseSearchMode) => {
-    setSearchMode(mode);
-    setActiveMatchIndex(null);
-  }, []);
-  const clearTranscriptSearch = useCallback(() => {
-    setSearchQuery("");
-    setActiveMatchIndex(null);
-  }, []);
-  const seekSearchMatch = useCallback(
-    (match: PhraseSearchMatch, index: number) => {
-      setActiveMatchIndex(index);
-      onSeek(match.fromSec);
-    },
-    [onSeek]
-  );
-  const seekNextSearchMatch = useCallback(() => {
-    if (searchMatches.length === 0) {
-      return;
-    }
-    const next =
-      activeSearchIndex == null
-        ? 0
-        : (activeSearchIndex + 1) % searchMatches.length;
-    setActiveMatchIndex(next);
-    onSeek(searchMatches[next].fromSec);
-  }, [activeSearchIndex, onSeek, searchMatches]);
-  const selectSearchMatch = useCallback(
-    (match: PhraseSearchMatch, index: number) => {
-      setActiveMatchIndex(index);
-      selectTranscriptRange(match.range);
-    },
-    [selectTranscriptRange]
-  );
-  // Cut the first (or every) matched run: optimistic word deletion + reanchor,
-  // then persist the EXACT ids through the registry cut action (history logs
-  // it). Persisting the phrase (cut-text) instead would let the server
-  // re-resolve matches at save time and cut a different occurrence than the
-  // one shown optimistically, e.g. on a double-clicked "Cut first" or after
-  // an external agent edit; explicit ids keep the UI and project.json in
-  // lockstep, matching how restore already works.
-  const cutSearchMatches = useCallback(
-    (all: boolean) => {
-      const phrase = searchQuery.trim();
-      const targets = all ? searchMatches : searchMatches.slice(0, 1);
-      if (!phrase || targets.length === 0) {
-        return;
-      }
-      const ids = targets.flatMap((m) => m.ids);
-      const note = searchNote.trim();
-      setProject((prev) => reanchoredWordUpdate(prev, new Set(ids), true));
-      setActiveMatchIndex(null);
-      enqueueSave(() =>
-        runGuiAction(project.slug, "cut", {
-          ids,
-          deleted: true,
-          note: note === "" ? undefined : note,
-        })
-      );
-    },
-    [enqueueSave, project.slug, searchMatches, searchNote, searchQuery]
-  );
-  // Restore matched runs found among cut words (cut-mode search).
-  const restoreSearchMatches = useCallback(
-    (all: boolean) => {
-      const targets = all ? searchMatches : searchMatches.slice(0, 1);
-      const ids = targets.flatMap((m) => m.ids);
-      if (ids.length === 0) {
-        return;
-      }
-      setProject((prev) => reanchoredWordUpdate(prev, new Set(ids), false));
-      setActiveMatchIndex(null);
-      enqueueSave(() =>
-        runGuiAction(project.slug, "cut", { ids, deleted: false })
-      );
-    },
-    [enqueueSave, project.slug, searchMatches]
-  );
-  // Mod+F focuses the transcript search input (skipped while typing elsewhere).
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (!isModKeyOnly(event) || event.key.toLowerCase() !== "f") {
-        return;
-      }
-      if (isTypingTarget(event.target)) {
-        return;
-      }
-      event.preventDefault();
-      transcriptSearchInputRef.current?.focus();
-      transcriptSearchInputRef.current?.select();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
-
-  const togglePreviewMute = useCallback(() => {
-    const v = videoRef.current;
-    if (!v) {
-      return;
-    }
-    v.muted = !v.muted;
-    setPreviewMuted(v.muted);
-  }, []);
-
-  const toggleMusicMute = useCallback(() => {
-    setMusicMuted((muted) => !muted);
-  }, []);
-
-  const cyclePreviewRate = useCallback(() => {
-    setPreviewRate((cur) => {
-      const i = PLAYER_SPEEDS.indexOf(cur as (typeof PLAYER_SPEEDS)[number]);
-      const next = PLAYER_SPEEDS[(i + 1) % PLAYER_SPEEDS.length];
-      if (videoRef.current) {
-        videoRef.current.playbackRate = next;
-      }
-      return next;
-    });
-  }, []);
-
-  const togglePreviewPip = useCallback(async () => {
-    const v = videoRef.current;
-    if (!v) {
-      return;
-    }
-    try {
-      if (document.pictureInPictureElement) {
-        await document.exitPictureInPicture();
-      } else if (document.pictureInPictureEnabled) {
-        await v.requestPictureInPicture();
-      }
-    } catch {
-      // PiP can be blocked; ignore.
-    }
-  }, []);
-
-  useEffect(() => {
-    const v = videoRef.current;
-    if (!v) {
-      return;
-    }
-    const onEnter = () => setPreviewPip(true);
-    const onLeave = () => setPreviewPip(false);
-    v.addEventListener("enterpictureinpicture", onEnter);
-    v.addEventListener("leavepictureinpicture", onLeave);
-    return () => {
-      v.removeEventListener("enterpictureinpicture", onEnter);
-      v.removeEventListener("leavepictureinpicture", onLeave);
-    };
-  }, []);
-
-  const onTimelineSelect = useCallback((kind: TimelineClipKind, id: string) => {
-    setSelAnchor(null);
-    setSelFocus(null);
-    setSelected({ kind, id });
-    const p = projectRef.current;
-    const item =
-      kind === "broll"
-        ? p?.broll.find((b) => b.id === id)
-        : kind === "zoom"
-          ? p?.zooms.find((z) => z.id === id)
-          : kind === "title"
-            ? p?.titles.find((t) => t.id === id)
-            : kind === "graphic"
-              ? p?.graphics?.find((g) => g.id === id)
-              : p?.stills?.find((s) => s.id === id);
-    if (item) {
-      schedRef.current?.seek(item.startSample / (p?.sampleRate ?? 48_000));
-      setCurSample(item.startSample);
-    }
-  }, []);
   const onTimelineWordClick = useCallback(
     (index: number, shiftKey: boolean) => {
       if (shiftKey) {
@@ -2392,297 +1795,98 @@ export function App({
         selGraphic.endSample
       )
     : null;
+  const hasOverlayInspector = Boolean(
+    selected && (selZoom || selTitle || selBroll || selStill || selGraphic)
+  );
+  useEffect(() => {
+    if (!shouldAutoOpenConfig({ hasOverlayInspector, selRange })) {
+      return;
+    }
+    setConfigTab("edit");
+    setConfigOpen(true);
+    setMobileRightPanel("config");
+  }, [hasOverlayInspector, selRange, selected?.id, selected?.kind]);
   const presetOf = (z: ZoomItem) =>
     Object.entries(ZOOM_PRESETS).find(
       ([, v]) =>
         Math.abs(z.scale - v.scale) < 0.001 &&
         Math.abs(z.rampSec - v.rampSec) < 0.001
     )?.[0] ?? "";
+  const configInspectorSummary = useMemo(
+    () =>
+      buildConfigInspectorSummary({
+        assetName,
+        fmtTime: formatEditorTime,
+        graphicLabel: selGraphicLabel,
+        sampleRate: sr,
+        selBroll: selBroll ?? null,
+        selGraphic: selGraphic
+          ? {
+              catalog:
+                selGraphic.type === "json-render"
+                  ? selGraphic.catalog
+                  : undefined,
+              startSample: selGraphic.startSample,
+              template:
+                selGraphic.type === "json-render"
+                  ? (selGraphic.catalog ?? "product-announcement")
+                  : selGraphic.template,
+              type: selGraphic.type === "json-render" ? "json-render" : "html",
+              validation: selGraphicValidation,
+            }
+          : null,
+        selRange,
+        selStill: selStill ?? null,
+        selTitle: selTitle ?? null,
+        selZoom: selZoom ?? null,
+        wordStartSample: selRange
+          ? (project.words[selRange[0]]?.startSample ?? null)
+          : null,
+      }),
+    [
+      assetName,
+      project.words,
+      selBroll,
+      selGraphic,
+      selGraphicLabel,
+      selGraphicValidation,
+      selRange,
+      selStill,
+      selTitle,
+      selZoom,
+      sr,
+    ]
+  );
   const exportDisabled = exporting || pendingSaves > 0 || saveError !== null;
   const exportLabel = exporting
     ? "Exporting…"
     : pendingSaves > 0
       ? "Saving…"
       : "Export";
-  const InspectorIcon = selZoom
-    ? ZoomIn
-    : selTitle
-      ? Type
-      : selBroll
-        ? Film
-        : selStill
-          ? ImageIcon
-          : selGraphic
-            ? Sparkles
-            : selRange
-              ? Sparkles
-              : Captions;
-  const inspectorLabel = selZoom
-    ? "Push-in"
-    : selTitle
-      ? "Title card"
-      : selBroll
-        ? "B-roll"
-        : selStill
-          ? "Still"
-          : selGraphic
-            ? selGraphicLabel
-            : selRange
-              ? "Selection"
-              : "Captions";
-  const inspectorBadge = selZoom
-    ? fmt(selZoom.startSample / sr)
-    : selTitle
-      ? fmt(selTitle.startSample / sr)
-      : selBroll
-        ? fmt(selBroll.startSample / sr)
-        : selStill
-          ? fmt(selStill.startSample / sr)
-          : selGraphic
-            ? fmt(selGraphic.startSample / sr)
-            : selRange
-              ? `${selRange[1] - selRange[0] + 1}`
-              : captionsOn
-                ? "On"
-                : "Off";
-  const inspectorMeta = selZoom
-    ? [
-        { icon: ZoomIn, label: "Scale", value: `${selZoom.scale.toFixed(2)}x` },
-        {
-          icon: Clock3,
-          label: "Ramp",
-          value: `${selZoom.rampSec.toFixed(1)}s`,
-        },
-      ]
-    : selTitle
-      ? [
-          { icon: Type, label: "Position", value: selTitle.position },
-          {
-            icon: Clock3,
-            label: "Starts",
-            value: fmt(selTitle.startSample / sr),
-          },
-        ]
-      : selBroll
-        ? [
-            { icon: Film, label: "Source", value: assetName(selBroll.assetId) },
-            {
-              icon: Scan,
-              label: "Display",
-              value:
-                (selBroll.display ?? "cover") === "pip"
-                  ? "PiP"
-                  : (selBroll.display ?? "cover") === "split"
-                    ? "Split"
-                    : "Cover",
-            },
-            {
-              icon: Volume2,
-              label: "Audio",
-              value:
-                selBroll.audioMode === "broll"
-                  ? "B-roll only"
-                  : selBroll.audioMode === "mix"
-                    ? "Mix"
-                    : selBroll.audioMode === "duck-voice"
-                      ? "Duck voice"
-                      : selBroll.audioMode === "duck-broll"
-                        ? "Duck b-roll"
-                        : "Silent",
-            },
-            {
-              icon: Clock3,
-              label: "Starts",
-              value: fmt(selBroll.startSample / sr),
-            },
-          ]
-        : selStill
-          ? [
-              {
-                icon: ImageIcon,
-                label: "Source",
-                value: assetName(selStill.assetId),
-              },
-              {
-                icon: ZoomIn,
-                label: "Scale",
-                value: `${selStill.scale.toFixed(2)}x`,
-              },
-              {
-                icon: Clock3,
-                label: "Starts",
-                value: fmt(selStill.startSample / sr),
-              },
-            ]
-          : selGraphic
-            ? [
-                {
-                  icon: Sparkles,
-                  label:
-                    selGraphic.type === "json-render" ? "Catalog" : "Template",
-                  value:
-                    selGraphic.type === "json-render"
-                      ? (selGraphic.catalog ?? "product-announcement")
-                      : selGraphic.template,
-                },
-                {
-                  icon: Clock3,
-                  label: "Starts",
-                  value: fmt(selGraphic.startSample / sr),
-                },
-                {
-                  icon: Captions,
-                  label: "Validation",
-                  value: selGraphicValidation
-                    ? selGraphicValidation.success
-                      ? "Valid"
-                      : "Invalid"
-                    : "Template",
-                },
-              ]
-            : selRange
-              ? [
-                  {
-                    icon: Sparkles,
-                    label: "Words",
-                    value: `${selRange[1] - selRange[0] + 1}`,
-                  },
-                  {
-                    icon: Clock3,
-                    label: "Start",
-                    value: fmt(project.words[selRange[0]].startSample / sr),
-                  },
-                ]
-              : [
-                  {
-                    icon: Captions,
-                    label: "Per line",
-                    value: String(project.captions?.maxWords ?? 6),
-                  },
-                  {
-                    icon: Clock3,
-                    label: "Pad",
-                    value: `${project.padMs ?? 50}ms`,
-                  },
-                ];
 
-  const timelineWords = useMemo(
-    () =>
-      project.words.map((w, index) => ({
-        id: w.id,
-        index,
-        startSample: w.startSample,
-        endSample: w.endSample,
-        startSec: w.startSample / sr,
-        endSec: w.endSample / sr,
-        deleted: w.deleted,
-      })),
-    [project.words, sr]
-  );
-  const timelineBroll = useMemo(
-    () =>
-      (project.broll ?? []).map((b) => ({
-        id: b.id,
-        startSample: b.startSample,
-        endSample: b.endSample,
-        startSec: b.startSample / sr,
-        endSec: b.endSample / sr,
-        label: assetName(b.assetId),
-      })),
-    [project.assets, project.broll, sr]
-  );
-  const timelineZooms = useMemo(
-    () =>
-      (project.zooms ?? []).map((z) => ({
-        id: z.id,
-        startSample: z.startSample,
-        endSample: z.endSample,
-        startSec: z.startSample / sr,
-        endSec: z.endSample / sr,
-        label: `${z.scale.toFixed(2)}x`,
-      })),
-    [project.zooms, sr]
-  );
-  const timelineTitles = useMemo(
-    () =>
-      (project.titles ?? []).map((t) => ({
-        id: t.id,
-        startSample: t.startSample,
-        endSample: t.endSample,
-        startSec: t.startSample / sr,
-        endSec: t.endSample / sr,
-        label: t.text.replace(/\n/g, " · "),
-      })),
-    [project.titles, sr]
-  );
-  const timelineGraphics = useMemo(
-    () =>
-      (project.graphics ?? []).map((g) => ({
-        id: g.id,
-        startSample: g.startSample,
-        endSample: g.endSample,
-        startSec: g.startSample / sr,
-        endSec: g.endSample / sr,
-        keyframes: g.keyframes,
-        label:
-          g.type === "json-render"
-            ? "Announcement graphic"
-            : `Graphic: ${g.template}`,
-      })),
-    [project.graphics, sr]
-  );
-  const timelinePlacedStills = useMemo(
-    () =>
-      (project.stills ?? []).map((s) => ({
-        id: s.id,
-        startSample: s.startSample,
-        endSample: s.endSample,
-        startSec: s.startSample / sr,
-        endSec: s.endSample / sr,
-        label: assetName(s.assetId),
-      })),
-    [project.assets, project.stills, sr]
-  );
-  const timelineMusic = useMemo(
-    () =>
-      project.assets
-        .filter((a) => a.kind === "music")
-        .map((a) => ({
-          id: a.id,
-          startSample: 0,
-          endSample: a.durationSamples,
-          startSec: 0,
-          endSec: a.durationSamples / sr,
-          label: a.name,
-        })),
-    [project.assets, sr]
-  );
-  const timelinePlacedMusic = useMemo(
-    () =>
-      (project.music ?? []).map((m) => ({
-        id: m.id,
-        startSample: m.startSample,
-        endSample: m.endSample,
-        startSec: m.startSample / sr,
-        endSec: m.endSample / sr,
-        label: assetName(m.assetId),
-      })),
-    [project.assets, project.music, sr]
-  );
-  const timelineLibraryStills = useMemo(
-    () =>
-      project.assets
-        .filter((a) => a.kind === "still")
-        .map((a) => ({
-          id: a.id,
-          startSample: 0,
-          endSample: a.durationSamples,
-          startSec: 0,
-          endSec: a.durationSamples / sr,
-          label: a.name,
-        })),
-    [project.assets, sr]
-  );
+  const {
+    timelineBroll,
+    timelineGraphics,
+    timelineLibraryStills,
+    timelineMusic,
+    timelinePlacedMusic,
+    timelinePlacedStills,
+    timelineTitles,
+    timelineWords,
+    timelineZooms,
+  } = useEditorTimeline({
+    assetName,
+    assets: project.assets,
+    broll: project.broll ?? [],
+    graphics: project.graphics,
+    music: project.music,
+    sampleRate: sr,
+    stills: project.stills,
+    titles: project.titles ?? [],
+    words: project.words,
+    zooms: project.zooms ?? [],
+  });
+
   const configCloseLabel =
     mobileRightPanel === "config" ? "Close config" : "Hide config";
 
@@ -2695,964 +1899,215 @@ export function App({
     crop: exportSettings.crop,
   });
 
+  const handleConfigClose = useCallback(() => {
+    if (mobileRightPanel === "config") {
+      setMobileRightPanel(null);
+      return;
+    }
+    setConfigOpen(false);
+  }, [mobileRightPanel]);
+
   const configPanel = (
-    <div className="flex min-h-0 flex-1 overflow-y-auto bg-background">
-      <div className="flex w-full flex-col overflow-hidden bg-background">
-        <div className="flex h-10 shrink-0 items-center gap-2 border-border border-b px-3">
-          <div className="min-w-0 flex-1 truncate font-semibold text-[0.98rem] tracking-tight">
-            Config
-          </div>
-          <Button
-            aria-label={configCloseLabel}
-            className="text-muted-foreground"
-            onClick={() => {
-              if (mobileRightPanel === "config") {
-                setMobileRightPanel(null);
-                return;
-              }
-              setConfigOpen(false);
-            }}
-            size="icon-sm"
-            title={configCloseLabel}
-            variant="ghost"
-          >
-            <PanelRight />
-          </Button>
-        </div>
-        <SidebarContent className="gap-0 overflow-visible bg-background">
-          <div className="border-border/80 border-b px-2 py-1.5">
-            <div className="flex h-7 items-center gap-2">
-              <InspectorIcon className="size-3.5 shrink-0 text-muted-foreground" />
-              <span className="min-w-0 flex-1 truncate font-medium text-[0.82rem]">
-                {inspectorLabel}
-              </span>
-              <Badge className="shrink-0" variant="secondary">
-                {inspectorBadge}
-              </Badge>
-            </div>
-            <div className="mt-1 ml-[0.42rem] border-border/70 border-l pl-2.5">
-              {inspectorMeta.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <div
-                    className="flex h-5 min-w-0 items-center gap-1.5 text-[0.75rem]"
-                    key={item.label}
-                    title={`${item.label}: ${item.value}`}
-                  >
-                    <Icon className="size-3 shrink-0 text-muted-foreground" />
-                    <span className="min-w-0 flex-1 truncate text-muted-foreground">
-                      {item.label}
-                    </span>
-                    <span className="min-w-0 max-w-[55%] truncate text-muted-foreground tabular-nums">
-                      {item.value}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-          {selected &&
-          (selZoom || selTitle || selBroll || selStill || selGraphic) ? (
-            <div className="group-data-[collapsible=icon]:hidden">
-              <div className="px-2 py-2">
-                <div className="flex items-center gap-1.5 font-medium text-[0.8rem]">
-                  {selZoom ? (
-                    <ZoomIn className={APP_ICON_CLASS} />
-                  ) : selTitle ? (
-                    <Type className={APP_ICON_CLASS} />
-                  ) : selStill ? (
-                    <ImageIcon className={APP_ICON_CLASS} />
-                  ) : selGraphic ? (
-                    <Sparkles className={APP_ICON_CLASS} />
-                  ) : (
-                    <Film className={APP_ICON_CLASS} />
-                  )}
-                  {selZoom
-                    ? "Push-in"
-                    : selTitle
-                      ? "Title card"
-                      : selStill
-                        ? "Still"
-                        : selGraphic
-                          ? selGraphicLabel
-                          : "B-roll"}
-                  <span className="ml-auto text-muted-foreground text-xs tabular-nums">
-                    {selZoom &&
-                      `${fmt(selZoom.startSample / sr)}–${fmt(selZoom.endSample / sr)}`}
-                    {selTitle &&
-                      `${fmt(selTitle.startSample / sr)}–${fmt(selTitle.endSample / sr)}`}
-                    {selBroll &&
-                      `${fmt(selBroll.startSample / sr)}–${fmt(selBroll.endSample / sr)}`}
-                    {selStill &&
-                      `${fmt(selStill.startSample / sr)}–${fmt(selStill.endSample / sr)}`}
-                    {selGraphic &&
-                      `${fmt(selGraphic.startSample / sr)}–${fmt(selGraphic.endSample / sr)}`}
-                  </span>
-                </div>
-              </div>
-
-              {selZoom && (
-                <>
-                  <Section defaultOpen title="Parameters">
-                    <SliderRow
-                      formatValue={(value) => `${value.toFixed(2)}×`}
-                      label="Scale"
-                      max={3}
-                      min={1}
-                      onValueChange={(value) =>
-                        updateZoom(selZoom.id, { scale: value })
-                      }
-                      step={0.05}
-                      value={selZoom.scale}
-                    />
-                    <SliderRow
-                      formatValue={(value) => `${value.toFixed(1)}s`}
-                      label="Ramp"
-                      max={5}
-                      min={0}
-                      onValueChange={(value) =>
-                        updateZoom(selZoom.id, { rampSec: value })
-                      }
-                      step={0.1}
-                      value={selZoom.rampSec}
-                    />
-                  </Section>
-                  <Section title="Preset">
-                    <ToggleGroup
-                      className="w-full"
-                      onValueChange={(value) => {
-                        const preset = firstToggleValue(value);
-                        if (preset && ZOOM_PRESETS[preset]) {
-                          updateZoom(selZoom.id, ZOOM_PRESETS[preset]);
-                        }
-                      }}
-                      size="sm"
-                      spacing={0}
-                      value={[presetOf(selZoom)].filter(Boolean)}
-                      variant="outline"
-                    >
-                      {Object.keys(ZOOM_PRESETS).map((k) => (
-                        <ToggleGroupItem className="flex-1" key={k} value={k}>
-                          {k}
-                        </ToggleGroupItem>
-                      ))}
-                    </ToggleGroup>
-                  </Section>
-                </>
-              )}
-
-              {selTitle && (
-                <Section defaultOpen title="Title">
-                  {selTitle.position === "hero" ? (
-                    <Textarea
-                      className={CONFIG_COMPACT_TEXTAREA_CLASS}
-                      onChange={(e) =>
-                        updateTitle(selTitle.id, {
-                          text: e.target.value,
-                        })
-                      }
-                      placeholder={"Headline\nSubtitle (optional second line)"}
-                      rows={3}
-                      value={selTitle.text}
-                    />
-                  ) : (
-                    <Input
-                      className={CONFIG_COMPACT_INPUT_CLASS}
-                      onChange={(e) =>
-                        updateTitle(selTitle.id, {
-                          text: e.target.value,
-                        })
-                      }
-                      placeholder="Title text"
-                      value={selTitle.text}
-                    />
-                  )}
-                  <div className="mt-2">
-                    <Select
-                      onValueChange={(v) => {
-                        if (v) {
-                          updateTitle(selTitle.id, {
-                            position: v as "lower" | "center" | "hero",
-                          });
-                        }
-                      }}
-                      value={selTitle.position}
-                    >
-                      <SelectTrigger
-                        className={cn(
-                          "w-full",
-                          CONFIG_COMPACT_SELECT_TRIGGER_CLASS
-                        )}
-                        size="sm"
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          <SelectItem value="lower">Lower third</SelectItem>
-                          <SelectItem value="center">Centered</SelectItem>
-                          <SelectItem value="hero">Hero card</SelectItem>
-                          <SelectItem value="quote">Quote card</SelectItem>
-                          <SelectItem value="divider">
-                            Section divider
-                          </SelectItem>
-                          <SelectItem value="callout">Callout label</SelectItem>
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </Section>
-              )}
-
-              {selBroll && brollAssets.length > 0 && (
-                <>
-                  <Section defaultOpen title="Display">
-                    <ToggleGroup
-                      className="w-full"
-                      onValueChange={(value) => {
-                        const mode = firstToggleValue(value);
-                        if (
-                          mode === "cover" ||
-                          mode === "pip" ||
-                          mode === "split"
-                        ) {
-                          updateBroll(selBroll.id, { display: mode });
-                        }
-                      }}
-                      size="sm"
-                      spacing={0}
-                      value={[selBroll.display ?? "cover"]}
-                      variant="outline"
-                    >
-                      <ToggleGroupItem className="flex-1" value="cover">
-                        Cover
-                      </ToggleGroupItem>
-                      <ToggleGroupItem className="flex-1" value="pip">
-                        PiP
-                      </ToggleGroupItem>
-                      <ToggleGroupItem className="flex-1" value="split">
-                        Split
-                      </ToggleGroupItem>
-                    </ToggleGroup>
-                  </Section>
-                  <Section title="Audio">
-                    <Select
-                      onValueChange={(v) => {
-                        if (
-                          v === "silent" ||
-                          v === "broll" ||
-                          v === "mix" ||
-                          v === "duck-voice" ||
-                          v === "duck-broll"
-                        ) {
-                          updateBroll(selBroll.id, { audioMode: v });
-                        }
-                      }}
-                      value={selBroll.audioMode ?? "silent"}
-                    >
-                      <SelectTrigger
-                        className={cn(
-                          "w-full",
-                          CONFIG_COMPACT_SELECT_TRIGGER_CLASS
-                        )}
-                        size="sm"
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          <SelectItem value="silent">
-                            Silent (voice only)
-                          </SelectItem>
-                          <SelectItem value="broll">
-                            B-roll audio only
-                          </SelectItem>
-                          <SelectItem value="mix">Mix with voice</SelectItem>
-                          <SelectItem value="duck-voice">
-                            Duck voice under b-roll
-                          </SelectItem>
-                          <SelectItem value="duck-broll">
-                            Duck b-roll under voice
-                          </SelectItem>
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                  </Section>
-                  <Section defaultOpen title="Source">
-                    <Select
-                      onValueChange={(v) =>
-                        v &&
-                        updateBroll(selBroll.id, {
-                          assetId: v,
-                        })
-                      }
-                      value={selBroll.assetId}
-                    >
-                      <SelectTrigger
-                        className={cn(
-                          "w-full",
-                          CONFIG_COMPACT_SELECT_TRIGGER_CLASS
-                        )}
-                        size="sm"
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          {brollAssets.map((a) => (
-                            <SelectItem key={a.id} value={a.id}>
-                              {a.name}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                    {(project.broll ?? []).length > 1 && (
-                      <div className="mt-3">
-                        <span className="text-muted-foreground text-xs">
-                          Paint order : drag to restack
-                        </span>
-                        <div className="mt-1.5">
-                          <OverlaySortable
-                            onReorder={reorderBrollOrder}
-                            onSelect={(id) =>
-                              setSelected({
-                                kind: "broll",
-                                id,
-                              })
-                            }
-                            rows={(project.broll ?? []).map((b) => ({
-                              id: b.id,
-                              label:
-                                provenanceDisplay && b.authoredBy
-                                  ? `${assetName(b.assetId)} · ${authorDisplayLabel(b.authoredBy)}`
-                                  : assetName(b.assetId),
-                            }))}
-                            selectedId={selected?.id}
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </Section>
-                </>
-              )}
-
-              {selStill && stillAssets.length > 0 && (
-                <>
-                  <Section title="Source">
-                    <Select
-                      onValueChange={(v) =>
-                        v &&
-                        updateStill(selStill.id, {
-                          assetId: v,
-                        })
-                      }
-                      value={selStill.assetId}
-                    >
-                      <SelectTrigger
-                        className={cn(
-                          "w-full",
-                          CONFIG_COMPACT_SELECT_TRIGGER_CLASS
-                        )}
-                        size="sm"
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          {stillAssets.map((a) => (
-                            <SelectItem key={a.id} value={a.id}>
-                              {a.name}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                  </Section>
-                  <Section title="Ken Burns">
-                    <SliderRow
-                      formatValue={(value) => `${value.toFixed(2)}×`}
-                      label="Scale"
-                      max={3}
-                      min={1}
-                      onValueChange={(value) =>
-                        updateStill(selStill.id, { scale: value })
-                      }
-                      step={0.05}
-                      value={selStill.scale}
-                    />
-                  </Section>
-                </>
-              )}
-
-              {selGraphic && (
-                <Section defaultOpen title="Graphic">
-                  <PropRow
-                    label={
-                      selGraphic.type === "json-render" ? "Catalog" : "Template"
-                    }
-                    value={
-                      selGraphic.type === "json-render"
-                        ? (selGraphic.catalog ?? "product-announcement")
-                        : selGraphic.template
-                    }
-                  >
-                    <span className="truncate text-muted-foreground text-xs">
-                      {selGraphic.type === "json-render"
-                        ? "JSON graphic"
-                        : "Template graphic"}
-                    </span>
-                  </PropRow>
-                  {selGraphic.type === "json-render" && (
-                    <PropRow
-                      label="Validation"
-                      value={
-                        selGraphicValidation?.success ? "Valid" : "Invalid"
-                      }
-                    >
-                      <span className="truncate text-muted-foreground text-xs">
-                        {selGraphicValidation?.success
-                          ? "Ready to export"
-                          : (selGraphicValidation?.issues[0] ?? "Invalid spec")}
-                      </span>
-                    </PropRow>
-                  )}
-                </Section>
-              )}
-
-              {selGraphic && (
-                <Section title="Keyframes">
-                  {selGraphicKeyframes.length === 0 ? (
-                    <p className="text-muted-foreground text-xs">
-                      No keyframes yet. Scrub the playhead inside this graphic
-                      and add one below. For build timing (stagger, entrance
-                      duration), use graphic-set params inDurFrames and
-                      staggerFrames via CLI or MCP.
-                    </p>
-                  ) : (
-                    selGraphicKeyframes.map((kf, index) => {
-                      const bounds = keyframeValueBounds(kf.property);
-                      return (
-                        <div
-                          className="space-y-1.5 rounded-md border border-border/60 bg-muted/30 p-1.5"
-                          key={`${kf.sampleOffset}-${kf.property}-${index}`}
-                        >
-                          <div className="flex items-center justify-between gap-1.5">
-                            <span className="font-medium text-xs">
-                              {formatKeyframeProperty(kf.property)}
-                            </span>
-                            <span className="text-muted-foreground text-xs tabular-nums">
-                              {fmt(kf.sampleOffset / sr)} in clip
-                            </span>
-                            <Button
-                              aria-label={`Remove keyframe ${formatKeyframeProperty(kf.property)}`}
-                              className="size-6! shrink-0"
-                              onClick={() =>
-                                updateGraphic(selGraphic.id, {
-                                  keyframes: removeKeyframeAt(
-                                    selGraphicKeyframes,
-                                    index
-                                  ),
-                                })
-                              }
-                              size="icon-sm"
-                              type="button"
-                              variant="ghost"
-                            >
-                              <Trash2 className="size-3.5" />
-                            </Button>
-                          </div>
-                          <SliderRow
-                            formatValue={(value) =>
-                              kf.property === "scale"
-                                ? `${value.toFixed(2)}×`
-                                : value.toFixed(2)
-                            }
-                            label="Value"
-                            max={bounds.max}
-                            min={bounds.min}
-                            onValueChange={(value) =>
-                              updateGraphic(selGraphic.id, {
-                                keyframes: updateKeyframeAt(
-                                  selGraphicKeyframes,
-                                  index,
-                                  { value }
-                                ),
-                              })
-                            }
-                            step={bounds.step}
-                            value={kf.value}
-                          />
-                          <Field className="grid h-7 grid-cols-[4.25rem_1fr] items-center gap-1.5">
-                            <FieldLabel className="text-muted-foreground text-xs">
-                              Easing
-                            </FieldLabel>
-                            <Select
-                              onValueChange={(v) => {
-                                if (
-                                  typeof v === "string" &&
-                                  (KEYFRAME_EASINGS as string[]).includes(v)
-                                ) {
-                                  const easing = v as Keyframe["easing"];
-                                  updateGraphic(selGraphic.id, {
-                                    keyframes: updateKeyframeAt(
-                                      selGraphicKeyframes,
-                                      index,
-                                      { easing }
-                                    ),
-                                  });
-                                }
-                              }}
-                              value={kf.easing}
-                            >
-                              <SelectTrigger
-                                className={cn(
-                                  "w-full",
-                                  CONFIG_COMPACT_SELECT_TRIGGER_CLASS
-                                )}
-                                size="sm"
-                              >
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectGroup>
-                                  {KEYFRAME_EASINGS.map((easing) => (
-                                    <SelectItem key={easing} value={easing}>
-                                      {easing}
-                                    </SelectItem>
-                                  ))}
-                                </SelectGroup>
-                              </SelectContent>
-                            </Select>
-                          </Field>
-                        </div>
-                      );
-                    })
-                  )}
-                  <div className="mt-1 flex gap-1.5">
-                    <Select
-                      onValueChange={(v) => {
-                        if (
-                          v === "opacity" ||
-                          v === "scale" ||
-                          v === "x" ||
-                          v === "y"
-                        ) {
-                          setNewKeyframeProperty(v);
-                        }
-                      }}
-                      value={newKeyframeProperty}
-                    >
-                      <SelectTrigger
-                        className={cn(
-                          "flex-1",
-                          CONFIG_COMPACT_SELECT_TRIGGER_CLASS
-                        )}
-                        size="sm"
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          {KEYFRAME_PROPERTIES.map((property) => (
-                            <SelectItem key={property} value={property}>
-                              {formatKeyframeProperty(property)}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      disabled={graphicPlayheadOffset === null}
-                      onClick={() => {
-                        if (!selGraphic || graphicPlayheadOffset === null) {
-                          return;
-                        }
-                        const clipLength =
-                          selGraphic.endSample - selGraphic.startSample;
-                        const sampleOffset = clampKeyframeSampleOffset(
-                          graphicPlayheadOffset,
-                          clipLength
-                        );
-                        updateGraphic(selGraphic.id, {
-                          keyframes: addKeyframe(selGraphicKeyframes, {
-                            sampleOffset,
-                            property: newKeyframeProperty,
-                            value: defaultKeyframeValue(newKeyframeProperty),
-                            easing: "linear",
-                          }),
-                        });
-                      }}
-                      size="sm"
-                      type="button"
-                      variant="secondary"
-                    >
-                      <Plus data-icon="inline-start" />
-                      At playhead
-                    </Button>
-                  </div>
-                </Section>
-              )}
-
-              <div className="p-2">
-                <Button
-                  className="w-full"
-                  onClick={removeSelected}
-                  size="sm"
-                  variant="destructive"
-                >
-                  <Trash2 data-icon="inline-start" /> Remove effect
-                </Button>
-              </div>
-            </div>
-          ) : selRange ? (
-            <div className="group-data-[collapsible=icon]:hidden">
-              <div className="px-2 py-2 font-medium text-[0.8rem]">
-                Selection
-                <span className="ml-2 text-muted-foreground text-xs">
-                  {selRange[1] - selRange[0] + 1} words
-                </span>
-              </div>
-              <Section defaultOpen title="Add effect">
-                <Button
-                  className="w-full justify-start"
-                  onClick={addZoom}
-                  size="sm"
-                  variant="secondary"
-                >
-                  <ZoomIn data-icon="inline-start" /> Push in
-                </Button>
-                <div className="mt-1.5 flex gap-1.5">
-                  <Select
-                    onValueChange={(value) => {
-                      if (value) {
-                        setChosenAsset(value);
-                      }
-                    }}
-                    value={chosenAsset}
-                  >
-                    <SelectTrigger
-                      className={cn(
-                        "flex-1",
-                        CONFIG_COMPACT_SELECT_TRIGGER_CLASS
-                      )}
-                      disabled={brollAssets.length === 0}
-                      size="sm"
-                    >
-                      <SelectValue placeholder="No b-roll" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {brollAssets.map((a) => (
-                          <SelectItem key={a.id} value={a.id}>
-                            {a.name}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    aria-label="Add b-roll"
-                    disabled={brollAssets.length === 0}
-                    onClick={addBroll}
-                    size="icon-sm"
-                    variant="secondary"
-                  >
-                    <Film />
-                  </Button>
-                </div>
-                <div className="mt-1.5 flex gap-1.5">
-                  <Select
-                    onValueChange={(value) => {
-                      if (value) {
-                        setChosenStillAsset(value);
-                      }
-                    }}
-                    value={chosenStillAsset}
-                  >
-                    <SelectTrigger
-                      className={cn(
-                        "flex-1",
-                        CONFIG_COMPACT_SELECT_TRIGGER_CLASS
-                      )}
-                      disabled={stillAssets.length === 0}
-                      size="sm"
-                    >
-                      <SelectValue placeholder="No still" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {stillAssets.map((a) => (
-                          <SelectItem key={a.id} value={a.id}>
-                            {a.name}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    aria-label="Add still"
-                    disabled={stillAssets.length === 0}
-                    onClick={addStill}
-                    size="icon-sm"
-                    variant="secondary"
-                  >
-                    <ImageIcon />
-                  </Button>
-                </div>
-              </Section>
-              <Section title="Title">
-                {titlePos === "hero" ? (
-                  <Textarea
-                    className={CONFIG_COMPACT_TEXTAREA_CLASS}
-                    onChange={(e) => setTitleText(e.target.value)}
-                    placeholder={"Headline\nSubtitle (optional second line)"}
-                    rows={3}
-                    value={titleText}
-                  />
-                ) : (
-                  <Input
-                    className={CONFIG_COMPACT_INPUT_CLASS}
-                    onChange={(e) => setTitleText(e.target.value)}
-                    placeholder="Title text"
-                    value={titleText}
-                  />
-                )}
-                <div className="mt-1.5 flex gap-1.5">
-                  <Select
-                    onValueChange={(v) => {
-                      if (v) {
-                        setTitlePos(v as "lower" | "center" | "hero");
-                      }
-                    }}
-                    value={titlePos}
-                  >
-                    <SelectTrigger
-                      className={cn(
-                        "flex-1",
-                        CONFIG_COMPACT_SELECT_TRIGGER_CLASS
-                      )}
-                      size="sm"
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        <SelectItem value="lower">Lower third</SelectItem>
-                        <SelectItem value="center">Centered</SelectItem>
-                        <SelectItem value="hero">Hero card</SelectItem>
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    aria-label="Add title"
-                    disabled={!titleText.trim()}
-                    onClick={addTitle}
-                    size="icon-sm"
-                    variant="secondary"
-                  >
-                    <Type />
-                  </Button>
-                </div>
-              </Section>
-              <div className="p-2">
-                <Button
-                  className="text-muted-foreground"
-                  onClick={clearSel}
-                  size="sm"
-                  variant="ghost"
-                >
-                  Clear selection
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="group-data-[collapsible=icon]:hidden">
-              <Section title="Color temp">
-                <ColorTempPad color={color} onColorChange={changeColor} />
-              </Section>
-              <Section title="Captions">
-                <SliderRow
-                  formatValue={(value) => String(Math.round(value))}
-                  label="Per line"
-                  max={12}
-                  min={1}
-                  onValueChange={setMaxWords}
-                  step={1}
-                  value={project.captions?.maxWords ?? 6}
-                />
-              </Section>
-              <Section title="Caption style">
-                <CaptionStylePicker
-                  onSelect={setCaptionStyle}
-                  selected={project.captions?.style ?? DEFAULT_CAPTION_STYLE}
-                />
-              </Section>
-              <Section title="Reframe">
-                <ReframeControls
-                  applying={pendingSaves > 0}
-                  applyingVision={applyingVision}
-                  exportSettings={exportSettings}
-                  hasSceneLog={Boolean(project.sceneLog)}
-                  onPatchExport={patchExport}
-                  onRunVisionFocus={onRunVisionFocus}
-                  visionFocusAvailable={visionFocusAvailable}
-                />
-              </Section>
-              <Section title="Timing">
-                <SliderRow
-                  formatValue={(value) => `${Math.round(value)}ms`}
-                  label="Pad"
-                  max={200}
-                  min={0}
-                  onValueChange={setPad}
-                  step={5}
-                  value={project.padMs ?? 50}
-                />
-              </Section>
-            </div>
-          )}
-          <div className="group-data-[collapsible=icon]:hidden">
-            <Section title="Brief">
-              <BriefEditor
-                initialBrief={project.brief ?? ""}
-                onSave={async (text) => {
-                  const r = await saveBrief(project.slug, text);
-                  if (r.ok) {
-                    setProject((prev) => ({ ...prev, brief: text }));
-                    return { ok: true };
-                  }
-                  return { ok: false, error: r.error };
-                }}
-                slug={project.slug}
-              />
-            </Section>
-            <Section title="Cleanup">
-              <CleanupPanel
-                applying={pendingSaves > 0}
-                onApply={applyCleanupCandidate}
-                onApplyAllSafe={applyAllSafeCleanup}
-                onRemoveSpan={removeDeadAirSpan}
-                registeredSpans={(project.cuts?.deadAir ?? []).map((s) => ({
-                  id: s.id,
-                  startSec: s.startSample / project.sampleRate,
-                  endSec: s.endSample / project.sampleRate,
-                }))}
-                report={cleanupReportView}
-              />
-            </Section>
-            <Section title="Highlights">
-              <HighlightsPanel
-                applying={pendingSaves > 0}
-                detecting={detectingHighlights}
-                highlights={project.highlights}
-                onDetect={onDetectHighlights}
-                onSeekClip={(c) => onSeek(c.fromSec)}
-              />
-            </Section>
-            <Section title="Takes">
-              <TakesPanel onAssembled={onHistoryReverted} slug={project.slug} />
-            </Section>
-            <Section title="Graphics">
-              <GraphicSectionControls
-                assets={(project.assets ?? []).map((a) => ({
-                  id: a.id,
-                  name: a.name,
-                  kind: a.kind ?? "broll",
-                }))}
-                beatCount={graphicBeatCount}
-                bpmByAssetId={musicBpmByAsset}
-                bpmDetectingAssetId={bpmDetectingAssetId}
-                chosenMusicAssetId={graphicMusicAssetId}
-                chosenTemplateId={
-                  graphicTemplates.some((t) => t.id === chosenGraphicTemplate)
-                    ? chosenGraphicTemplate
-                    : ""
-                }
-                durationSec={project.durationSamples / sr}
-                musicAssets={musicAssets.map((a) => ({
-                  id: a.id,
-                  name: a.name,
-                }))}
-                onAdd={addGraphicPlacement}
-                onAddAtCuts={addGraphicAtCutSeams}
-                onBeatCountChange={setGraphicBeatCount}
-                onChooseMusicAsset={setGraphicMusicAssetId}
-                onChooseTemplate={(id) => {
-                  setChosenGraphicTemplate(id);
-                  const template = graphicTemplates.find((t) => t.id === id);
-                  if (!template) {
-                    setGraphicParamDraft({});
-                    return;
-                  }
-                  const defaults: Record<string, string | number | boolean> =
-                    {};
-                  for (const [key, spec] of Object.entries(template.params)) {
-                    defaults[key] = spec.default;
-                  }
-                  setGraphicParamDraft(defaults);
-                }}
-                onDetectBpm={detectMusicBpm}
-                onParamChange={(key, value) => {
-                  setGraphicParamDraft((prev) => ({ ...prev, [key]: value }));
-                }}
-                onSpanModeChange={setGraphicSpanMode}
-                paramDraft={graphicParamDraft}
-                spanMode={graphicSpanMode}
-                templates={graphicTemplates}
-              />
-            </Section>
-            <Section title="Music">
-              <MusicSectionControls
-                assetName={assetName}
-                assets={musicAssets.map((a) => ({ id: a.id, name: a.name }))}
-                bpmByAssetId={musicBpmByAsset}
-                bpmDetectingAssetId={bpmDetectingAssetId}
-                chosenAssetId={
-                  musicAssets.some((a) => a.id === chosenMusicAsset)
-                    ? chosenMusicAsset
-                    : ""
-                }
-                onAdd={addMusicPlacement}
-                onChooseAsset={setChosenMusicAsset}
-                onDetectBpm={detectMusicBpm}
-                onPatch={patchMusicPlacement}
-                onRemove={removeMusicPlacement}
-                placements={project.music ?? []}
-                sampleRate={sr}
-              />
-            </Section>
-            <Section title="Audio">
-              <AudioControls
-                applying={pendingSaves > 0}
-                audio={project.audio ?? DEFAULT_AUDIO}
-                measure={audioMeasure}
-                measuring={audioMeasuring}
-                onMeasure={measureAudioLoudness}
-                onPatchAudio={patchAudio}
-                onPatchSnap={patchSnap}
-                snap={project.cuts?.snap ?? DEFAULT_CUT_SNAP}
-              />
-            </Section>
-            <Section defaultOpen title="History">
-              <HistoryPanel
-                currentRevision={project.revision ?? 0}
-                currentWords={project.words.map((word) => ({
-                  deleted: word.deleted,
-                  id: word.id,
-                  text: word.text,
-                }))}
-                focusRevision={historyFocusRevision}
-                onFocusRevisionHandled={() => setHistoryFocusRevision(null)}
-                onReverted={onHistoryReverted}
-                showProvenance={provenanceDisplay}
-                slug={project.slug}
-              />
-            </Section>
-          </div>
-        </SidebarContent>
-      </div>
-    </div>
+    <ConfigPanel
+      activeTab={configTab}
+      closeLabel={configCloseLabel}
+      edit={{
+        addBroll,
+        addStill,
+        addTitle,
+        addZoom,
+        assetName,
+        brollAssets,
+        chosenAsset,
+        chosenStillAsset,
+        clearSelection: clearSel,
+        fmtTime: formatEditorTime,
+        graphicPlayheadOffset,
+        hasOverlayInspector,
+        newKeyframeProperty,
+        onChosenAssetChange: setChosenAsset,
+        onChosenStillAssetChange: setChosenStillAsset,
+        onNewKeyframePropertyChange: setNewKeyframeProperty,
+        onTitlePosChange: setTitlePos,
+        onTitleTextChange: setTitleText,
+        presetOf,
+        projectBroll: project.broll ?? [],
+        provenanceDisplay,
+        removeSelected,
+        reorderBrollOrder,
+        sampleRate: sr,
+        selBroll: selBroll ?? null,
+        selGraphic: selGraphic ?? null,
+        selGraphicKeyframes,
+        selGraphicValidation,
+        selRange,
+        selStill: selStill ?? null,
+        selTitle: selTitle ?? null,
+        selZoom: selZoom ?? null,
+        selectedId: selected?.id,
+        setSelected,
+        stillAssets,
+        titlePos,
+        titleText,
+        updateBroll,
+        updateGraphic,
+        updateStill,
+        updateTitle,
+        updateZoom,
+      }}
+      history={{
+        currentRevision: project.revision ?? 0,
+        currentWords: project.words.map((word) => ({
+          deleted: word.deleted,
+          id: word.id,
+          text: word.text,
+        })),
+        focusRevision: historyFocusRevision,
+        onFocusRevisionHandled: () => setHistoryFocusRevision(null),
+        onReverted: onHistoryReverted,
+        showProvenance: provenanceDisplay,
+        slug: project.slug,
+      }}
+      inspectorSummary={configInspectorSummary}
+      look={{
+        atSec: curSec,
+        captionStyle: project.captions?.style ?? DEFAULT_CAPTION_STYLE,
+        color,
+        filter,
+        maxWords: project.captions?.maxWords ?? 6,
+        motionSpeed,
+        onCaptionStyle: setCaptionStyle,
+        onColor: changeColor,
+        onFilter: changeFilter,
+        onMaxWords: setMaxWords,
+        onMotionSpeed: changeMotionSpeed,
+        onPadMs: setPad,
+        onVignette: toggleVignette,
+        padMs: project.padMs ?? 50,
+        reframe: {
+          applying: pendingSaves > 0,
+          applyingVision,
+          exportSettings,
+          hasSceneLog: Boolean(project.sceneLog),
+          onPatchExport: patchExport,
+          onRunVisionFocus,
+          visionFocusAvailable,
+        },
+        slug: project.slug,
+        vignetteOn,
+      }}
+      onClose={handleConfigClose}
+      onTabChange={setConfigTab}
+      project={{
+        applyingVision,
+        assets: project.assets ?? [],
+        assetName,
+        audio: project.audio,
+        audioMeasure,
+        audioMeasuring,
+        brief: project.brief ?? "",
+        bpmByAssetId: musicBpmByAsset,
+        bpmDetectingAssetId,
+        chosenGraphicTemplate,
+        chosenMusicAsset,
+        cleanupReport: cleanupReportView,
+        deadAirSpans: (project.cuts?.deadAir ?? []).map((span) => ({
+          id: span.id,
+          startSec: span.startSample / project.sampleRate,
+          endSec: span.endSample / project.sampleRate,
+        })),
+        detectingHighlights,
+        durationSec: project.durationSamples / sr,
+        graphicBeatCount,
+        graphicMusicAssetId,
+        graphicParamDraft,
+        graphicSpanMode,
+        graphicTemplates,
+        highlights: project.highlights,
+        musicAssets,
+        musicPlacements: project.music ?? [],
+        onAddGraphic: addGraphicPlacement,
+        onAddGraphicAtCuts: addGraphicAtCutSeams,
+        onAddMusic: addMusicPlacement,
+        onApplyAllSafeCleanup: applyAllSafeCleanup,
+        onApplyCleanup: applyCleanupCandidate,
+        onAssembled: onHistoryReverted,
+        onBeatCountChange: setGraphicBeatCount,
+        onChooseGraphicMusicAsset: setGraphicMusicAssetId,
+        onChooseGraphicTemplate: (id) => {
+          setChosenGraphicTemplate(id);
+          const template = graphicTemplates.find((entry) => entry.id === id);
+          if (!template) {
+            setGraphicParamDraft({});
+            return;
+          }
+          const defaults: Record<string, string | number | boolean> = {};
+          for (const [key, spec] of Object.entries(template.params)) {
+            defaults[key] = spec.default;
+          }
+          setGraphicParamDraft(defaults);
+        },
+        onChooseMusicAsset: setChosenMusicAsset,
+        onDetectBpm: detectMusicBpm,
+        onDetectHighlights,
+        onGraphicParamChange: (key, value) => {
+          setGraphicParamDraft((prev) => ({ ...prev, [key]: value }));
+        },
+        onGraphicSpanModeChange: setGraphicSpanMode,
+        onMeasureAudio: measureAudioLoudness,
+        onPatchAudio: patchAudio,
+        onPatchMusic: patchMusicPlacement,
+        onPatchSnap: patchSnap,
+        onRemoveDeadAirSpan: removeDeadAirSpan,
+        onRemoveMusic: removeMusicPlacement,
+        onSaveBrief: async (text) => {
+          const r = await saveBrief(project.slug, text);
+          if (r.ok) {
+            setProject((prev) => ({ ...prev, brief: text }));
+            return { ok: true as const };
+          }
+          return { ok: false as const, error: r.error };
+        },
+        onSeekHighlight: onSeek,
+        pendingSaves,
+        sampleRate: sr,
+        slug: project.slug,
+        snap: project.cuts?.snap,
+      }}
+      tools={{
+        curSec,
+        fmtTime: formatEditorTime,
+        fullDurationSec: fullDur,
+        keptDurationSec: keptDuration,
+        loop,
+        onClearLoop: () => setLoop(null),
+        onSetLoop: setLoop,
+        outPos,
+        timeline: {
+          broll: timelineBroll,
+          curSec,
+          durationSamples: project.durationSamples,
+          durationSec: fullDur,
+          fmtTime: formatEditorTime,
+          graphics: timelineGraphics,
+          libraryMusic: timelineMusic,
+          libraryStills: timelineLibraryStills,
+          music: timelinePlacedMusic,
+          onClipTiming,
+          onSeek,
+          onSelect: onTimelineSelect,
+          onWordClick: onTimelineWordClick,
+          ranges,
+          sampleRate: sr,
+          selected,
+          selRange,
+          stills: timelinePlacedStills,
+          titles: timelineTitles,
+          wordSpans: timelineWords,
+          zooms: timelineZooms,
+        },
+      }}
+    />
   );
 
   return (
@@ -3725,561 +2180,131 @@ export function App({
               keyboardShortcut={false}
               style={
                 {
-                  "--sidebar-width": `${visibleChatWidth}px`,
+                  "--sidebar-width": `${resolvedChatWidth}px`,
                   "--sidebar-width-icon": "3.25rem",
                 } as CSSProperties
               }
             >
               <EditorSidebarShortcuts agentSidebar={agentSidebar} />
               {/* CENTER : preview + transcript (or settings) */}
-              <SidebarInset className="flex min-h-[28rem] min-w-0 flex-col bg-background md:min-h-0">
-                {settingsOpen ? (
-                  <SettingsView
-                    activeSection={settingsSection}
-                    defaultAgent={defaultAgent}
-                    export1080={export1080}
-                    onDefaultAgentChange={setDefaultAgentModel}
-                    onExport1080Change={setExport1080}
-                  />
-                ) : (
-                  <>
-                    <div className="flex min-h-12 shrink-0 flex-wrap items-center gap-2 border-border border-b px-3 py-2 sm:h-12 sm:flex-nowrap sm:py-0">
-                      {agentSidebar.isMobile || !agentSidebar.open ? (
-                        <AgentSidebarToolbarTrigger
-                          onToggle={agentSidebar.toggleSidebar}
-                        />
-                      ) : null}
-                      {agentSidebar.isMobile || !agentSidebar.open ? (
-                        <div className="h-4 w-px bg-foreground/10" />
-                      ) : null}
-                      <div className="min-w-0">
-                        <div className="font-medium text-sm">Editor</div>
-                        <div className="truncate text-muted-foreground text-xs">
-                          {ranges.length} {ranges.length === 1 ? "cut" : "cuts"}{" "}
-                          · {fmt(keptDuration)} / {fmt(fullDur)}
-                        </div>
-                      </div>
-                      <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-                        <ExportDialog
-                          defaultResolution={export1080 ? "1080" : "4k"}
-                          disabled={exportDisabled}
-                          durationSec={keptDuration}
-                          exportAspect={exportSettings.aspect}
-                          onExport={onExport}
-                          sourceFps={project.fps}
-                          sourceHeight={project.height}
-                          sourceWidth={project.width}
-                        >
-                          <ActionStatusButton
-                            busy={exporting || pendingSaves > 0}
-                            disabled={exportDisabled}
-                            icon={Download}
-                            label={exportLabel}
-                            size="sm"
-                            variant="default"
-                          />
-                        </ExportDialog>
-                        <ToggleGroup
-                          aria-label="Preview aspect ratio"
-                          onValueChange={(value) => {
-                            const nextOrientation = Array.isArray(value)
-                              ? value[0]
-                              : value;
-                            if (nextOrientation) {
-                              changeOrientation(nextOrientation as Orientation);
-                            }
-                          }}
-                          size="sm"
-                          spacing={0}
-                          type="single"
-                          value={orientation}
-                          variant="outline"
-                        >
-                          {(
-                            ["landscape", "portrait", "square"] as Orientation[]
-                          ).map((o) => (
-                            <ToggleGroupItem
-                              aria-label={`Preview ${ORIENTATION_LABEL[o]}`}
-                              key={o}
-                              value={o}
-                            >
-                              {ORIENTATION_LABEL[o]}
-                            </ToggleGroupItem>
-                          ))}
-                        </ToggleGroup>
-                        {orientation === "portrait" && (
-                          <Select
-                            onValueChange={(value) => {
-                              if (value) {
-                                onSafeAreaGuideChange(
-                                  value as SafeAreaPlatform
-                                );
-                              }
-                            }}
-                            value={safeAreaGuide}
-                          >
-                            <SelectTrigger
-                              aria-label="Safe area guides"
-                              className="h-11 w-[9.5rem] text-xs sm:h-8"
-                              size="sm"
-                            >
-                              <SelectValue placeholder="Safe areas" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectGroup>
-                                {SAFE_AREA_PLATFORMS.map((platform) => (
-                                  <SelectItem key={platform} value={platform}>
-                                    {safeAreaGuideLabel(platform)}
-                                  </SelectItem>
-                                ))}
-                              </SelectGroup>
-                            </SelectContent>
-                          </Select>
-                        )}
-                        <Button
-                          aria-label="Toggle color scheme"
-                          onClick={toggleColorScheme}
-                          size="icon-sm"
-                          variant="ghost"
-                        >
-                          {colorScheme === "dark" ? <Sun /> : <Moon />}
-                        </Button>
-                        <Button
-                          aria-label="Open chat"
-                          className="xl:hidden"
-                          onClick={() => setMobileRightPanel("chat")}
-                          size="icon-sm"
-                          title="Open chat"
-                          variant={
-                            mobileRightPanel === "chat" ? "secondary" : "ghost"
-                          }
-                        >
-                          <MessageSquare />
-                        </Button>
-                        <Button
-                          aria-label="Open config"
-                          className="xl:hidden"
-                          onClick={() => setMobileRightPanel("config")}
-                          size="icon-sm"
-                          title="Open config"
-                          variant={
-                            mobileRightPanel === "config"
-                              ? "secondary"
-                              : "ghost"
-                          }
-                        >
-                          <PanelRight />
-                        </Button>
-                        <Button
-                          aria-label="Toggle config"
-                          className="hidden xl:inline-flex"
-                          onClick={() => setConfigOpen((open) => !open)}
-                          size="icon-sm"
-                          title="Toggle config"
-                          variant={configOpen ? "secondary" : "ghost"}
-                        >
-                          <PanelRight />
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="flex min-h-0 flex-1 flex-col">
-                      <div className="shrink-0 space-y-3 border-border border-b p-4">
-                        <div className="mx-auto flex w-full max-w-2xl flex-wrap items-center gap-2">
-                          <FindFillerButton />
-                          <VerifyCutButton />
-                          <Drawer
-                            onOpenChange={setTimelineOpen}
-                            open={timelineOpen}
-                          >
-                            <DrawerTrigger
-                              render={
-                                <Button size="sm" variant="outline">
-                                  Timeline
-                                </Button>
-                              }
-                            />
-                            <DrawerContent className="max-h-[85vh]">
-                              <DrawerHeader className="pb-2">
-                                <DrawerTitle className="flex items-center justify-between font-medium text-sm">
-                                  <span>Timeline</span>
-                                  <span className="font-normal text-muted-foreground tabular-nums">
-                                    {fmt(curSec)} / {fmt(fullDur)}
-                                  </span>
-                                </DrawerTitle>
-                              </DrawerHeader>
-                              <EditTimeline
-                                broll={timelineBroll}
-                                curSec={curSec}
-                                durationSamples={project.durationSamples}
-                                durationSec={fullDur}
-                                graphics={timelineGraphics}
-                                libraryMusic={timelineMusic}
-                                libraryStills={timelineLibraryStills}
-                                music={timelinePlacedMusic}
-                                onClipTiming={onClipTiming}
-                                onSeek={onSeek}
-                                onSelect={onTimelineSelect}
-                                onWordClick={onTimelineWordClick}
-                                ranges={ranges}
-                                sampleRate={sr}
-                                selected={selected}
-                                selRange={selRange}
-                                stills={timelinePlacedStills}
-                                titles={timelineTitles}
-                                wordSpans={timelineWords}
-                                zooms={timelineZooms}
-                              />
-                            </DrawerContent>
-                          </Drawer>
-                        </div>
-                        <div className="mx-auto w-full max-w-2xl">
-                          <div
-                            className="group/preview relative cursor-pointer overflow-hidden rounded-lg border border-border bg-black"
-                            onClick={onPreviewClick}
-                            style={
-                              orientation === "landscape"
-                                ? {
-                                    width: "100%",
-                                    aspectRatio: String(
-                                      ORIENTATION_RATIO.landscape
-                                    ),
-                                  }
-                                : {
-                                    height: "min(42vh, 50vw)",
-                                    aspectRatio: String(
-                                      ORIENTATION_RATIO[orientation]
-                                    ),
-                                  }
-                            }
-                          >
-                            {/* biome-ignore lint/a11y/useMediaCaption: editor preview; transcript is the caption source */}
-                            <video
-                              className={cn(
-                                "block bg-black object-cover",
-                                activeSplitBroll
-                                  ? "absolute inset-y-0 left-0 z-0 h-full w-1/2"
-                                  : "h-full w-full"
-                              )}
-                              playsInline
-                              ref={videoRef}
-                              src={`/media/proxy.mp4?v=${project.mediaVersion ?? 0}`}
-                              style={{
-                                transform: `scale(${zoomScale})`,
-                                transformOrigin: "center",
-                                transition: "transform 0.25s ease-out",
-                                ...(previewReframe
-                                  ? {
-                                      objectPosition: cropObjectPosition(
-                                        exportSettings.crop
-                                      ),
-                                    }
-                                  : {}),
-                              }}
-                            />
-                            <video
-                              className={cn(
-                                "absolute z-0 bg-black object-cover",
-                                activeCoverBroll
-                                  ? "inset-0 block h-full w-full"
-                                  : activePipBroll
-                                    ? "right-2 bottom-2 block aspect-video w-[28%] rounded-md border border-white/25 shadow-lg"
-                                    : activeSplitBroll
-                                      ? "inset-y-0 right-0 block h-full w-1/2"
-                                      : "hidden"
-                              )}
-                              muted
-                              playsInline
-                              ref={brollRef}
-                            />
-                            {/* biome-ignore lint/a11y/useMediaCaption: hidden music bed for preview; the transcript is the caption source */}
-                            <audio
-                              className="hidden"
-                              playsInline
-                              ref={musicRef}
-                            />
-                            <SafeAreaGuides platform={safeAreaGuide} />
-                            {vignetteOn && (
-                              <div
-                                className="pointer-events-none absolute inset-0 z-10"
-                                style={{
-                                  background:
-                                    "radial-gradient(ellipse at center, transparent 42%, rgba(0,0,0,0.62) 100%)",
-                                }}
-                              />
-                            )}
-                            <PreviewOverlays
-                              captionGroups={captionGroups}
-                              captionStyleId={project.captions?.style}
-                              captionsOn={captionsOn}
-                              curSample={curSample}
-                              graphics={project.graphics ?? []}
-                              sampleRate={sr}
-                              slug={project.slug}
-                              titles={project.titles ?? []}
-                            />
-                            <CutTransitionSweep ref={sweepRef} />
-                            {(exporting || pendingSaves > 0) && (
-                              <div className="pointer-events-none absolute top-2 right-2 z-20 flex items-center gap-1.5 rounded-md bg-black/70 px-2 py-1 font-medium text-white text-xs backdrop-blur">
-                                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
-                                {exporting ? "Exporting…" : "Rebuilding…"}
-                              </div>
-                            )}
-                            {/* Linear-parity transport, shared with the cinema overlay */}
-                            <PlayerControls
-                              captionsOn={captionsOn}
-                              className="absolute inset-x-0 bottom-0 z-30 px-3 pb-2 opacity-0 transition-opacity duration-200 ease-out focus-within:opacity-100 group-hover/preview:opacity-100"
-                              current={outPos}
-                              duration={keptDuration}
-                              fullscreenLabel="Open cinema player"
-                              musicMuted={musicMuted}
-                              muted={previewMuted}
-                              onCycleSpeed={cyclePreviewRate}
-                              onFullscreen={() => setCinema(true)}
-                              onPlayToggle={onPlay}
-                              onSeekFraction={(frac) =>
-                                onSeek(
-                                  sourceSecForOutputPosition(
-                                    ranges,
-                                    frac * keptDuration
-                                  )
-                                )
-                              }
-                              onToggleCaptions={() =>
-                                toggleCaptions(!captionsOn)
-                              }
-                              onToggleMusicMute={
-                                (project.music?.length ?? 0) > 0
-                                  ? toggleMusicMute
-                                  : undefined
-                              }
-                              onToggleMute={togglePreviewMute}
-                              onTogglePip={togglePreviewPip}
-                              pipOn={previewPip}
-                              playing={playing}
-                              rate={previewRate}
-                            />
-                          </div>
-                        </div>
+              <EditorColumn
+                agentSidebar={{
+                  isMobile: agentSidebar.isMobile,
+                  open: agentSidebar.open,
+                  toggleSidebar: agentSidebar.toggleSidebar,
+                }}
+                preview={{
+                  activeCoverBroll: Boolean(activeCoverBroll),
+                  activePipBroll: Boolean(activePipBroll),
+                  activeSplitBroll: Boolean(activeSplitBroll),
+                  brollRef,
+                  captionGroups,
+                  captionStyleId: project.captions?.style,
+                  captionsOn,
+                  curSample,
+                  exportSettingsCrop: exportSettings.crop,
+                  exporting,
+                  graphics: project.graphics ?? [],
+                  keptDurationSec: keptDuration,
+                  mediaVersion: project.mediaVersion ?? 0,
+                  musicBedCount: project.music?.length ?? 0,
+                  musicMuted,
+                  musicRef,
+                  onCycleSpeed: cyclePreviewRate,
+                  onFullscreen: () => setCinema(true),
+                  onPlayToggle: onPlay,
+                  onPreviewClick,
+                  onSeekFraction: (frac) =>
+                    onSeek(
+                      sourceSecForOutputPosition(ranges, frac * keptDuration)
+                    ),
+                  onToggleCaptions: () => toggleCaptions(!captionsOn),
+                  onToggleMusicMute: toggleMusicMute,
+                  onToggleMute: togglePreviewMute,
+                  onTogglePip: togglePreviewPip,
+                  orientation,
+                  outPos,
+                  pendingSaves,
+                  playing,
+                  previewMuted,
+                  previewPip,
+                  previewRate,
+                  previewReframe,
+                  sampleRate: sr,
+                  safeAreaGuide,
+                  slug: project.slug,
+                  sweepRef,
+                  titles: project.titles ?? [],
+                  videoRef,
+                  vignetteOn,
+                  zoomScale,
+                }}
+                settings={{
+                  activeSection: settingsSection,
+                  defaultAgent,
+                  export1080,
+                  onDefaultAgentChange: setDefaultAgentModel,
+                  onExport1080Change: setExport1080,
+                }}
+                settingsOpen={settingsOpen}
+                toolbar={{
+                  colorScheme,
+                  configOpen,
+                  cutCount: ranges.length,
+                  exportAspect: exportSettings.aspect,
+                  exportDefaultResolution: export1080 ? "1080" : "4k",
+                  exportDisabled,
+                  exportLabel,
+                  exporting,
+                  fmtTime: formatEditorTime,
+                  fullDurationSec: fullDur,
+                  keptDurationSec: keptDuration,
+                  mobileRightPanel,
+                  onExport,
+                  onOpenChat: () => setMobileRightPanel("chat"),
+                  onOpenConfig: () => setMobileRightPanel("config"),
+                  onOrientationChange: changeOrientation,
+                  onSafeAreaGuideChange,
+                  onToggleColorScheme: toggleColorScheme,
+                  onToggleConfig: () => setConfigOpen((open) => !open),
+                  orientation,
+                  pendingSaves,
+                  safeAreaGuide,
+                  sourceFps: project.fps,
+                  sourceHeight: project.height,
+                  sourceWidth: project.width,
+                }}
+                transcript={{
+                  activeMatchRange: activeSearchRange,
+                  curSample,
+                  inBroll,
+                  inZoom,
+                  matchRanges: searchMatchRanges,
+                  onCutSelection: cutSelection,
+                  onRestoreSelection: restoreSelection,
+                  onSelectRange: selectTranscriptRange,
+                  onTextEdit: reconcileTranscriptEdit,
+                  onViewInHistory: provenanceDisplay
+                    ? focusWordInHistory
+                    : undefined,
+                  search: searchField,
+                  selRange,
+                  showProvenance: provenanceDisplay,
+                  words: project.words,
+                }}
+              />
 
-                        {/* OpenKlip-specific controls (no Linear analogue) */}
-                        <div className="mx-auto flex w-full max-w-2xl flex-wrap items-center gap-2 md:flex-nowrap md:gap-3">
-                          <span className="shrink-0 text-muted-foreground text-xs tabular-nums">
-                            {fmt(outPos)} / {fmt(keptDuration)}
-                          </span>
-                          <div className="flex shrink-0 items-center gap-1">
-                            <Button
-                              aria-label="Set loop in-point"
-                              onClick={() => setLoopInPending(curSec)}
-                              size="sm"
-                              variant="outline"
-                            >
-                              In
-                            </Button>
-                            <Button
-                              aria-label="Set loop out-point"
-                              onClick={() => {
-                                const r = clampLoopRegion(
-                                  loopInPending ?? 0,
-                                  curSec,
-                                  fullDur
-                                );
-                                if (r) {
-                                  setLoop(r);
-                                }
-                              }}
-                              size="sm"
-                              variant="outline"
-                            >
-                              Out
-                            </Button>
-                            {loop && (
-                              <Button
-                                aria-label="Clear loop region"
-                                className="text-muted-foreground text-xs"
-                                onClick={() => {
-                                  setLoop(null);
-                                  setLoopInPending(null);
-                                }}
-                                size="sm"
-                                variant="ghost"
-                              >
-                                Loop {fmt(loop.inSec)}–{fmt(loop.outSec)} ✕
-                              </Button>
-                            )}
-                          </div>
-                          <Select
-                            onValueChange={(v) => {
-                              if (v) {
-                                changeMotionSpeed(Number(v));
-                              }
-                            }}
-                            value={String(motionSpeed)}
-                          >
-                            <SelectTrigger
-                              aria-label="Motion speed"
-                              className="ml-auto w-[8rem]"
-                              size="sm"
-                            >
-                              <SelectValue placeholder="Motion" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectGroup>
-                                <SelectItem value="0.7">Slower</SelectItem>
-                                <SelectItem value="1">Default</SelectItem>
-                                <SelectItem value="1.4">Snappy</SelectItem>
-                                <SelectItem value="1.8">Snappier</SelectItem>
-                              </SelectGroup>
-                            </SelectContent>
-                          </Select>
-                          <Select
-                            onValueChange={(v) => {
-                              if (v) {
-                                changeFilter(v as Filter);
-                              }
-                            }}
-                            value={filter}
-                          >
-                            <SelectTrigger
-                              aria-label="Filter"
-                              className="w-[8.5rem]"
-                              size="sm"
-                            >
-                              <SelectValue placeholder="Filter">
-                                {filterLabel(filter)}
-                              </SelectValue>
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectGroup>
-                                {FILTER_OPTIONS.map((g) => (
-                                  <SelectItem key={g.id} value={g.id}>
-                                    {g.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectGroup>
-                            </SelectContent>
-                          </Select>
-                          <FilterControls
-                            atSec={curSec}
-                            color={color}
-                            filter={filter}
-                            onColor={changeColor}
-                            onFilter={changeFilter}
-                            slug={project.slug}
-                          />
-                          <Toggle
-                            aria-label="Vignette"
-                            onPressedChange={toggleVignette}
-                            pressed={vignetteOn}
-                            size="sm"
-                            variant="outline"
-                          >
-                            Vignette
-                          </Toggle>
-                        </div>
-                      </div>
-
-                      <div className="flex min-h-0 flex-1 flex-col">
-                        <EditorTranscriptPanel
-                          activeMatchRange={activeSearchRange}
-                          curSample={curSample}
-                          inBroll={inBroll}
-                          inZoom={inZoom}
-                          matchRanges={searchMatchRanges}
-                          onCutSelection={cutSelection}
-                          onRestoreSelection={restoreSelection}
-                          onSelectRange={selectTranscriptRange}
-                          onTextEdit={reconcileTranscriptEdit}
-                          onViewInHistory={
-                            provenanceDisplay ? focusWordInHistory : undefined
-                          }
-                          search={
-                            <TranscriptSearch
-                              activeMatchIndex={activeSearchIndex}
-                              matches={searchMatches}
-                              mode={searchMode}
-                              note={searchNote}
-                              onCutMatches={cutSearchMatches}
-                              onModeChange={changeSearchMode}
-                              onNoteChange={setSearchNote}
-                              onQueryChange={changeSearchQuery}
-                              onRestoreMatches={restoreSearchMatches}
-                              onSearchClear={clearTranscriptSearch}
-                              onSeekMatch={seekSearchMatch}
-                              onSeekNextMatch={seekNextSearchMatch}
-                              onSelectMatch={selectSearchMatch}
-                              query={searchQuery}
-                              searchInputRef={transcriptSearchInputRef}
-                              shortcutLabel={searchShortcutLabel}
-                            />
-                          }
-                          selRange={selRange}
-                          showProvenance={provenanceDisplay}
-                          words={project.words}
-                        />
-                      </div>
-                    </div>
-                  </>
-                )}
-              </SidebarInset>
-
-              {/* RIGHT : chat, then config */}
-              {settingsOpen ? null : (
-                <>
-                  <aside
-                    className="relative hidden min-h-0 min-w-0 shrink-0 overflow-hidden border-border border-l bg-background xl:flex"
-                    style={{ width: visibleChatWidth }}
-                  >
-                    <ChatResizeHandle
-                      onResize={setChatWidth}
-                      rightOffset={configOpen ? CONFIG_SIDEBAR_WIDTH : 0}
-                      width={visibleChatWidth}
-                    />
-                    <AgentChatPanel
-                      onAssetsUpdated={applyAssetUpdate}
-                      showSidebarTrigger={false}
-                      slug={project.slug}
-                    />
-                  </aside>
-                  {configOpen ? (
-                    <aside
-                      className="hidden min-h-0 shrink-0 border-border border-l bg-background xl:flex"
-                      style={{ width: CONFIG_SIDEBAR_WIDTH }}
-                    >
-                      {configPanel}
-                    </aside>
-                  ) : null}
-                  {mobileRightPanel === null ? null : (
-                    <div className="fixed inset-0 z-50 xl:hidden">
-                      <button
-                        aria-label="Close panel"
-                        className="absolute inset-0 bg-black/10"
-                        onClick={() => setMobileRightPanel(null)}
-                        type="button"
-                      />
-                      <section
-                        aria-label={
-                          mobileRightPanel === "chat" ? "Chat" : "Config"
-                        }
-                        aria-modal="true"
-                        className="absolute inset-x-0 bottom-0 flex h-[88vh] max-h-[88vh] flex-col overflow-hidden rounded-t-xl border-border border-t bg-background text-foreground shadow-lg"
-                        role="dialog"
-                      >
-                        <div className="flex min-h-0 flex-1 overflow-hidden">
-                          {mobileRightPanel === "chat" ? (
-                            <AgentChatPanel
-                              onAssetsUpdated={applyAssetUpdate}
-                              onClose={() => setMobileRightPanel(null)}
-                              showSidebarTrigger={false}
-                              slug={project.slug}
-                            />
-                          ) : null}
-                          {mobileRightPanel === "config" ? configPanel : null}
-                        </div>
-                      </section>
-                    </div>
-                  )}
-                </>
-              )}
+              <EditorRightRail
+                chatWidth={chatWidth}
+                configOpen={configOpen}
+                configPanel={configPanel}
+                hidden={settingsOpen}
+                mobilePanel={mobileRightPanel}
+                onAssetsUpdated={applyAssetUpdate}
+                onChatWidthChange={setChatWidth}
+                onCloseMobilePanel={() => setMobileRightPanel(null)}
+                slug={project.slug}
+              />
             </SidebarProvider>
           )}
         </SidebarContextBridge>
@@ -4294,113 +2319,4 @@ function SidebarContextBridge({
   children: (context: ReturnType<typeof useSidebar>) => ReactNode;
 }) {
   return children(useSidebar());
-}
-
-function AgentSidebarToolbarTrigger({ onToggle }: { onToggle: () => void }) {
-  const shortcut = useModShortcut("b");
-  const label = `Toggle agent sidebar (${shortcut})`;
-
-  return (
-    <Button
-      aria-label={label}
-      className="size-11 shrink-0 text-muted-foreground/75 hover:text-foreground sm:size-7"
-      onClick={onToggle}
-      size="icon-xs"
-      title={label}
-      variant="ghost"
-    >
-      <PanelLeft />
-    </Button>
-  );
-}
-
-function Section({
-  children,
-  defaultOpen = false,
-  title,
-}: {
-  children: ReactNode;
-  defaultOpen?: boolean;
-  title: string;
-}) {
-  const [open, setOpen] = useState(defaultOpen);
-
-  useEffect(() => {
-    setOpen(defaultOpen);
-  }, [defaultOpen, title]);
-
-  return (
-    <SidebarGroup className="border-border/80 border-t px-2 py-1">
-      <Collapsible onOpenChange={setOpen} open={open} render={<div />}>
-        <CollapsibleTrigger
-          render={
-            <Button
-              className="h-7! w-full justify-start rounded-md px-2 font-medium text-[0.8rem] text-foreground/85 tracking-normal hover:bg-muted/45 [&[data-panel-open]>svg.chevron]:rotate-90"
-              type="button"
-              variant="ghost"
-            >
-              <span className="min-w-0 flex-1 truncate text-left">{title}</span>
-              <ChevronRight className="chevron size-3 shrink-0 text-muted-foreground transition-transform duration-200" />
-            </Button>
-          }
-        />
-        <CollapsibleContent>
-          <SidebarGroupContent className="pt-1.5 pb-1">
-            <FieldGroup className="gap-1.5">{children}</FieldGroup>
-          </SidebarGroupContent>
-        </CollapsibleContent>
-      </Collapsible>
-    </SidebarGroup>
-  );
-}
-
-function SliderRow({
-  formatValue,
-  label,
-  max,
-  min,
-  onValueChange,
-  step,
-  value,
-}: {
-  formatValue?: (value: number) => string;
-  label: string;
-  max: number;
-  min: number;
-  onValueChange: (value: number) => void;
-  step: number;
-  value: number;
-}) {
-  return (
-    <ElasticSlider
-      className="w-full"
-      formatValue={formatValue}
-      label={label}
-      max={max}
-      min={min}
-      onValueChange={onValueChange}
-      step={step}
-      value={value}
-    />
-  );
-}
-
-function PropRow({
-  label,
-  value,
-  children,
-}: {
-  label: string;
-  value: string;
-  children: ReactNode;
-}) {
-  return (
-    <Field className="grid h-7 grid-cols-[4.35rem_1fr_2.75rem] items-center gap-1.5">
-      <FieldLabel className="truncate text-muted-foreground text-xs">
-        {label}
-      </FieldLabel>
-      {children}
-      <span className="text-right text-xs tabular-nums">{value}</span>
-    </Field>
-  );
 }

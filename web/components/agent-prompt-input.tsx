@@ -7,6 +7,7 @@ import {
   AgentModelOptionContent,
   AgentModelTriggerValue,
 } from "@/components/agent-model-select";
+import { AgentPromptAttachments } from "@/components/agent-prompt-attachments";
 import { AgentSkillTokenField } from "@/components/agent-skill-token-field";
 import {
   AgentSkillsMenu,
@@ -44,6 +45,7 @@ import {
 import type { AssetBinUpdate } from "@/lib/asset-bin-update";
 import { syncProjectAssets, uploadProjectAssets } from "@/lib/asset-upload";
 import { Plus, Sparkles } from "@/lib/icon";
+import { fileUIPartToFile } from "@/lib/prompt-attachment";
 import {
   buildSkillCatalog,
   buildSkillsMessage,
@@ -155,32 +157,7 @@ function AgentPromptInputInner({
   });
   const skillsMenuId = "agent-skills-menu-list";
 
-  const onSubmit = async ({ text }: PromptInputMessage) => {
-    if (selectedSkills.length > 0) {
-      const message = buildSkillsMessage(selectedSkills, text);
-      setSelectedSkills([]);
-      clearInput();
-      await onSubmitMessage(message);
-      return;
-    }
-
-    const trimmed = text.trim();
-    if (trimmed.startsWith("/")) {
-      const match = skills.find(
-        (skill) =>
-          skill.slash === trimmed.slice(1) ||
-          skill.id === trimmed.slice(1) ||
-          `template:${skill.templateId}` === trimmed.slice(1)
-      );
-      if (match) {
-        selectSkill(match);
-        return;
-      }
-    }
-    await onSubmitMessage(trimmed);
-  };
-
-  const onUploadAssets = async (files: FileList | null) => {
+  const onUploadAssets = async (files: FileList | File[] | null) => {
     if (!files || files.length === 0) {
       return;
     }
@@ -198,8 +175,44 @@ function AgentPromptInputInner({
       toastChatAssetUploadSuccess(count);
     } catch (e) {
       toastAssetUploadFailed((e as Error).message);
+      throw e;
     } finally {
       setUploadingAssets(false);
+    }
+  };
+
+  const onSubmit = async ({ text, files }: PromptInputMessage) => {
+    if (files.length > 0) {
+      const fileObjects = await Promise.all(files.map(fileUIPartToFile));
+      await onUploadAssets(fileObjects);
+    }
+
+    if (selectedSkills.length > 0) {
+      const message = buildSkillsMessage(selectedSkills, text);
+      setSelectedSkills([]);
+      clearInput();
+      await onSubmitMessage(message);
+      return;
+    }
+
+    const trimmed = text.trim();
+    if (!trimmed && files.length === 0) {
+      return;
+    }
+    if (trimmed.startsWith("/")) {
+      const match = skills.find(
+        (skill) =>
+          skill.slash === trimmed.slice(1) ||
+          skill.id === trimmed.slice(1) ||
+          `template:${skill.templateId}` === trimmed.slice(1)
+      );
+      if (match) {
+        selectSkill(match);
+        return;
+      }
+    }
+    if (trimmed) {
+      await onSubmitMessage(trimmed);
     }
   };
 
@@ -215,11 +228,14 @@ function AgentPromptInputInner({
     >
       <div ref={promptRootRef}>
         <PromptInput
+          accept="video/*,audio/*,image/*"
           className="min-w-0 rounded-lg"
           inputGroupClassName="items-stretch overflow-visible"
+          multiple
           onSubmit={onSubmit}
         >
           <PromptInputBody>
+            <AgentPromptAttachments />
             {selectedSkills.length > 0 ? (
               <AgentSkillTokenField
                 ariaControls={slashMenu.menuOpen ? skillsMenuId : undefined}

@@ -6,15 +6,6 @@ import { AgentPromptInput } from "@/components/agent-prompt-input";
 import { ChatMarkdown } from "@/components/chat-markdown";
 import { HelloLoading } from "@/components/hello-loading";
 import { TaskProgressPanel } from "@/components/task-progress-panel";
-import {
-  Attachment,
-  AttachmentAction,
-  AttachmentActions,
-  AttachmentContent,
-  AttachmentDescription,
-  AttachmentMedia,
-  AttachmentTitle,
-} from "@/components/ui/attachment";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,7 +14,6 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "@/components/ui/empty";
-import { Marker, MarkerContent, MarkerIcon } from "@/components/ui/marker";
 import {
   Message,
   MessageAvatar,
@@ -44,7 +34,7 @@ import { AgentProviderIcon } from "@/lib/agent-icons";
 import { getAgentModelLabel } from "@/lib/agent-preferences";
 import type { ThreadMessage } from "@/lib/agent-threads";
 import type { AssetBinUpdate } from "@/lib/asset-bin-update";
-import { APP_ICON_CLASS, CheckIcon, FileTextIcon, XIcon } from "@/lib/icon";
+import { APP_ICON_CLASS, XIcon } from "@/lib/icon";
 import { cn } from "@/lib/utils";
 
 const TRAIL_PREVIEW_LENGTH = 180;
@@ -322,7 +312,6 @@ export function AgentChatPanel({
   } = useAgentChat();
 
   const isRunning = runningThreadId !== null;
-  const showStaticMockups = !(chatsLoading || activeThread?.messages.length);
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
@@ -381,38 +370,6 @@ export function AgentChatPanel({
                   </MessageScrollerItem>
                 ) : (
                   <>
-                    {showStaticMockups && (
-                      <MessageScrollerItem>
-                        <Marker>
-                          <MarkerIcon>
-                            <CheckIcon />
-                          </MarkerIcon>
-                          <MarkerContent>Project context ready</MarkerContent>
-                        </Marker>
-                      </MessageScrollerItem>
-                    )}
-                    {showStaticMockups && (
-                      <MessageScrollerItem>
-                        <Attachment>
-                          <AttachmentMedia>
-                            <FileTextIcon />
-                          </AttachmentMedia>
-                          <AttachmentContent>
-                            <AttachmentTitle>
-                              sales-dashboard.pdf
-                            </AttachmentTitle>
-                            <AttachmentDescription>
-                              PDF · 2.4 MB
-                            </AttachmentDescription>
-                          </AttachmentContent>
-                          <AttachmentActions>
-                            <AttachmentAction aria-label="Remove sales-dashboard.pdf">
-                              <XIcon />
-                            </AttachmentAction>
-                          </AttachmentActions>
-                        </Attachment>
-                      </MessageScrollerItem>
-                    )}
                     {!activeThread?.messages.length && (
                       <MessageScrollerItem className="flex flex-1 items-center">
                         <Empty>

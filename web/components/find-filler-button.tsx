@@ -5,7 +5,7 @@ import { useAgentChat } from "@/components/agent-chat-context";
 import { helloLoadingLabel } from "@/lib/hello-loading-labels";
 import { Sparkles } from "@/lib/icon";
 
-export function FindFillerButton() {
+export function FindFillerButton({ className }: { className?: string }) {
   const {
     activeStatus,
     agentUsable,
@@ -35,6 +35,7 @@ export function FindFillerButton() {
   return (
     <ActionStatusButton
       busy={isRunning}
+      className={className}
       disabled={isRunning || !agentUsable || chatsLoading}
       icon={Sparkles}
       label={label}
