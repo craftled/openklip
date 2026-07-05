@@ -96,6 +96,7 @@ import {
 } from "./package-pass.ts";
 import { projectPaths } from "./paths.ts";
 import { PRODUCT_ANNOUNCEMENT_CATALOG } from "./product-announcement.ts";
+import { auditProjectForShip } from "./project-brief-audit.ts";
 import {
   latestProject,
   listHistorySnapshotRevisions,
@@ -258,6 +259,7 @@ Look & captions
   openklip template show <id>            print a template skill file
   openklip template set <slug> <id>      attach a template to a project
   openklip brief <slug>                  print the project brief (brief.md)
+  openklip brief <slug> --audit          check edit against brief targets (exit 1 on failure)
   openklip brief <slug> --set <text...>  replace the brief with the given text
   openklip brief <slug> --file <path>    replace the brief with a file's content
                                        (empty text clears the brief)
@@ -2952,6 +2954,25 @@ try {
             ? `brief saved for ${slug}${source} (${newText.trim().length} chars)`
             : `brief cleared for ${slug}`
         );
+        break;
+      }
+      if (rest.includes("--audit")) {
+        const brief = await loadBrief(slug);
+        if (!brief?.trim()) {
+          throw new Error(`no brief.md for ${slug}; cannot audit`);
+        }
+        const project = await loadProject(slug);
+        const result = auditProjectForShip({ briefText: brief, project });
+        for (const warning of result.warnings) {
+          console.log(`warning: ${warning}`);
+        }
+        if (!result.ok) {
+          for (const issue of result.issues) {
+            console.error(`issue: ${issue}`);
+          }
+          process.exit(1);
+        }
+        console.log(`brief audit passed for ${slug}`);
         break;
       }
       const brief = await loadBrief(slug);

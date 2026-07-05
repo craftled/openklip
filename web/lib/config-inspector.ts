@@ -54,7 +54,7 @@ interface InspectorGraphic {
   validation?: { success: boolean; issues: string[] } | null;
 }
 
-interface BuildConfigInspectorSummaryInput {
+export interface ConfigInspectorSummaryInput {
   assetName: (assetId: string) => string;
   fmtTime: (sec: number) => string;
   graphicLabel: string;
@@ -94,7 +94,7 @@ function brollDisplayLabel(display: string | undefined): string {
 }
 
 export function buildConfigInspectorSummary(
-  input: BuildConfigInspectorSummaryInput
+  input: ConfigInspectorSummaryInput
 ): ConfigInspectorSummary | null {
   const {
     assetName,

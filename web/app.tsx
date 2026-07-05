@@ -51,7 +51,6 @@ import {
 } from "@/components/chat-resize-handle";
 import { CinemaPlayer } from "@/components/cinema-player";
 import { buildCleanupCandidates } from "@/components/cleanup-panel";
-import { ConfigPanel } from "@/components/config/config-panel";
 import { ZOOM_PRESETS } from "@/components/config/config-section";
 import type {
   TimelineClipKind,
@@ -75,7 +74,7 @@ import {
 import { PreviewOverlays } from "@/components/preview-overlays";
 import type { ExportPatch } from "@/components/reframe-controls";
 import { SidebarProvider, useSidebar } from "@/components/ui/sidebar";
-import { useEditorTimeline } from "@/hooks/use-editor-timeline";
+import { useConfigPanel } from "@/hooks/use-config-panel";
 import { usePreviewPlayback } from "@/hooks/use-preview-playback";
 import { useProjectSaves } from "@/hooks/use-project-saves";
 import {
@@ -97,7 +96,6 @@ import {
   toastTransitionFallback,
 } from "@/lib/app-toast";
 import type { AssetBinUpdate } from "@/lib/asset-bin-update";
-import { buildConfigInspectorSummary } from "@/lib/config-inspector";
 import { shouldAutoOpenConfig } from "@/lib/config-panel-behavior";
 import type { ConfigTabId } from "@/lib/config-tabs";
 import { type DeadAirItem, reconcileDeadAirItems } from "@/lib/dead-air-state";
@@ -1807,83 +1805,12 @@ export function App({
         Math.abs(z.scale - v.scale) < 0.001 &&
         Math.abs(z.rampSec - v.rampSec) < 0.001
     )?.[0] ?? "";
-  const configInspectorSummary = useMemo(
-    () =>
-      buildConfigInspectorSummary({
-        assetName,
-        fmtTime: formatEditorTime,
-        graphicLabel: selGraphicLabel,
-        sampleRate: sr,
-        selBroll: selBroll ?? null,
-        selGraphic: selGraphic
-          ? {
-              catalog:
-                selGraphic.type === "json-render"
-                  ? selGraphic.catalog
-                  : undefined,
-              startSample: selGraphic.startSample,
-              template:
-                selGraphic.type === "json-render"
-                  ? (selGraphic.catalog ?? "product-announcement")
-                  : selGraphic.template,
-              type: selGraphic.type === "json-render" ? "json-render" : "html",
-              validation: selGraphicValidation,
-            }
-          : null,
-        selRange,
-        selStill: selStill ?? null,
-        selTitle: selTitle ?? null,
-        selZoom: selZoom ?? null,
-        wordStartSample: selRange
-          ? (project.words[selRange[0]]?.startSample ?? null)
-          : null,
-      }),
-    [
-      assetName,
-      project.words,
-      selBroll,
-      selGraphic,
-      selGraphicLabel,
-      selGraphicValidation,
-      selRange,
-      selStill,
-      selTitle,
-      selZoom,
-      sr,
-    ]
-  );
   const exportDisabled = exporting || pendingSaves > 0 || saveError !== null;
   const exportLabel = exporting
     ? "Exporting…"
     : pendingSaves > 0
       ? "Saving…"
       : "Export";
-
-  const {
-    timelineBroll,
-    timelineGraphics,
-    timelineLibraryStills,
-    timelineMusic,
-    timelinePlacedMusic,
-    timelinePlacedStills,
-    timelineTitles,
-    timelineWords,
-    timelineZooms,
-  } = useEditorTimeline({
-    assetName,
-    assets: project.assets,
-    broll: project.broll ?? [],
-    graphics: project.graphics,
-    music: project.music,
-    sampleRate: sr,
-    stills: project.stills,
-    titles: project.titles ?? [],
-    words: project.words,
-    zooms: project.zooms ?? [],
-  });
-
-  const configCloseLabel =
-    mobileRightPanel === "config" ? "Close config" : "Hide config";
 
   const exportSettings = useMemo(
     () => ExportSettingsSchema.parse(project.export ?? {}),
@@ -1894,7 +1821,7 @@ export function App({
     crop: exportSettings.crop,
   });
 
-  const handleConfigClose = useCallback(() => {
+  const onCloseConfig = useCallback(() => {
     if (mobileRightPanel === "config") {
       setMobileRightPanel(null);
       return;
@@ -1902,208 +1829,235 @@ export function App({
     setConfigOpen(false);
   }, [mobileRightPanel]);
 
-  const configPanel = (
-    <ConfigPanel
-      activeTab={configTab}
-      closeLabel={configCloseLabel}
-      edit={{
-        addBroll,
-        addStill,
-        addTitle,
-        addZoom,
-        assetName,
-        brollAssets,
-        chosenAsset,
-        chosenStillAsset,
-        clearSelection: clearSel,
-        fmtTime: formatEditorTime,
-        graphicPlayheadOffset,
-        hasOverlayInspector,
-        newKeyframeProperty,
-        onChosenAssetChange: setChosenAsset,
-        onChosenStillAssetChange: setChosenStillAsset,
-        onNewKeyframePropertyChange: setNewKeyframeProperty,
-        onTitlePosChange: setTitlePos,
-        onTitleTextChange: setTitleText,
-        presetOf,
-        projectBroll: project.broll ?? [],
-        provenanceDisplay,
-        removeSelected,
-        reorderBrollOrder,
-        sampleRate: sr,
-        selBroll: selBroll ?? null,
-        selGraphic: selGraphic ?? null,
-        selGraphicKeyframes,
-        selGraphicValidation,
-        selRange,
-        selStill: selStill ?? null,
-        selTitle: selTitle ?? null,
-        selZoom: selZoom ?? null,
-        selectedId: selected?.id,
-        setSelected,
-        stillAssets,
-        titlePos,
-        titleText,
-        updateBroll,
-        updateGraphic,
-        updateStill,
-        updateTitle,
-        updateZoom,
-      }}
-      history={{
-        currentRevision: project.revision ?? 0,
-        currentWords: project.words.map((word) => ({
-          deleted: word.deleted,
-          id: word.id,
-          text: word.text,
-        })),
-        focusRevision: historyFocusRevision,
-        onFocusRevisionHandled: () => setHistoryFocusRevision(null),
-        onReverted: onHistoryReverted,
-        showProvenance: provenanceDisplay,
-        slug: project.slug,
-      }}
-      inspectorSummary={configInspectorSummary}
-      look={{
-        atSec: curSec,
-        captionStyle: project.captions?.style ?? DEFAULT_CAPTION_STYLE,
-        color,
-        filter,
-        maxWords: project.captions?.maxWords ?? 6,
-        motionSpeed,
-        onCaptionStyle: setCaptionStyle,
-        onColor: changeColor,
-        onFilter: changeFilter,
-        onMaxWords: setMaxWords,
-        onMotionSpeed: changeMotionSpeed,
-        onPadMs: setPad,
-        onVignette: toggleVignette,
-        padMs: project.padMs ?? 50,
-        reframe: {
-          applying: pendingSaves > 0,
-          applyingVision,
-          exportSettings,
-          hasSceneLog: Boolean(project.sceneLog),
-          onPatchExport: patchExport,
-          onRunVisionFocus,
-          visionFocusAvailable,
-        },
-        slug: project.slug,
-        vignetteOn,
-      }}
-      onClose={handleConfigClose}
-      onTabChange={setConfigTab}
-      project={{
+  const configPanel = useConfigPanel({
+    activeTab: configTab,
+    onTabChange: setConfigTab,
+    mobileRightPanel,
+    onCloseConfig,
+    edit: {
+      addBroll,
+      addStill,
+      addTitle,
+      addZoom,
+      assetName,
+      brollAssets,
+      chosenAsset,
+      chosenStillAsset,
+      clearSelection: clearSel,
+      fmtTime: formatEditorTime,
+      graphicPlayheadOffset,
+      hasOverlayInspector,
+      newKeyframeProperty,
+      onChosenAssetChange: setChosenAsset,
+      onChosenStillAssetChange: setChosenStillAsset,
+      onNewKeyframePropertyChange: setNewKeyframeProperty,
+      onTitlePosChange: setTitlePos,
+      onTitleTextChange: setTitleText,
+      presetOf,
+      projectBroll: project.broll ?? [],
+      provenanceDisplay,
+      removeSelected,
+      reorderBrollOrder,
+      sampleRate: sr,
+      selBroll: selBroll ?? null,
+      selGraphic: selGraphic ?? null,
+      selGraphicKeyframes,
+      selGraphicValidation,
+      selRange,
+      selStill: selStill ?? null,
+      selTitle: selTitle ?? null,
+      selZoom: selZoom ?? null,
+      selectedId: selected?.id,
+      setSelected,
+      stillAssets,
+      titlePos,
+      titleText,
+      updateBroll,
+      updateGraphic,
+      updateStill,
+      updateTitle,
+      updateZoom,
+    },
+    history: {
+      currentRevision: project.revision ?? 0,
+      currentWords: project.words.map((word) => ({
+        deleted: word.deleted,
+        id: word.id,
+        text: word.text,
+      })),
+      focusRevision: historyFocusRevision,
+      onFocusRevisionHandled: () => setHistoryFocusRevision(null),
+      onReverted: onHistoryReverted,
+      showProvenance: provenanceDisplay,
+      slug: project.slug,
+    },
+    inspector: {
+      assetName,
+      fmtTime: formatEditorTime,
+      graphicLabel: selGraphicLabel,
+      sampleRate: sr,
+      selBroll: selBroll ?? null,
+      selGraphic: selGraphic
+        ? {
+            catalog:
+              selGraphic.type === "json-render"
+                ? selGraphic.catalog
+                : undefined,
+            startSample: selGraphic.startSample,
+            template:
+              selGraphic.type === "json-render"
+                ? (selGraphic.catalog ?? "product-announcement")
+                : selGraphic.template,
+            type: selGraphic.type === "json-render" ? "json-render" : "html",
+            validation: selGraphicValidation,
+          }
+        : null,
+      selRange,
+      selStill: selStill ?? null,
+      selTitle: selTitle ?? null,
+      selZoom: selZoom ?? null,
+      wordStartSample: selRange
+        ? (project.words[selRange[0]]?.startSample ?? null)
+        : null,
+    },
+    look: {
+      atSec: curSec,
+      captionStyle: project.captions?.style ?? DEFAULT_CAPTION_STYLE,
+      color,
+      filter,
+      maxWords: project.captions?.maxWords ?? 6,
+      motionSpeed,
+      onCaptionStyle: setCaptionStyle,
+      onColor: changeColor,
+      onFilter: changeFilter,
+      onMaxWords: setMaxWords,
+      onMotionSpeed: changeMotionSpeed,
+      onPadMs: setPad,
+      onVignette: toggleVignette,
+      padMs: project.padMs ?? 50,
+      reframe: {
+        applying: pendingSaves > 0,
         applyingVision,
-        assets: project.assets ?? [],
-        assetName,
-        audio: project.audio,
-        audioMeasure,
-        audioMeasuring,
-        brief: project.brief ?? "",
-        bpmByAssetId: musicBpmByAsset,
-        bpmDetectingAssetId,
-        chosenGraphicTemplate,
-        chosenMusicAsset,
-        cleanupReport: cleanupReportView,
-        deadAirSpans: (project.cuts?.deadAir ?? []).map((span) => ({
-          id: span.id,
-          startSec: span.startSample / project.sampleRate,
-          endSec: span.endSample / project.sampleRate,
-        })),
-        detectingHighlights,
-        durationSec: project.durationSamples / sr,
-        graphicBeatCount,
-        graphicMusicAssetId,
-        graphicParamDraft,
-        graphicSpanMode,
-        graphicTemplates,
-        highlights: project.highlights,
-        musicAssets,
-        musicPlacements: project.music ?? [],
-        onAddGraphic: addGraphicPlacement,
-        onAddGraphicAtCuts: addGraphicAtCutSeams,
-        onAddMusic: addMusicPlacement,
-        onApplyAllSafeCleanup: applyAllSafeCleanup,
-        onApplyCleanup: applyCleanupCandidate,
-        onAssembled: onHistoryReverted,
-        onBeatCountChange: setGraphicBeatCount,
-        onChooseGraphicMusicAsset: setGraphicMusicAssetId,
-        onChooseGraphicTemplate: (id) => {
-          setChosenGraphicTemplate(id);
-          const template = graphicTemplates.find((entry) => entry.id === id);
-          if (!template) {
-            setGraphicParamDraft({});
-            return;
-          }
-          const defaults: Record<string, string | number | boolean> = {};
-          for (const [key, spec] of Object.entries(template.params)) {
-            defaults[key] = spec.default;
-          }
-          setGraphicParamDraft(defaults);
-        },
-        onChooseMusicAsset: setChosenMusicAsset,
-        onDetectBpm: detectMusicBpm,
-        onDetectHighlights,
-        onGraphicParamChange: (key, value) => {
-          setGraphicParamDraft((prev) => ({ ...prev, [key]: value }));
-        },
-        onGraphicSpanModeChange: setGraphicSpanMode,
-        onMeasureAudio: measureAudioLoudness,
-        onPatchAudio: patchAudio,
-        onPatchMusic: patchMusicPlacement,
-        onPatchSnap: patchSnap,
-        onRemoveDeadAirSpan: removeDeadAirSpan,
-        onRemoveMusic: removeMusicPlacement,
-        onSaveBrief: async (text) => {
-          const r = await saveBrief(project.slug, text);
-          if (r.ok) {
-            setProject((prev) => ({ ...prev, brief: text }));
-            return { ok: true as const };
-          }
-          return { ok: false as const, error: r.error };
-        },
-        onSeekHighlight: onSeek,
-        pendingSaves,
-        sampleRate: sr,
-        slug: project.slug,
-        snap: project.cuts?.snap,
-      }}
-      tools={{
-        curSec,
-        fmtTime: formatEditorTime,
-        fullDurationSec: fullDur,
-        keptDurationSec: keptDuration,
-        loop,
-        onClearLoop: () => setLoop(null),
-        onSetLoop: setLoop,
-        outPos,
-        timeline: {
-          broll: timelineBroll,
-          curSec,
-          durationSamples: project.durationSamples,
-          durationSec: fullDur,
-          fmtTime: formatEditorTime,
-          graphics: timelineGraphics,
-          libraryMusic: timelineMusic,
-          libraryStills: timelineLibraryStills,
-          music: timelinePlacedMusic,
-          onClipTiming,
-          onSeek,
-          onSelect: onTimelineSelect,
-          onWordClick: onTimelineWordClick,
-          ranges,
-          sampleRate: sr,
-          selected,
-          selRange,
-          stills: timelinePlacedStills,
-          titles: timelineTitles,
-          wordSpans: timelineWords,
-          zooms: timelineZooms,
-        },
-      }}
-    />
-  );
+        exportSettings,
+        hasSceneLog: Boolean(project.sceneLog),
+        onPatchExport: patchExport,
+        onRunVisionFocus,
+        visionFocusAvailable,
+      },
+      slug: project.slug,
+      vignetteOn,
+    },
+    project: {
+      applyingVision,
+      assets: project.assets ?? [],
+      assetName,
+      audio: project.audio,
+      audioMeasure,
+      audioMeasuring,
+      brief: project.brief ?? "",
+      bpmByAssetId: musicBpmByAsset,
+      bpmDetectingAssetId,
+      chosenGraphicTemplate,
+      chosenMusicAsset,
+      cleanupReport: cleanupReportView,
+      deadAirSpans: (project.cuts?.deadAir ?? []).map((span) => ({
+        id: span.id,
+        startSec: span.startSample / project.sampleRate,
+        endSec: span.endSample / project.sampleRate,
+      })),
+      detectingHighlights,
+      durationSec: project.durationSamples / sr,
+      graphicBeatCount,
+      graphicMusicAssetId,
+      graphicParamDraft,
+      graphicSpanMode,
+      graphicTemplates,
+      highlights: project.highlights,
+      musicAssets,
+      musicPlacements: project.music ?? [],
+      onAddGraphic: addGraphicPlacement,
+      onAddGraphicAtCuts: addGraphicAtCutSeams,
+      onAddMusic: addMusicPlacement,
+      onApplyAllSafeCleanup: applyAllSafeCleanup,
+      onApplyCleanup: applyCleanupCandidate,
+      onAssembled: onHistoryReverted,
+      onBeatCountChange: setGraphicBeatCount,
+      onChooseGraphicMusicAsset: setGraphicMusicAssetId,
+      onChooseGraphicTemplate: (id) => {
+        setChosenGraphicTemplate(id);
+        const template = graphicTemplates.find((entry) => entry.id === id);
+        if (!template) {
+          setGraphicParamDraft({});
+          return;
+        }
+        const defaults: Record<string, string | number | boolean> = {};
+        for (const [key, spec] of Object.entries(template.params)) {
+          defaults[key] = spec.default;
+        }
+        setGraphicParamDraft(defaults);
+      },
+      onChooseMusicAsset: setChosenMusicAsset,
+      onDetectBpm: detectMusicBpm,
+      onDetectHighlights,
+      onGraphicParamChange: (key, value) => {
+        setGraphicParamDraft((prev) => ({ ...prev, [key]: value }));
+      },
+      onGraphicSpanModeChange: setGraphicSpanMode,
+      onMeasureAudio: measureAudioLoudness,
+      onPatchAudio: patchAudio,
+      onPatchMusic: patchMusicPlacement,
+      onPatchSnap: patchSnap,
+      onRemoveDeadAirSpan: removeDeadAirSpan,
+      onRemoveMusic: removeMusicPlacement,
+      onSaveBrief: async (text) => {
+        const r = await saveBrief(project.slug, text);
+        if (r.ok) {
+          setProject((prev) => ({ ...prev, brief: text }));
+          return { ok: true as const };
+        }
+        return { ok: false as const, error: r.error };
+      },
+      onSeekHighlight: onSeek,
+      pendingSaves,
+      sampleRate: sr,
+      slug: project.slug,
+      snap: project.cuts?.snap,
+    },
+    playback: {
+      curSec,
+      fullDurationSec: fullDur,
+      keptDurationSec: keptDuration,
+      loop,
+      onClearLoop: () => setLoop(null),
+      onSetLoop: setLoop,
+      outPos,
+    },
+    timeline: {
+      assetName,
+      assets: project.assets,
+      broll: project.broll ?? [],
+      graphics: project.graphics,
+      music: project.music,
+      sampleRate: sr,
+      stills: project.stills,
+      titles: project.titles ?? [],
+      words: project.words,
+      zooms: project.zooms ?? [],
+    },
+    timelineCallbacks: {
+      curSec,
+      durationSamples: project.durationSamples,
+      durationSec: fullDur,
+      onClipTiming,
+      onSeek,
+      onSelect: onTimelineSelect,
+      onWordClick: onTimelineWordClick,
+      ranges,
+      sampleRate: sr,
+      selected,
+      selRange,
+    },
+  });
 
   return (
     <AgentChatProvider
