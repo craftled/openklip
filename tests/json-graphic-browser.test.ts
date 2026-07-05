@@ -79,9 +79,9 @@ test("editor selects json-render graphic on timeline and shows inspector", {
       timeout: 30_000,
     });
     await page.evaluate((label) => {
-      const clip = document.querySelector(`[title="${label}"]`) as
-        | HTMLElement
-        | null;
+      const clip = document.querySelector(
+        `[title="${label}"]`
+      ) as HTMLElement | null;
       if (!clip) {
         return;
       }
@@ -123,9 +123,9 @@ test("editor selects json-render graphic on timeline and shows inspector", {
     await openTimelineDrawer(page);
     const trimmed = await page.evaluate((label) => {
       const clipEl = document.querySelector(`[title="${label}"]`);
-      const handle = clipEl?.querySelector('[data-handle="end"]') as
-        | HTMLElement
-        | null;
+      const handle = clipEl?.querySelector(
+        '[data-handle="end"]'
+      ) as HTMLElement | null;
       if (!(clipEl && handle)) {
         return false;
       }
