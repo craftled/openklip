@@ -24,11 +24,11 @@ import {
   getShaderNoiseTexture,
   godRaysFragmentShader,
   grainGradientFragmentShader,
-  halftoneCmykFragmentShader,
   HalftoneCmykTypes,
-  halftoneDotsFragmentShader,
   HalftoneDotsGrids,
   HalftoneDotsTypes,
+  halftoneCmykFragmentShader,
+  halftoneDotsFragmentShader,
   heatmapFragmentShader,
   imageDitheringFragmentShader,
   LiquidMetalShapes,
@@ -316,10 +316,7 @@ function imageUniform(
   return emptyPixelImage();
 }
 
-function imageAspectUniform(
-  params: GraphicParams,
-  shaderId: ShaderId
-): number {
+function imageAspectUniform(params: GraphicParams, shaderId: ShaderId): number {
   return imageAspectFromCached(params, shaderId);
 }
 

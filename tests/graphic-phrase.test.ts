@@ -14,9 +14,27 @@ test("phraseStaggerFrames scales down with more words", () => {
 test("resolveGraphicPhraseParams sets stagger from phrase word ids", () => {
   const project = makeProject();
   project.words = [
-    { id: "w0", text: "hello", startSample: 0, endSample: 24_000, deleted: false },
-    { id: "w1", text: "brave", startSample: 24_000, endSample: 48_000, deleted: false },
-    { id: "w2", text: "world", startSample: 48_000, endSample: 72_000, deleted: false },
+    {
+      id: "w0",
+      text: "hello",
+      startSample: 0,
+      endSample: 24_000,
+      deleted: false,
+    },
+    {
+      id: "w1",
+      text: "brave",
+      startSample: 24_000,
+      endSample: 48_000,
+      deleted: false,
+    },
+    {
+      id: "w2",
+      text: "world",
+      startSample: 48_000,
+      endSample: 72_000,
+      deleted: false,
+    },
   ];
   const params = resolveGraphicPhraseParams(
     project,

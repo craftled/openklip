@@ -82,7 +82,7 @@ function MusicPlacementRow({
         <span className="min-w-0 flex-1 truncate">{name}</span>
         <span className="shrink-0 text-muted-foreground tabular-nums">
           {fromSec.toFixed(1)}s–{toSec.toFixed(1)}s
-          {bpm !== undefined ? ` · ${bpm} BPM` : ""}
+          {bpm === undefined ? "" : ` · ${bpm} BPM`}
         </span>
       </div>
       <ElasticSlider
@@ -265,7 +265,9 @@ export function MusicSectionControls({
             <div className="flex items-center gap-1.5">
               <Button
                 data-music-bpm-detect
-                disabled={!chosenAssetId || bpmDetectingAssetId === chosenAssetId}
+                disabled={
+                  !chosenAssetId || bpmDetectingAssetId === chosenAssetId
+                }
                 onClick={() => onDetectBpm(chosenAssetId)}
                 size="sm"
                 variant="outline"
@@ -295,13 +297,13 @@ export function MusicSectionControls({
       ) : (
         placements.map((m) => (
           <MusicPlacementRow
+            bpm={bpmByAssetId[m.assetId]?.bpm}
             key={m.id}
             m={m}
             name={assetName(m.assetId)}
             onPatch={onPatch}
             onRemove={onRemove}
             sampleRate={sampleRate}
-            bpm={bpmByAssetId[m.assetId]?.bpm}
           />
         ))
       )}

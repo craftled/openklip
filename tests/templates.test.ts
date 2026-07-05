@@ -47,9 +47,15 @@ test("listTemplates finds the make-draft, make-short, make-highlights, and revis
   );
   assert.equal(motionGraphics?.label, "Motion graphics");
   const motionShorts = list.find((t) => t.id === "motion-shorts");
-  assert.ok(motionShorts, "motion-shorts should be auto-listed from templates/");
+  assert.ok(
+    motionShorts,
+    "motion-shorts should be auto-listed from templates/"
+  );
   const motionCanvas = list.find((t) => t.id === "motion-canvas");
-  assert.ok(motionCanvas, "motion-canvas should be auto-listed from templates/");
+  assert.ok(
+    motionCanvas,
+    "motion-canvas should be auto-listed from templates/"
+  );
   assert.equal(motionCanvas?.label, "Motion canvas");
 });
 

@@ -21,7 +21,10 @@ test("detectBpm finds a steady pulse near 120 BPM", () => {
     pcm[i] = beatPhase < 0.02 ? 1 : 0.01;
   }
   const result = detectBpm(pcm, sampleRate);
-  assert.ok(result.bpm >= 115 && result.bpm <= 125, `expected ~120, got ${result.bpm}`);
+  assert.ok(
+    result.bpm >= 115 && result.bpm <= 125,
+    `expected ~120, got ${result.bpm}`
+  );
   assert.ok(result.confidence >= 0);
 });
 

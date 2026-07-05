@@ -19,8 +19,6 @@ import {
   shaderSpecFor,
 } from "./paper-shader-specs.ts";
 
-export { ensureGraphicImagesReady } from "./graphic-image-cache.ts";
-
 export interface GraphicFrameOptions {
   height: number;
   keyframes?: Keyframe[];

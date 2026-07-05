@@ -56,7 +56,11 @@ import { AgentChatProvider } from "@/components/agent-chat-context";
 import { AgentChatPanel } from "@/components/agent-chat-panel";
 import { AgentSidebar } from "@/components/agent-sidebar";
 import { withAssetKind } from "@/components/asset-bin";
-import { AudioControls, type AudioMeasureView, type AudioPatch } from "@/components/audio-controls";
+import {
+  AudioControls,
+  type AudioMeasureView,
+  type AudioPatch,
+} from "@/components/audio-controls";
 import { BriefEditor } from "@/components/brief-editor";
 import { CaptionStylePicker } from "@/components/caption-style-picker";
 import {
@@ -89,6 +93,12 @@ import {
 import { FilterControls } from "@/components/filter-controls";
 import { FindFillerButton } from "@/components/find-filler-button";
 import type { GraphicItem } from "@/components/graphic-overlay";
+import {
+  DEFAULT_GRAPHIC_SPAN_SEC,
+  GraphicSectionControls,
+  type GraphicSpanMode,
+  useGraphicTemplates,
+} from "@/components/graphic-picker-controls";
 import { HighlightsPanel } from "@/components/highlights-panel";
 import { HistoryPanel } from "@/components/history-panel";
 import {
@@ -97,12 +107,6 @@ import {
   type MusicPlacementView,
   MusicSectionControls,
 } from "@/components/music-controls";
-import {
-  DEFAULT_GRAPHIC_SPAN_SEC,
-  GraphicSectionControls,
-  type GraphicSpanMode,
-  useGraphicTemplates,
-} from "@/components/graphic-picker-controls";
 import { OverlaySortable } from "@/components/overlay-sortable";
 import { PLAYER_SPEEDS, PlayerControls } from "@/components/player-controls";
 import { PreviewOverlays } from "@/components/preview-overlays";
@@ -1244,7 +1248,7 @@ export function App({
     }
     const durationSec = project.durationSamples / project.sampleRate;
     const fromSec = curSec;
-    let toSec = Math.min(curSec + DEFAULT_GRAPHIC_SPAN_SEC, durationSec);
+    const toSec = Math.min(curSec + DEFAULT_GRAPHIC_SPAN_SEC, durationSec);
     const beatsPayload =
       graphicSpanMode === "beats" &&
       graphicMusicAssetId &&
@@ -1633,7 +1637,13 @@ export function App({
           confidence?: number;
           error?: string;
         };
-        if (!(res.ok && typeof data.bpm === "number" && typeof data.confidence === "number")) {
+        if (
+          !(
+            res.ok &&
+            typeof data.bpm === "number" &&
+            typeof data.confidence === "number"
+          )
+        ) {
           throw new Error(data.error ?? "BPM detection failed");
         }
         const { bpm, confidence } = data;

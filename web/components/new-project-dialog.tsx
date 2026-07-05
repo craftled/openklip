@@ -23,7 +23,14 @@ import {
   toastProjectCreateFailed,
   toastWorkspacePickFailed,
 } from "@/lib/app-toast";
-import { APP_ICON_CLASS, Check, Film, FolderOpen, LayoutTemplate, Upload } from "@/lib/icon";
+import {
+  APP_ICON_CLASS,
+  Check,
+  Film,
+  FolderOpen,
+  LayoutTemplate,
+  Upload,
+} from "@/lib/icon";
 import { selectDroppedVideo } from "@/lib/project-intake";
 import { workspacePickerToasts } from "@/lib/toast-notifications";
 import { cn } from "@/lib/utils";

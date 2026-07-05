@@ -9,8 +9,8 @@
 // transcribe spawn touch the world.
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { FFMPEG, run } from "./ffmpeg.ts";
 import { isBlankCanvasProject } from "./blank-ingest.ts";
+import { FFMPEG, run } from "./ffmpeg.ts";
 import { projectPaths } from "./paths.ts";
 import { loadProject } from "./projectStore.ts";
 import { transcribeScriptPath } from "./script-paths.ts";

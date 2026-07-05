@@ -4,19 +4,19 @@ import { join } from "node:path";
 import { FFMPEG, run } from "./ffmpeg.ts";
 import {
   analyzeLoudnormPass,
-  parseLoudnormJson,
+  type LoudnormMeasured,
 } from "./loudnorm-two-pass.ts";
 import { projectPaths } from "./paths.ts";
 
 export type AudioMeasureSource = "export" | "proxy";
 
 export interface AudioMeasureResult {
-  source: AudioMeasureSource;
-  path: string;
   integratedLufs: number;
-  truePeakDbtp: number;
   lra: number;
+  path: string;
+  source: AudioMeasureSource;
   targetLufs: number;
+  truePeakDbtp: number;
 }
 
 async function extractAudioWav(
@@ -59,12 +59,9 @@ export async function measureProjectAudio(
     );
   }
 
-  const probeWav = join(
-    paths.working,
-    `.audio-measure-${process.pid}.wav`
-  );
+  const probeWav = join(paths.working, `.audio-measure-${process.pid}.wav`);
   await extractAudioWav(mediaPath, probeWav);
-  let measured;
+  let measured: LoudnormMeasured;
   try {
     measured = await analyzeLoudnormPass(probeWav, targetLufs);
   } finally {
@@ -98,5 +95,3 @@ export async function measureFileLoudness(
     targetLufs,
   };
 }
-
-export { parseLoudnormJson };

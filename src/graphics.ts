@@ -49,7 +49,10 @@ export function projectGraphicsRoot(slug: string): string {
 
 export function graphicDir(id: string, opts?: { slug?: string }): string {
   if (opts?.slug) {
-    const local = join(projectGraphicsRoot(opts.slug), assertValidGraphicId(id));
+    const local = join(
+      projectGraphicsRoot(opts.slug),
+      assertValidGraphicId(id)
+    );
     if (existsSync(join(local, "manifest.json"))) {
       return local;
     }
@@ -57,7 +60,10 @@ export function graphicDir(id: string, opts?: { slug?: string }): string {
   return join(graphicsRoot(), assertValidGraphicId(id));
 }
 
-export function graphicManifestPath(id: string, opts?: { slug?: string }): string {
+export function graphicManifestPath(
+  id: string,
+  opts?: { slug?: string }
+): string {
   return join(graphicDir(id, opts), "manifest.json");
 }
 
@@ -86,7 +92,10 @@ export type GraphicPack =
   | "other"
   | "project";
 
-export function graphicPack(id: string, scope?: "bundled" | "project"): GraphicPack {
+export function graphicPack(
+  id: string,
+  scope?: "bundled" | "project"
+): GraphicPack {
   if (scope === "project") {
     return "project";
   }

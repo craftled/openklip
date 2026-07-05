@@ -45,8 +45,8 @@ export interface GraphicTemplateOption {
 
 export interface GraphicAssetOption {
   id: string;
-  name: string;
   kind: string;
+  name: string;
 }
 
 export interface GraphicMusicAssetOption {
@@ -83,7 +83,9 @@ function groupedTemplates(templates: GraphicTemplateOption[]) {
   return PACK_ORDER.map((pack) => ({
     pack,
     label: PACK_LABELS[pack],
-    items: (groups.get(pack) ?? []).sort((a, b) => a.name.localeCompare(b.name)),
+    items: (groups.get(pack) ?? []).sort((a, b) =>
+      a.name.localeCompare(b.name)
+    ),
   })).filter((g) => g.items.length > 0);
 }
 
@@ -244,7 +246,10 @@ export function GraphicSectionControls({
               value={chosenMusicAssetId}
             >
               <SelectTrigger
-                className={cn("min-w-24 flex-1", CONFIG_COMPACT_SELECT_TRIGGER_CLASS)}
+                className={cn(
+                  "min-w-24 flex-1",
+                  CONFIG_COMPACT_SELECT_TRIGGER_CLASS
+                )}
                 data-graphic-music-asset
                 disabled={musicAssets.length === 0}
                 size="sm"
@@ -269,7 +274,9 @@ export function GraphicSectionControls({
                 size="sm"
                 variant="ghost"
               >
-                {bpmDetectingAssetId === chosenMusicAssetId ? "Detecting…" : "BPM"}
+                {bpmDetectingAssetId === chosenMusicAssetId
+                  ? "Detecting…"
+                  : "BPM"}
               </Button>
             ) : null}
             {chosenMusicAssetId && bpmByAssetId[chosenMusicAssetId] ? (

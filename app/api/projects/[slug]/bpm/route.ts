@@ -19,7 +19,10 @@ export async function GET(req: Request, { params }: RouteParams) {
   const url = new URL(req.url);
   const assetId = url.searchParams.get("assetId")?.trim();
   if (!assetId) {
-    return Response.json({ error: "assetId query param is required" }, { status: 400 });
+    return Response.json(
+      { error: "assetId query param is required" },
+      { status: 400 }
+    );
   }
 
   const force = url.searchParams.get("force") === "1";
@@ -29,7 +32,10 @@ export async function GET(req: Request, { params }: RouteParams) {
     return Response.json(result);
   } catch (e) {
     const message = (e as Error).message;
-    if (message.includes("unknown asset") || message.includes("requires kind music")) {
+    if (
+      message.includes("unknown asset") ||
+      message.includes("requires kind music")
+    ) {
       return Response.json({ error: message }, { status: 404 });
     }
     return Response.json({ error: message }, { status: 500 });

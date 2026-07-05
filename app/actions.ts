@@ -20,6 +20,7 @@ import {
 } from "@engine/export-platforms";
 import type { CutTransitionFallbackReason } from "@engine/export-segments";
 import type { ExportCompression, ExportFormat } from "@engine/exporter";
+import { finalizeGraphicSpan } from "@engine/graphic-placement";
 import { projectPaths } from "@engine/paths";
 import {
   applyBroll,
@@ -39,7 +40,6 @@ import { guiMutateMeta } from "@engine/provenance";
 import { getAction, runAction } from "@engine/registry";
 import { revealInFileManager } from "@engine/reveal-path";
 import { type RevertTarget, revertProject } from "@engine/revert";
-import { finalizeGraphicSpan } from "@engine/graphic-placement";
 
 export type ActionResult<T = void> =
   | ({ ok: true } & (T extends void ? object : { data: T }))

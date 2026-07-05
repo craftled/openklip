@@ -29,7 +29,10 @@ test("ingestBlank creates a graphics-first project with empty words", async () =
     const ranges = rangesForExport(project);
     assert.equal(ranges.length, 1);
     assert.equal(ranges[0]?.startSec, 0);
-    assert.equal(ranges[0]?.endSec, project.durationSamples / project.sampleRate);
+    assert.equal(
+      ranges[0]?.endSec,
+      project.durationSamples / project.sampleRate
+    );
   } finally {
     rmSync(projectPaths(slug).dir, { recursive: true, force: true });
   }

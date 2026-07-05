@@ -11,15 +11,15 @@ import {
   setAgentTaskStep,
 } from "./agent-tasks.ts";
 import { assembleFromSelection, listTakes, loadTake } from "./assembly.ts";
-import { ingestBlank } from "./blank-ingest.ts";
 import { loadAudioAnalysis } from "./audio-analysis.ts";
 import type { SilenceSpan } from "./audio-analysis-core.ts";
 import { measureProjectAudio } from "./audio-measure.ts";
+import { ingestBlank } from "./blank-ingest.ts";
+import { measureMusicBpm } from "./bpm.ts";
 import { loadBrief, saveBrief } from "./brief.ts";
 import { logBriefSet } from "./brief-log.ts";
-import { measureMusicBpm } from "./bpm.ts";
 import { cleanupReport, fillerOnlyCleanupReport } from "./cleanup.ts";
-import { type Project, samplesToSec, PhraseAnchorSchema } from "./edl.ts";
+import { PhraseAnchorSchema, type Project, samplesToSec } from "./edl.ts";
 import { EXPORT_PLATFORM_IDS } from "./export-platforms.ts";
 import {
   EXPORT_COMPRESSIONS,
@@ -27,8 +27,8 @@ import {
   exportCut,
   GIF_MAX_WIDTH_OVERRIDE_CEILING_PX,
 } from "./exporter.ts";
-import { finalizeGraphicSpan } from "./graphic-placement.ts";
 import { resolveGraphicPhraseParams } from "./graphic-phrase.ts";
+import { finalizeGraphicSpan } from "./graphic-placement.ts";
 import {
   graphicCompositionPath,
   listGraphics,
@@ -583,7 +583,9 @@ const queryTools: AgentToolDef[] = [
     summary:
       "List available graphic templates with param schemas (graphics/*/manifest.json).",
     schema: z.object({ slug: slug.optional() }),
-    run: ({ slug }) => ({ graphics: listGraphics(slug ? { slug } : undefined) }),
+    run: ({ slug }) => ({
+      graphics: listGraphics(slug ? { slug } : undefined),
+    }),
   }),
   defineQueryTool({
     name: "graphic_show",

@@ -31,10 +31,13 @@ export function resolveGraphicPhraseParams(
 ): Record<string, string | number | boolean> {
   const merged = { ...(params ?? {}) };
   const runs = findPhraseRuns(project, spokenPhrase, { all: false });
-  if (merged.text === undefined && KINETIC_TEXT_TEMPLATES.has(template)) {
-    if (runs.length > 0 && runs[0].text) {
-      merged.text = runs[0].text;
-    }
+  if (
+    merged.text === undefined &&
+    KINETIC_TEXT_TEMPLATES.has(template) &&
+    runs.length > 0 &&
+    runs[0].text
+  ) {
+    merged.text = runs[0].text;
   }
   const count = wordIds?.length ?? runs[0]?.ids.length ?? 0;
   if (

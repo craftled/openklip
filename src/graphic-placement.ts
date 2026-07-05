@@ -1,5 +1,5 @@
-import type { Project } from "./edl.ts";
 import { measureMusicBpm, readCachedMusicBpm } from "./bpm.ts";
+import type { Project } from "./edl.ts";
 import {
   extendGraphicSpanForEntrance,
   spanForBeats,
@@ -17,7 +17,8 @@ export async function finalizeGraphicSpan(input: {
   bpm?: number;
   musicAssetId?: string;
 }): Promise<{ fromSec: number; toSec: number }> {
-  const projectDurationSec = input.project.durationSamples / input.project.sampleRate;
+  const projectDurationSec =
+    input.project.durationSamples / input.project.sampleRate;
   const fromSec = input.fromSec;
   let toSec = extendGraphicSpanForEntrance({
     template: input.template,

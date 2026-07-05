@@ -1,19 +1,31 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import type { Project } from "../src/edl.ts";
 import {
   addGraphicsAtCutSeams,
   cutSeamTimes,
   defaultTransitionDurationSec,
   spanAtCutSeam,
 } from "../src/graphic-cut-transitions.ts";
-import type { Project } from "../src/edl.ts";
 import { makeProject } from "./helpers/projectFixture.ts";
 
 function projectWithCuts(): Project {
   const p = makeProject();
   p.words = [
-    { id: "w0", text: "one", startSample: 0, endSample: 48_000, deleted: false },
-    { id: "w1", text: "two", startSample: 48_000, endSample: 96_000, deleted: false },
+    {
+      id: "w0",
+      text: "one",
+      startSample: 0,
+      endSample: 48_000,
+      deleted: false,
+    },
+    {
+      id: "w1",
+      text: "two",
+      startSample: 48_000,
+      endSample: 96_000,
+      deleted: false,
+    },
     {
       id: "w-cut",
       text: "filler",
@@ -21,8 +33,20 @@ function projectWithCuts(): Project {
       endSample: 200_000,
       deleted: true,
     },
-    { id: "w2", text: "three", startSample: 200_000, endSample: 248_000, deleted: false },
-    { id: "w3", text: "four", startSample: 248_000, endSample: 296_000, deleted: false },
+    {
+      id: "w2",
+      text: "three",
+      startSample: 200_000,
+      endSample: 248_000,
+      deleted: false,
+    },
+    {
+      id: "w3",
+      text: "four",
+      startSample: 248_000,
+      endSample: 296_000,
+      deleted: false,
+    },
   ];
   p.durationSamples = 400_000;
   return p;

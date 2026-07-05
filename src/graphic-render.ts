@@ -41,10 +41,10 @@ export interface RenderGraphicInput {
   manifest: GraphicManifest;
   // Working dir to write the asset into (exporter passes p.working).
   outDir: string;
-  /** Project slug for project-local template lookup. */
-  slug?: string;
   // Already merged over the manifest's param defaults by the caller.
   params: Record<string, string | number | boolean>;
+  /** Project slug for project-local template lookup. */
+  slug?: string;
   // graphic-template id (composition.html lookup + error messages).
   template: string;
   // Output width / height (exporter passes outW / outH).

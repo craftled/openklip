@@ -8,9 +8,9 @@ import {
   toastProjectCreateFailed,
 } from "@/lib/app-toast";
 import {
+  createBlankProject,
   type IngestProgressView,
   type ProjectCreateOptions,
-  createBlankProject,
   ProjectExistsError,
 } from "@/lib/project-create";
 import { projectIngestLoadingMessage } from "@/lib/toast-notifications";

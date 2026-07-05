@@ -29,11 +29,11 @@ import {
   type ExportAspect,
   type ExportCrop,
   ExportSettingsSchema,
-  rangesForExport,
   intersectRangesWithSpan,
   type MusicPlacement,
   ProjectSchema,
   type Range,
+  rangesForExport,
   SAMPLE_RATE,
   sec,
   sourceToOutputSec,
@@ -65,8 +65,8 @@ import {
 } from "./export-segments.ts";
 import { FFMPEG, probe, run } from "./ffmpeg.ts";
 import { filterChain } from "./filter.ts";
-import { renderGraphicOverlay } from "./graphic-render.ts";
 import { enrichGraphicParamsWithImage } from "./graphic-image.ts";
+import { renderGraphicOverlay } from "./graphic-render.ts";
 import {
   defaultGraphicParams,
   type GraphicManifest,
@@ -1133,12 +1133,10 @@ export async function exportCut(
         const manifest: GraphicManifest = loadGraphicManifest(g.template, {
           slug: project.slug,
         });
-        const params = enrichGraphicParamsWithImage(
-          slug,
-          project,
-          g.template,
-          { ...defaultGraphicParams(manifest), ...g.params }
-        );
+        const params = enrichGraphicParamsWithImage(slug, project, g.template, {
+          ...defaultGraphicParams(manifest),
+          ...g.params,
+        });
         return {
           graphic: g,
           outStart: win.outStart,

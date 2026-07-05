@@ -14,11 +14,11 @@ import {
 import { assembleFromSelection, ingestTake, listTakes } from "./assembly.ts";
 import { analyzeAssets } from "./asset-cards.ts";
 import { registerAsset } from "./assets.ts";
-import { measureProjectAudio } from "./audio-measure.ts";
 import { loadAudioAnalysis } from "./audio-analysis.ts";
 import type { SilenceSpan } from "./audio-analysis-core.ts";
+import { measureProjectAudio } from "./audio-measure.ts";
+import { type BlankAspect, ingestBlank } from "./blank-ingest.ts";
 import { measureMusicBpm } from "./bpm.ts";
-import { ingestBlank, type BlankAspect } from "./blank-ingest.ts";
 import { applyBrand, loadBrand } from "./brands.ts";
 import { loadBrief, saveBrief } from "./brief.ts";
 import { logBriefSet } from "./brief-log.ts";
@@ -72,8 +72,8 @@ import {
 } from "./exporter.ts";
 import { FFMPEG, FFPROBE } from "./ffmpeg.ts";
 import { FILTER_NAMES, isFilter } from "./filter.ts";
-import { finalizeGraphicSpan } from "./graphic-placement.ts";
 import { resolveGraphicPhraseParams } from "./graphic-phrase.ts";
+import { finalizeGraphicSpan } from "./graphic-placement.ts";
 import {
   graphicCompositionPath,
   listGraphics,
@@ -673,7 +673,9 @@ try {
         const force = args.includes("--force");
         const slug = flagValue(args, "--slug");
         const durationSec = flagNumber(args, "--duration");
-        const aspectRaw = flagValue(args, "--aspect") as BlankAspect | undefined;
+        const aspectRaw = flagValue(args, "--aspect") as
+          | BlankAspect
+          | undefined;
         const fps = flagNumber(args, "--fps");
         const color = flagValue(args, "--color");
         const aspect =
@@ -2378,7 +2380,11 @@ try {
           toSec: span.toSec,
           params: mergedParams,
           track: trackFlag(args),
-          anchor: { phrase: spokenPhrase, wordIds: phraseSpan.ids, stale: false },
+          anchor: {
+            phrase: spokenPhrase,
+            wordIds: phraseSpan.ids,
+            stale: false,
+          },
         }
       );
       console.log(

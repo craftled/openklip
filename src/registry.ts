@@ -49,7 +49,6 @@ import {
   updateTitle,
   updateZoom,
 } from "./actions.ts";
-import { addGraphicsAtCutSeams } from "./graphic-cut-transitions.ts";
 import { CAPTION_STYLE_IDS } from "./caption-styles.ts";
 import { NEUTRAL_COLOR } from "./color-adjust.ts";
 import {
@@ -61,6 +60,7 @@ import {
   type Project,
 } from "./edl.ts";
 import { EXPORT_ASPECT_IDS } from "./export-aspect.ts";
+import { addGraphicsAtCutSeams } from "./graphic-cut-transitions.ts";
 import { KeyframeSchema } from "./keyframes.ts";
 import {
   PRODUCT_ANNOUNCEMENT_CATALOG,

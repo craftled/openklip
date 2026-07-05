@@ -12,12 +12,11 @@ const ANALYSIS_HZ = 200;
 const MAX_ANALYSIS_SEC = 45;
 
 /** Estimate tempo from mono float PCM (any sample rate). */
-export function detectBpm(
-  pcm: Float32Array,
-  sampleRate: number
-): BpmDetection {
+export function detectBpm(pcm: Float32Array, sampleRate: number): BpmDetection {
   if (pcm.length < sampleRate) {
-    throw new Error("audio too short for BPM detection (need at least 1 second)");
+    throw new Error(
+      "audio too short for BPM detection (need at least 1 second)"
+    );
   }
   const blockSize = Math.max(1, Math.floor(sampleRate / ANALYSIS_HZ));
   const envLen = Math.floor(pcm.length / blockSize);

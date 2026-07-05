@@ -2,11 +2,11 @@
 
 import type { Keyframe } from "@engine/keyframes";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { ensureGraphicImagesReady } from "@/lib/graphic-image-cache";
 import {
   applyGraphicFrame,
   applyGraphicParams,
   disposeGraphicRuntime,
-  ensureGraphicImagesReady,
   graphicFrameAt,
 } from "@/lib/graphic-runtime";
 import { graphicRequiresImageAsset } from "../../src/graphics.ts";

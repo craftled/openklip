@@ -1,7 +1,10 @@
 import { existsSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import type { Asset, Project } from "./edl.ts";
-import { graphicRequiresImageAsset, graphicSupportsImageAsset } from "./graphics.ts";
+import {
+  graphicRequiresImageAsset,
+  graphicSupportsImageAsset,
+} from "./graphics.ts";
 import { assetStoragePath } from "./paths.ts";
 
 export function resolveGraphicImageFileUrl(
@@ -11,7 +14,7 @@ export function resolveGraphicImageFileUrl(
   params: Record<string, string | number | boolean>
 ): string | undefined {
   if (!graphicSupportsImageAsset(template)) {
-    return undefined;
+    return;
   }
   const assetId = params.assetId;
   if (typeof assetId !== "string" || !assetId.trim()) {
@@ -20,7 +23,7 @@ export function resolveGraphicImageFileUrl(
         `graphic template "${template}" requires --param assetId=<still-or-image-asset>`
       );
     }
-    return undefined;
+    return;
   }
   const asset = project.assets.find((a) => a.id === assetId);
   if (!asset) {

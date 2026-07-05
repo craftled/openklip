@@ -1,4 +1,4 @@
-import { ingestBlank, type BlankAspect } from "@engine/blank-ingest";
+import { type BlankAspect, ingestBlank } from "@engine/blank-ingest";
 import { assertValidSlug } from "@engine/paths";
 import type { NextRequest } from "next/server";
 

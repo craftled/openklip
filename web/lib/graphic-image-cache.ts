@@ -28,14 +28,14 @@ export function getCachedGraphicImage(
   return imageCache.get(cacheKey(src, shaderId === "heatmap"));
 }
 
-export async function loadGraphicImage(
+export function loadGraphicImage(
   src: string,
   opts?: { heatmap?: boolean }
 ): Promise<HTMLImageElement> {
   const key = cacheKey(src, opts?.heatmap === true);
   const cached = imageCache.get(key);
   if (cached) {
-    return cached;
+    return Promise.resolve(cached);
   }
   const pending = imageLoading.get(key);
   if (pending) {
@@ -80,7 +80,11 @@ export function imageAspectFromCached(
     return image.naturalWidth / image.naturalHeight;
   }
   const fallback = params._imageAspectRatio;
-  if (typeof fallback === "number" && Number.isFinite(fallback) && fallback > 0) {
+  if (
+    typeof fallback === "number" &&
+    Number.isFinite(fallback) &&
+    fallback > 0
+  ) {
     return fallback;
   }
   return 1;

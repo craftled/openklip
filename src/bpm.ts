@@ -6,6 +6,7 @@ import { type BpmDetection, detectBpm } from "./bpm-core.ts";
 import type { Asset, Project } from "./edl.ts";
 import { validateBpm } from "./graphic-span.ts";
 import { assetStoragePath, projectPaths } from "./paths.ts";
+
 const BPM_SAMPLE_RATE = 22_050;
 
 const BpmCacheEntrySchema = z.object({

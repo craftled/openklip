@@ -1082,7 +1082,9 @@ export function updateGraphic(
     template === item.template
       ? item.params
       : {
-          ...defaultGraphicParams(loadGraphicManifest(template, { slug: project.slug })),
+          ...defaultGraphicParams(
+            loadGraphicManifest(template, { slug: project.slug })
+          ),
           ...item.params,
         };
   item.template = template;

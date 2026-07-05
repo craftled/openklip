@@ -4,8 +4,8 @@ import type { Audio, CutSnap } from "@engine/edl";
 import { useState } from "react";
 import { ElasticSlider } from "@/components/elastic-slider";
 import { formatDotDecimal } from "@/components/slider-primitives";
-import { Field, FieldLabel } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
+import { Field, FieldLabel } from "@/components/ui/field";
 import {
   Select,
   SelectContent,
@@ -372,7 +372,7 @@ export function AudioControls({
           </Button>
           {measure ? (
             <p
-              className="text-muted-foreground text-xs leading-snug tabular-nums"
+              className="text-muted-foreground text-xs tabular-nums leading-snug"
               data-audio-measure-result
             >
               {measure.integratedLufs.toFixed(1)} LUFS integrated (

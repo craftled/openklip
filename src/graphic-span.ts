@@ -42,11 +42,11 @@ export function minGraphicSpanSec(
     words = Math.round(params.phraseWordCount);
   } else {
     const text =
-      params.text !== undefined
-        ? String(params.text)
-        : params.title !== undefined
-          ? String(params.title)
-          : "";
+      params.text === undefined
+        ? params.title === undefined
+          ? ""
+          : String(params.title)
+        : String(params.text);
     if (text.trim()) {
       words = Math.max(1, text.trim().split(/\s+/).length);
     }

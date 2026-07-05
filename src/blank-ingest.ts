@@ -1,22 +1,21 @@
-import { existsSync } from "node:fs";
 import { mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { type Project, ProjectSchema, SAMPLE_RATE } from "./edl.ts";
 import { FFMPEG, run } from "./ffmpeg.ts";
-import { assertProjectCanBeIngested } from "./ingest-guard.ts";
 import { buildProxy } from "./ingest.ts";
+import { assertProjectCanBeIngested } from "./ingest-guard.ts";
 import { projectPaths, slugify } from "./paths.ts";
 import { defaultTemplateId } from "./templates.ts";
 
 export type BlankAspect = "16:9" | "9:16" | "1:1";
 
 export interface IngestBlankOptions {
-  slug?: string;
-  durationSec?: number;
   aspect?: BlankAspect;
-  fps?: number;
   color?: string;
+  durationSec?: number;
   force?: boolean;
+  fps?: number;
+  slug?: string;
 }
 
 const ASPECT_DIMS: Record<BlankAspect, { width: number; height: number }> = {
@@ -30,7 +29,9 @@ function normalizeColor(raw: string): string {
   if (/^#[0-9a-fA-F]{6}$/.test(color)) {
     return color;
   }
-  throw new Error(`color must be a hex value like #000000 (got ${JSON.stringify(raw)})`);
+  throw new Error(
+    `color must be a hex value like #000000 (got ${JSON.stringify(raw)})`
+  );
 }
 
 async function buildBlankSource(input: {
@@ -71,7 +72,9 @@ async function buildBlankSource(input: {
 /** Create a graphics-first project with no speech transcript. */
 export async function ingestBlank(opts?: IngestBlankOptions): Promise<string> {
   const durationSec = opts?.durationSec ?? 30;
-  if (!(Number.isFinite(durationSec) && durationSec >= 1 && durationSec <= 3600)) {
+  if (
+    !(Number.isFinite(durationSec) && durationSec >= 1 && durationSec <= 3600)
+  ) {
     throw new Error("duration must be between 1 and 3600 seconds");
   }
   const aspect = opts?.aspect ?? "16:9";
