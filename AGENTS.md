@@ -55,7 +55,7 @@ Time is integer audio samples at 48 kHz. The CLI takes seconds where a human num
 | Ingest a video | `openklip ingest <video> [--force]` |
 | Create blank canvas | `openklip ingest --blank [--slug] [--duration] [--aspect] [--fps] [--color] [--force]` (GUI: New project → Blank canvas; MCP: `blank_ingest`) |
 | Open editor | `openklip serve [slug]` (alias `dev`) |
-| Read / write the project brief | `openklip brief <slug> [--set <text...> \| --file <path>]` |
+| Read / write the project brief | `openklip brief <slug> [--set <text...> \| --file <path> \| --audit]` |
 | Read transcript (full) | `openklip transcript <slug>` |
 | Grep transcript | `openklip transcript grep`, `span`, `phrase` |
 | Review edit (JSON) | `openklip status <slug> --json`, `ranges`, `overlays` |
@@ -132,6 +132,7 @@ Run as `bun run src/cli.ts <command>` (or the `openklip` bin).
 | `openklip brief <slug>` | Print the project brief (`brief.md`), or a hint if none exists yet. |
 | `openklip brief <slug> --set <text...>` | Replace the brief with the given text (empty text clears it). |
 | `openklip brief <slug> --file <path>` | Replace the brief with a file's content. |
+| `openklip brief <slug> --audit` | Check the current edit against `brief.md` targets (runtime, overlays, music, protected phrases). Exits non-zero on failure. |
 
 ### Transcript (read)
 
@@ -287,7 +288,7 @@ The tool-calling edit prompt (`buildEditPrompt` in `src/agent-driver.ts`) advert
 | Query | `list_projects`, `blank_ingest`, `transcript_grep`, `transcript_phrase`, `scene_log`, `highlights_list`, `project_status`, `project_overlays`, `cleanup_report`, `history_list`, `task_list`, `template_list`, `graphic_list`, `graphic_show`, `load_skill`, `music_bpm`, `audio_measure`, … | `openklip transcript grep`, `status --json`, `overlays --json`, `highlights`, `cleanup --json`, `openklip history`, `openklip tasks`, `openklip template list`, `openklip ingest --blank`, `openklip graphic list`, `openklip bpm`, `openklip audio measure` |
 | Mutate | `cut`, `cut-text`, `broll-add`, `title-set`, `word-text`, `dead-air-add`, `dead-air-rm`, `audio`, `captions-style`, … | `openklip cut`, `broll-add`, `word-text`, `dead-air-rm`, `audio`, `captions-style`, … |
 | Phrase compose | `title-add-phrase`, `zoom-add-phrase`, `broll-add-phrase`, `graphic-add-phrase` | `openklip title-add-phrase`, … |
-| Brief | `brief_get`, `brief_set` | `openklip brief`, `openklip brief --set` |
+| Brief | `brief_get`, `brief_set`, `brief_audit` | `openklip brief`, `openklip brief --set`, `openklip brief --audit` |
 | Agent task progress | `task_step`, `task_complete` | no CLI equivalent: scoped to the running agent's own task via `OPENKLIP_TASK_ID` |
 | Revert | `revert` | `openklip revert` |
 | Render | `export` (accepts `format`, `gifMaxWidth`, `platform`, and `loudnessTargetLufs`) | `openklip export --format --gif-max-width --platform --loudness` |

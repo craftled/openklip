@@ -35,6 +35,7 @@ import {
   loadGraphicManifest,
 } from "./graphics.ts";
 import { listLuts } from "./lut.ts";
+import { auditProjectForShip } from "./project-brief-audit.ts";
 import {
   listHistorySnapshotRevisions,
   listProjects,
@@ -686,6 +687,20 @@ const queryTools: AgentToolDef[] = [
       await saveBrief(projectSlug, text);
       await logBriefSet(projectSlug, toolActor(), text, toolTaskId());
       return { saved: true, chars: text.trim().length };
+    },
+  }),
+  defineQueryTool({
+    name: "brief_audit",
+    summary:
+      "Check the current edit against brief.md targets (runtime, b-roll/still counts, music gain, protected phrases, overlay visibility in kept ranges).",
+    schema: z.object({ slug }),
+    run: async ({ slug: projectSlug }) => {
+      const brief = await loadBrief(projectSlug);
+      if (!brief?.trim()) {
+        throw new Error(`no brief.md for ${projectSlug}; cannot audit`);
+      }
+      const project = await loadProject(projectSlug);
+      return auditProjectForShip({ briefText: brief, project });
     },
   }),
   defineQueryTool({
