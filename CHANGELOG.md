@@ -16,7 +16,7 @@
 - **Motion templates**: manifest timing params (`inDurFrames`, `staggerFrames`) wired through preview and export; motion pack compositions updated for `data-timing-bind`.
 - **Agent driver and make-draft / revise-draft skills**: advertise motion graphics, beat sync, and blank-canvas workflows.
 - **Known limitations** (`TODO.md`): image-filter shaders and 29-shader count reflect shipped behavior.
-- **Version**: bumped OpenKlip to `0.41.0.0` (`1779` tests passing).
+- **Version**: bumped OpenKlip to `0.41.0.0` (`1780` tests: 1779 pass, 1 skip).
 
 ## 0.40.0.1 - 2026-07-04
 
