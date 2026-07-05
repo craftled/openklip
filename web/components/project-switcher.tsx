@@ -65,6 +65,7 @@ export function ProjectSwitcher({
   const {
     cancelOverwrite,
     confirmOverwrite,
+    createBlank,
     createPhase,
     createdSlug,
     creating,
@@ -129,6 +130,7 @@ export function ProjectSwitcher({
         />
       ) : null}
       <NewProjectDialog
+        onBlankSelected={() => void createBlank()}
         onOpenChange={setNewProjectOpen}
         onVideoSelected={ingestVideo}
         open={newProjectOpen}

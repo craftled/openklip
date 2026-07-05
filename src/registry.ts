@@ -60,6 +60,7 @@ import {
   type Project,
 } from "./edl.ts";
 import { EXPORT_ASPECT_IDS } from "./export-aspect.ts";
+import { addGraphicsAtCutSeams } from "./graphic-cut-transitions.ts";
 import { KeyframeSchema } from "./keyframes.ts";
 import {
   PRODUCT_ANNOUNCEMENT_CATALOG,
@@ -452,6 +453,25 @@ export const actions: ActionDef[] = [
     surfaces: ["cli", "gui", "mcp"],
     schema: z.object({ id: z.string() }),
     run: (p, i) => ({ removed: removeGraphic(p, i.id) }),
+  }),
+  defineAction({
+    name: "graphic-add-cuts",
+    summary:
+      "Place a transition-* graphic centered on every kept-range cut seam.",
+    surfaces: ["cli", "gui", "mcp"],
+    schema: z.object({
+      template: z.string(),
+      durationSec: sec.optional(),
+      params: z
+        .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
+        .optional(),
+      track: track.optional(),
+      note: z.string().optional(),
+    }),
+    run: (p, i) => {
+      const items = addGraphicsAtCutSeams(p, i);
+      return { count: items.length, ids: items.map((g) => g.id), items };
+    },
   }),
   defineAction({
     name: "captions",

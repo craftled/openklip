@@ -370,6 +370,60 @@ test("CLI broll-add-phrase covers phrase span", async () => {
   });
 });
 
+test("CLI graphic list includes motion-word-cascade with params", async () => {
+  const r = await runCli(["graphic", "list"]);
+  assert.equal(r.code, 0);
+  assert.match(r.out, /motion-word-cascade/);
+  assert.match(r.out, /motion\t/);
+  assert.match(r.out, /graphic template/);
+});
+
+test("CLI graphic show prints manifest JSON", async () => {
+  const r = await runCli(["graphic", "show", "motion-word-cascade"]);
+  assert.equal(r.code, 0);
+  const data = JSON.parse(r.out.trim());
+  assert.equal(data.manifest.id, "motion-word-cascade");
+  assert.ok(data.compositionPath.includes("motion-word-cascade"));
+  assert.ok(data.manifest.params.inDurFrames);
+});
+
+test("CLI graphic-add-phrase places graphic with transcript text", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+
+    const r = await runCli([
+      "graphic-add-phrase",
+      slug,
+      "motion-word-cascade",
+      "Hello world",
+    ]);
+    assert.equal(r.code, 0);
+    assert.match(r.out, /added graphic/);
+
+    const status = await runCli(["overlays", slug, "--json"]);
+    const data = JSON.parse(status.out.trim());
+    assert.equal(data.graphics.length, 1);
+    assert.equal(data.graphics[0].template, "motion-word-cascade");
+    assert.equal(data.graphics[0].params?.text, "Hello world");
+    assert.equal(data.graphics[0].anchor?.phrase, "Hello world");
+  });
+});
+
+test("CLI graphic-add-phrase errors when phrase not found", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+
+    const r = await runCli([
+      "graphic-add-phrase",
+      slug,
+      "motion-word-cascade",
+      "missing phrase",
+    ]);
+    assert.notEqual(r.code, 0);
+    assert.match(r.out, /no match/i);
+  });
+});
+
 test("CLI transcript grep fails cleanly when phrase missing", async () => {
   await withTempProjectsRoot(async ({ slug }) => {
     writeFixtureProject(slug, makeProject({ slug }));

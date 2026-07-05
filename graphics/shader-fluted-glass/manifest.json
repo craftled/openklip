@@ -1,0 +1,14 @@
+{
+  "id": "shader-fluted-glass",
+  "name": "Shader: Fluted glass (image)",
+  "kind": "rich",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "params": {
+    "assetId": { "type": "asset", "default": "", "label": "Image asset" },
+    "speed": { "type": "number", "default": 0.5, "label": "Speed" },
+    "distortion": { "type": "number", "default": 0.5, "label": "Distortion" },
+    "size": { "type": "number", "default": 0.5, "label": "Size" }
+  }
+}

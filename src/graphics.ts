@@ -3,12 +3,14 @@
 // (editorial playbooks under templates/<id>/skill.md): graphics are MOTION/overlay
 // assets composited at export by ffmpeg via the renderer seam (src/graphic-render.ts).
 //
-// This loader stays pure fs + Zod (mirroring src/templates.ts list/get idioms). It
-// never imports the renderer or hyperframes, so typecheck/build/tests pass with the
-// optional rich backend absent.
+// Bundled templates live in repo graphics/. Projects may also drop templates under
+// projects/<slug>/graphics/ (project-local overrides win on id collision).
+
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
+import { graphicRequiresImageAsset } from "./graphic-image-shader-ids.ts";
+import { projectPaths } from "./paths.ts";
 import { repoPath } from "./repo-paths.ts";
 
 const GRAPHIC_ID = /^[a-z][a-z0-9-]*$/;
@@ -20,9 +22,8 @@ export function assertValidGraphicId(id: string): string {
   return id;
 }
 
-// One scalar param the template accepts, with a default and an optional label.
 const GraphicParamSchema = z.object({
-  type: z.enum(["string", "number", "boolean", "color"]),
+  type: z.enum(["string", "number", "boolean", "color", "asset"]),
   default: z.union([z.string(), z.number(), z.boolean()]),
   label: z.string().optional(),
 });
@@ -39,41 +40,92 @@ export const GraphicManifestSchema = z.object({
 });
 export type GraphicManifest = z.infer<typeof GraphicManifestSchema>;
 
-// graphics/ lives at the repo root next to templates/ and brands/.
 export function graphicsRoot(): string {
   return repoPath("graphics");
 }
 
-export function graphicDir(id: string): string {
+export function projectGraphicsRoot(slug: string): string {
+  return join(projectPaths(slug).dir, "graphics");
+}
+
+export function graphicDir(id: string, opts?: { slug?: string }): string {
+  if (opts?.slug) {
+    const local = join(
+      projectGraphicsRoot(opts.slug),
+      assertValidGraphicId(id)
+    );
+    if (existsSync(join(local, "manifest.json"))) {
+      return local;
+    }
+  }
   return join(graphicsRoot(), assertValidGraphicId(id));
 }
 
-export function graphicManifestPath(id: string): string {
-  return join(graphicDir(id), "manifest.json");
+export function graphicManifestPath(
+  id: string,
+  opts?: { slug?: string }
+): string {
+  return join(graphicDir(id, opts), "manifest.json");
 }
 
-export function graphicCompositionPath(id: string): string {
-  return join(graphicDir(id), "composition.html");
+export function graphicCompositionPath(
+  id: string,
+  opts?: { slug?: string }
+): string {
+  return join(graphicDir(id, opts), "composition.html");
 }
 
-// Parse + validate one template's manifest (throws if missing/invalid).
-export function loadGraphicManifest(id: string): GraphicManifest {
-  const path = graphicManifestPath(id);
+export function loadGraphicManifest(
+  id: string,
+  opts?: { slug?: string }
+): GraphicManifest {
+  const path = graphicManifestPath(id, opts);
   if (!existsSync(path)) {
     throw new Error(`graphic template not found: ${id} (${path})`);
   }
   return GraphicManifestSchema.parse(JSON.parse(readFileSync(path, "utf8")));
 }
 
+export type GraphicPack =
+  | "motion"
+  | "shader"
+  | "transition"
+  | "other"
+  | "project";
+
+export function graphicPack(
+  id: string,
+  scope?: "bundled" | "project"
+): GraphicPack {
+  if (scope === "project") {
+    return "project";
+  }
+  if (id.startsWith("motion-")) {
+    return "motion";
+  }
+  if (id.startsWith("shader-")) {
+    return "shader";
+  }
+  if (id.startsWith("transition-")) {
+    return "transition";
+  }
+  return "other";
+}
+
 export interface GraphicListing {
   id: string;
   kind: "text" | "rich";
   name: string;
+  pack: GraphicPack;
+  params: Record<string, GraphicParam>;
+  requiresAsset: boolean;
+  scope: "bundled" | "project";
 }
 
-// List valid templates (each needs manifest.json + composition.html), sorted by name.
-export function listGraphics(): GraphicListing[] {
-  const root = graphicsRoot();
+function scanGraphicsDir(
+  root: string,
+  scope: "bundled" | "project"
+): GraphicListing[] {
   if (!existsSync(root)) {
     return [];
   }
@@ -84,24 +136,48 @@ export function listGraphics(): GraphicListing[] {
       } catch {
         return null;
       }
-      if (!existsSync(graphicManifestPath(name))) {
-        return null;
-      }
-      if (!existsSync(graphicCompositionPath(name))) {
+      const manifestPath = join(root, name, "manifest.json");
+      const compositionPath = join(root, name, "composition.html");
+      if (!(existsSync(manifestPath) && existsSync(compositionPath))) {
         return null;
       }
       try {
-        const m = loadGraphicManifest(name);
-        return { id: m.id, name: m.name, kind: m.kind };
+        const m = GraphicManifestSchema.parse(
+          JSON.parse(readFileSync(manifestPath, "utf8"))
+        );
+        return {
+          id: m.id,
+          name: m.name,
+          kind: m.kind,
+          pack: graphicPack(m.id, scope === "project" ? "project" : undefined),
+          params: m.params,
+          requiresAsset: graphicRequiresImageAsset(m.id),
+          scope,
+        };
       } catch {
         return null;
       }
     })
-    .filter((x): x is GraphicListing => x !== null)
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .filter((x): x is GraphicListing => x !== null);
 }
 
-// Build a fully-populated params record from a manifest's declared defaults.
+/** List bundled + optional project-local templates (project overrides bundled ids). */
+export function listGraphics(opts?: { slug?: string }): GraphicListing[] {
+  const bundled = scanGraphicsDir(graphicsRoot(), "bundled");
+  if (!opts?.slug) {
+    return bundled.sort((a, b) => a.name.localeCompare(b.name));
+  }
+  const local = scanGraphicsDir(projectGraphicsRoot(opts.slug), "project");
+  const byId = new Map<string, GraphicListing>();
+  for (const item of bundled) {
+    byId.set(item.id, item);
+  }
+  for (const item of local) {
+    byId.set(item.id, item);
+  }
+  return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
 export function defaultGraphicParams(
   manifest: GraphicManifest
 ): Record<string, string | number | boolean> {

@@ -22,6 +22,7 @@ projects/<slug>/
   brief.md                optional project brief: audience, goal, tone,
                           must-use assets, avoid list, target length, formats
   assets/                 user originals (flat): drop b-roll, music, stills here
+  graphics/               optional project-local graphic templates (override bundled ids)
   working/                derived media + scratch: proxy.mp4, transcript.json,
                           audio16k.f32, frames/, asset proxies, chats.json,
                           actions.jsonl, tasks.json…
@@ -52,6 +53,7 @@ Time is integer audio samples at 48 kHz. The CLI takes seconds where a human num
 | --- | --- |
 | List projects | `openklip list` |
 | Ingest a video | `openklip ingest <video> [--force]` |
+| Create blank canvas | `openklip ingest --blank [--slug] [--duration] [--aspect] [--fps] [--color] [--force]` (GUI: New project → Blank canvas; MCP: `blank_ingest`) |
 | Open editor | `openklip serve [slug]` (alias `dev`) |
 | Read / write the project brief | `openklip brief <slug> [--set <text...> \| --file <path>]` |
 | Read transcript (full) | `openklip transcript <slug>` |
@@ -69,7 +71,10 @@ Time is integer audio samples at 48 kHz. The CLI takes seconds where a human num
 | Place / patch / remove b-roll | `openklip broll-add`, `broll-set`, `broll-rm`, `broll-add-phrase` |
 | Place / patch / remove still (Ken Burns) | `openklip still-add`, `still-set`, `still-rm` |
 | Place / patch / remove music placement | `openklip music-add`, `music-set`, `music-rm` |
-| Place / patch / remove graphic (HTML/CSS template) | `openklip graphic-add`, `graphic-set`, `graphic-rm` |
+| Detect music tempo (BPM) | `openklip bpm <slug> <assetId>` (MCP: `music_bpm`; GUI: Music panel **Detect BPM**) |
+| Measure loudness before export | `openklip audio measure <slug>` (MCP: `audio_measure`; GUI: Audio panel **Measure loudness**) |
+| Place / patch / remove graphic (HTML/CSS template) | `openklip graphic-add`, `graphic-set`, `graphic-rm`, `graphic-add-phrase` (optional `--beats`, `--bpm`, `--music-asset`), `graphic-add-cuts` |
+| List / show graphic templates | `openklip graphic list [--slug]`, `openklip graphic show <id> [--slug]` (MCP: `graphic_list`, `graphic_show`; GUI Config → Graphics picker) |
 | Add / patch json-render graphic (product announcement) | `openklip json-graphic-add`, `json-graphic-set` |
 | Place / patch / remove title | `openklip title-add`, `title-set`, `title-rm`, `title-add-phrase` |
 | Add / patch / remove zoom | `openklip zoom-add`, `zoom-set`, `zoom-rm`, `zoom-add-phrase` |
@@ -177,7 +182,13 @@ Add `--note "<why>"` to any `cut` or overlay-add to record the rationale on the 
 | `openklip still-add <slug> <assetId> <fromSec> <toSec>` | Overlay a registered **still** image with a Ken Burns push-in. `--scale 1.2` (1–3), `--focus-x 0.5` / `--focus-y 0.5` (0–1 image coords). |
 | `openklip still-set <slug> <stillId>` | Patch a still: `--asset`, `--from`, `--to`, `--scale`, `--focus-x`, `--focus-y`. |
 | `openklip still-rm <slug> <stillId>` | Remove a still overlay. |
-| `openklip graphic-add <slug> <template> <fromSec> <toSec>` | Overlay an HTML/CSS graphic template. `--param key=value` (repeatable), `--track broll\|title\|zoom` (z-layer). Text templates (`kind: "text"`) render via ASS and stay browser-free; rich templates (`kind: "rich"`) render pixel-faithfully through headless Chrome to a transparent ProRes 4444 MOV (install once: `bunx puppeteer browsers install chrome-headless-shell`). Includes 24 shader templates (`shader-mesh-gradient`, `shader-grain-gradient`, `shader-dithering`, plus 21 more under `graphics/shader-*`) powered by `@paper-design/shaders@0.0.77`, with deterministic frame-driven motion from the shared runtime (`web/lib/paper-shader-specs.ts`). Image-filter shaders that require a user photo (`shader-fluted-glass`, halftone, heatmap, image-dithering) are not bundled yet. |
+| `openklip graphic-add <slug> <template> <fromSec> <toSec>` | Overlay an HTML/CSS graphic template. `--param key=value` (repeatable), `--track broll\|title\|zoom` (z-layer), optional `--beats N` with `--bpm` or `--music-asset` for beat-snapped spans. Spans auto-extend to fit `inDurFrames`/`staggerFrames` entrance timing. Motion pack templates accept `inDurFrames` and `staggerFrames` timing params. Image-filter shaders (`shader-fluted-glass`, `shader-halftone-*`, `shader-heatmap`, `shader-image-dithering`) require `--param assetId=<still-or-image-broll>`. `shader-liquid-metal` and `shader-gem-smoke` accept an optional `assetId` for logo-style treatments. Text templates (`kind: "text"`) render via ASS and stay browser-free; rich templates (`kind: "rich"`) render pixel-faithfully through headless Chrome to a transparent ProRes 4444 MOV (install once: `bunx puppeteer browsers install chrome-headless-shell`). Rich renders are cached in `working/graphics-cache/` when params and span match a prior export. Includes 29 shader templates under `graphics/shader-*` (24 procedural + 5 image-filter) powered by `@paper-design/shaders@0.0.77`, plus 5 `transition-*` hit templates, with deterministic frame-driven motion from the shared runtime (`web/lib/graphic-runtime.ts`, `web/lib/paper-shader-specs.ts`). Bundled templates live in repo `graphics/`; drop overrides in `projects/<slug>/graphics/` (project-local ids win on collision). |
+| `openklip graphic list [--slug <slug>]` | List graphic templates with pack, kind, and param keys (includes project-local when `--slug` is set). |
+| `openklip graphic show <id> [--slug <slug>]` | Print one template manifest as JSON (project-local override when `--slug` is set). |
+| `openklip graphic-add-phrase <slug> <template> "spoken phrase"` | Place a graphic at the first spoken phrase match (min 2s span; extends for entrance animation). Same flags as `graphic-add`, plus optional `--beats`/`--bpm`/`--music-asset`. Auto-fills `text` from the transcript for kinetic motion templates when omitted; auto-sets `staggerFrames` from kept phrase word ids when omitted. See `templates/motion-graphics/skill.md`, `templates/motion-shorts/skill.md`, and `templates/motion-canvas/skill.md`. |
+| `openklip graphic-add-cuts <slug> <transition-template>` | Place a `transition-*` graphic centered on every kept-range cut seam. `--duration <sec>` overrides template default length; same `--param` / `--track` flags as `graphic-add`. GUI: **Place at cut seams** in the Graphics section when a transition template is selected. |
+| `openklip bpm <slug> <assetId>` | Detect tempo of a registered **music** asset (local ffmpeg PCM analysis). Caches in `working/music-bpm.json`. `--force` re-analyzes. |
+| `openklip audio measure <slug>` | Read integrated loudness (LUFS), true peak, and LRA from `output/out.mp4` or the ingest proxy without re-exporting. `--source export\|proxy`, `--json`. |
 | `openklip graphic-set <slug> <graphicId>` | Patch a graphic: `--template`, `--from`, `--to`, `--param`, `--track`. |
 | `openklip graphic-rm <slug> <graphicId>` | Remove a graphic overlay. |
 | `openklip json-graphic-add <slug> product-announcement <fromSec> <toSec> --spec-file spec.json` | Add a catalog-constrained json-render graphic (only `product-announcement` today). `--spec-file` is required; `--track broll\|title\|zoom` sets the z-layer. The spec is hard-validated (accent values, size caps, graph cycles, orphans, non-scene root, missing catalog/spec fields) before it persists; the editor previews the same React render and it exports through the normal timeline. See `templates/product-announcement/skill.md`. |
@@ -187,7 +198,7 @@ Add `--note "<why>"` to any `cut` or overlay-add to record the rationale on the 
 
 The `*-add-phrase` helpers remember the spoken phrase as an **anchor** on the overlay, so a later cut re-snaps the overlay's window onto the words it belongs to instead of stranding it. If you manually move a phrase-placed overlay with `*-set` (`--from`/`--to`), that span may be re-moved by the next word-deletion (the anchor still wins); place anchorless overlays with the plain `*-add` if you want the span pinned. When the anchored phrase is deleted the overlay is flagged `stale` and keeps its last good span (the exporter still renders it); restoring the words clears `stale`.
 
-**Authoring graphic templates**: `graphic-add`'s `<template>` argument is any `graphics/<id>/` folder (a `manifest.json` + `composition.html` pair, auto-discovered, no code registration). This includes the bundled `motion-*` pack (`motion-typewriter`, `motion-blur-reveal`, `motion-shimmer`, `motion-glitch`, `motion-kinetic-build`, `motion-roll-number`, `motion-word-cascade`, `motion-highlight-pop`), rich text templates driven by the shared `data-anim` runtime contract. To add a new template, read `graphics/AUTHORING.md` first: it documents the manifest schema, the full `data-anim`/split/stagger attribute reference, and frame-purity rules.
+**Authoring graphic templates**: `graphic-add`'s `<template>` argument is any `graphics/<id>/` folder (a `manifest.json` + `composition.html` pair, auto-discovered, no code registration) under repo `graphics/` or `projects/<slug>/graphics/`. This includes the bundled `motion-*` pack (`motion-typewriter`, `motion-blur-reveal`, `motion-shimmer`, `motion-glitch`, `motion-kinetic-build`, `motion-roll-number`, `motion-word-cascade`, `motion-highlight-pop`), the `transition-*` hit pack, and rich text templates driven by the shared `data-anim` runtime contract. To add a new template, read `graphics/AUTHORING.md` first: it documents the manifest schema, the full `data-anim`/split/stagger attribute reference, and frame-purity rules.
 
 ### Multi-take assembly
 
@@ -254,7 +265,7 @@ Workflow: `take-add` each recording, read `take_transcript <slug> <takeId>` to f
 
 ## Recommended workflow
 
-1. **Discover.** `openklip list` to pick a project, or `openklip ingest <video>` to create one. Re-ingest requires `--force` (wipes the project).
+1. **Discover.** `openklip list` to pick a project, or `openklip ingest <video>` / `openklip ingest --blank` to create one. Re-ingest requires `--force` (wipes the project).
 2. **Read first.** `openklip transcript grep <slug> "phrase"` or `transcript phrase` for spans; use full `transcript` only on short clips. `openklip status <slug> --json` for edit health.
 3. **Decide cuts.** Identify filler, false starts, and tangents. Prefer cutting whole sentences, not single words.
 4. **Edit.** `openklip cut <slug> w12-w20` (or `--text "the part to remove"`). Add overlays with `broll-add`, `title-add`, `zoom-add`. Patch with `*-set` commands. Toggle look with `look` and `captions`.
@@ -273,9 +284,9 @@ The tool-calling edit prompt (`buildEditPrompt` in `src/agent-driver.ts`) advert
 
 | Layer | MCP tool names | Same as CLI |
 | --- | --- | --- |
-| Query | `list_projects`, `transcript_grep`, `transcript_phrase`, `scene_log`, `highlights_list`, `project_status`, `project_overlays`, `cleanup_report`, `history_list`, `task_list`, `template_list`, `load_skill`, … | `openklip transcript grep`, `status --json`, `overlays --json`, `highlights`, `cleanup --json`, `openklip history`, `openklip tasks`, `openklip template list` |
+| Query | `list_projects`, `blank_ingest`, `transcript_grep`, `transcript_phrase`, `scene_log`, `highlights_list`, `project_status`, `project_overlays`, `cleanup_report`, `history_list`, `task_list`, `template_list`, `graphic_list`, `graphic_show`, `load_skill`, `music_bpm`, `audio_measure`, … | `openklip transcript grep`, `status --json`, `overlays --json`, `highlights`, `cleanup --json`, `openklip history`, `openklip tasks`, `openklip template list`, `openklip ingest --blank`, `openklip graphic list`, `openklip bpm`, `openklip audio measure` |
 | Mutate | `cut`, `cut-text`, `broll-add`, `title-set`, `word-text`, `dead-air-add`, `dead-air-rm`, `audio`, `captions-style`, … | `openklip cut`, `broll-add`, `word-text`, `dead-air-rm`, `audio`, `captions-style`, … |
-| Phrase compose | `title-add-phrase`, `zoom-add-phrase`, `broll-add-phrase` | `openklip title-add-phrase`, … |
+| Phrase compose | `title-add-phrase`, `zoom-add-phrase`, `broll-add-phrase`, `graphic-add-phrase` | `openklip title-add-phrase`, … |
 | Brief | `brief_get`, `brief_set` | `openklip brief`, `openklip brief --set` |
 | Agent task progress | `task_step`, `task_complete` | no CLI equivalent: scoped to the running agent's own task via `OPENKLIP_TASK_ID` |
 | Revert | `revert` | `openklip revert` |
@@ -284,6 +295,19 @@ The tool-calling edit prompt (`buildEditPrompt` in `src/agent-driver.ts`) advert
 **Inspect the manifest:** `openklip tools --json --surface mcp`
 
 **Parity rule:** every registry action with `surfaces` including `mcp` is an MCP tool with `{ slug, … }` input. Query tools use snake_case names; mutations keep registry kebab-case names (`broll-add`).
+
+**Optional skills package:** `skills/` ships `SKILL.md` playbooks installable via `npx skills add <owner>/openklip --skill openklip-motion-canvas` (see `skills/README.md`). Same content as `templates/<id>/skill.md`; MCP `load_skill` works without installing.
+
+## External generative media (optional)
+
+OpenKlip does **not** bundle cloud image/video/TTS APIs. Generate media with any external tool (Egaki, Runway, Kling, your own scripts), then import into the edit loop:
+
+1. Save the file under `projects/<slug>/assets/` (or register from elsewhere).
+2. `openklip asset-add <slug> <file> --kind broll|music|still` or `openklip broll <slug> <file>`.
+3. Place with `broll-add`, `broll-add-phrase`, or a music bed with `music-add`.
+4. Run `openklip bpm <slug> <musicAssetId>` when beat-syncing motion graphics (`--beats` on `graphic-add`).
+
+The EDL stays local; external tools are optional upstream suppliers, not dependencies.
 
 ## Agent loop
 

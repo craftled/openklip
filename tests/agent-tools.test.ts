@@ -34,6 +34,10 @@ test("agentToolManifest includes query tools and registry mutations", () => {
   assert.ok(names.includes("json-graphic-add"));
   assert.ok(names.includes("json-graphic-set"));
   assert.ok(names.includes("title-add-phrase"));
+  assert.ok(names.includes("graphic-add-phrase"));
+  assert.ok(names.includes("graphic_show"));
+  assert.ok(names.includes("music_bpm"));
+  assert.ok(names.includes("audio_measure"));
   assert.ok(names.includes("export"));
   const manifest = agentToolManifest("mcp");
   assert.ok(manifest.length >= 30);
@@ -157,6 +161,47 @@ test("callAgentTool title-add-phrase places overlay", async () => {
     assert.equal(overlays.titles.length, 1);
     assert.equal(overlays.titles[0].text, "Jane\nCEO");
   });
+});
+
+test("callAgentTool graphic-add-phrase places motion graphic with anchor", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const result = (await callAgentTool("graphic-add-phrase", {
+      slug,
+      template: "motion-word-cascade",
+      spokenPhrase: "Hello world",
+    })) as { id: string; params: { text?: string } };
+    assert.ok(result.id.startsWith("g"));
+    assert.equal(result.params.text, "Hello world");
+    const overlays = (await callAgentTool("project_overlays", { slug })) as {
+      graphics: Array<{ id: string; anchor: { phrase: string } | null }>;
+    };
+    assert.equal(overlays.graphics.length, 1);
+    assert.equal(overlays.graphics[0].anchor?.phrase, "Hello world");
+  });
+});
+
+test("callAgentTool graphic_show returns manifest", async () => {
+  const result = (await callAgentTool("graphic_show", {
+    id: "motion-word-cascade",
+  })) as { id: string; manifest: { id: string }; compositionPath: string };
+  assert.equal(result.id, "motion-word-cascade");
+  assert.equal(result.manifest.id, "motion-word-cascade");
+  assert.ok(result.compositionPath.includes("motion-word-cascade"));
+});
+
+test("callAgentTool graphic_list returns param schemas", async () => {
+  const result = (await callAgentTool("graphic_list", {})) as {
+    graphics: Array<{
+      id: string;
+      pack: string;
+      params: Record<string, unknown>;
+    }>;
+  };
+  const wc = result.graphics.find((g) => g.id === "motion-word-cascade");
+  assert.ok(wc);
+  assert.equal(wc?.pack, "motion");
+  assert.ok(wc?.params.inDurFrames);
 });
 
 test("callAgentTool template_show returns skill markdown", async () => {

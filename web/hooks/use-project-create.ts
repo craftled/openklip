@@ -8,6 +8,7 @@ import {
   toastProjectCreateFailed,
 } from "@/lib/app-toast";
 import {
+  createBlankProject,
   type IngestProgressView,
   type ProjectCreateOptions,
   ProjectExistsError,
@@ -90,6 +91,30 @@ export function useProjectCreate({
     [runCreate]
   );
 
+  const createBlank = useCallback(async () => {
+    setCreatePhase("creating");
+    setCreatedSlug(null);
+    setProgress(null);
+    const loadingId = toastLoading("Creating blank canvas…");
+    try {
+      const slug = await createBlankProject();
+      toastDismiss(loadingId);
+      setCreatedSlug(slug);
+      setCreatePhase("success");
+      await new Promise((resolve) => {
+        window.setTimeout(resolve, SUCCESS_CHECK_HOLD_MS);
+      });
+      onProjectCreated(slug);
+    } catch (e) {
+      toastDismiss(loadingId);
+      toastProjectCreateFailed((e as Error).message);
+    } finally {
+      setCreatePhase(null);
+      setCreatedSlug(null);
+      setProgress(null);
+    }
+  }, [onProjectCreated]);
+
   const confirmOverwrite = useCallback(() => {
     if (!pendingOverwrite) {
       return;
@@ -106,6 +131,7 @@ export function useProjectCreate({
   return {
     cancelOverwrite,
     confirmOverwrite,
+    createBlank,
     createPhase,
     createdSlug,
     creating,

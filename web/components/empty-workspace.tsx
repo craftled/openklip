@@ -94,6 +94,7 @@ export function EmptyWorkspace() {
   const {
     cancelOverwrite,
     confirmOverwrite,
+    createBlank,
     createPhase,
     createdSlug,
     creating,
@@ -159,6 +160,7 @@ export function EmptyWorkspace() {
         />
       ) : null}
       <NewProjectDialog
+        onBlankSelected={() => void createBlank()}
         onFolderChosen={() => {
           void fetchWorkspace()
             .then(setWorkspace)

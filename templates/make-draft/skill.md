@@ -23,6 +23,12 @@ One prompt to a full first draft: cuts, captions, titles, b-roll or stills, musi
 - Keep captions on (max words 6) unless the brief says otherwise.
 - Add one lower-third title naming the speaker or topic near the start (title-add-phrase when a clean phrase exists, else title-add on the first kept seconds).
 
+## 3b. Motion graphics (optional)
+
+- When a spoken phrase deserves emphasis (a stat, a punch line, a product name), place one motion overlay with graphic-add-phrase: `motion-word-cascade` for phrase emphasis, `motion-roll-number` for stats (`--param value=N`), or a `shader-*` template for a short full-frame background on the `broll` track.
+- Call graphic_list or graphic_show to pick a template. Keep spans 2 to 6 seconds on speaker video. Tune entrance with graphic-set `--param inDurFrames=N` and `--param staggerFrames=N` when the default feels too fast or slow.
+- Skip when the brief asks for a clean talking-head with no motion overlays.
+
 ## 4. B-roll and stills
 
 - Cover one to three spans with b-roll using broll-add-phrase, 2 to 6 seconds each, matched by the asset cards' bestFor and tags.

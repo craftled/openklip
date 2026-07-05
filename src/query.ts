@@ -4,10 +4,10 @@ import { DEFAULT_CAPTION_STYLE } from "./caption-styles.ts";
 import {
   type CutSnap,
   CutsSchema,
-  effectiveRanges,
   type Filter,
   type PhraseAnchor,
   type Project,
+  rangesForExport,
   samplesToSec,
 } from "./edl.ts";
 import type { Keyframe } from "./keyframes.ts";
@@ -243,7 +243,7 @@ export function listRanges(
   project: Project,
   silences?: SilenceSpan[]
 ): Array<{ endSec: number; startSec: number }> {
-  return effectiveRanges(project, silences);
+  return rangesForExport(project, silences);
 }
 
 export function listOverlays(project: Project): OverlayViews {

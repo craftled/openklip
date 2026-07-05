@@ -13,6 +13,11 @@
 
 import { join } from "node:path";
 import { SAMPLE_RATE } from "./edl.ts";
+import {
+  copyGraphicFromCache,
+  graphicRenderCacheKey,
+  saveGraphicToCache,
+} from "./graphic-cache.ts";
 import type { GraphicManifest } from "./graphics.ts";
 import { graphicCompositionPath } from "./graphics.ts";
 import type { Keyframe } from "./keyframes.ts";
@@ -38,6 +43,8 @@ export interface RenderGraphicInput {
   outDir: string;
   // Already merged over the manifest's param defaults by the caller.
   params: Record<string, string | number | boolean>;
+  /** Project slug for project-local template lookup. */
+  slug?: string;
   // graphic-template id (composition.html lookup + error messages).
   template: string;
   // Output width / height (exporter passes outW / outH).
@@ -132,13 +139,32 @@ async function renderRichGraphic(
   if (!compositionHtml) {
     try {
       compositionHtml = await Bun.file(
-        graphicCompositionPath(input.template)
+        graphicCompositionPath(input.template, { slug: input.slug })
       ).text();
     } catch {
       throw new Error(
         `rich graphic "${input.template}": composition.html not found in graphics/${input.template}/.`
       );
     }
+  }
+
+  const cacheKey = graphicRenderCacheKey({
+    template: input.template,
+    params: input.params,
+    keyframes: input.keyframes,
+    durFrames,
+    width: input.width,
+    height: input.height,
+    fps: input.fps,
+    compositionHtml,
+  });
+  const cached = await copyGraphicFromCache({
+    workingDir: input.outDir,
+    cacheKey,
+    outPath: assetPath,
+  });
+  if (cached) {
+    return { assetPath, kind: "alpha" };
   }
 
   try {
@@ -152,6 +178,11 @@ async function renderRichGraphic(
       fps: input.fps,
       durFrames,
       outPath: assetPath,
+    });
+    await saveGraphicToCache({
+      workingDir: input.outDir,
+      cacheKey,
+      renderedPath: assetPath,
     });
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);

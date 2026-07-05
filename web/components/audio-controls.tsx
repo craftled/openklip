@@ -4,6 +4,7 @@ import type { Audio, CutSnap } from "@engine/edl";
 import { useState } from "react";
 import { ElasticSlider } from "@/components/elastic-slider";
 import { formatDotDecimal } from "@/components/slider-primitives";
+import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
 import {
   Select,
@@ -103,10 +104,20 @@ export interface AudioPatch {
   voiceHighpass?: Partial<Audio["voiceHighpass"]>;
 }
 
+export interface AudioMeasureView {
+  integratedLufs: number;
+  lra: number;
+  source: "export" | "proxy";
+  truePeakDbtp: number;
+}
+
 export interface AudioControlsProps {
   /** Disable every control while a save is in flight (CleanupPanel parity). */
   applying?: boolean;
   audio: Audio;
+  measure?: AudioMeasureView | null;
+  measuring?: boolean;
+  onMeasure?: () => void;
   onPatchAudio: (patch: AudioPatch) => void;
   onPatchSnap: (patch: Partial<CutSnap>) => void;
   snap: CutSnap;
@@ -123,6 +134,9 @@ export interface AudioControlsProps {
 export function AudioControls({
   applying = false,
   audio,
+  measure = null,
+  measuring = false,
+  onMeasure,
   onPatchAudio,
   onPatchSnap,
   snap,
@@ -344,6 +358,35 @@ export function AudioControls({
           and reuses a few milliseconds of the removed audio.
         </p>
       </div>
+
+      {onMeasure ? (
+        <div className="flex flex-col gap-1.5" data-audio-measure>
+          <Button
+            data-audio-measure-run
+            disabled={applying || measuring}
+            onClick={onMeasure}
+            size="sm"
+            variant="outline"
+          >
+            {measuring ? "Measuring loudness…" : "Measure loudness"}
+          </Button>
+          {measure ? (
+            <p
+              className="text-muted-foreground text-xs tabular-nums leading-snug"
+              data-audio-measure-result
+            >
+              {measure.integratedLufs.toFixed(1)} LUFS integrated (
+              {measure.source}), {measure.truePeakDbtp.toFixed(1)} dBTP peak,{" "}
+              {measure.lra.toFixed(1)} LU LRA
+            </p>
+          ) : (
+            <p className="text-muted-foreground text-xs leading-snug">
+              Read-only LUFS from the latest export or ingest proxy. Export
+              loudness settings above are not applied until you render.
+            </p>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }

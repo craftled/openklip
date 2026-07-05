@@ -1,0 +1,13 @@
+{
+  "id": "shader-halftone-cmyk",
+  "name": "Shader: Halftone CMYK (image)",
+  "kind": "rich",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "params": {
+    "assetId": { "type": "asset", "default": "", "label": "Image asset" },
+    "size": { "type": "number", "default": 2, "label": "Dot size" },
+    "contrast": { "type": "number", "default": 1, "label": "Contrast" }
+  }
+}

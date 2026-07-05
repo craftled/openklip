@@ -145,6 +145,24 @@ export async function renderHeadlessAlpha(
     await page.evaluate(() => document.fonts.ready);
     await page.addScriptTag({ content: bundle });
 
+    await page.evaluate(async (params: unknown) => {
+      const api = (
+        window as unknown as {
+          __okGraphic: {
+            ensureGraphicImagesReady: (
+              p: unknown,
+              shaderId?: string | null
+            ) => Promise<void>;
+          };
+        }
+      ).__okGraphic;
+      const root = document.querySelector("[data-shader]");
+      await api.ensureGraphicImagesReady(
+        params,
+        root?.getAttribute("data-shader")
+      );
+    }, input.params);
+
     // Params are static for the whole render. Bind text/accent ONCE, not per
     // frame (the per-frame loop only re-seeks the animation).
     await page.evaluate((params: unknown) => {

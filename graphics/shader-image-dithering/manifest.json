@@ -1,0 +1,13 @@
+{
+  "id": "shader-image-dithering",
+  "name": "Shader: Image dithering",
+  "kind": "rich",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "params": {
+    "assetId": { "type": "asset", "default": "", "label": "Image asset" },
+    "size": { "type": "number", "default": 2.5, "label": "Pixel size" },
+    "type": { "type": "string", "default": "4x4", "label": "Dither type" }
+  }
+}

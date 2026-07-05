@@ -16,6 +16,9 @@ import { analyzeAssets } from "./asset-cards.ts";
 import { registerAsset } from "./assets.ts";
 import { loadAudioAnalysis } from "./audio-analysis.ts";
 import type { SilenceSpan } from "./audio-analysis-core.ts";
+import { measureProjectAudio } from "./audio-measure.ts";
+import { type BlankAspect, ingestBlank } from "./blank-ingest.ts";
+import { measureMusicBpm } from "./bpm.ts";
 import { applyBrand, loadBrand } from "./brands.ts";
 import { loadBrief, saveBrief } from "./brief.ts";
 import { logBriefSet } from "./brief-log.ts";
@@ -69,6 +72,13 @@ import {
 } from "./exporter.ts";
 import { FFMPEG, FFPROBE } from "./ffmpeg.ts";
 import { FILTER_NAMES, isFilter } from "./filter.ts";
+import { resolveGraphicPhraseParams } from "./graphic-phrase.ts";
+import { finalizeGraphicSpan } from "./graphic-placement.ts";
+import {
+  graphicCompositionPath,
+  listGraphics,
+  loadGraphicManifest,
+} from "./graphics.ts";
 import { exportAllHighlights, exportHighlight } from "./highlight-export.ts";
 import { detectHighlights, highlightClipLines } from "./highlights.ts";
 import { ingest } from "./ingest.ts";
@@ -128,6 +138,7 @@ Discovery
 
 Setup
   openklip ingest <video>            transcribe + build a project
+  openklip ingest --blank            graphics-first blank canvas (no transcript)
                                        --brand <name>  apply a brand preset
   openklip serve [slug]              open the local editor (default: latest)
   openklip asset-add <slug> <file>   register b-roll, music, or still (auto-detect)
@@ -193,9 +204,19 @@ Overlays
   openklip graphic-add <slug> <template> <fromSec> <toSec>
                                      overlay an HTML/CSS graphic template
                                        --param key=value (repeatable)  --track broll|title|zoom
+                                       --beats N  --bpm <n>  --music-asset <id>
+  openklip graphic-add-phrase <slug> <template> "spoken phrase"
+                                     place graphic at first phrase match
+                                       --param key=value (repeatable)  --track broll|title|zoom
+                                       --beats N  --bpm <n>  --music-asset <id>
+  openklip graphic list                list graphic templates (graphics/*/manifest.json)
+  openklip graphic show <id>           print one graphic template manifest
   openklip graphic-set <slug> <graphicId> patch graphic (--template --from --to --param --track
                                       [--keyframes-file keyframes.json | --clear-keyframes])
   openklip graphic-rm <slug> <graphicId> remove a graphic overlay
+  openklip graphic-add-cuts <slug> <transition-template>
+                                     place transition-* at every kept-range cut seam
+                                       --duration <sec>  --param key=value  --track broll|title|zoom
   openklip json-graphic-add <slug> product-announcement <fromSec> <toSec>
                                      overlay a validated json-render announcement spec
                                        --spec-file spec.json  --track broll|title|zoom
@@ -220,6 +241,10 @@ Look & captions
   openklip look <slug> vignette <on|off> toggle vignette
   openklip look <slug> color [--temp n] [--tint n] [--bright n] [--contrast n] [--sat n] | --reset
   openklip audio <slug>                  print current export audio quality settings
+  openklip audio measure <slug>          read integrated loudness (LUFS) without exporting
+                                       --source export|proxy  --json
+  openklip bpm <slug> <assetId>          detect tempo of a registered music asset
+                                       --force  --json
   openklip audio <slug> [--duck on|off] [--duck-amount <1-30 dB>]
                         [--duck-attack <1-500 ms>] [--duck-release <20-2000 ms>]
                         [--loudness on|off] [--loudness-target <-30..-10 LUFS>]
@@ -643,9 +668,39 @@ try {
       break;
     }
     case "ingest": {
+      if (rest.includes("--blank")) {
+        const args = rest.filter((a) => a !== "--blank");
+        const force = args.includes("--force");
+        const slug = flagValue(args, "--slug");
+        const durationSec = flagNumber(args, "--duration");
+        const aspectRaw = flagValue(args, "--aspect") as
+          | BlankAspect
+          | undefined;
+        const fps = flagNumber(args, "--fps");
+        const color = flagValue(args, "--color");
+        const aspect =
+          aspectRaw === "16:9" || aspectRaw === "9:16" || aspectRaw === "1:1"
+            ? aspectRaw
+            : undefined;
+        if (aspectRaw && !aspect) {
+          throw new Error(
+            "usage: openklip ingest --blank [--slug <id>] [--duration <sec>] [--aspect 16:9|9:16|1:1] [--fps <n>] [--color <hex>] [--force]"
+          );
+        }
+        const created = await ingestBlank({
+          slug,
+          durationSec,
+          aspect,
+          fps,
+          color,
+          force,
+        });
+        console.log(`blank project ready: ${created}`);
+        break;
+      }
       if (!rest[0]) {
         throw new Error(
-          "usage: openklip ingest <video> [--brand <name>] [--force]"
+          "usage: openklip ingest <video> [--brand <name>] [--force]\n       openklip ingest --blank [--slug <id>] [--duration <sec>] [--aspect 16:9|9:16|1:1] [--fps <n>] [--color <hex>] [--force]"
         );
       }
       const brandName = flagValue(rest, "--brand");
@@ -1202,19 +1257,79 @@ try {
       console.log(`removed still ${rest[1]}`);
       break;
     }
+    case "graphic": {
+      const sub = rest[0];
+      if (sub === "list") {
+        const slug = flagValue(rest.slice(1), "--slug");
+        const list = listGraphics(slug ? { slug } : undefined);
+        if (list.length === 0) {
+          console.log("no graphics in graphics/");
+          break;
+        }
+        for (const g of list) {
+          const paramKeys = Object.keys(g.params).join(", ") || "(none)";
+          console.log(`${g.id}\t${g.pack}\t${g.kind}\t${g.name}\t${paramKeys}`);
+        }
+        console.log(`\n${list.length} graphic template(s)`);
+        break;
+      }
+      if (sub === "show") {
+        const id = rest[1];
+        if (!id) {
+          throw new Error("usage: openklip graphic show <id> [--slug <slug>]");
+        }
+        const slug = flagValue(rest.slice(2), "--slug");
+        const manifest = loadGraphicManifest(id, slug ? { slug } : undefined);
+        console.log(
+          JSON.stringify(
+            {
+              manifest,
+              compositionPath: graphicCompositionPath(
+                id,
+                slug ? { slug } : undefined
+              ),
+            },
+            null,
+            2
+          )
+        );
+        break;
+      }
+      throw new Error(
+        "usage: openklip graphic list [--slug <slug>] | show <id> [--slug <slug>]"
+      );
+    }
     case "graphic-add": {
       if (!(rest[0] && rest[1] && rest[2] && rest[3])) {
         throw new Error(
-          "usage: openklip graphic-add <slug> <template> <fromSec> <toSec> [--param key=value ...] [--track broll|title|zoom]"
+          "usage: openklip graphic-add <slug> <template> <fromSec> <toSec> [--param key=value ...] [--track broll|title|zoom] [--beats N] [--bpm N] [--music-asset id]"
         );
       }
       const slug = rest[0];
       const args = rest.slice(1);
-      const fromSec = Number(rest[2]);
-      const toSec = Number(rest[3]);
+      let fromSec = Number(rest[2]);
+      let toSec = Number(rest[3]);
       if (!(Number.isFinite(fromSec) && Number.isFinite(toSec))) {
         throw new Error("fromSec and toSec must be numbers (seconds)");
       }
+      const params = collectParams(args);
+      const beats = flagNumber(args, "--beats");
+      const bpm = flagNumber(args, "--bpm");
+      const musicAssetId = flagValue(args, "--music-asset");
+      const project = await loadProject(slug);
+      const span = await finalizeGraphicSpan({
+        slug,
+        project,
+        template: rest[1],
+        fromSec,
+        toSec,
+        params,
+        beats,
+        bpm,
+        musicAssetId,
+      });
+      fromSec = span.fromSec;
+      toSec = span.toSec;
       const { result: item } = await runLoggedAction<Graphic>(
         slug,
         "graphic-add",
@@ -1222,7 +1337,7 @@ try {
           template: rest[1],
           fromSec,
           toSec,
-          params: collectParams(args),
+          params,
           track: trackFlag(args),
         }
       );
@@ -1317,6 +1432,31 @@ try {
       );
       console.log(
         `updated JSON graphic ${item.id} (catalog "${item.catalog}", ${secSpan(item.startSample, item.endSample)}, ${item.track})`
+      );
+      break;
+    }
+    case "graphic-add-cuts": {
+      if (!(rest[0] && rest[1])) {
+        throw new Error(
+          "usage: openklip graphic-add-cuts <slug> <transition-template> [--duration <sec>] [--param key=value ...] [--track broll|title|zoom]"
+        );
+      }
+      const slug = rest[0];
+      const template = rest[1];
+      const args = rest.slice(2);
+      const params = collectParams(args);
+      const durationSec = flagNumber(args, "--duration");
+      const { result } = await runLoggedAction<{
+        count: number;
+        ids: string[];
+      }>(slug, "graphic-add-cuts", {
+        template,
+        durationSec,
+        params: Object.keys(params).length > 0 ? params : undefined,
+        track: trackFlag(args),
+      });
+      console.log(
+        `placed ${result.count} transition(s) at cut seams: ${result.ids.join(", ")} (template "${template}")`
       );
       break;
     }
@@ -1710,8 +1850,36 @@ try {
     case "audio": {
       if (!rest[0]) {
         throw new Error(
-          "usage: openklip audio <slug> [--duck on|off] [--duck-amount <db>] [--duck-attack <ms>] [--duck-release <ms>] [--loudness on|off] [--loudness-target <lufs>] [--loudness-mode single|two-pass] [--noise-reduction on|off] [--noise-strength <n>] [--highpass on|off] [--highpass-hz <n>] [--deess on|off] [--deess-intensity <n>]"
+          "usage: openklip audio <slug> | openklip audio measure <slug> [--source export|proxy] [--json]"
         );
+      }
+      if (rest[0] === "measure") {
+        if (!rest[1]) {
+          throw new Error(
+            "usage: openklip audio measure <slug> [--source export|proxy] [--json]"
+          );
+        }
+        const slug = rest[1];
+        const sourceRaw = flagValue(rest.slice(2), "--source");
+        const source =
+          sourceRaw === undefined
+            ? undefined
+            : sourceRaw === "export" || sourceRaw === "proxy"
+              ? sourceRaw
+              : (() => {
+                  throw new Error(
+                    "openklip audio measure --source must be export or proxy"
+                  );
+                })();
+        const result = await measureProjectAudio(slug, { source });
+        if (rest.includes("--json")) {
+          process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+        } else {
+          console.log(
+            `audio measure (${result.source}): ${result.integratedLufs.toFixed(1)} LUFS integrated, ${result.truePeakDbtp.toFixed(1)} dBTP true peak, ${result.lra.toFixed(1)} LU LRA`
+          );
+        }
+        break;
       }
       const slug = rest[0];
       const duck = flagValue(rest, "--duck");
@@ -2138,6 +2306,89 @@ try {
       });
       console.log(
         `added b-roll ${item.id} at phrase "${spokenPhrase}" (asset "${assetId}", ${span.fromSec.toFixed(3)}s-${span.toSec.toFixed(3)}s)`
+      );
+      break;
+    }
+    case "graphic-add-phrase": {
+      if (!(rest[0] && rest[1])) {
+        throw new Error(
+          'usage: openklip graphic-add-phrase <slug> <template> "spoken phrase" [--param key=value ...] [--track broll|title|zoom] [--beats N] [--bpm N] [--music-asset id]'
+        );
+      }
+      const slug = rest[0];
+      const template = rest[1];
+      const args = rest.slice(2);
+      const spokenParts: string[] = [];
+      let argIndex = 0;
+      while (argIndex < args.length) {
+        const arg = args[argIndex];
+        if (
+          arg === "--param" ||
+          arg === "--track" ||
+          arg === "--beats" ||
+          arg === "--bpm" ||
+          arg === "--music-asset"
+        ) {
+          argIndex += 2;
+          continue;
+        }
+        if (arg.startsWith("--")) {
+          argIndex += 1;
+          continue;
+        }
+        spokenParts.push(arg);
+        argIndex += 1;
+      }
+      const spokenPhrase = spokenParts.join(" ");
+      if (!spokenPhrase) {
+        throw new Error(
+          'usage: openklip graphic-add-phrase <slug> <template> "spoken phrase" [--param key=value ...] [--track broll|title|zoom] [--beats N] [--bpm N] [--music-asset id]'
+        );
+      }
+      const project = await loadProject(slug);
+      const phraseSpan = placeFromPhrase(project, spokenPhrase);
+      if (!phraseSpan.matched) {
+        throw new Error(`no match for spoken phrase: "${spokenPhrase}"`);
+      }
+      const mergedParams = resolveGraphicPhraseParams(
+        project,
+        template,
+        spokenPhrase,
+        collectParams(args),
+        phraseSpan.ids
+      );
+      const beats = flagNumber(args, "--beats");
+      const bpm = flagNumber(args, "--bpm");
+      const musicAssetId = flagValue(args, "--music-asset");
+      const span = await finalizeGraphicSpan({
+        slug,
+        project,
+        template,
+        fromSec: phraseSpan.fromSec,
+        toSec: phraseSpan.toSec,
+        params: mergedParams,
+        beats,
+        bpm,
+        musicAssetId,
+      });
+      const { result: item } = await runLoggedAction<Graphic>(
+        slug,
+        "graphic-add",
+        {
+          template,
+          fromSec: span.fromSec,
+          toSec: span.toSec,
+          params: mergedParams,
+          track: trackFlag(args),
+          anchor: {
+            phrase: spokenPhrase,
+            wordIds: phraseSpan.ids,
+            stale: false,
+          },
+        }
+      );
+      console.log(
+        `added graphic ${item.id} at phrase "${spokenPhrase}" (template "${template}", ${span.fromSec.toFixed(3)}s-${span.toSec.toFixed(3)}s, ${item.track})`
       );
       break;
     }
@@ -2594,6 +2845,25 @@ try {
       console.log(
         `assembled ${r.segments} segment(s), ${r.words} words, ${r.durationSec.toFixed(1)}s -> ${slug}`
       );
+      break;
+    }
+    case "bpm": {
+      if (!(rest[0] && rest[1])) {
+        throw new Error(
+          "usage: openklip bpm <slug> <assetId> [--force] [--json]"
+        );
+      }
+      const slug = rest[0];
+      const assetId = rest[1];
+      const force = rest.includes("--force");
+      const result = await measureMusicBpm(slug, assetId, { force });
+      if (rest.includes("--json")) {
+        process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+      } else {
+        console.log(
+          `bpm: ${result.bpm} (confidence ${result.confidence}${result.cached ? ", cached" : ""}) for music asset "${assetId}"`
+        );
+      }
       break;
     }
     case "brand": {

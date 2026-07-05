@@ -6,6 +6,11 @@
   "height": 1080,
   "fps": 30,
   "params": {
+    "assetId": {
+      "type": "asset",
+      "default": "",
+      "label": "Logo or image (optional)"
+    },
     "colors": {
       "type": "string",
       "default": "#333333, #e7e6df",

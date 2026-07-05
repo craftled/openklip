@@ -74,6 +74,26 @@ export async function createProjectFromVideo(
   return await pollIngestJob(data.jobId, onProgress);
 }
 
+export async function createBlankProject(input?: {
+  slug?: string;
+  durationSec?: number;
+  aspect?: "16:9" | "9:16" | "1:1";
+  fps?: number;
+  color?: string;
+  force?: boolean;
+}): Promise<string> {
+  const res = await fetch("/api/projects/blank", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input ?? {}),
+  });
+  const data = (await res.json()) as { error?: string; slug?: string };
+  if (!(res.ok && data.slug)) {
+    throw new Error(data.error ?? `Blank project failed (${res.status})`);
+  }
+  return data.slug;
+}
+
 async function pollIngestJob(
   jobId: string,
   onProgress?: (p: IngestProgressView) => void

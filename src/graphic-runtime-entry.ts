@@ -2,6 +2,7 @@
 // Chrome page. It exposes the SAME web/lib/graphic-runtime.ts functions that the
 // live preview uses, on window.__okGraphic, so a rich graphic's export is
 // frame-identical to its preview. NOT imported by the app/server bundle.
+import { ensureGraphicImagesReady } from "../web/lib/graphic-image-cache.ts";
 import {
   applyGraphicFrame,
   applyGraphicParams,
@@ -10,4 +11,5 @@ import {
 (window as unknown as { __okGraphic: unknown }).__okGraphic = {
   applyGraphicFrame,
   applyGraphicParams,
+  ensureGraphicImagesReady,
 };

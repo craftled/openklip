@@ -580,6 +580,8 @@ export const ProjectSchema = z
   .object({
     version: z.literal(1),
     slug: z.string(),
+    /** Graphics-only project: no speech transcript; export uses full duration. */
+    blankCanvas: z.boolean().optional(),
     source: z.string(),
     proxy: z.string(),
     sampleRate: z.literal(SAMPLE_RATE),
@@ -728,6 +730,24 @@ export function survivingRanges(project: Project): Range[] {
     }
   }
   return merged.filter((r) => r.endSec - r.startSec > 0.01);
+}
+
+/** Export ranges: blank-canvas projects use the full timeline when there are no kept words. */
+export function rangesForExport(
+  project: Project,
+  silences?: SilenceSpan[]
+): Range[] {
+  const ranges = effectiveRanges(project, silences);
+  if (ranges.length > 0) {
+    return ranges;
+  }
+  if (project.blankCanvas) {
+    const durSec = project.durationSamples / project.sampleRate;
+    if (durSec > 0.01) {
+      return [{ startSec: 0, endSec: durSec }];
+    }
+  }
+  return ranges;
 }
 
 // The single shared range pipeline every consumer (exporter, query/CLI,

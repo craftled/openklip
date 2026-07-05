@@ -40,11 +40,29 @@ test("listTemplates finds the make-draft, make-short, make-highlights, and revis
   );
   assert.ok(reviseDraft, "revise-draft should be auto-listed from templates/");
   assert.equal(reviseDraft?.label, "Revise a draft");
+  const motionGraphics = list.find((t) => t.id === "motion-graphics");
+  assert.ok(
+    motionGraphics,
+    "motion-graphics should be auto-listed from templates/"
+  );
+  assert.equal(motionGraphics?.label, "Motion graphics");
+  const motionShorts = list.find((t) => t.id === "motion-shorts");
+  assert.ok(
+    motionShorts,
+    "motion-shorts should be auto-listed from templates/"
+  );
+  const motionCanvas = list.find((t) => t.id === "motion-canvas");
+  assert.ok(
+    motionCanvas,
+    "motion-canvas should be auto-listed from templates/"
+  );
+  assert.equal(motionCanvas?.label, "Motion canvas");
 });
 
 test("loadTemplateSkill reads the make-draft, make-short, make-highlights, and revise-draft playbooks", () => {
   const makeDraft = loadTemplateSkill("make-draft");
   assert.match(makeDraft, /task_complete/);
+  assert.match(makeDraft, /graphic-add-phrase/);
 
   const makeShort = loadTemplateSkill("make-short");
   assert.match(makeShort, /task_complete/);
@@ -60,6 +78,25 @@ test("loadTemplateSkill reads the make-draft, make-short, make-highlights, and r
   assert.match(reviseDraft, /task_complete/);
   assert.match(reviseDraft, /revert/);
   assert.match(reviseDraft, /project_overlays/);
+  assert.match(reviseDraft, /graphic-set/);
+});
+
+test("loadTemplateSkill reads motion-graphics playbook", () => {
+  const skill = loadTemplateSkill("motion-graphics");
+  assert.match(skill, /graphic-add-phrase/);
+  assert.match(skill, /inDurFrames/);
+});
+
+test("loadTemplateSkill reads motion-shorts playbook", () => {
+  const skill = loadTemplateSkill("motion-shorts");
+  assert.match(skill, /music_bpm/);
+  assert.match(skill, /--beats/);
+});
+
+test("loadTemplateSkill reads motion-canvas playbook", () => {
+  const skill = loadTemplateSkill("motion-canvas");
+  assert.match(skill, /ingest --blank/);
+  assert.match(skill, /graphic-add-cuts/);
 });
 
 test("revise-draft skill mentions Convert to short path", () => {

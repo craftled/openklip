@@ -7,6 +7,7 @@ import {
   GraphicManifestSchema,
   graphicCompositionPath,
   graphicManifestPath,
+  graphicPack,
   listGraphics,
   loadGraphicManifest,
 } from "../src/graphics.ts";
@@ -20,10 +21,11 @@ test("listGraphics finds the bundled templates sorted by name", () => {
   assert.ok(ids.includes("shader-grain-gradient"));
   assert.ok(ids.includes("shader-mesh-gradient"));
   assert.ok(ids.includes("shader-metaballs"));
-  assert.ok(ids.includes("shader-warp"));
+  assert.ok(ids.includes("shader-image-dithering"));
+  assert.ok(ids.includes("transition-flash"));
   assert.ok(ids.includes("shader-water"));
   const shaderIds = ids.filter((id) => id.startsWith("shader-"));
-  assert.equal(shaderIds.length, 24);
+  assert.equal(shaderIds.length, 29);
   const names = list.map((g) => g.name);
   const sorted = [...names].sort((a, b) => a.localeCompare(b));
   assert.deepEqual(names, sorted);
@@ -48,7 +50,7 @@ test("shader manifests are rich-kind templates", () => {
   const shaderTemplateIds = listGraphics()
     .map((g) => g.id)
     .filter((id) => id.startsWith("shader-"));
-  assert.equal(shaderTemplateIds.length, 24);
+  assert.equal(shaderTemplateIds.length, 29);
   for (const id of shaderTemplateIds) {
     assert.equal(loadGraphicManifest(id).kind, "rich", id);
   }
@@ -64,6 +66,16 @@ const MOTION_TEMPLATE_IDS = [
   "motion-word-cascade",
   "motion-highlight-pop",
 ];
+
+test("listGraphics includes param schemas and pack", () => {
+  const wc = listGraphics().find((g) => g.id === "motion-word-cascade");
+  assert.ok(wc);
+  assert.equal(wc?.pack, "motion");
+  assert.equal(wc?.params.text?.type, "string");
+  assert.equal(wc?.params.inDurFrames?.type, "number");
+  const shader = listGraphics().find((g) => g.id === "shader-mesh-gradient");
+  assert.equal(shader?.pack, "shader");
+});
 
 test("listGraphics includes the bundled Motion text pack", () => {
   const ids = listGraphics().map((g) => g.id);
@@ -85,6 +97,14 @@ test("Motion pack manifests parse and are rich-kind", () => {
       `expected ${id} name to start with "Motion: "`
     );
   }
+});
+
+test("graphicPack classifies motion, shader, transition, and project ids", () => {
+  assert.equal(graphicPack("motion-typewriter"), "motion");
+  assert.equal(graphicPack("shader-mesh-gradient"), "shader");
+  assert.equal(graphicPack("transition-flash"), "transition");
+  assert.equal(graphicPack("lower-third"), "other");
+  assert.equal(graphicPack("local-badge", "project"), "project");
 });
 
 test("loadGraphicManifest throws for an unknown template", () => {

@@ -1,0 +1,13 @@
+{
+  "id": "transition-wipe",
+  "name": "Transition: Wipe",
+  "kind": "rich",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "params": {
+    "accent": { "type": "color", "default": "#000000", "label": "Wipe color" },
+    "inDurFrames": { "type": "number", "default": 10, "label": "In (frames)" },
+    "outDurFrames": { "type": "number", "default": 10, "label": "Out (frames)" }
+  }
+}

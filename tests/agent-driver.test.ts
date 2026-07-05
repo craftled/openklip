@@ -60,6 +60,18 @@ test("buildEditPrompt names the slug and tells the model to do the edit", () => 
   assert.match(prompt, /User: cut the word world/);
 });
 
+test("buildEditPrompt advertises motion graphics tools", () => {
+  const prompt = buildEditPrompt(
+    { words: [{ text: "hello" }, { text: "world" }] },
+    "demo",
+    "add motion text"
+  );
+  assert.match(prompt, /graphic-add-phrase/);
+  assert.match(prompt, /graphic_list/);
+  assert.match(prompt, /graphic_show/);
+  assert.match(prompt, /inDurFrames/);
+});
+
 test("buildEditPrompt injects analyzed asset cards when present", () => {
   const prompt = buildEditPrompt(
     {

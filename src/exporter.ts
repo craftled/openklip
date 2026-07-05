@@ -29,11 +29,11 @@ import {
   type ExportAspect,
   type ExportCrop,
   ExportSettingsSchema,
-  effectiveRanges,
   intersectRangesWithSpan,
   type MusicPlacement,
   ProjectSchema,
   type Range,
+  rangesForExport,
   SAMPLE_RATE,
   sec,
   sourceToOutputSec,
@@ -65,6 +65,7 @@ import {
 } from "./export-segments.ts";
 import { FFMPEG, probe, run } from "./ffmpeg.ts";
 import { filterChain } from "./filter.ts";
+import { enrichGraphicParamsWithImage } from "./graphic-image.ts";
 import { renderGraphicOverlay } from "./graphic-render.ts";
 import {
   defaultGraphicParams,
@@ -970,7 +971,7 @@ export async function exportCut(
         .then((a) => a.silences)
         .catch(() => undefined)
     : undefined;
-  let ranges = effectiveRanges(project, silences);
+  let ranges = rangesForExport(project, silences);
   if (opts.sourceSpan) {
     ranges = intersectRangesWithSpan(
       ranges,
@@ -1129,8 +1130,13 @@ export async function exportCut(
             ),
           };
         }
-        const manifest: GraphicManifest = loadGraphicManifest(g.template);
-        const params = { ...defaultGraphicParams(manifest), ...g.params };
+        const manifest: GraphicManifest = loadGraphicManifest(g.template, {
+          slug: project.slug,
+        });
+        const params = enrichGraphicParamsWithImage(slug, project, g.template, {
+          ...defaultGraphicParams(manifest),
+          ...g.params,
+        });
         return {
           graphic: g,
           outStart: win.outStart,
@@ -1202,6 +1208,7 @@ export async function exportCut(
           manifest: x.manifest,
           id: x.graphic.id,
           template: x.graphic.template,
+          slug: project.slug,
           compositionHtml: x.compositionHtml,
           params: x.params,
           keyframes: x.graphic.keyframes,

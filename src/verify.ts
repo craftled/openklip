@@ -9,6 +9,7 @@
 // transcribe spawn touch the world.
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { isBlankCanvasProject } from "./blank-ingest.ts";
 import { FFMPEG, run } from "./ffmpeg.ts";
 import { projectPaths } from "./paths.ts";
 import { loadProject } from "./projectStore.ts";
@@ -186,6 +187,16 @@ export async function verifyCut(slug: string): Promise<VerifyReport> {
   );
   const renderedWords = await transcribeToWords(audioAbs, outJson);
   const project = await loadProject(slug);
+  if (isBlankCanvasProject(project)) {
+    return {
+      ok: true,
+      fillerSurvivors: [],
+      leakedDeleted: [],
+      missingKept: [],
+      keptCoverage: 1,
+      renderedWordCount: 0,
+    };
+  }
   return diffCut({
     keptWords: project.words.filter((w) => !w.deleted).map((w) => w.text),
     deletedWords: project.words.filter((w) => w.deleted).map((w) => w.text),
