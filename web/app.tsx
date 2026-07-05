@@ -1,6 +1,5 @@
 "use client";
 
-import { DEFAULT_CAPTION_STYLE } from "@engine/caption-styles";
 import type {
   ColorAdjust,
   Project as EngineProject,
@@ -12,8 +11,6 @@ import {
   shouldApplyReframe,
 } from "@engine/export-aspect";
 import type { Keyframe } from "@engine/keyframes";
-import { stampGuiWordProvenance } from "@engine/provenance-display";
-import type { SafeAreaPlatform } from "@engine/safe-areas";
 import {
   type CSSProperties,
   type ReactNode,
@@ -26,10 +23,6 @@ import {
 import { AgentChatProvider } from "@/components/agent-chat-context";
 import { AgentSidebar } from "@/components/agent-sidebar";
 import { withAssetKind } from "@/components/asset-bin";
-import {
-  CHAT_WIDTH_DEFAULT,
-  readStoredChatWidth,
-} from "@/components/chat-resize-handle";
 import { CinemaPlayer } from "@/components/cinema-player";
 import { buildCleanupCandidates } from "@/components/cleanup-panel";
 import type { TimelineClipKind } from "@/components/edit-timeline";
@@ -42,7 +35,8 @@ import {
 } from "@/components/graphic-picker-controls";
 import { PreviewOverlays } from "@/components/preview-overlays";
 import { SidebarProvider, useSidebar } from "@/components/ui/sidebar";
-import { useConfigPanel } from "@/hooks/use-config-panel";
+import { useEditorChrome } from "@/hooks/use-editor-chrome";
+import { useEditorConfigPanel } from "@/hooks/use-editor-config-panel";
 import { useEditorExport } from "@/hooks/use-editor-export";
 import { useEditorSelection } from "@/hooks/use-editor-selection";
 import { useLookControls } from "@/hooks/use-look-controls";
@@ -50,20 +44,14 @@ import { useOverlayEditors } from "@/hooks/use-overlay-editors";
 import { usePreviewPlayback } from "@/hooks/use-preview-playback";
 import { useProjectConfigActions } from "@/hooks/use-project-config-actions";
 import { useProjectSaves } from "@/hooks/use-project-saves";
+import { useTranscriptEdits } from "@/hooks/use-transcript-edits";
 import {
   type UseTranscriptSearchParams,
   useTranscriptSearch,
 } from "@/hooks/use-transcript-search";
-import {
-  type AgentModelId,
-  DEFAULT_AGENT_MODEL,
-  getDefaultAgentModel,
-  setDefaultAgentModel,
-  subscribeDefaultAgent,
-} from "@/lib/agent-preferences";
+import { setDefaultAgentModel } from "@/lib/agent-preferences";
 import type { AssetBinUpdate } from "@/lib/asset-bin-update";
 import { shouldAutoOpenConfig } from "@/lib/config-panel-behavior";
-import type { ConfigTabId } from "@/lib/config-tabs";
 import type {
   EditorProject,
   EditorSelection,
@@ -73,28 +61,6 @@ import { formatEditorTime } from "@/lib/format-time";
 import type { Orientation } from "@/lib/preview-layout";
 import { buildProjectHoverContext } from "@/lib/project-context";
 import type { ProjectListing } from "@/lib/project-list";
-import {
-  readProvenanceDisplayEnabled,
-  subscribeProvenanceDisplay,
-} from "@/lib/provenance-preferences";
-import { visibleChatWidth } from "@/lib/right-rail-layout";
-import {
-  getSafeAreaGuidePlatform,
-  setSafeAreaGuidePlatform,
-} from "@/lib/safe-area-preferences";
-import type { SettingsSectionId } from "@/lib/settings-navigation";
-import {
-  applyColorScheme,
-  type ColorScheme,
-  getColorScheme,
-  setColorScheme,
-  subscribeColorScheme,
-} from "@/lib/theme-preferences";
-import {
-  reconcileTranscriptText,
-  setWordRangeDeleted,
-} from "@/lib/transcript-edit";
-import { saveProjectEdits } from "../app/actions.ts";
 import type { EditorChatsSnapshot } from "../app/lib/editor-chats.ts";
 import { type CaptionWord, groupCaptions } from "../src/captions.ts";
 import { sourceSecForOutputPosition } from "../src/schedulerLogic.ts";
@@ -139,35 +105,6 @@ export function App({
   const [motionSpeed, setMotionSpeed] = useState<number>(
     initialProject.motion?.speed ?? 1
   );
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [settingsSection, setSettingsSection] =
-    useState<SettingsSectionId>("appearance");
-  const [defaultAgent, setDefaultAgent] =
-    useState<AgentModelId>(DEFAULT_AGENT_MODEL);
-  const [configOpen, setConfigOpen] = useState(false);
-  const [configTab, setConfigTab] = useState<ConfigTabId>("look");
-  const [mobileRightPanel, setMobileRightPanel] = useState<
-    "chat" | "config" | null
-  >(null);
-  const [historyFocusRevision, setHistoryFocusRevision] = useState<
-    number | null
-  >(null);
-  const focusWordInHistory = useCallback((revisionAfter: number) => {
-    setConfigOpen(true);
-    setMobileRightPanel("config");
-    setConfigTab("history");
-    setHistoryFocusRevision(revisionAfter);
-  }, []);
-  // Chat sidebar width (px), drag-adjustable. Default on server; the stored
-  // value is read after mount so SSR and first client render agree.
-  const [chatWidth, setChatWidth] = useState(CHAT_WIDTH_DEFAULT);
-  useEffect(() => {
-    setChatWidth(readStoredChatWidth());
-  }, []);
-  const resolvedChatWidth = visibleChatWidth(chatWidth, configOpen);
-  const [cinema, setCinema] = useState(false);
-  const [selAnchor, setSelAnchor] = useState<number | null>(null);
-  const [selFocus, setSelFocus] = useState<number | null>(null);
   const [selected, setSelected] = useState<Selected>(null);
   const [chosenAsset, setChosenAsset] = useState(
     initialProject.assets?.find((a) => (a.kind ?? "broll") === "broll")?.id ??
@@ -191,106 +128,68 @@ export function App({
     useState<GraphicSpanMode>("seconds");
   const [graphicBeatCount, setGraphicBeatCount] = useState(4);
   const [graphicMusicAssetId, setGraphicMusicAssetId] = useState("");
-
-  // G1: a GUI revert (HistoryPanel's onReverted prop) is the only place a
-  // server action can rewrite an ALREADY-OPEN project's revision out from
-  // under this component. `project` is a plain useState<Project> seeded
-  // once from initialProject at mount (page.tsx keys the tree by slug, not
-  // revision, so remounting on every edit isn't an option): without this,
-  // the transcript/preview would keep showing pre-revert state, and the
-  // next edit (toggleWord -> saveProjectEdits serializes the CLIENT's full
-  // words deleted-map; same wholesale-state pattern in saveLook/saveZooms/
-  // saveTitles/saveBroll) would silently resurrect it by overwriting the
-  // just-restored project.json with the stale in-memory copy.
-  //
-  // Reseeds project plus every piece of client state this component itself
-  // derives from initialProject at mount (captionsOn, vignetteOn, filter,
-  // color, motionSpeed, chosenAsset/chosenStillAsset/chosenMusicAsset above),
-  // mirroring that exact derivation rather than inventing a second one.
-  // Deliberately leaves dirPath/mediaVersion/brief/silences alone: none of
-  // those live in project.json, so revert never touches them (brief.md
-  // especially; see saveBrief and HistoryList's groupHasBriefSet caveat for
-  // a task revert that spans a brief-set entry).
-  //
-  // Any save already in flight when a revert lands is left to the existing
-  // enqueueSave/saveError path (see toggleWord etc. below): it will still
-  // write, just now on top of the reseeded state, which is the simplest
-  // correct behavior available without a bigger in-flight-save cancellation
-  // mechanism.
-  //
-  // Out of scope: a CLI/MCP revert (or any other out-of-band project.json
-  // write) made while this editor is open has no signal to reseed from and
-  // leaves the same stale client state behind; that is the same
-  // pre-existing class of staleness as any other external edit racing an
-  // open editor, not something this fix addresses.
-  const onHistoryReverted = useCallback((restored: EngineProject) => {
-    setProject((prev) => ({
-      ...prev,
-      ...(restored as unknown as Project),
-      brief: prev.brief,
-      dirPath: prev.dirPath,
-      mediaVersion: prev.mediaVersion,
-      silences: prev.silences,
-    }));
-    setCaptionsOn(restored.captions?.enabled ?? true);
-    setVignetteOn(restored.look?.vignette ?? false);
-    setFilterState(restored.look?.filter ?? "none");
-    setColorState(restored.look?.color ?? null);
-    setMotionSpeed(restored.motion?.speed ?? 1);
-    setOrientation(
-      exportAspectToOrientation(
-        ExportSettingsSchema.parse(restored.export ?? {}).aspect
-      )
-    );
-    setChosenAsset(
-      restored.assets?.find((a) => (a.kind ?? "broll") === "broll")?.id ?? ""
-    );
-    setChosenStillAsset(
-      restored.assets?.find((a) => a.kind === "still")?.id ?? ""
-    );
-    setChosenMusicAsset(
-      restored.assets?.find((a) => a.kind === "music")?.id ?? ""
-    );
-  }, []);
-
-  const [titleText, setTitleText] = useState("");
-  const [titlePos, setTitlePos] = useState<"lower" | "center" | "hero">(
-    "lower"
-  );
   const [orientation, setOrientation] = useState<Orientation>(() =>
     exportAspectToOrientation(
       ExportSettingsSchema.parse(initialProject.export ?? {}).aspect
     )
   );
-  const [safeAreaGuide, setSafeAreaGuide] = useState<SafeAreaPlatform>("off");
-  useEffect(() => {
-    setSafeAreaGuide(getSafeAreaGuidePlatform());
-  }, []);
-  const onSafeAreaGuideChange = useCallback((platform: SafeAreaPlatform) => {
-    setSafeAreaGuide(platform);
-    setSafeAreaGuidePlatform(platform);
-  }, []);
-  const [colorScheme, setColorSchemeState] = useState<ColorScheme>("light");
-  const [provenanceDisplay, setProvenanceDisplay] = useState(false);
-  useEffect(() => {
-    const storedColorScheme = getColorScheme();
-    setColorSchemeState(storedColorScheme);
-    applyColorScheme(storedColorScheme);
-    return subscribeColorScheme(setColorSchemeState);
-  }, []);
 
-  useEffect(() => {
-    setProvenanceDisplay(readProvenanceDisplayEnabled());
-    return subscribeProvenanceDisplay(setProvenanceDisplay);
-  }, []);
+  const {
+    cinema,
+    colorScheme,
+    configOpen,
+    configTab,
+    defaultAgent,
+    focusWordInHistory,
+    historyFocusRevision,
+    mobileRightPanel,
+    onCloseConfig,
+    onHistoryReverted,
+    onSafeAreaGuideChange,
+    provenanceDisplay,
+    resolvedChatWidth,
+    safeAreaGuide,
+    chatWidth,
+    setCinema,
+    setConfigOpen,
+    setConfigTab,
+    setHistoryFocusRevision,
+    setMobileRightPanel,
+    setChatWidth,
+    setSettingsOpen,
+    setSettingsSection,
+    settingsOpen,
+    settingsSection,
+    toggleColorScheme,
+  } = useEditorChrome({
+    setCaptionsOn,
+    setChosenAsset,
+    setChosenMusicAsset,
+    setChosenStillAsset,
+    setColorState,
+    setFilterState,
+    setMotionSpeed,
+    setOrientation,
+    setProject,
+    setVignetteOn,
+  });
 
-  useEffect(() => {
-    setDefaultAgent(getDefaultAgentModel());
-    return subscribeDefaultAgent(setDefaultAgent);
-  }, []);
-  const toggleColorScheme = useCallback(() => {
-    setColorScheme(colorScheme === "dark" ? "light" : "dark");
-  }, [colorScheme]);
+  const {
+    clearSel,
+    clearTranscriptSelection,
+    cutSelection,
+    extendTranscriptSelection,
+    reconcileTranscriptEdit,
+    restoreSelection,
+    selRange,
+    selectTranscriptRange,
+    toggleWord,
+  } = useTranscriptEdits({ enqueueSave, setProject, setSelected });
+
+  const [titleText, setTitleText] = useState("");
+  const [titlePos, setTitlePos] = useState<"lower" | "center" | "hero">(
+    "lower"
+  );
   const projectRef = useRef<Project | null>(null);
   projectRef.current = project;
 
@@ -419,120 +318,6 @@ export function App({
       project.stills,
       project.graphics,
     ]
-  );
-
-  const toggleWord = useCallback(
-    (id: string) => {
-      setProject((prev) => {
-        const revisionAfter = (prev.revision ?? 0) + 1;
-        const words = stampGuiWordProvenance(
-          prev.words.map((w) =>
-            w.id === id ? { ...w, deleted: !w.deleted } : w
-          ),
-          [id],
-          revisionAfter
-        );
-        enqueueSave(() =>
-          saveProjectEdits(prev.slug, {
-            words: words.map((w) => ({ id: w.id, deleted: w.deleted })),
-          })
-        );
-        return { ...prev, words };
-      });
-    },
-    [enqueueSave]
-  );
-
-  const setTranscriptRangeDeleted = useCallback(
-    (range: readonly [number, number], deleted: boolean) => {
-      setProject((prev) => {
-        const revisionAfter = (prev.revision ?? 0) + 1;
-        const changedIds = prev.words
-          .slice(range[0], range[1] + 1)
-          .map((w) => w.id);
-        const words = stampGuiWordProvenance(
-          setWordRangeDeleted(prev.words, range, deleted),
-          changedIds,
-          revisionAfter
-        );
-        enqueueSave(() =>
-          saveProjectEdits(prev.slug, {
-            words: words.map((w) => ({
-              id: w.id,
-              deleted: w.deleted,
-              text: w.text,
-            })),
-          })
-        );
-        return { ...prev, words };
-      });
-    },
-    [enqueueSave]
-  );
-
-  const reconcileTranscriptEdit = useCallback(
-    (editedText: string) => {
-      setProject((prev) => {
-        const revisionAfter = (prev.revision ?? 0) + 1;
-        const words = stampGuiWordProvenance(
-          reconcileTranscriptText(prev.words, editedText),
-          prev.words.map((w) => w.id),
-          revisionAfter
-        );
-        enqueueSave(() =>
-          saveProjectEdits(prev.slug, {
-            words: words.map((w) => ({
-              id: w.id,
-              deleted: w.deleted,
-              text: w.text,
-            })),
-          })
-        );
-        return { ...prev, words };
-      });
-    },
-    [enqueueSave]
-  );
-
-  const selRange =
-    selAnchor != null && selFocus != null
-      ? ([
-          Math.min(selAnchor, selFocus),
-          Math.max(selAnchor, selFocus),
-        ] as const)
-      : null;
-  const clearSel = () => {
-    setSelAnchor(null);
-    setSelFocus(null);
-  };
-  const selectTranscriptRange = useCallback(
-    (range: readonly [number, number] | null) => {
-      setSelected(null);
-      if (range) {
-        setSelAnchor(range[0]);
-        setSelFocus(range[1]);
-      } else {
-        setSelAnchor(null);
-        setSelFocus(null);
-      }
-    },
-    []
-  );
-  const cutSelection = useCallback(
-    (range: readonly [number, number] | null = selRange) => {
-      if (range) {
-        setTranscriptRangeDeleted(range, true);
-      }
-    },
-    [selRange, setTranscriptRangeDeleted]
-  );
-  const restoreSelection = useCallback(
-    (range: readonly [number, number] | null = selRange) => {
-      if (range) {
-        setTranscriptRangeDeleted(range, false);
-      }
-    },
-    [selRange, setTranscriptRangeDeleted]
   );
 
   const { activeSearchRange, searchField, searchMatchRanges } =
@@ -675,26 +460,27 @@ export function App({
 
   const onTimelineSelect = useCallback(
     (kind: TimelineClipKind, id: string) => {
-      setSelAnchor(null);
-      setSelFocus(null);
+      clearTranscriptSelection();
       setSelected({ kind, id });
       seekTimelineClip(kind, id);
     },
-    [seekTimelineClip]
+    [clearTranscriptSelection, seekTimelineClip]
   );
   const onTimelineWordClick = useCallback(
     (index: number, shiftKey: boolean) => {
       if (shiftKey) {
-        setSelected(null);
-        setSelAnchor((prev) => (prev == null ? index : prev));
-        setSelFocus(index);
+        extendTranscriptSelection(index);
         return;
       }
-      setSelAnchor(null);
-      setSelFocus(null);
+      clearTranscriptSelection();
       toggleWord(project.words[index].id);
     },
-    [project.words, toggleWord]
+    [
+      clearTranscriptSelection,
+      extendTranscriptSelection,
+      project.words,
+      toggleWord,
+    ]
   );
 
   const fullDur = project.durationSamples / project.sampleRate;
@@ -722,211 +508,8 @@ export function App({
     crop: exportSettings.crop,
   });
 
-  const onCloseConfig = useCallback(() => {
-    if (mobileRightPanel === "config") {
-      setMobileRightPanel(null);
-      return;
-    }
-    setConfigOpen(false);
-  }, [mobileRightPanel]);
-
-  const configPanel = useConfigPanel({
-    activeTab: configTab,
-    onTabChange: setConfigTab,
-    mobileRightPanel,
-    onCloseConfig,
-    edit: {
-      addBroll,
-      addStill,
-      addTitle,
-      addZoom,
-      assetName,
-      brollAssets,
-      chosenAsset,
-      chosenStillAsset,
-      clearSelection: clearSel,
-      fmtTime: formatEditorTime,
-      graphicPlayheadOffset,
-      hasOverlayInspector,
-      newKeyframeProperty,
-      onChosenAssetChange: setChosenAsset,
-      onChosenStillAssetChange: setChosenStillAsset,
-      onNewKeyframePropertyChange: setNewKeyframeProperty,
-      onTitlePosChange: setTitlePos,
-      onTitleTextChange: setTitleText,
-      presetOf,
-      projectBroll: project.broll ?? [],
-      provenanceDisplay,
-      removeSelected,
-      reorderBrollOrder,
-      sampleRate: sr,
-      selBroll: selBroll ?? null,
-      selGraphic: selGraphic ?? null,
-      selGraphicKeyframes,
-      selGraphicValidation,
-      selRange,
-      selStill: selStill ?? null,
-      selTitle: selTitle ?? null,
-      selZoom: selZoom ?? null,
-      selectedId: selected?.id,
-      setSelected,
-      stillAssets,
-      titlePos,
-      titleText,
-      updateBroll,
-      updateGraphic,
-      updateStill,
-      updateTitle,
-      updateZoom,
-    },
-    history: {
-      currentRevision: project.revision ?? 0,
-      currentWords: project.words.map((word) => ({
-        deleted: word.deleted,
-        id: word.id,
-        text: word.text,
-      })),
-      focusRevision: historyFocusRevision,
-      onFocusRevisionHandled: () => setHistoryFocusRevision(null),
-      onReverted: onHistoryReverted,
-      showProvenance: provenanceDisplay,
-      slug: project.slug,
-    },
-    inspector: {
-      assetName,
-      fmtTime: formatEditorTime,
-      graphicLabel: selGraphicLabel,
-      sampleRate: sr,
-      selBroll: selBroll ?? null,
-      selGraphic: selGraphic
-        ? {
-            catalog:
-              selGraphic.type === "json-render"
-                ? selGraphic.catalog
-                : undefined,
-            startSample: selGraphic.startSample,
-            template:
-              selGraphic.type === "json-render"
-                ? (selGraphic.catalog ?? "product-announcement")
-                : selGraphic.template,
-            type: selGraphic.type === "json-render" ? "json-render" : "html",
-            validation: selGraphicValidation,
-          }
-        : null,
-      selRange,
-      selStill: selStill ?? null,
-      selTitle: selTitle ?? null,
-      selZoom: selZoom ?? null,
-      wordStartSample: selRange
-        ? (project.words[selRange[0]]?.startSample ?? null)
-        : null,
-    },
-    look: {
-      atSec: curSec,
-      captionStyle: project.captions?.style ?? DEFAULT_CAPTION_STYLE,
-      color,
-      filter,
-      maxWords: project.captions?.maxWords ?? 6,
-      motionSpeed,
-      onCaptionStyle: setCaptionStyle,
-      onColor: changeColor,
-      onFilter: changeFilter,
-      onMaxWords: setMaxWords,
-      onMotionSpeed: changeMotionSpeed,
-      onPadMs: setPad,
-      onVignette: toggleVignette,
-      padMs: project.padMs ?? 50,
-      reframe: {
-        applying: pendingSaves > 0,
-        applyingVision,
-        exportSettings,
-        hasSceneLog: Boolean(project.sceneLog),
-        onPatchExport: patchExport,
-        onRunVisionFocus,
-        visionFocusAvailable,
-      },
-      slug: project.slug,
-      vignetteOn,
-    },
-    project: {
-      applyingVision,
-      assets: project.assets ?? [],
-      assetName,
-      audio: project.audio,
-      audioMeasure,
-      audioMeasuring,
-      brief: project.brief ?? "",
-      bpmByAssetId: musicBpmByAsset,
-      bpmDetectingAssetId,
-      chosenGraphicTemplate,
-      chosenMusicAsset,
-      cleanupReport: cleanupReportView,
-      deadAirSpans: (project.cuts?.deadAir ?? []).map((span) => ({
-        id: span.id,
-        startSec: span.startSample / project.sampleRate,
-        endSec: span.endSample / project.sampleRate,
-      })),
-      detectingHighlights,
-      durationSec: project.durationSamples / sr,
-      graphicBeatCount,
-      graphicMusicAssetId,
-      graphicParamDraft,
-      graphicSpanMode,
-      graphicTemplates,
-      highlights: project.highlights,
-      musicAssets,
-      musicPlacements: project.music ?? [],
-      onAddGraphic: addGraphicPlacement,
-      onAddGraphicAtCuts: addGraphicAtCutSeams,
-      onAddMusic: addMusicPlacement,
-      onApplyAllSafeCleanup: applyAllSafeCleanup,
-      onApplyCleanup: applyCleanupCandidate,
-      onAssembled: onHistoryReverted,
-      onBeatCountChange: setGraphicBeatCount,
-      onChooseGraphicMusicAsset: setGraphicMusicAssetId,
-      onChooseGraphicTemplate,
-      onChooseMusicAsset: setChosenMusicAsset,
-      onDetectBpm: detectMusicBpm,
-      onDetectHighlights,
-      onGraphicParamChange: (key, value) => {
-        setGraphicParamDraft((prev) => ({ ...prev, [key]: value }));
-      },
-      onGraphicSpanModeChange: setGraphicSpanMode,
-      onMeasureAudio: measureAudioLoudness,
-      onPatchAudio: patchAudio,
-      onPatchMusic: patchMusicPlacement,
-      onPatchSnap: patchSnap,
-      onRemoveDeadAirSpan: removeDeadAirSpan,
-      onRemoveMusic: removeMusicPlacement,
-      onSaveBrief,
-      onSeekHighlight: onSeek,
-      pendingSaves,
-      sampleRate: sr,
-      slug: project.slug,
-      snap: project.cuts?.snap,
-    },
-    playback: {
-      curSec,
-      fullDurationSec: fullDur,
-      keptDurationSec: keptDuration,
-      loop,
-      onClearLoop: () => setLoop(null),
-      onSetLoop: setLoop,
-      outPos,
-    },
-    timeline: {
-      assetName,
-      assets: project.assets,
-      broll: project.broll ?? [],
-      graphics: project.graphics,
-      music: project.music,
-      sampleRate: sr,
-      stills: project.stills,
-      titles: project.titles ?? [],
-      words: project.words,
-      zooms: project.zooms ?? [],
-    },
-    timelineCallbacks: {
+  const timelineCallbacks = useMemo(
+    () => ({
       curSec,
       durationSamples: project.durationSamples,
       durationSec: fullDur,
@@ -938,7 +521,144 @@ export function App({
       sampleRate: sr,
       selected,
       selRange,
+    }),
+    [
+      curSec,
+      fullDur,
+      onClipTiming,
+      onSeek,
+      onTimelineSelect,
+      onTimelineWordClick,
+      project.durationSamples,
+      ranges,
+      selected,
+      selRange,
+      sr,
+    ]
+  );
+
+  const configPanel = useEditorConfigPanel({
+    activeTab: configTab,
+    applyingVision,
+    assetName,
+    audioMeasure,
+    audioMeasuring,
+    bpmDetectingAssetId,
+    brollAssets,
+    chosenAsset,
+    chosenGraphicTemplate,
+    chosenMusicAsset,
+    chosenStillAsset,
+    cleanupReport: cleanupReportView,
+    clearSelection: clearSel,
+    color,
+    curSec,
+    detectingHighlights,
+    editActions: {
+      addBroll,
+      addStill,
+      addTitle,
+      addZoom,
+      removeSelected,
+      reorderBrollOrder,
+      updateBroll,
+      updateGraphic,
+      updateStill,
+      updateTitle,
+      updateZoom,
     },
+    exportSettings,
+    filter,
+    fullDur,
+    graphicActions: {
+      onAddGraphic: addGraphicPlacement,
+      onAddGraphicAtCuts: addGraphicAtCutSeams,
+      onBeatCountChange: setGraphicBeatCount,
+      onChooseGraphicMusicAsset: setGraphicMusicAssetId,
+      onChooseGraphicTemplate,
+      onGraphicParamChange: (key, value) => {
+        setGraphicParamDraft((prev) => ({ ...prev, [key]: value }));
+      },
+      onGraphicSpanModeChange: setGraphicSpanMode,
+    },
+    graphicBeatCount,
+    graphicMusicAssetId,
+    graphicParamDraft,
+    graphicSpanMode,
+    graphicTemplates,
+    historyFocusRevision,
+    keptDuration,
+    loop,
+    lookActions: {
+      onCaptionStyle: setCaptionStyle,
+      onColor: changeColor,
+      onFilter: changeFilter,
+      onMaxWords: setMaxWords,
+      onMotionSpeed: changeMotionSpeed,
+      onPadMs: setPad,
+    },
+    mobileRightPanel,
+    motionSpeed,
+    musicAssets,
+    musicBpmByAsset,
+    newKeyframeProperty,
+    onChosenAssetChange: setChosenAsset,
+    onChosenStillAssetChange: setChosenStillAsset,
+    onClearLoop: () => setLoop(null),
+    onCloseConfig,
+    onFocusRevisionHandled: () => setHistoryFocusRevision(null),
+    onHistoryReverted,
+    onNewKeyframePropertyChange: setNewKeyframeProperty,
+    onSetLoop: setLoop,
+    onTabChange: setConfigTab,
+    onTitlePosChange: setTitlePos,
+    onTitleTextChange: setTitleText,
+    outPos,
+    patchExport,
+    pendingSaves,
+    project,
+    projectActions: {
+      onAddMusic: addMusicPlacement,
+      onApplyAllSafeCleanup: applyAllSafeCleanup,
+      onApplyCleanup: applyCleanupCandidate,
+      onChooseMusicAsset: setChosenMusicAsset,
+      onDetectBpm: detectMusicBpm,
+      onDetectHighlights,
+      onMeasureAudio: measureAudioLoudness,
+      onPatchAudio: patchAudio,
+      onPatchMusic: patchMusicPlacement,
+      onPatchSnap: patchSnap,
+      onRemoveDeadAirSpan: removeDeadAirSpan,
+      onRemoveMusic: removeMusicPlacement,
+      onSaveBrief,
+      onSeekHighlight: onSeek,
+    },
+    provenanceDisplay,
+    reframeActions: { applyingVision, onRunVisionFocus },
+    sampleRate: sr,
+    selected,
+    selection: {
+      graphicPlayheadOffset,
+      hasOverlayInspector,
+      presetOf,
+      selBroll,
+      selGraphic,
+      selGraphicKeyframes,
+      selGraphicLabel,
+      selGraphicValidation,
+      selStill,
+      selTitle,
+      selZoom,
+    },
+    selRange,
+    setSelected,
+    stillAssets,
+    timelineCallbacks,
+    titlePos,
+    titleText,
+    toggleVignette,
+    vignetteOn,
+    visionFocusAvailable,
   });
 
   return (

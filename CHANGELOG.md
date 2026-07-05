@@ -4,8 +4,10 @@
 
 ### Added
 - **MCP `brief_audit`**: agents can check the current edit against `brief.md` targets (runtime, b-roll/still counts, music gain, protected phrases, overlay visibility), parity with `openklip brief <slug> --audit`.
+- **CLI `openklip brief <slug> --audit`**: ship-readiness check against parsed brief targets (runtime, overlays, music, protected phrases).
 
 ### Changed
+- **Editor shell refactor**: `web/app.tsx` slimmed to orchestration (~860 lines) with transcript edits, chrome/preferences, config panel wiring, and overlay/config/look/export logic in dedicated hooks under `web/hooks/`.
 - **Docs**: `CLAUDE.md`, `README.md`, `TODO.md`, and `AGENTS.md` test and MCP tool counts match `bun test` and `openklip tools --json --surface mcp` (1822 tests, 83 MCP tools).
 
 ## 0.41.0.0 - 2026-07-05

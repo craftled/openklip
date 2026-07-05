@@ -42,5 +42,6 @@ One prompt to a full first draft: cuts, captions, titles, b-roll or stills, musi
 
 ## 6. Export and verify
 
+- Call brief_audit when a brief exists. Fix any reported issues before exporting.
 - Export with default settings unless the brief names a platform (then pick the matching compression preset and height).
 - Call verify. If it reports drift (surviving filler, leaked cuts, low coverage), fix the cause and export once more before completing.
