@@ -295,6 +295,21 @@ export function useOverlayEditors({
           }
           return { ...prev, graphics };
         }
+        if (kind === "music") {
+          const music = (prev.music ?? []).map((m) =>
+            m.id === id ? { ...m, ...patch } : m
+          );
+          if (commit) {
+            enqueueSave(() =>
+              runGuiAction(prev.slug, "music-set", {
+                id,
+                fromSec: timing.startSample / prev.sampleRate,
+                toSec: timing.endSample / prev.sampleRate,
+              })
+            );
+          }
+          return { ...prev, music };
+        }
         const stills = (prev.stills ?? []).map((s) =>
           s.id === id ? { ...s, ...patch } : s
         );

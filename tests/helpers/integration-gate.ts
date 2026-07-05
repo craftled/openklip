@@ -24,13 +24,14 @@ export async function devServerAvailable(
 }
 
 /**
- * Browser integration tests are opt-in so `bun test` stays fast and reliable
- * without a dev server. Set OPENKLIP_INTEGRATION=1 and run the dev server first.
+ * Browser integration tests are opt-in (`OPENKLIP_INTEGRATION=1`) so default
+ * `bun test` stays fast. When enabled, transcript-diff-browser.test.ts
+ * bootstraps its own fixture project and dev server on a free port.
  */
-export async function browserIntegrationSkipReason(input: {
+export function browserIntegrationSkipReason(input: {
   chromePath?: string;
   serverUrl: string;
-}): Promise<string | false> {
+}): string | false {
   if (process.env.OPENKLIP_INTEGRATION !== "1") {
     return "Set OPENKLIP_INTEGRATION=1 to run browser integration tests";
   }
@@ -38,9 +39,6 @@ export async function browserIntegrationSkipReason(input: {
     input.chromePath ?? process.env.OPENKLIP_CHROME_PATH ?? DEFAULT_CHROME_PATH;
   if (!chromeAvailable(chromePath)) {
     return "Chrome not installed (set OPENKLIP_CHROME_PATH to override)";
-  }
-  if (!(await devServerAvailable(input.serverUrl))) {
-    return `Dev server not running at ${input.serverUrl}`;
   }
   return false;
 }

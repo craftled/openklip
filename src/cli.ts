@@ -254,6 +254,10 @@ Look & captions
                         [--highpass on|off] [--highpass-hz <40-200>]
                         [--deess on|off] [--deess-intensity <0-1>]
   openklip pad <slug> <ms>               cut boundary padding (0-500 ms)
+  openklip cuts-snap <slug>              print VAD cut snap settings
+  openklip cuts-snap <slug> [--on|--off] [--mode off|vad]
+                        [--max-shift <ms>] [--crossfade <ms>]
+                                       snap cut boundaries to silence + seam crossfade
   openklip brand <slug> <name>           apply a brand preset (look defaults)
   openklip template list                 list edit templates (templates/*/skill.md)
   openklip template show <id>            print a template skill file
@@ -2014,6 +2018,51 @@ try {
       }
       const { project } = await runLoggedAction(rest[0], "pad", { padMs: ms });
       console.log(`pad: ${project.padMs}ms`);
+      break;
+    }
+    case "cuts-snap": {
+      if (!rest[0]) {
+        throw new Error(
+          "usage: openklip cuts-snap <slug> [--on|--off] [--mode off|vad] [--max-shift <ms>] [--crossfade <ms>]"
+        );
+      }
+      const slug = rest[0];
+      const flags = rest.slice(1);
+      const onOff = flags.find((f) => f === "--on" || f === "--off");
+      const mode = flagValue(flags, "--mode");
+      const maxShift = flagNumber(flags, "--max-shift");
+      const crossfade = flagNumber(flags, "--crossfade");
+      const input: {
+        enabled?: boolean;
+        mode?: "off" | "vad";
+        maxShiftMs?: number;
+        crossfadeMs?: number;
+      } = {};
+      if (onOff === "--on") {
+        input.enabled = true;
+      } else if (onOff === "--off") {
+        input.enabled = false;
+      }
+      if (mode !== undefined) {
+        if (mode !== "off" && mode !== "vad") {
+          throw new Error("openklip cuts-snap --mode must be off or vad");
+        }
+        input.mode = mode;
+      }
+      if (maxShift !== undefined) {
+        input.maxShiftMs = maxShift;
+      }
+      if (crossfade !== undefined) {
+        input.crossfadeMs = crossfade;
+      }
+      const project =
+        Object.keys(input).length === 0
+          ? await loadProject(slug)
+          : (await runLoggedAction(slug, "cuts-snap", input)).project;
+      const snap = project.cuts?.snap;
+      console.log(
+        `cuts-snap: ${snap?.enabled ? "on" : "off"} (mode ${snap?.mode ?? "off"}, max shift ${snap?.maxShiftMs ?? 0}ms, crossfade ${snap?.crossfadeMs ?? 0}ms)`
+      );
       break;
     }
     case "status": {

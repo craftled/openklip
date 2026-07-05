@@ -6,6 +6,25 @@ Publishing status checked on 2026-07-05 (`gh release list`): GitHub releases are
 
 ---
 
+## v0.41.0.2
+
+**Agent parity, timeline UX, and browser integration gates.**
+
+### Highlights
+- **`openklip cuts-snap`**: CLI parity for VAD snap and seam crossfade settings.
+- **Timeline UX**: drag-trim music beds; json-render graphic select + trim covered by a browser integration test.
+- **Graphics upload**: project-local template upload in Config → Graphics.
+- **Ship audit**: `brief_audit` on motion export skills; title/zoom/still provenance in inspectors when attribution is enabled.
+- **Reliability**: action log tail reads with limits; orphaned running agent tasks finalize after server restart.
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#04102---2026-07-05)
+
+---
+
 ## v0.41.0.1
 
 **Editor refactor, brief ship audit for agents, doc count sync.**

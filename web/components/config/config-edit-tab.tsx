@@ -2,6 +2,7 @@
 
 import type { Keyframe } from "@engine/keyframes";
 import { authorDisplayLabel } from "@engine/provenance-display";
+import type { ReactNode } from "react";
 import {
   CONFIG_COMPACT_INPUT_CLASS,
   CONFIG_COMPACT_SELECT_TRIGGER_CLASS,
@@ -43,6 +44,7 @@ import { firstToggleValue } from "@/lib/toggle-value";
 import { cn } from "@/lib/utils";
 
 interface ZoomItem {
+  authoredBy?: string;
   endSample: number;
   id: string;
   rampSec: number;
@@ -50,7 +52,22 @@ interface ZoomItem {
   startSample: number;
 }
 
+function overlayProvenanceNote(
+  authoredBy: string | undefined,
+  show: boolean
+): ReactNode {
+  if (!(show && authoredBy)) {
+    return null;
+  }
+  return (
+    <p className="text-muted-foreground text-xs">
+      Edited by {authorDisplayLabel(authoredBy)}
+    </p>
+  );
+}
+
 interface TitleItem {
+  authoredBy?: string;
   endSample: number;
   id: string;
   position: "callout" | "center" | "divider" | "hero" | "lower" | "quote";
@@ -71,6 +88,7 @@ interface BrollItem {
 
 interface StillItem {
   assetId: string;
+  authoredBy?: string;
   endSample: number;
   focusX: number;
   focusY: number;
@@ -186,6 +204,7 @@ export function ConfigEditTab({
           {selZoom && (
             <>
               <Section defaultOpen title="Parameters">
+                {overlayProvenanceNote(selZoom.authoredBy, provenanceDisplay)}
                 <SliderRow
                   formatValue={(value) => `${value.toFixed(2)}×`}
                   label="Scale"
@@ -235,6 +254,7 @@ export function ConfigEditTab({
 
           {selTitle && (
             <Section defaultOpen title="Title">
+              {overlayProvenanceNote(selTitle.authoredBy, provenanceDisplay)}
               {selTitle.position === "hero" ? (
                 <Textarea
                   className={CONFIG_COMPACT_TEXTAREA_CLASS}
@@ -428,6 +448,7 @@ export function ConfigEditTab({
           {selStill && stillAssets.length > 0 && (
             <>
               <Section title="Source">
+                {overlayProvenanceNote(selStill.authoredBy, provenanceDisplay)}
                 <Select
                   onValueChange={(v) =>
                     v &&

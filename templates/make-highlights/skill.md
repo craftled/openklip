@@ -26,7 +26,7 @@ For each clip you will export:
 1. **Isolate the span**: cut everything outside `fromSec`-`toSec` using word ids from transcript_span around those times, or cut-text for obvious bookend phrases. Cut whole sentences, not lone words.
 2. **Tighten pacing**: run cleanup_report and apply safe candidates inside the span if filler remains.
 3. **Reframe**: on macOS, `openklip vision-focus <slug>` then `export-set` with `aspect: "9:16"` and `cropMode: "scene"` when a sceneLog exists; otherwise `cropMode: "vision"` on macOS or `manual` with a small focus patch.
-4. **Export**: `openklip export <slug> --platform shorts` (or the export MCP tool with `platform: "shorts"`).
+4. **Export**: `openklip export <slug> --platform shorts` (or the export MCP tool with `platform: "shorts"`). Call brief_audit when a brief exists first; fix any reported issues before exporting.
 5. **Verify**: call verify; fix and re-export once if drift is reported.
 
 Rename or copy `output/out.mp4` before exporting the next clip if the user needs multiple files kept (OpenKlip overwrites `output/out.mp4` each full-project export). Prefer `openklip export-highlight <slug> <id>` or `all`, which writes `output/highlights/{id}.mp4` without mutating the edit.
