@@ -2,13 +2,13 @@
 
 Use these bodies when publishing releases. Each section matches a tag in `CHANGELOG.md` without duplicating the full changelog. **Known gaps:** always link to [TODO.md](../TODO.md#known-limitations); do not duplicate the list here.
 
-Publishing status checked on 2026-07-06 (`gh release list`): GitHub releases are published through `v0.41.0.2`. This section is the draft body for `v0.41.0.3`.
+Publishing status checked on 2026-07-06 (`gh release list`): GitHub releases are published through `v0.41.0.3` (tag `2ea691e` on `main`).
 
 ---
 
 ## v0.41.0.3
 
-**Trust, agent loop, intake, and shorts polish (Ships A-D).**
+**Trust, agent loop, intake, and shorts polish (Ships A-D).** Shipped direct to `main` at `2ea691e`.
 
 ### Highlights
 - **Agent smoke audit**: `bun run agent-smoke-audit` in CI; `--real` for live `edgaras-raw` when present.

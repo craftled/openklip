@@ -88,6 +88,7 @@ Time is integer audio samples at 48 kHz. The CLI takes seconds where a human num
 | Toggle captions | `openklip captions <slug> on\|off` |
 | Caption line length | `openklip captions-max <slug> <n>` |
 | Caption look preset | `openklip captions-style <slug> <boxed\|clean\|karaoke\|bold-caps\|minimal>` |
+| Vertical caption safe-area inset | `openklip captions-inset <slug> on\|off [--platform generic\|tiktok\|reels\|youtube-shorts]` |
 | Toggle vignette | `openklip look <slug> vignette on\|off` |
 | Set animation feel | `openklip motion <slug> --speed <n>` |
 | Set color grade | `openklip look <slug> grade <name>` |
@@ -221,6 +222,7 @@ Workflow: `take-add` each recording, read `take_transcript <slug> <takeId>` to f
 | `openklip captions <slug> <on\|off>` | Toggle burned captions for export. |
 | `openklip captions-max <slug> <n>` | Words per caption line (1–12). |
 | `openklip captions-style <slug> <style>` | Set the caption look preset: `boxed` (default), `clean`, `karaoke`, `bold-caps`, `minimal`. Defined once in `src/caption-styles.ts` and rendered identically by the preview and the ASS export burn-in. An unknown or missing style on `project.json` falls back to `boxed` on load; this command validates and rejects an invalid id. |
+| `openklip captions-inset <slug> on\|off [--platform …]` | Toggle vertical-export caption safe-area inset (`captions.insetPlatform`). Applies on portrait exports only; uses the same inset fractions as preview safe-area guides. |
 | `openklip look <slug> vignette <on\|off>` | Toggle vignette. |
 | `openklip motion <slug> [--speed n] [--fade ms] [--hero-fade ms] [--slide frac]` | Global animation feel for overlay entrances (the deck's anim.tsx). `speed` scales every duration, so "make it snappier" is one number (`--speed 1.4`). Titles read it at export (ASS fade + slide). |
 | `openklip look <slug> grade <name>` | Set the color grade applied to the whole picture at export: `none`, `neutral`, `warm`, `cool`, `cool_desat`, `filmic`, `punchy`. Expands to a deterministic ffmpeg filter chain. `none` is the default no-op. |
@@ -243,7 +245,7 @@ Workflow: `take-add` each recording, read `take_transcript <slug> <takeId>` to f
 | `openklip status <slug> --json` | Same data as compact JSON (preferred for agents). |
 | `openklip ranges <slug> [--json]` | Kept source-time segments after cuts and pad. |
 | `openklip overlays <slug> [--json]` | All b-roll, titles, zooms, stills with ids and spans. |
-| `openklip cleanup <slug> [--json]` | Filler-word and dead-air cleanup candidates with risk (`safe`/`review`), reason, and estimated seconds saved. Degrades to filler-only (with a warning) when no audio analysis is available yet. |
+| `openklip cleanup <slug> [--json]` | Filler-word and dead-air cleanup candidates with risk (`safe`/`review`), reason, and estimated seconds saved. Honors brief **Always cut:** / **Never cut:** lines and optional `project.cuts.cleanupPhrases`. Degrades to filler-only (with a warning) when no audio analysis is available yet. |
 | `openklip cleanup <slug> --apply-safe` | Apply every `safe` candidate (cuts filler words, registers dead-air spans) and print what changed. `review` candidates are never auto-applied; apply them individually via `cut`/`dead-air-add` after a human or agent judgment call. |
 | `openklip dead-air-rm <slug> <id>` | Remove a registered dead-air span by id. Also exposed in the GUI Cleanup panel. |
 | `openklip export-set <slug>` | Set export aspect ratio and reframe crop on `project.export` (preview/export parity). `--aspect source\|16:9\|9:16\|1:1`, `--crop-mode manual\|scene\|vision`, `--crop-focus-x`, `--crop-focus-y`, `--crop-scale`, `--layout fill\|split-vertical`, `--split-ratio`, `--split-speaker top\|bottom`. |
@@ -288,7 +290,7 @@ The tool-calling edit prompt (`buildEditPrompt` in `src/agent-driver.ts`) advert
 | Layer | MCP tool names | Same as CLI |
 | --- | --- | --- |
 | Query | `list_projects`, `blank_ingest`, `transcript_grep`, `transcript_phrase`, `scene_log`, `highlights_list`, `project_status`, `project_overlays`, `cleanup_report`, `history_list`, `task_list`, `template_list`, `graphic_list`, `graphic_show`, `load_skill`, `music_bpm`, `audio_measure`, … | `openklip transcript grep`, `status --json`, `overlays --json`, `highlights`, `cleanup --json`, `openklip history`, `openklip tasks`, `openklip template list`, `openklip ingest --blank`, `openklip graphic list`, `openklip bpm`, `openklip audio measure` |
-| Mutate | `cut`, `cut-text`, `broll-add`, `title-set`, `word-text`, `dead-air-add`, `dead-air-rm`, `audio`, `captions-style`, … | `openklip cut`, `broll-add`, `word-text`, `dead-air-rm`, `audio`, `captions-style`, … |
+| Mutate | `cut`, `cut-text`, `broll-add`, `title-set`, `word-text`, `dead-air-add`, `dead-air-rm`, `audio`, `captions-style`, `captions-inset`, … | `openklip cut`, `broll-add`, `word-text`, `dead-air-rm`, `audio`, `captions-style`, `captions-inset`, … |
 | Phrase compose | `title-add-phrase`, `zoom-add-phrase`, `broll-add-phrase`, `graphic-add-phrase` | `openklip title-add-phrase`, … |
 | Brief | `brief_get`, `brief_set`, `brief_audit` | `openklip brief`, `openklip brief --set`, `openklip brief --audit` |
 | Agent task progress | `task_step`, `task_complete` | no CLI equivalent: scoped to the running agent's own task via `OPENKLIP_TASK_ID` |
@@ -341,6 +343,14 @@ bun run agent-make-short <slug>
 bun run agent-make-short <slug> --max-sec 60       # warn if over 60s
 bun run agent-make-short <slug> --dry-run          # preview settings only
 bun run agent-make-short <slug> --skip-export      # reframe only, no render
+```
+
+`agent-smoke-audit`: deterministic agent-loop smoke (no LLM). CI runs the lavfi fixture; `--real` audits `edgaras-raw` when present; `--all` runs both.
+
+```bash
+bun run agent-smoke-audit
+bun run agent-smoke-audit --real    # skip gracefully when edgaras-raw absent
+bun run agent-smoke-audit --all
 ```
 
 ## Editing guardrails
