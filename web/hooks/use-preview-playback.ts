@@ -29,13 +29,7 @@ interface PreviewMusic {
   startSample: number;
 }
 
-interface PreviewAsset {
-  durationSamples: number;
-  id: string;
-}
-
 export interface UsePreviewPlaybackParams {
-  assets: PreviewAsset[];
   broll: PreviewBroll[];
   cinema: boolean;
   mediaVersion?: number;
@@ -52,7 +46,6 @@ export interface UsePreviewPlaybackParams {
 }
 
 export function usePreviewPlayback({
-  assets,
   broll,
   cinema,
   mediaVersion,

@@ -512,7 +512,6 @@ export function App({
   );
 
   const playback = usePreviewPlayback({
-    assets: project.assets,
     broll: project.broll ?? [],
     cinema,
     mediaVersion: project.mediaVersion,
@@ -736,20 +735,16 @@ export function App({
     [selRange, setTranscriptRangeDeleted]
   );
 
-  const {
-    activeSearchIndex,
-    activeSearchRange,
-    searchField,
-    searchMatchRanges,
-  } = useTranscriptSearch({
-    enqueueSave,
-    onSeek,
-    selectTranscriptRange,
-    setProject:
-      setProject as unknown as UseTranscriptSearchParams["setProject"],
-    slug: project.slug,
-    words: project.words,
-  });
+  const { activeSearchRange, searchField, searchMatchRanges } =
+    useTranscriptSearch({
+      enqueueSave,
+      onSeek,
+      selectTranscriptRange,
+      setProject:
+        setProject as unknown as UseTranscriptSearchParams["setProject"],
+      slug: project.slug,
+      words: project.words,
+    });
 
   const addZoom = () => {
     if (!selRange) {
