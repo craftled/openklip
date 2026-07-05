@@ -9,6 +9,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
+import { graphicRequiresImageAsset } from "./graphic-image-shader-ids.ts";
 import { projectPaths } from "./paths.ts";
 import { repoPath } from "./repo-paths.ts";
 
@@ -109,32 +110,6 @@ export function graphicPack(
     return "transition";
   }
   return "other";
-}
-
-export const REQUIRED_IMAGE_SHADER_TEMPLATE_IDS = new Set([
-  "shader-fluted-glass",
-  "shader-halftone-cmyk",
-  "shader-halftone-dots",
-  "shader-heatmap",
-  "shader-image-dithering",
-]);
-
-export const OPTIONAL_IMAGE_SHADER_TEMPLATE_IDS = new Set([
-  "shader-gem-smoke",
-  "shader-liquid-metal",
-]);
-
-export const IMAGE_SHADER_TEMPLATE_IDS = new Set([
-  ...REQUIRED_IMAGE_SHADER_TEMPLATE_IDS,
-  ...OPTIONAL_IMAGE_SHADER_TEMPLATE_IDS,
-]);
-
-export function graphicRequiresImageAsset(template: string): boolean {
-  return REQUIRED_IMAGE_SHADER_TEMPLATE_IDS.has(template);
-}
-
-export function graphicSupportsImageAsset(template: string): boolean {
-  return IMAGE_SHADER_TEMPLATE_IDS.has(template);
 }
 
 export interface GraphicListing {

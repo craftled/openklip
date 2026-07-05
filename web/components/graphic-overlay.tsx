@@ -9,7 +9,7 @@ import {
   disposeGraphicRuntime,
   graphicFrameAt,
 } from "@/lib/graphic-runtime";
-import { graphicRequiresImageAsset } from "../../src/graphics.ts";
+import { graphicRequiresImageAsset } from "../../src/graphic-image-shader-ids.ts";
 
 // One active graphic overlay rendered live over the <video>, driven by the SAME
 // scheduler-derived sample position the export rasterizer uses. The composition

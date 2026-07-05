@@ -4,7 +4,7 @@ import type { Asset, Project } from "./edl.ts";
 import {
   graphicRequiresImageAsset,
   graphicSupportsImageAsset,
-} from "./graphics.ts";
+} from "./graphic-image-shader-ids.ts";
 import { assetStoragePath } from "./paths.ts";
 
 export function resolveGraphicImageFileUrl(
