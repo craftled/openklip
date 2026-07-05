@@ -38,6 +38,7 @@ Use this path when the classify step lands on **Convert to short**. Do not rever
 - Patch crop with export-set when needed: raise `scale` slightly (1.1 to 1.4) to tighten on the speaker, or shift `focusX` / `focusY` (0 to 1) to keep the face in frame. One small adjustment at a time; re-read project_status after each change.
 - Keep captions on unless the brief or user says otherwise. Captions burn in for vertical export; avoid placing a hero title in the bottom third when captions are on.
 - Export with the `shorts` platform preset (`platform: "shorts"` on the export tool). That fills 9:16 aspect, 30fps, 1920 height cap, social compression, and -14 LUFS for this invocation only. Do not mutate `project.audio.loudness`.
+- Call brief_audit when a brief exists. Fix any reported issues before exporting.
 - Call verify. If it reports drift, fix and export once more.
 - In task_complete, report that aspect was set to 9:16, the crop used, and that `output/out.mp4` was rendered for Shorts. Name any overlays or cuts that were left untouched because the user did not ask to change them.
 
@@ -50,6 +51,7 @@ Use this path when the classify step lands on **Convert to short**. Do not rever
 
 ## 5. Verify and export
 
+- Call brief_audit when a brief exists. Fix any reported issues before exporting.
 - Call verify. If it reports drift (surviving filler, leaked cuts, low coverage), fix the cause and export once more before completing.
 - Export only if the change affects the rendered output and the user needs a fresh file, or the brief names a platform preset to apply.
 - In task_complete, name specifically what changed (and what, if anything, was left alone or declined) rather than repeating the full draft.

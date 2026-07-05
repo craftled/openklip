@@ -2,7 +2,24 @@
 
 Use these bodies when publishing releases. Each section matches a tag in `CHANGELOG.md` without duplicating the full changelog. **Known gaps:** always link to [TODO.md](../TODO.md#known-limitations); do not duplicate the list here.
 
-Publishing status checked on 2026-07-05 (`gh release list`): GitHub releases are published through `v0.41.0.0`.
+Publishing status checked on 2026-07-05 (`gh release list`): GitHub releases are published through `v0.41.0.1`.
+
+---
+
+## v0.41.0.1
+
+**Editor refactor, brief ship audit for agents, doc count sync.**
+
+### Highlights
+- **MCP `brief_audit`**: agents validate the edit against `brief.md` before export (runtime, overlays, music gain, protected phrases).
+- **CLI `openklip brief <slug> --audit`**: same ship-readiness check from the terminal.
+- **Editor shell**: `web/app.tsx` orchestration-only (~860 lines); transcript, chrome, and config panel wiring live in dedicated hooks.
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#04101---2026-07-05)
 
 ---
 

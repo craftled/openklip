@@ -98,3 +98,5 @@ export function useEditorSelection({
     selZoom,
   };
 }
+
+export type UseEditorSelectionReturn = ReturnType<typeof useEditorSelection>;
