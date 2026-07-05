@@ -11,12 +11,15 @@ import {
   setAgentTaskStep,
 } from "./agent-tasks.ts";
 import { assembleFromSelection, listTakes, loadTake } from "./assembly.ts";
+import { ingestBlank } from "./blank-ingest.ts";
 import { loadAudioAnalysis } from "./audio-analysis.ts";
 import type { SilenceSpan } from "./audio-analysis-core.ts";
+import { measureProjectAudio } from "./audio-measure.ts";
 import { loadBrief, saveBrief } from "./brief.ts";
 import { logBriefSet } from "./brief-log.ts";
+import { measureMusicBpm } from "./bpm.ts";
 import { cleanupReport, fillerOnlyCleanupReport } from "./cleanup.ts";
-import { type Project, samplesToSec } from "./edl.ts";
+import { type Project, samplesToSec, PhraseAnchorSchema } from "./edl.ts";
 import { EXPORT_PLATFORM_IDS } from "./export-platforms.ts";
 import {
   EXPORT_COMPRESSIONS,
@@ -24,7 +27,13 @@ import {
   exportCut,
   GIF_MAX_WIDTH_OVERRIDE_CEILING_PX,
 } from "./exporter.ts";
-import { listGraphics } from "./graphics.ts";
+import { finalizeGraphicSpan } from "./graphic-placement.ts";
+import { resolveGraphicPhraseParams } from "./graphic-phrase.ts";
+import {
+  graphicCompositionPath,
+  listGraphics,
+  loadGraphicManifest,
+} from "./graphics.ts";
 import { listLuts } from "./lut.ts";
 import {
   listHistorySnapshotRevisions,
@@ -270,6 +279,29 @@ const queryTools: AgentToolDef[] = [
     },
   }),
   defineQueryTool({
+    name: "blank_ingest",
+    summary:
+      "Create a graphics-first blank canvas project (no speech transcript).",
+    schema: z.object({
+      slug: z.string().min(1).optional(),
+      durationSec: z.number().min(1).max(3600).optional(),
+      aspect: z.enum(["16:9", "9:16", "1:1"]).optional(),
+      fps: z.number().int().min(1).max(120).optional(),
+      color: z.string().optional(),
+      force: z.boolean().optional(),
+    }),
+    run: async (input) => ({
+      slug: await ingestBlank({
+        slug: input.slug,
+        durationSec: input.durationSec,
+        aspect: input.aspect,
+        fps: input.fps,
+        color: input.color,
+        force: input.force,
+      }),
+    }),
+  }),
+  defineQueryTool({
     name: "list_assets",
     summary: "List registered media assets for a project.",
     schema: z.object({ slug }),
@@ -350,7 +382,8 @@ const queryTools: AgentToolDef[] = [
   }),
   defineQueryTool({
     name: "project_overlays",
-    summary: "All b-roll, titles, zooms, and stills with ids and spans.",
+    summary:
+      "All b-roll, titles, zooms, stills, music, and graphics with ids and spans.",
     schema: z.object({ slug }),
     run: async ({ slug: projectSlug }) => {
       const project = await loadProject(projectSlug);
@@ -547,9 +580,54 @@ const queryTools: AgentToolDef[] = [
   }),
   defineQueryTool({
     name: "graphic_list",
-    summary: "List available graphic templates (graphics/*/manifest.json).",
-    schema: z.object({}),
-    run: () => ({ graphics: listGraphics() }),
+    summary:
+      "List available graphic templates with param schemas (graphics/*/manifest.json).",
+    schema: z.object({ slug: slug.optional() }),
+    run: ({ slug }) => ({ graphics: listGraphics(slug ? { slug } : undefined) }),
+  }),
+  defineQueryTool({
+    name: "graphic_show",
+    summary: "Full manifest for one graphic template.",
+    schema: z.object({ id: z.string().min(1), slug: slug.optional() }),
+    surfaces: ["cli", "mcp"],
+    run: ({ id, slug: projectSlug }) => {
+      const manifest = loadGraphicManifest(
+        id,
+        projectSlug ? { slug: projectSlug } : undefined
+      );
+      return {
+        id: manifest.id,
+        manifest,
+        compositionPath: graphicCompositionPath(
+          id,
+          projectSlug ? { slug: projectSlug } : undefined
+        ),
+      };
+    },
+  }),
+  defineQueryTool({
+    name: "music_bpm",
+    summary:
+      "Detect tempo (BPM) of a registered music asset; caches in working/music-bpm.json.",
+    schema: z.object({
+      slug,
+      assetId: z.string().min(1),
+      force: z.boolean().optional(),
+    }),
+    run: async ({ slug: projectSlug, assetId, force }) =>
+      measureMusicBpm(projectSlug, assetId, { force }),
+  }),
+  defineQueryTool({
+    name: "audio_measure",
+    summary:
+      "Read integrated loudness (LUFS) from the latest export or ingest proxy without re-exporting.",
+    schema: z.object({
+      slug,
+      source: z.enum(["export", "proxy"]).optional(),
+      targetLufs: z.number().min(-30).max(-10).optional(),
+    }),
+    run: async ({ slug: projectSlug, source, targetLufs }) =>
+      measureProjectAudio(projectSlug, { source, targetLufs }),
   }),
   defineQueryTool({
     name: "template_show",
@@ -786,6 +864,82 @@ const queryTools: AgentToolDef[] = [
       ),
   }),
   defineQueryTool({
+    name: "graphic-add-phrase",
+    summary:
+      "Place a graphic template at the first spoken phrase match (min 2s span).",
+    schema: z.object({
+      slug,
+      template: z.string().min(1),
+      spokenPhrase: z.string().min(1),
+      params: z
+        .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
+        .optional(),
+      track: z.enum(["broll", "title", "zoom"]).optional(),
+      note: z.string().optional(),
+      beats: z.number().positive().optional(),
+      bpm: z.number().positive().optional(),
+      musicAssetId: z.string().min(1).optional(),
+    }),
+    run: async ({
+      slug: projectSlug,
+      template,
+      spokenPhrase,
+      params,
+      track,
+      note,
+      beats,
+      bpm,
+      musicAssetId,
+    }) =>
+      mutateProject(
+        projectSlug,
+        async (project) => {
+          const phraseSpan = placeFromPhrase(project, spokenPhrase);
+          if (!phraseSpan.matched) {
+            throw new Error(`no match for spoken phrase: "${spokenPhrase}"`);
+          }
+          const mergedParams = resolveGraphicPhraseParams(
+            project,
+            template,
+            spokenPhrase,
+            params,
+            phraseSpan.ids
+          );
+          const span = await finalizeGraphicSpan({
+            slug: projectSlug,
+            project,
+            template,
+            fromSec: phraseSpan.fromSec,
+            toSec: phraseSpan.toSec,
+            params: mergedParams,
+            beats,
+            bpm,
+            musicAssetId,
+          });
+          return runAction("graphic-add", project, {
+            template,
+            fromSec: span.fromSec,
+            toSec: span.toSec,
+            params:
+              Object.keys(mergedParams).length > 0 ? mergedParams : undefined,
+            track,
+            note,
+            anchor: {
+              phrase: spokenPhrase,
+              wordIds: phraseSpan.ids,
+              stale: false,
+            },
+          });
+        },
+        {
+          action: "graphic-add-phrase",
+          actor: toolActor(),
+          input: { template, spokenPhrase, params, track, note },
+          taskId: toolTaskId(),
+        }
+      ),
+  }),
+  defineQueryTool({
     name: "export",
     summary: "Render the current cut to output/out.mp4.",
     schema: z.object({
@@ -992,7 +1146,95 @@ const revertTool: AgentToolDef = {
   },
 };
 
-const mutationTools = actions.map(mutationTool);
+const graphicAddShape = {
+  slug,
+  template: z.string(),
+  fromSec: z.number(),
+  toSec: z.number(),
+  params: z
+    .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
+    .optional(),
+  track: z.enum(["broll", "title", "zoom"]).optional(),
+  note: z.string().optional(),
+  anchor: PhraseAnchorSchema.optional(),
+  beats: z.number().positive().optional(),
+  bpm: z.number().positive().optional(),
+  musicAssetId: z.string().min(1).optional(),
+};
+const graphicAddSchema = z.object(graphicAddShape);
+
+const graphicAddTool: AgentToolDef = {
+  name: "graphic-add",
+  summary:
+    "Overlay an HTML/CSS graphic template over a source-time span. Optional beats/bpm/musicAssetId snap span length to music tempo.",
+  surfaces: ["cli", "gui", "mcp"],
+  schema: graphicAddSchema,
+  zodShape: graphicAddShape,
+  run: async (raw) => {
+    const input = graphicAddSchema.parse(raw);
+    const {
+      slug: projectSlug,
+      template,
+      params,
+      track,
+      note,
+      anchor,
+      beats,
+      bpm,
+      musicAssetId,
+    } = input;
+    let { fromSec, toSec } = input;
+    const project = await loadProject(projectSlug);
+    const span = await finalizeGraphicSpan({
+      slug: projectSlug,
+      project,
+      template,
+      fromSec,
+      toSec,
+      params: params ?? {},
+      beats,
+      bpm,
+      musicAssetId,
+    });
+    fromSec = span.fromSec;
+    toSec = span.toSec;
+    return mutateProject(
+      projectSlug,
+      (p) =>
+        runAction("graphic-add", p, {
+          template,
+          fromSec,
+          toSec,
+          params,
+          track,
+          note,
+          anchor,
+        }),
+      {
+        action: "graphic-add",
+        actor: toolActor(),
+        input: {
+          template,
+          fromSec,
+          toSec,
+          params,
+          track,
+          note,
+          anchor,
+          beats,
+          bpm,
+          musicAssetId,
+        },
+        taskId: toolTaskId(),
+      }
+    );
+  },
+};
+
+const mutationTools = [
+  ...actions.filter((a) => a.name !== "graphic-add").map(mutationTool),
+  graphicAddTool,
+];
 
 const allTools: AgentToolDef[] = [...queryTools, revertTool, ...mutationTools];
 

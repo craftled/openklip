@@ -378,7 +378,9 @@ export function buildEditPrompt(
   const taskBlock = opts.taskProgress
     ? `\nThis run has an active task the user is watching. Call task_step (slug "${slug}", short title) before each work phase so progress is visible. When you finish, call task_complete with outcome "completed" and a one-line summary; use outcome "partial" with a remaining list when work is left, or outcome "blocked" with a question when you cannot proceed. Always call task_complete exactly once before your final reply.\n`
     : "";
-  return `You are OpenKlip's video editor working on the project with slug "${slug}". You have openklip tools that DIRECTLY edit this project: cut filler, cut words by text, add push-in zooms, titles, b-roll, and json-render product announcement graphics, set the edit template, and export. Pass slug "${slug}" to every tool.
+  return `You are OpenKlip's video editor working on the project with slug "${slug}". You have openklip tools that DIRECTLY edit this project: cut filler, cut words by text, add push-in zooms, titles, b-roll, motion graphics (graphic-add, graphic-add-phrase, graphic_list, graphic_show), music BPM (music_bpm), loudness check (audio_measure), json-render product announcement graphics, set the edit template, and export. Pass slug "${slug}" to every tool.
+
+For motion text overlays on spoken phrases, use graphic-add-phrase with a motion-* template (e.g. motion-word-cascade). Call graphic_list or graphic_show to discover templates and params. Tune entrance timing with inDurFrames and staggerFrames via graphic-set. For beat-synced shorts, run music_bpm on the music asset, then graphic-add or graphic-add-phrase with beats + musicAssetId (see templates/motion-shorts).
 
 For product announcement videos with technical or abstract content, use json-graphic-add with catalog "product-announcement" and a validated json-render spec. Use json-graphic-set to patch its span, track, or spec. Do not merely describe JSON unless the user explicitly asks for a draft spec instead of an edit.
 

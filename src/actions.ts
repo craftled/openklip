@@ -830,14 +830,54 @@ export function updateTitle(
 
 // Resolve and validate a graphic template id against the on-disk catalog,
 // throwing an actionable list (mirrors how addStill validates the asset id).
-function resolveGraphicTemplate(template: string): void {
-  const known = listGraphics();
+function resolveGraphicTemplate(template: string, slug: string): void {
+  const known = listGraphics({ slug });
   if (!known.some((g) => g.id === template)) {
     const list = known.map((g) => g.id).join(", ") || "(none)";
     throw new Error(
       `unknown graphic template "${template}". Available: ${list}`
     );
   }
+}
+
+const STAGGER_FRAMES_MAX = 30;
+const IN_DUR_FRAMES_MIN = 1;
+const IN_DUR_FRAMES_MAX = 120;
+
+export function clampGraphicTimingParams(
+  params: Record<string, string | number | boolean>
+): Record<string, string | number | boolean> {
+  const out = { ...params };
+  if (typeof out.staggerFrames === "number") {
+    if (!Number.isFinite(out.staggerFrames)) {
+      throw new Error("staggerFrames must be a finite number");
+    }
+    out.staggerFrames = Math.max(
+      0,
+      Math.min(STAGGER_FRAMES_MAX, Math.round(out.staggerFrames))
+    );
+  }
+  if (typeof out.inDurFrames === "number") {
+    if (!Number.isFinite(out.inDurFrames)) {
+      throw new Error("inDurFrames must be a finite number");
+    }
+    out.inDurFrames = Math.max(
+      IN_DUR_FRAMES_MIN,
+      Math.min(IN_DUR_FRAMES_MAX, Math.round(out.inDurFrames))
+    );
+  }
+  return out;
+}
+
+function mergeGraphicParams(
+  template: string,
+  params?: Record<string, string | number | boolean>,
+  slug?: string
+): Record<string, string | number | boolean> {
+  return clampGraphicTimingParams({
+    ...defaultGraphicParams(loadGraphicManifest(template, { slug })),
+    ...(params ?? {}),
+  });
 }
 
 // Add an HTML/CSS graphic overlay over a span of the source timeline. Validates
@@ -871,7 +911,7 @@ export function addGraphic(
   if (fromSec < 0 || toSec < 0) {
     throw new Error("graphic timing values must be non-negative");
   }
-  resolveGraphicTemplate(template);
+  resolveGraphicTemplate(template, project.slug);
   if (toSec <= fromSec) {
     throw new Error(
       `graphic span is empty: toSec (${toSec}) must be greater than fromSec (${fromSec})`
@@ -885,10 +925,7 @@ export function addGraphic(
   if (endSec <= fromSec) {
     throw new Error("graphic span is empty after clamping to project duration");
   }
-  const merged = {
-    ...defaultGraphicParams(loadGraphicManifest(template)),
-    ...(params ?? {}),
-  };
+  const merged = mergeGraphicParams(template, params, project.slug);
   const item: Graphic = {
     id: graphicId(project),
     template,
@@ -1025,7 +1062,7 @@ export function updateGraphic(
   if (fromSec < 0 || toSec < 0) {
     throw new Error("graphic timing values must be non-negative");
   }
-  resolveGraphicTemplate(template);
+  resolveGraphicTemplate(template, project.slug);
   if (toSec <= fromSec) {
     throw new Error(
       `graphic span is empty: toSec (${toSec}) must be greater than fromSec (${fromSec})`
@@ -1045,11 +1082,14 @@ export function updateGraphic(
     template === item.template
       ? item.params
       : {
-          ...defaultGraphicParams(loadGraphicManifest(template)),
+          ...defaultGraphicParams(loadGraphicManifest(template, { slug: project.slug })),
           ...item.params,
         };
   item.template = template;
-  item.params = { ...base, ...(patch.params ?? {}) };
+  item.params = clampGraphicTimingParams({
+    ...base,
+    ...(patch.params ?? {}),
+  });
   if (patch.keyframes !== undefined) {
     if (patch.keyframes === null || patch.keyframes.length === 0) {
       item.keyframes = undefined;

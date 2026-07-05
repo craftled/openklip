@@ -5,6 +5,7 @@ import {
   type CutSnap,
   CutsSchema,
   effectiveRanges,
+  rangesForExport,
   type Filter,
   type PhraseAnchor,
   type Project,
@@ -243,7 +244,7 @@ export function listRanges(
   project: Project,
   silences?: SilenceSpan[]
 ): Array<{ endSec: number; startSec: number }> {
-  return effectiveRanges(project, silences);
+  return rangesForExport(project, silences);
 }
 
 export function listOverlays(project: Project): OverlayViews {

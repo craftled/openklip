@@ -5,9 +5,11 @@
 import {
   applyGraphicFrame,
   applyGraphicParams,
+  ensureGraphicImagesReady,
 } from "../web/lib/graphic-runtime.ts";
 
 (window as unknown as { __okGraphic: unknown }).__okGraphic = {
   applyGraphicFrame,
   applyGraphicParams,
+  ensureGraphicImagesReady,
 };

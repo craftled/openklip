@@ -13,6 +13,11 @@
 
 import { join } from "node:path";
 import { SAMPLE_RATE } from "./edl.ts";
+import {
+  copyGraphicFromCache,
+  graphicRenderCacheKey,
+  saveGraphicToCache,
+} from "./graphic-cache.ts";
 import type { GraphicManifest } from "./graphics.ts";
 import { graphicCompositionPath } from "./graphics.ts";
 import type { Keyframe } from "./keyframes.ts";
@@ -36,6 +41,8 @@ export interface RenderGraphicInput {
   manifest: GraphicManifest;
   // Working dir to write the asset into (exporter passes p.working).
   outDir: string;
+  /** Project slug for project-local template lookup. */
+  slug?: string;
   // Already merged over the manifest's param defaults by the caller.
   params: Record<string, string | number | boolean>;
   // graphic-template id (composition.html lookup + error messages).
@@ -132,13 +139,32 @@ async function renderRichGraphic(
   if (!compositionHtml) {
     try {
       compositionHtml = await Bun.file(
-        graphicCompositionPath(input.template)
+        graphicCompositionPath(input.template, { slug: input.slug })
       ).text();
     } catch {
       throw new Error(
         `rich graphic "${input.template}": composition.html not found in graphics/${input.template}/.`
       );
     }
+  }
+
+  const cacheKey = graphicRenderCacheKey({
+    template: input.template,
+    params: input.params,
+    keyframes: input.keyframes,
+    durFrames,
+    width: input.width,
+    height: input.height,
+    fps: input.fps,
+    compositionHtml,
+  });
+  const cached = await copyGraphicFromCache({
+    workingDir: input.outDir,
+    cacheKey,
+    outPath: assetPath,
+  });
+  if (cached) {
+    return { assetPath, kind: "alpha" };
   }
 
   try {
@@ -152,6 +178,11 @@ async function renderRichGraphic(
       fps: input.fps,
       durFrames,
       outPath: assetPath,
+    });
+    await saveGraphicToCache({
+      workingDir: input.outDir,
+      cacheKey,
+      renderedPath: assetPath,
     });
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);

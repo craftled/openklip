@@ -205,7 +205,9 @@ export function clampGraphicItems(
   project: Project,
   graphics: unknown[]
 ): Graphic[] {
-  const templateIds = new Set(listGraphics().map((g) => g.id));
+  const templateIds = new Set(
+    listGraphics({ slug: project.slug }).map((g) => g.id)
+  );
   const dur = project.durationSamples;
   const items: Graphic[] = [];
   for (const raw of graphics) {
