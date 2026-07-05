@@ -10,12 +10,12 @@ Change an existing draft on request: read what is already there, apply only what
 ## 1. Understand the current draft and the request
 
 - Call project_status, then brief_get. The brief's audience, goal, tone, must-use assets, and avoid list still apply to any new edit; do not relax them just because this is a revision.
-- Call project_overlays for the ids of the titles, zooms, b-roll, stills, and music placements already on the timeline, so targeted patches have something to patch. Use transcript_grep or transcript_span to find the phrases the user is referring to.
+- Call project_overlays for the ids of the titles, zooms, b-roll, stills, music placements, and graphics already on the timeline, so targeted patches have something to patch. Use transcript_grep or transcript_span to find the phrases the user is referring to.
 - If this same conversation ran the task that produced the current draft, its id came back in that task's task_complete result, reuse it from context. Otherwise call task_list to find candidate task ids by request text and recency, then history_list with `task` set to that id to confirm which revisions it touched and whether `snapshotRevisions` covers them (a revert only works on a revision with a snapshot). If you still cannot identify which task produced the draft and the request needs a revert, ask instead of guessing (task_complete outcome "blocked").
 
 ## 2. Classify the request
 
-- **Targeted edit**: change a title's text, a zoom's span or scale, a music bed's gain, cut a few more words on a named phrase, or restore a few that were cut. Apply the specific mutation only; do not touch anything the user did not mention.
+- **Targeted edit**: change a title's text, a zoom's span or scale, a music bed's gain, a graphic's params or span, cut a few more words on a named phrase, or restore a few that were cut. Apply the specific mutation only; do not touch anything the user did not mention.
 - **Whole-task undo**: "undo that", "go back to before the b-roll", "redo the whole cut". Use revert with the prior task's id, and only when you are confident which task id produced the part the user wants gone.
 - **Convert to short**: user asks for Shorts, Reels, TikTok, vertical, or 9:16 without requesting a full redo of the draft. Do NOT revert; follow the convert-to-short path in section 3b only.
 - **Out of scope**: brief.md content or swapping media files. Say so in task_complete rather than attempting it; brief_set and asset registration are separate flows this playbook does not drive.
@@ -27,6 +27,7 @@ Change an existing draft on request: read what is already there, apply only what
 - Zooms: zoom-set with the overlay id and only the changed fields (scale, rampSec, span).
 - B-roll or stills: broll-set or still-set with the overlay id and only the changed fields.
 - Music: music-set with the placement id for gain or fade changes; music-add only if no bed exists yet. Keep ducking on (audio {"ducking": {"enabled": true}}) unless the user asks to turn it off.
+- Graphics: graphic-set with the overlay id for template, span, params (`text`, `inDurFrames`, `staggerFrames`), or keyframes; graphic-rm to remove. Phrase-anchored graphics re-snap after cuts automatically; call reanchor manually only when the transcript changed out of band.
 - Captions or look flags: captions, captions-max, look-vignette, and similar direct actions, called only for what was asked.
 
 ## 3b. Convert to short
@@ -43,7 +44,7 @@ Use this path when the classify step lands on **Convert to short**. Do not rever
 ## 4. Whole-task revert
 
 - Never pass `force` on your own judgment. If revert reports that an interloper action from another task or actor would also be discarded, stop and ask via task_complete outcome "blocked" instead of forcing through it, unless the user's request clearly covers discarding that other change too.
-- If the prior task also made changes the user wants to keep, prefer targeted inverse edits (title-rm, zoom-rm, broll-rm, still-rm, music-rm, or cut with `deleted: false`) over a whole-task revert.
+- If the prior task also made changes the user wants to keep, prefer targeted inverse edits (title-rm, zoom-rm, broll-rm, still-rm, music-rm, graphic-rm, or cut with `deleted: false`) over a whole-task revert.
 - After any revert, call project_status again before making further edits; the project state changed under you and any ids or spans you read earlier may no longer apply.
 - Revert restores project.json only, not brief.md or media, and export output is not restored either. Re-export after a revert if the user needs the rendered file to match.
 

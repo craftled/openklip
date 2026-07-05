@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { clampGraphicTimingParams } from "../src/actions.ts";
 import type { Project } from "../src/edl.ts";
 import { SAMPLE_RATE } from "../src/edl.ts";
 import {
@@ -472,6 +473,15 @@ test("actionManifest exposes JSON-schema input per action and filters by surface
   const mcp = actionManifest("mcp");
   assert.ok(mcp.length > 0, "no actions exposed to mcp");
   assert.ok(mcp.every((m) => m.surfaces.includes("mcp")));
+});
+
+test("clampGraphicTimingParams rounds and clamps timing knobs", () => {
+  const out = clampGraphicTimingParams({
+    staggerFrames: 99.2,
+    inDurFrames: 200.7,
+  });
+  assert.equal(out.staggerFrames, 30);
+  assert.equal(out.inDurFrames, 120);
 });
 
 test("graphic-add: places a bundled template and fills manifest defaults", () => {

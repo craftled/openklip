@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   applyGraphicFrame,
+  applyGraphicParams,
   hash01,
   motionUnitStyle,
   unitProgress,
@@ -546,4 +547,21 @@ test("motionUnitStyle fade+slideUp split case matches per-unit formula", () => {
   });
   assert.equal(style.opacity, 0.5);
   assert.ok(Math.abs(style.transform.length) >= 0);
+});
+
+test("applyGraphicParams sets timing attrs on data-timing-bind elements", () => {
+  const doc = new FakeDocument();
+  const el = makeAnimChild(doc, {
+    "data-anim": "fade",
+    "data-timing-bind": "",
+    "data-stagger": "3",
+    "data-in-dur": "8",
+  });
+  const root = makeRoot([el]);
+  applyGraphicParams(root as unknown as HTMLElement, {
+    staggerFrames: 5,
+    inDurFrames: 12,
+  });
+  assert.equal(el.getAttribute("data-stagger"), "5");
+  assert.equal(el.getAttribute("data-in-dur"), "12");
 });

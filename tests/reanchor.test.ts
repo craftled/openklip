@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { Project, Title } from "../src/edl.ts";
+import type { Graphic, Project, Title } from "../src/edl.ts";
 import { SAMPLE_RATE } from "../src/edl.ts";
 import {
   MIN_PHRASE_OVERLAY_SEC,
@@ -145,6 +145,33 @@ test("placeFromPhrase mirrors the spanForPhraseOverlay contract", () => {
   assert.equal(miss.matched, false);
   assert.equal(miss.fromSec, 0);
   assert.equal(miss.toSec, 0);
+});
+
+function graphicAnchored(
+  startSample: number,
+  endSample: number,
+  phrase: string
+): Graphic {
+  return {
+    id: "g1",
+    template: "motion-word-cascade",
+    params: { text: phrase },
+    startSample,
+    endSample,
+    track: "title",
+    anchor: { phrase, wordIds: [], stale: false },
+  };
+}
+
+test("reanchorOverlay moves phrase-anchored graphics like titles", () => {
+  const p = project(["one", "two", "three", "four", "big", "reveal"]);
+  const g = graphicAnchored(0, sec(1), "big reveal");
+  p.graphics = [g];
+  const result = reanchorOverlay(p, g);
+  assert.equal(result.matched, true);
+  assert.equal(result.stale, false);
+  assert.equal(g.startSample, sec(4));
+  assert.deepEqual(g.anchor?.wordIds, ["w4", "w5"]);
 });
 
 test("reanchorProject reports moved / stale / unchanged across all five kinds", () => {

@@ -149,6 +149,21 @@ test("de-essing group toggle and intensity slider render when enabled, with an h
   assert.match(html, /Tames harsh sibilants/);
 });
 
+test("measure loudness button and result render when wired", () => {
+  const html = render({
+    measure: {
+      integratedLufs: -14.2,
+      truePeakDbtp: -1.1,
+      lra: 8.5,
+      source: "export",
+    },
+    onMeasure: noop,
+  });
+  assert.match(html, /data-audio-measure-run/);
+  assert.match(html, /Measure loudness/);
+  assert.match(html, /-14.2 LUFS integrated \(export\)/);
+});
+
 test("de-essing group hides the intensity slider when disabled but keeps the toggle and caption", () => {
   const html = render();
   assert.match(html, /data-audio-deess/);

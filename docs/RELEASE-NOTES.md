@@ -6,6 +6,26 @@ Publishing status checked on 2026-07-04 (`gh release list`): GitHub releases are
 
 ---
 
+## v0.41.0.0
+
+**Motion workflow parity: blank canvas, beat sync, transitions, and GUI graphics picker.**
+
+### Highlights
+- **Blank canvas**: `openklip ingest --blank`, MCP `blank_ingest`, GUI **Blank canvas…** for motion-from-scratch projects.
+- **Motion workflow**: `graphic_list` / `graphic_show`, phrase placement, beat-snapped spans, BPM detect, audio loudness measure, and motion timing params on templates.
+- **Transition pack + cut seams**: five `transition-*` templates and `graphic-add-cuts` (CLI/MCP/GUI) for jump-cut transitions.
+- **Image shaders**: five required-image filters plus optional logo paths on liquid-metal and gem-smoke.
+- **GUI Graphics picker**: place templates at the playhead with seconds or beats, BPM detect, and **Place at cut seams**.
+- **Agent skills**: `templates/motion-*` playbooks and `skills/` for `npx skills add`.
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#04100---2026-07-05)
+
+---
+
 ## v0.40.0.1
 
 **Per-slug URLs, script-first editing, and optional edit attribution.**

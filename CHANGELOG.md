@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.41.0.0 - 2026-07-05
+
+### Added
+- **Blank canvas ingest** (`openklip ingest --blank`, MCP `blank_ingest`, GUI **Blank canvas…**): create a motion project with no camera footage, full-timeline export when the transcript is empty, and verify short-circuit for blank projects.
+- **Motion workflow parity**: `graphic_list` / `graphic_show` (optional project slug), `graphic-add-phrase`, beat-snapped spans (`--beats`, `--bpm`, `--music-asset`), `music_bpm`, `audio_measure`, render cache (`working/graphics-cache/`), and entrance timing params (`inDurFrames`, `staggerFrames`) on motion templates.
+- **Project-local graphics** (`projects/<slug>/graphics/`): discover and override bundled templates per project; GUI and MCP list project-local packs.
+- **Transition pack** (`graphics/transition-*`): five hit templates (flash, dip, wipe, zoom-blur, glitch-hit) plus `openklip graphic-add-cuts` / MCP `graphic-add-cuts` to place transitions at kept-range cut seams (GUI **Place at cut seams**).
+- **Image-filter shaders** (`shader-fluted-glass`, halftone, heatmap, image-dithering): require `assetId`; optional logo treatments on `shader-liquid-metal` and `shader-gem-smoke`.
+- **GUI Graphics picker** (Config → Graphics): template picker with pack grouping, optional image asset, beat-snapped placement with BPM detect, and cut-seam transition helper.
+- **Per-word phrase stagger**: kinetic phrase placement auto-sets `staggerFrames` from kept phrase word ids.
+- **Edit templates** (`templates/motion-canvas`, `motion-graphics`, `motion-shorts`) and **`skills/`** package for `npx skills add` agent playbooks.
+
+### Changed
+- **Motion templates**: manifest timing params (`inDurFrames`, `staggerFrames`) wired through preview and export; motion pack compositions updated for `data-timing-bind`.
+- **Agent driver and make-draft / revise-draft skills**: advertise motion graphics, beat sync, and blank-canvas workflows.
+- **Known limitations** (`TODO.md`): image-filter shaders and 29-shader count reflect shipped behavior.
+- **Version**: bumped OpenKlip to `0.41.0.0` (`1779` tests passing).
+
 ## 0.40.0.1 - 2026-07-04
 
 ### Added
