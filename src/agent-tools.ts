@@ -18,7 +18,6 @@ import { ingestBlank } from "./blank-ingest.ts";
 import { measureMusicBpm } from "./bpm.ts";
 import { loadBrief, saveBrief } from "./brief.ts";
 import { logBriefSet } from "./brief-log.ts";
-import { auditProjectForShip } from "./project-brief-audit.ts";
 import { cleanupReport, fillerOnlyCleanupReport } from "./cleanup.ts";
 import { PhraseAnchorSchema, type Project, samplesToSec } from "./edl.ts";
 import { EXPORT_PLATFORM_IDS } from "./export-platforms.ts";
@@ -36,6 +35,7 @@ import {
   loadGraphicManifest,
 } from "./graphics.ts";
 import { listLuts } from "./lut.ts";
+import { auditProjectForShip } from "./project-brief-audit.ts";
 import {
   listHistorySnapshotRevisions,
   listProjects,
