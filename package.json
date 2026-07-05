@@ -73,6 +73,7 @@
     "agent-make-highlights": "bun run scripts/agent-make-highlights.ts",
     "demo-gif": "bash scripts/record-demo-gif.sh",
     "test": "bun test",
+    "test:integration": "OPENKLIP_INTEGRATION=1 bun test tests/transcript-diff-browser.test.ts",
     "typecheck": "tsc --noEmit",
     "check": "ultracite check",
     "fix": "ultracite fix",

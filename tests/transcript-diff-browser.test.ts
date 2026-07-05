@@ -1,26 +1,17 @@
 import assert from "node:assert/strict";
-import { existsSync } from "node:fs";
 import { test } from "node:test";
 import puppeteer from "puppeteer-core";
+import { browserIntegrationSkipReason } from "./helpers/integration-gate.ts";
 
 const CHROME_PATH =
+  process.env.OPENKLIP_CHROME_PATH ??
   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const PROD_EDITOR_URL = "http://localhost:4399/edgaras-raw";
 
-function chromeAvailable(): boolean {
-  return existsSync(CHROME_PATH);
-}
-
-async function serverAvailable(): Promise<boolean> {
-  try {
-    const res = await fetch(PROD_EDITOR_URL, {
-      signal: AbortSignal.timeout(5000),
-    });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
+const skipReason = await browserIntegrationSkipReason({
+  chromePath: CHROME_PATH,
+  serverUrl: PROD_EDITOR_URL,
+});
 
 async function ensureHistoryPanelReady(page: import("puppeteer-core").Page) {
   await page.waitForFunction(
@@ -87,11 +78,7 @@ async function openTranscriptDiffWithChanges(
 }
 
 test("editor History panel shows transcript diff for transcript actions", {
-  skip: chromeAvailable()
-    ? (await serverAvailable())
-      ? false
-      : "Dev server not running on :4399"
-    : "Chrome not installed",
+  skip: skipReason,
   timeout: 180_000,
 }, async () => {
   const browser = await puppeteer.launch({
