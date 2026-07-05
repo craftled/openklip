@@ -39,6 +39,7 @@ import { guiMutateMeta } from "@engine/provenance";
 import { getAction, runAction } from "@engine/registry";
 import { revealInFileManager } from "@engine/reveal-path";
 import { type RevertTarget, revertProject } from "@engine/revert";
+import { finalizeGraphicSpan } from "@engine/graphic-placement";
 
 export type ActionResult<T = void> =
   | ({ ok: true } & (T extends void ? object : { data: T }))
@@ -69,9 +70,50 @@ export async function runGuiAction(
     if (!action.surfaces.includes("gui")) {
       throw new Error(`action is not available in the GUI: ${actionName}`);
     }
+    let actionInput = input;
+    if (
+      actionName === "graphic-add" &&
+      input &&
+      typeof input === "object" &&
+      ("beats" in input || "bpm" in input || "musicAssetId" in input)
+    ) {
+      const raw = input as {
+        template: string;
+        fromSec: number;
+        toSec: number;
+        params?: Record<string, string | number | boolean>;
+        track?: string;
+        note?: string;
+        anchor?: unknown;
+        beats?: number;
+        bpm?: number;
+        musicAssetId?: string;
+      };
+      const project = await loadProject(slug);
+      const span = await finalizeGraphicSpan({
+        slug,
+        project,
+        template: raw.template,
+        fromSec: raw.fromSec,
+        toSec: raw.toSec,
+        params: raw.params ?? {},
+        beats: raw.beats,
+        bpm: raw.bpm,
+        musicAssetId: raw.musicAssetId,
+      });
+      actionInput = {
+        template: raw.template,
+        fromSec: span.fromSec,
+        toSec: span.toSec,
+        params: raw.params,
+        track: raw.track,
+        note: raw.note,
+        anchor: raw.anchor,
+      };
+    }
     const result = await mutateProject(
       slug,
-      (project) => runAction(actionName, project, input),
+      (project) => runAction(actionName, project, actionInput),
       { ...guiMutateMeta(actionName, input) }
     );
     return { ok: true, data: { result } };

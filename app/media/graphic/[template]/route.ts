@@ -4,6 +4,7 @@ import {
   graphicCompositionPath,
   loadGraphicManifest,
 } from "@engine/graphics";
+import { assertValidSlug } from "@engine/paths";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,7 +14,7 @@ export const dynamic = "force-dynamic";
 // fragment and read its intrinsic width/height/fps. The export path reads the
 // same files off disk directly via src/graphics.ts, so preview === export.
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ template: string }> }
 ): Promise<Response> {
   const { template } = await params;
@@ -23,12 +24,22 @@ export async function GET(
   } catch {
     return new Response("invalid graphic id", { status: 400 });
   }
-  const htmlPath = graphicCompositionPath(id);
+  const slugParam = new URL(req.url).searchParams.get("slug");
+  let slugOpts: { slug: string } | undefined;
+  if (slugParam) {
+    try {
+      assertValidSlug(slugParam);
+      slugOpts = { slug: slugParam };
+    } catch {
+      return new Response("invalid slug", { status: 400 });
+    }
+  }
+  const htmlPath = graphicCompositionPath(id, slugOpts);
   if (!existsSync(htmlPath)) {
     return new Response("not found", { status: 404 });
   }
   try {
-    const manifest = loadGraphicManifest(id);
+    const manifest = loadGraphicManifest(id, slugOpts);
     const html = readFileSync(htmlPath, "utf8");
     return Response.json({ id, manifest, html });
   } catch (e) {

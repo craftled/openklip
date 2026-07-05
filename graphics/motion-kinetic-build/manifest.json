@@ -15,6 +15,16 @@
       "type": "color",
       "default": "oklch(0.809 0.1 284.59)",
       "label": "Accent"
+    },
+    "inDurFrames": {
+      "type": "number",
+      "default": 10,
+      "label": "Entrance duration (frames)"
+    },
+    "staggerFrames": {
+      "type": "number",
+      "default": 4,
+      "label": "Stagger (frames)"
     }
   }
 }

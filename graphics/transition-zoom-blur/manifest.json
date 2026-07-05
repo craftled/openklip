@@ -1,0 +1,13 @@
+{
+  "id": "transition-zoom-blur",
+  "name": "Transition: Zoom blur",
+  "kind": "rich",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "params": {
+    "accent": { "type": "color", "default": "#000000", "label": "Background" },
+    "inDurFrames": { "type": "number", "default": 8, "label": "In (frames)" },
+    "outDurFrames": { "type": "number", "default": 8, "label": "Out (frames)" }
+  }
+}

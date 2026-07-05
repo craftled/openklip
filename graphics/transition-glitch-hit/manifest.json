@@ -1,0 +1,14 @@
+{
+  "id": "transition-glitch-hit",
+  "name": "Transition: Glitch hit",
+  "kind": "rich",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "params": {
+    "text": { "type": "string", "default": "CUT", "label": "Hit text" },
+    "accent": { "type": "color", "default": "oklch(0.809 0.1 284.59)", "label": "Accent" },
+    "inDurFrames": { "type": "number", "default": 6, "label": "In (frames)" },
+    "outDurFrames": { "type": "number", "default": 6, "label": "Out (frames)" }
+  }
+}

@@ -1,39 +1,36 @@
 <div data-fps="30" data-graphic-root data-height="1080" data-width="1920">
   <style>
-  .gl {
+  .hit {
     position: absolute;
     inset: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 0 8%;
-    text-align: center;
+    background: rgba(0, 0, 0, 0.55);
   }
-  .gl h1 {
+  .hit h1 {
     margin: 0;
     font-family: "JetBrains Mono", "Consolas", "SF Mono", monospace;
-    font-size: 112px;
+    font-size: 120px;
     font-weight: 700;
     color: #fff;
-    letter-spacing: 0.04em;
-    text-shadow:
-      0 2px 24px rgba(0, 0, 0, 0.5),
-      2px 0 var(--accent, oklch(0.809 0.1 284.59));
+    letter-spacing: 0.08em;
+    text-shadow: 0 2px 24px rgba(0, 0, 0, 0.5);
   }
   </style>
-  <div class="gl">
+  <div class="hit">
     <h1
-      data-anim="glitch"
+      data-anim="glitch fade"
       data-bind="text"
-      data-glitch-amp="8"
+      data-glitch-amp="12"
       data-in-dur="6"
       data-in-frame="0"
       data-out-dur="6"
-      data-out-frame="-8"
+      data-out-frame="-6"
       data-split="char"
       data-timing-bind
     >
-      SYSTEM ONLINE
+      CUT
     </h1>
   </div>
 </div>

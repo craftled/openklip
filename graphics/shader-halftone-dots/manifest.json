@@ -1,0 +1,14 @@
+{
+  "id": "shader-halftone-dots",
+  "name": "Shader: Halftone dots (image)",
+  "kind": "rich",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "params": {
+    "assetId": { "type": "asset", "default": "", "label": "Image asset" },
+    "speed": { "type": "number", "default": 0.3, "label": "Speed" },
+    "size": { "type": "number", "default": 2, "label": "Dot size" },
+    "contrast": { "type": "number", "default": 1, "label": "Contrast" }
+  }
+}

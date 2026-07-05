@@ -6,6 +6,7 @@
   "height": 1080,
   "fps": 30,
   "params": {
+    "assetId": { "type": "asset", "default": "", "label": "Logo or image (optional)" },
     "colorBack": {
       "type": "string",
       "default": "#AAAAAC",

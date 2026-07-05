@@ -1,0 +1,18 @@
+{
+  "id": "shader-heatmap",
+  "name": "Shader: Heatmap (image)",
+  "kind": "rich",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "params": {
+    "assetId": { "type": "asset", "default": "", "label": "Image asset" },
+    "speed": { "type": "number", "default": 0.4, "label": "Speed" },
+    "contour": { "type": "number", "default": 0.5, "label": "Contour" },
+    "colors": {
+      "type": "string",
+      "default": "#0000ff, #00ffff, #ffff00, #ff0000",
+      "label": "Colors (comma-separated hex)"
+    }
+  }
+}

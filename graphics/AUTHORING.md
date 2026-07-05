@@ -66,6 +66,22 @@ Fields:
   if a param needs bounds, clamp in the owning engine code (`src/actions.ts`
   or the renderer), never here.
 
+### Standard timing params (motion pack)
+
+Motion templates may declare these optional manifest params (clamped in
+`src/actions.ts` when placed via `graphic-add` / `graphic-set`):
+
+| Param | Maps to | Clamp |
+| --- | --- | --- |
+| `staggerFrames` | `data-stagger` on opted-in elements | 0-30 |
+| `inDurFrames` | `data-in-dur` on opted-in elements | 1-120 |
+
+Add `data-timing-bind` on any animated element that should receive timing
+param overrides from `applyGraphicParams` (`web/lib/graphic-runtime.ts`).
+Elements without the attribute keep their HTML defaults. Use keyframes
+(`graphic-set --keyframes-file`) for whole-overlay wrapper transforms, not
+per-element build timing.
+
 ## `kind: "rich"` vs `kind: "text"`
 
 - `"rich"` — the composition is real HTML/CSS/SVG, rendered frame-by-frame in
