@@ -96,6 +96,7 @@ Time is integer audio samples at 48 kHz. The CLI takes seconds where a human num
 | List available LUTs | `openklip luts` |
 | Set export audio quality (ducking / loudness / highpass / noise / de-ess) | `openklip audio <slug> [--duck on\|off] [--loudness on\|off] [--loudness-mode single\|two-pass] [--noise-reduction on\|off] [--highpass on\|off] [--deess on\|off]` |
 | Cut boundary padding | `openklip pad <slug> <ms>` |
+| VAD cut snap + seam crossfade | `openklip cuts-snap <slug> [--on\|--off] [--mode off\|vad] [--max-shift <ms>] [--crossfade <ms>]` |
 | Review edit | `openklip status <slug>` (`--json` for agents) |
 | Kept ranges / overlays | `openklip ranges <slug>`, `openklip overlays <slug>` |
 | Check environment / project health | `openklip doctor [slug]` |
@@ -228,6 +229,7 @@ Workflow: `take-add` each recording, read `take_transcript <slug> <takeId>` to f
 | `openklip audio <slug>` | Print current export audio quality settings (ducking, loudness, voice highpass, de-essing). |
 | `openklip audio <slug> [--duck on\|off] [--duck-amount <1-30 dB>] [--duck-attack <1-500 ms>] [--duck-release <20-2000 ms>] [--loudness on\|off] [--loudness-target <-30..-10 LUFS>] [--loudness-mode single\|two-pass] [--noise-reduction on\|off] [--noise-strength <1-97>] [--highpass on\|off] [--highpass-hz <40-200>] [--deess on\|off] [--deess-intensity <0-1>]` | Patch export audio quality: ducking, loudness (single or two-pass), noise reduction, voice highpass, and de-essing (ffmpeg `deesser` filter). Export-only; preview audio is unprocessed. |
 | `openklip pad <slug> <ms>` | Symmetric padding around kept ranges (0–500 ms). |
+| `openklip cuts-snap <slug> [--on\|--off] [--mode off\|vad] [--max-shift <ms>] [--crossfade <ms>]` | Toggle VAD snap-to-silence on cut boundaries and set seam crossfade length. Print-only when no flags are passed. |
 | `openklip brand <slug> <name>` | Apply a brand preset (`brands/<name>.json`): sets caption/vignette/pad **defaults** only. `project.json` stays the edit; words and overlays are untouched. Also available at ingest: `openklip ingest <video> --brand <name>`. |
 | `openklip template list` | List edit templates (`templates/<id>/skill.md`): agent playbooks for cuts, overlays, and export. |
 | `openklip template show <id>` | Print a template skill file. Same underlying lookup as the MCP-only `load_skill` tool, which returns a skill's markdown by id without touching `project.json`'s `template` field (unlike `template set`). |

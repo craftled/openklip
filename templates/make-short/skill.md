@@ -29,6 +29,7 @@ Derive a vertical short from an existing edit: trim to a tight runtime if needed
 
 ## 4. Export for Shorts
 
+- Call brief_audit when a brief exists. Fix any reported issues before exporting.
 - Export with the `shorts` platform preset (`platform: "shorts"` on the export tool, or `openklip export <slug> --platform shorts` from the terminal). That fills 9:16 aspect, 30fps, 1920 height cap, social compression, and -14 LUFS for this invocation only.
 - Do not mutate `project.audio.loudness` for platform loudness; the preset applies normalization at export time.
 - If the user asked for a one-off different aspect or crop for this render only, pass `aspect` / `crop` on the export call instead of changing project.export.

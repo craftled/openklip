@@ -61,9 +61,12 @@ MCP: `graphic-add-phrase` and `graphic-add` accept `beats`, `bpm`, and `musicAss
 ```
 openklip graphic-set <slug> g2 --param inDurFrames=10 --param staggerFrames=3
 openklip audio measure <slug> --json
+openklip brief <slug> --audit
 openklip export <slug> --platform shorts
 openklip verify <slug>
 ```
+
+- Call `brief_audit` when a brief exists. Fix any reported issues before exporting.
 
 `audio measure` reads LUFS from the latest export (or proxy before first export). MCP: `audio_measure`.
 

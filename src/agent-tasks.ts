@@ -177,7 +177,14 @@ export function resetAgentTaskIdSequenceForTests(): void {
   idSeq = 0;
 }
 
-export async function loadAgentTasks(slug: string): Promise<AgentTasksFile> {
+const STARTUP_RECONCILED = new Set<string>();
+const ORPHANED_TASK_MESSAGE = "Server restarted while task was running";
+
+export function resetStartupTaskReconciliationForTests(): void {
+  STARTUP_RECONCILED.clear();
+}
+
+async function readAgentTasksFromDisk(slug: string): Promise<AgentTasksFile> {
   const fp = projectPaths(slug).tasks;
   if (!existsSync(fp)) {
     return { ...EMPTY };
@@ -216,6 +223,54 @@ export async function loadAgentTasks(slug: string): Promise<AgentTasksFile> {
   // hand edit or a future format change could leave one bad row without
   // corrupting the whole file the way a non-array `tasks` does.
   return { tasks: (parsed as AgentTasksFile).tasks.filter(isAgentTask) };
+}
+
+async function reconcileOrphanedRunningTasksIfNeeded(
+  slug: string
+): Promise<void> {
+  if (STARTUP_RECONCILED.has(slug)) {
+    return;
+  }
+  STARTUP_RECONCILED.add(slug);
+
+  let data: AgentTasksFile;
+  try {
+    data = await readAgentTasksFromDisk(slug);
+  } catch {
+    return;
+  }
+  let changed = false;
+  const now = Date.now();
+  const nextTasks = data.tasks.map((task) => {
+    if (task.status !== "running" && task.status !== "pending") {
+      return task;
+    }
+    changed = true;
+    return {
+      ...task,
+      status: "failed" as const,
+      updatedAt: now,
+      completedAt: now,
+      summary: truncate(ORPHANED_TASK_MESSAGE, SUMMARY_MAX_CHARS),
+      steps: task.steps.map((step) =>
+        step.status === "running" || step.status === "pending"
+          ? {
+              ...step,
+              status: "failed" as const,
+              note: ORPHANED_TASK_MESSAGE,
+            }
+          : step
+      ),
+    };
+  });
+  if (changed) {
+    await saveAgentTasks(slug, { tasks: nextTasks });
+  }
+}
+
+export async function loadAgentTasks(slug: string): Promise<AgentTasksFile> {
+  await reconcileOrphanedRunningTasksIfNeeded(slug);
+  return readAgentTasksFromDisk(slug);
 }
 
 async function backupCorruptTasks(fp: string): Promise<void> {

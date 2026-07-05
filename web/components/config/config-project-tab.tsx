@@ -74,6 +74,7 @@ export interface ConfigProjectTabProps {
   onPatchAudio: (patch: AudioPatch) => void;
   onPatchMusic: (id: string, patch: MusicPlacementPatch) => void;
   onPatchSnap: (patch: Partial<CutSnap>) => void;
+  onReloadGraphicTemplates?: () => void;
   onRemoveDeadAirSpan: (id: string) => void;
   onRemoveMusic: (id: string) => void;
   onSaveBrief: (
@@ -127,6 +128,7 @@ export function ConfigProjectTab({
   onPatchAudio,
   onPatchMusic,
   onPatchSnap,
+  onReloadGraphicTemplates,
   onRemoveDeadAirSpan,
   onRemoveMusic,
   onSaveBrief,
@@ -191,7 +193,9 @@ export function ConfigProjectTab({
           onDetectBpm={onDetectBpm}
           onParamChange={onGraphicParamChange}
           onSpanModeChange={onGraphicSpanModeChange}
+          onTemplatesReload={onReloadGraphicTemplates}
           paramDraft={graphicParamDraft}
+          slug={slug}
           spanMode={graphicSpanMode}
           templates={graphicTemplates}
         />

@@ -8,6 +8,7 @@ import type { TimelineClipKind } from "@/components/edit-timeline";
 import { PLAYER_SPEEDS } from "@/components/player-controls";
 import { toastNothingToPlay, toastPlaybackFailed } from "@/lib/app-toast";
 import { musicPreviewTime } from "@/lib/music-preview";
+import { setMusicPreviewGain } from "@/lib/music-preview-audio";
 import { outputPositionSec } from "../../src/schedulerLogic.ts";
 import { type ZoomWindow, zoomFactorAtSec } from "../../src/zoom-ramp.ts";
 import { CutScheduler } from "../scheduler.ts";
@@ -220,7 +221,7 @@ export function usePreviewPlayback({
     if (el.playbackRate !== previewRate) {
       el.playbackRate = previewRate;
     }
-    el.volume = musicMuted || previewMuted ? 0 : Math.min(1, activeMusic.gain);
+    setMusicPreviewGain(el, activeMusic.gain, musicMuted || previewMuted);
     if (playing && el.paused) {
       void el.play().catch(() => {
         // Playback can be rejected when the browser blocks autoplay.
@@ -390,7 +391,9 @@ export function usePreviewPlayback({
               ? p.titles?.find((t) => t.id === id)
               : kind === "graphic"
                 ? p.graphics?.find((g) => g.id === id)
-                : p.stills?.find((s) => s.id === id);
+                : kind === "music"
+                  ? p.music?.find((m) => m.id === id)
+                  : p.stills?.find((s) => s.id === id);
       if (item) {
         seekToSample(item.startSample);
       }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { LayoutTemplate, Plus, Scissors } from "@/lib/icon";
+import { LayoutTemplate, Plus, Scissors, Upload } from "@/lib/icon";
 import { cn } from "@/lib/utils";
 
 export const DEFAULT_GRAPHIC_SPAN_SEC = 4;
@@ -106,7 +106,9 @@ export function GraphicSectionControls({
   onDetectBpm,
   onParamChange,
   onSpanModeChange,
+  onTemplatesReload,
   paramDraft,
+  slug,
   spanMode,
   templates,
 }: {
@@ -126,10 +128,59 @@ export function GraphicSectionControls({
   onDetectBpm?: (assetId: string) => void;
   onParamChange: (key: string, value: string | number | boolean) => void;
   onSpanModeChange: (mode: GraphicSpanMode) => void;
+  onTemplatesReload?: () => void;
   paramDraft: Record<string, string | number | boolean>;
+  slug: string;
   spanMode: GraphicSpanMode;
   templates: GraphicTemplateOption[];
 }) {
+  const [uploadId, setUploadId] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [pendingManifest, setPendingManifest] = useState<File | null>(null);
+  const [pendingComposition, setPendingComposition] = useState<File | null>(
+    null
+  );
+
+  const uploadTemplate = useCallback(
+    async (manifestFile: File, compositionFile: File) => {
+      const id = uploadId.trim();
+      if (!id) {
+        setUploadError("Template id is required");
+        return;
+      }
+      setUploading(true);
+      setUploadError(null);
+      try {
+        const form = new FormData();
+        form.set("id", id);
+        form.set("manifest", manifestFile);
+        form.set("composition", compositionFile);
+        const res = await fetch(
+          `/api/projects/${encodeURIComponent(slug)}/graphics`,
+          { method: "POST", body: form }
+        );
+        const data = (await res.json()) as {
+          error?: string;
+          graphic?: { id: string };
+        };
+        if (!res.ok) {
+          throw new Error(data.error ?? `upload failed (${res.status})`);
+        }
+        onTemplatesReload?.();
+        if (data.graphic?.id) {
+          onChooseTemplate(data.graphic.id);
+        }
+        setUploadId("");
+      } catch (e) {
+        setUploadError((e as Error).message);
+      } finally {
+        setUploading(false);
+      }
+    },
+    [onChooseTemplate, onTemplatesReload, slug, uploadId]
+  );
+
   const groups = useMemo(() => groupedTemplates(templates), [templates]);
   const selected = templates.find((t) => t.id === chosenTemplateId);
   const imageAssets = assets.filter(
@@ -379,12 +430,89 @@ export function GraphicSectionControls({
           </>
         )}
       </p>
+      <div className="space-y-2 rounded-md border border-border/60 p-2">
+        <p className="font-medium text-muted-foreground text-xs">
+          <Upload className="mr-1 inline size-3" />
+          Upload project-local template
+        </p>
+        <Field>
+          <FieldLabel className="text-muted-foreground text-xs">
+            Template id
+          </FieldLabel>
+          <Input
+            className={CONFIG_COMPACT_INPUT_CLASS}
+            onChange={(e) => setUploadId(e.target.value)}
+            placeholder="my-lower-third"
+            value={uploadId}
+          />
+        </Field>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <Field>
+            <FieldLabel className="text-muted-foreground text-xs">
+              manifest.json
+            </FieldLabel>
+            <Input
+              accept=".json,application/json"
+              className={CONFIG_COMPACT_INPUT_CLASS}
+              disabled={uploading}
+              onChange={(e) => setPendingManifest(e.target.files?.[0] ?? null)}
+              type="file"
+            />
+          </Field>
+          <Field>
+            <FieldLabel className="text-muted-foreground text-xs">
+              composition.html
+            </FieldLabel>
+            <Input
+              accept=".html,text/html"
+              className={CONFIG_COMPACT_INPUT_CLASS}
+              disabled={uploading}
+              onChange={(e) =>
+                setPendingComposition(e.target.files?.[0] ?? null)
+              }
+              type="file"
+            />
+          </Field>
+        </div>
+        <Button
+          disabled={uploading || !pendingManifest || !pendingComposition}
+          onClick={() => {
+            if (pendingManifest && pendingComposition) {
+              void uploadTemplate(pendingManifest, pendingComposition).then(
+                () => {
+                  setPendingManifest(null);
+                  setPendingComposition(null);
+                }
+              );
+            }
+          }}
+          size="sm"
+          type="button"
+          variant="outline"
+        >
+          {uploading ? "Uploading…" : "Upload template"}
+        </Button>
+        {uploadError ? (
+          <p className="text-destructive text-xs">{uploadError}</p>
+        ) : null}
+        <p className="text-[0.7rem] text-muted-foreground leading-snug">
+          Saves to projects/{slug}/graphics/&lt;id&gt;/ (manifest +
+          composition).
+        </p>
+      </div>
     </div>
   );
 }
 
-export function useGraphicTemplates(slug: string): GraphicTemplateOption[] {
+export function useGraphicTemplates(slug: string): {
+  reloadTemplates: () => void;
+  templates: GraphicTemplateOption[];
+} {
   const [templates, setTemplates] = useState<GraphicTemplateOption[]>([]);
+  const [reloadKey, setReloadKey] = useState(0);
+  const reloadTemplates = useCallback(() => {
+    setReloadKey((key) => key + 1);
+  }, []);
   useEffect(() => {
     let alive = true;
     void fetch(`/api/projects/${encodeURIComponent(slug)}/graphics`)
@@ -410,6 +538,6 @@ export function useGraphicTemplates(slug: string): GraphicTemplateOption[] {
     return () => {
       alive = false;
     };
-  }, [slug]);
-  return templates;
+  }, [reloadKey, slug]);
+  return { reloadTemplates, templates };
 }

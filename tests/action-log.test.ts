@@ -22,6 +22,25 @@ test("projectPaths exposes the actions log under working/", async () => {
   });
 });
 
+test("readActionLog with limit reads newest entries without loading the full file semantics", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    for (let index = 0; index < 30; index += 1) {
+      await appendActionLog(slug, {
+        at: index,
+        action: "pad",
+        actor: "cli",
+        revisionBefore: index,
+        revisionAfter: index + 1,
+      });
+    }
+    const limited = await readActionLog(slug, { limit: 3 });
+    assert.equal(limited.length, 3);
+    assert.equal(limited[0].revisionAfter, 30);
+    assert.equal(limited[1].revisionAfter, 29);
+    assert.equal(limited[2].revisionAfter, 28);
+  });
+});
+
 test("appendActionLog and readActionLog round-trip newest first", async () => {
   await withTempProjectsRoot(async ({ slug }) => {
     // No writeFixtureProject on purpose: append must create working/ itself.

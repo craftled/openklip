@@ -16,6 +16,8 @@ import {
   listAgentTasks,
   loadAgentTasks,
   resetAgentTaskIdSequenceForTests,
+  resetStartupTaskReconciliationForTests,
+  saveAgentTasks,
   setAgentTaskStep,
 } from "../src/agent-tasks.ts";
 import {
@@ -469,5 +471,49 @@ test("100-cap drops oldest terminal tasks past the cap", async () => {
       tasks.some((t) => t.id === ids.at(-1)),
       "newest task should remain"
     );
+  });
+});
+
+test("loadAgentTasks finalizes running tasks once per process after server restart", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    resetAgentTaskIdSequenceForTests();
+    resetStartupTaskReconciliationForTests();
+    writeFixtureProject(slug, makeProject({ slug }));
+
+    await saveAgentTasks(slug, {
+      tasks: [
+        {
+          id: "task-stale",
+          slug,
+          request: "Stale run",
+          status: "running",
+          steps: [{ id: "s1", title: "Export", status: "running" }],
+          startedAt: 1,
+          updatedAt: 1,
+        },
+      ],
+    });
+
+    const { tasks } = await loadAgentTasks(slug);
+    assert.equal(tasks[0]?.status, "failed");
+    assert.match(tasks[0]?.summary ?? "", /Server restarted/);
+    assert.equal(tasks[0]?.steps[0]?.status, "failed");
+
+    await saveAgentTasks(slug, {
+      tasks: [
+        {
+          id: "task-live",
+          slug,
+          request: "Live run",
+          status: "running",
+          steps: [{ id: "s1", title: "Cut", status: "running" }],
+          startedAt: 2,
+          updatedAt: 2,
+        },
+      ],
+    });
+
+    const { tasks: again } = await loadAgentTasks(slug);
+    assert.equal(again[0]?.status, "running");
   });
 });

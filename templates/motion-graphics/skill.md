@@ -58,7 +58,16 @@ openklip graphic-add-phrase <slug> motion-word-cascade "hook line" --beats 4 --m
 | `motion-blur-reveal` | Short punchy line (keep text under ~24 chars for preview perf) |
 | `shader-*` | Full-frame animated backgrounds |
 
-Rich templates need `chrome-headless-shell` for export (`bunx puppeteer browsers install chrome-headless-shell`).
+## Export
+
+```
+openklip status <slug> --json
+openklip export <slug>
+openklip verify <slug>
+```
+
+- Call `brief_audit` when a brief exists. Fix any reported issues before exporting.
+- Rich templates need `chrome-headless-shell` for export (`bunx puppeteer browsers install chrome-headless-shell`).
 
 ## Revise or remove
 

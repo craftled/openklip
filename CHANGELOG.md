@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.41.0.2 - 2026-07-05
+
+### Added
+- **CLI `openklip cuts-snap`**: toggle VAD snap-to-silence and seam crossfade from the terminal (parity with GUI Config and MCP `cuts-snap`).
+- **Music timeline drag-trim**: music placements use the same draggable clip blocks as b-roll on the edit timeline.
+- **Project-local graphics upload**: Config → Graphics accepts a template id plus `manifest.json` and `composition.html` (POST `/api/projects/[slug]/graphics`).
+- **Browser integration CI**: Chrome job runs History transcript diff and json-render timeline tests (`OPENKLIP_INTEGRATION=1`).
+- **Motion skill `brief_audit`**: `motion-canvas`, `motion-graphics`, and `motion-shorts` call `brief_audit` before export when a brief exists.
+- **Overlay provenance in inspectors**: title, zoom, and still Config inspectors show author when Settings → Appearance → **Show edit attribution** is on.
+
+### Changed
+- **Music preview gain**: preview honors export's 0-2 gain range via Web Audio (`web/lib/music-preview-audio.ts`).
+- **Action history reads**: `readActionLog` tail-reads when a limit is passed instead of parsing the whole file.
+- **Agent tasks on restart**: tasks still marked `running` or `pending` finalize as `failed` once per server process start.
+- **CutScheduler tests** (`tests/cut-scheduler-dom.test.ts`): cover `.dispose()`, seek vs cut boundary, and overlay timing.
+- **Export skills**: `make-short`, `make-highlights`, and `talking-head` include the pre-export `brief_audit` gate.
+
 ## 0.41.0.1 - 2026-07-05
 
 ### Added

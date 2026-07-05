@@ -7,6 +7,7 @@
 // projects/<slug>/graphics/ (project-local overrides win on id collision).
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { mkdir, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
 import { graphicRequiresImageAsset } from "./graphic-image-shader-ids.ts";
@@ -186,4 +187,36 @@ export function defaultGraphicParams(
     out[key] = p.default;
   }
   return out;
+}
+
+/** Write or overwrite a project-local graphic template folder. */
+export async function saveProjectGraphicTemplate(
+  slug: string,
+  manifest: GraphicManifest,
+  compositionHtml: string
+): Promise<GraphicListing> {
+  const id = assertValidGraphicId(manifest.id);
+  const parsed = GraphicManifestSchema.parse({ ...manifest, id });
+  if (!compositionHtml.trim()) {
+    throw new Error("composition.html must not be empty");
+  }
+  const dir = join(projectGraphicsRoot(slug), id);
+  await mkdir(dir, { recursive: true });
+  const manifestPath = join(dir, "manifest.json");
+  const compositionPath = join(dir, "composition.html");
+  const manifestTmp = `${manifestPath}.tmp`;
+  const compositionTmp = `${compositionPath}.tmp`;
+  await writeFile(manifestTmp, `${JSON.stringify(parsed, null, 2)}\n`, "utf8");
+  await writeFile(compositionTmp, compositionHtml, "utf8");
+  await rename(manifestTmp, manifestPath);
+  await rename(compositionTmp, compositionPath);
+  return {
+    id: parsed.id,
+    name: parsed.name,
+    kind: parsed.kind,
+    pack: "project",
+    params: parsed.params,
+    requiresAsset: graphicRequiresImageAsset(parsed.id),
+    scope: "project",
+  };
 }

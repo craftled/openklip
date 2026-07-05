@@ -119,7 +119,10 @@ export function App({
   const [musicBpmByAsset, setMusicBpmByAsset] = useState<
     Record<string, { bpm: number; confidence: number }>
   >({});
-  const graphicTemplates = useGraphicTemplates(project.slug);
+  const {
+    reloadTemplates: reloadGraphicTemplates,
+    templates: graphicTemplates,
+  } = useGraphicTemplates(project.slug);
   const [chosenGraphicTemplate, setChosenGraphicTemplate] = useState("");
   const [graphicParamDraft, setGraphicParamDraft] = useState<
     Record<string, string | number | boolean>
@@ -580,6 +583,7 @@ export function App({
         setGraphicParamDraft((prev) => ({ ...prev, [key]: value }));
       },
       onGraphicSpanModeChange: setGraphicSpanMode,
+      onReloadGraphicTemplates: reloadGraphicTemplates,
     },
     graphicBeatCount,
     graphicMusicAssetId,

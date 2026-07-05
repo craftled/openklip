@@ -48,6 +48,9 @@ Read the transcript first. Cut whole sentences or phrases, not lone words mid-th
 
 ## Verify and export
 
+- Call brief_audit when a brief exists. Fix any reported issues before exporting.
+- Export only when the edit is ready to ship.
+
 ```bash
 openklip status <slug>
 openklip export <slug>

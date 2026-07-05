@@ -50,7 +50,13 @@ import {
 } from "@/lib/timeline-zoom";
 import { cn } from "@/lib/utils";
 
-export type TimelineClipKind = "broll" | "zoom" | "title" | "still" | "graphic";
+export type TimelineClipKind =
+  | "broll"
+  | "zoom"
+  | "title"
+  | "still"
+  | "graphic"
+  | "music";
 
 export interface TimelineClip {
   endSample: number;
@@ -612,8 +618,8 @@ export function EditTimeline({
   const gridTicks = ticks.filter((t) => t > 0 && t < durationSec);
 
   const allOverlays = useMemo(
-    () => [...broll, ...zooms, ...titles, ...stills, ...graphics],
-    [broll, graphics, stills, titles, zooms]
+    () => [...broll, ...zooms, ...titles, ...stills, ...graphics, ...music],
+    [broll, graphics, music, stills, titles, zooms]
   );
 
   const onScroll = useCallback(() => {
@@ -791,29 +797,14 @@ export function EditTimeline({
           />
 
           {music.length > 0 && (
-            <TrackRow
-              contentWidthPx={contentWidthPx}
+            <ClipTrack
+              {...clipTrackProps}
+              clipClassName="border border-border bg-muted/70 text-foreground"
+              clips={music}
               icon={Music}
               label="Music"
-              onSeek={onSeek}
-              scrollLeft={scrollLeft}
-              ticks={gridTicks}
-              zoom={zoom}
-            >
-              {music.map((clip) => (
-                <div
-                  className="absolute top-1 bottom-1 truncate rounded border border-border bg-muted/70 px-1 text-foreground text-xs leading-none"
-                  key={clip.id}
-                  style={{
-                    left: clipLeftPx(clip.startSec, zoom),
-                    width: clipWidthPx(clip.startSec, clip.endSec, zoom),
-                  }}
-                  title={`${clip.label} (music bed)`}
-                >
-                  {clip.label}
-                </div>
-              ))}
-            </TrackRow>
+              trackKind="music"
+            />
           )}
 
           {libraryMusic.length > 0 && (

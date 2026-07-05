@@ -1,7 +1,3 @@
-// Append-only per-project action history (working/actions.jsonl). Every logged
-// registry mutation, from any surface (GUI, CLI, MCP, agent), appends one JSON
-// line here so "what happened to this edit" is answerable after the fact.
-// Pure Node fs (no Bun globals) so it runs under Next on Bun or Node.
 import { existsSync, statSync } from "node:fs";
 import { appendFile, mkdir, open, readFile } from "node:fs/promises";
 import {
@@ -22,6 +18,7 @@ export function actorFromEnv(): Actor | undefined {
 }
 
 const SUMMARY_MAX = 200;
+const TAIL_CHUNK_BYTES = 64 * 1024;
 
 // One-line, bounded description of an arbitrary value for the log. Never
 // throws: circular structures fall back to String(value), and undefined stays
@@ -90,6 +87,61 @@ function parseLogLine(line: string): ActionLogEntry | undefined {
   return isActionLogEntry(parsed) ? parsed : undefined;
 }
 
+async function readActionLogTail(
+  path: string,
+  limit: number
+): Promise<ActionLogEntry[]> {
+  const size = statSync(path).size;
+  if (size === 0) {
+    return [];
+  }
+
+  const entries: ActionLogEntry[] = [];
+  let position = size;
+  let partial = "";
+
+  while (position > 0 && entries.length < limit) {
+    const readSize = Math.min(TAIL_CHUNK_BYTES, position);
+    position -= readSize;
+    const handle = await open(path, "r");
+    let chunk = "";
+    try {
+      const buf = Buffer.alloc(readSize);
+      await handle.read(buf, 0, readSize, position);
+      chunk = buf.toString("utf8");
+    } finally {
+      await handle.close();
+    }
+
+    const combined = chunk + partial;
+    const lines = combined.split("\n");
+    partial = lines.shift() ?? "";
+
+    for (let index = lines.length - 1; index >= 0; index -= 1) {
+      const line = lines[index]?.trim();
+      if (!line) {
+        continue;
+      }
+      const entry = parseLogLine(line);
+      if (entry) {
+        entries.push(entry);
+        if (entries.length >= limit) {
+          break;
+        }
+      }
+    }
+  }
+
+  if (entries.length < limit && partial.trim()) {
+    const entry = parseLogLine(partial.trim());
+    if (entry) {
+      entries.push(entry);
+    }
+  }
+
+  return entries;
+}
+
 // Read the log newest first. A missing file is an empty history; corrupt lines
 // (crash mid-append, hand edits) are skipped rather than failing the read.
 export async function readActionLog(
@@ -99,6 +151,9 @@ export async function readActionLog(
   const fp = projectPaths(slug).actionsLog;
   if (!existsSync(fp)) {
     return [];
+  }
+  if (opts.limit !== undefined) {
+    return readActionLogTail(fp, opts.limit);
   }
   let raw: string;
   try {
@@ -117,5 +172,5 @@ export async function readActionLog(
     }
   }
   entries.reverse();
-  return opts.limit === undefined ? entries : entries.slice(0, opts.limit);
+  return entries;
 }

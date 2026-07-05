@@ -77,6 +77,7 @@ export interface UseEditorConfigPanelParams {
     | "onChooseGraphicTemplate"
     | "onGraphicParamChange"
     | "onGraphicSpanModeChange"
+    | "onReloadGraphicTemplates"
   >;
   graphicBeatCount: number;
   graphicMusicAssetId: string;

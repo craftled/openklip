@@ -68,9 +68,12 @@ MCP: `music_bpm`, then `graphic-add` with `beats` + `musicAssetId`.
 ```
 openklip graphic-set my-piece g1 --param inDurFrames=12 --param staggerFrames=4
 openklip motion my-piece --speed 1.2
+openklip brief my-piece --audit
 openklip export my-piece --platform youtube
 openklip verify my-piece
 ```
+
+- Call `brief_audit` when a brief exists. Fix any reported issues before exporting.
 
 Blank canvas with no words skips transcript verify drift checks.
 

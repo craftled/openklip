@@ -1,6 +1,6 @@
 {
   "name": "openklip",
-  "version": "0.41.0.1",
+  "version": "0.41.0.2",
   "dependencies": {
     "@base-ui/react": "^1.6.0",
     "@dnd-kit/core": "^6.3.1",
@@ -73,7 +73,7 @@
     "agent-make-highlights": "bun run scripts/agent-make-highlights.ts",
     "demo-gif": "bash scripts/record-demo-gif.sh",
     "test": "bun test",
-    "test:integration": "OPENKLIP_INTEGRATION=1 bun test tests/transcript-diff-browser.test.ts",
+    "test:integration": "OPENKLIP_INTEGRATION=1 bun test tests/transcript-diff-browser.test.ts tests/json-graphic-browser.test.ts",
     "typecheck": "tsc --noEmit",
     "check": "ultracite check",
     "fix": "ultracite fix",

@@ -5,12 +5,12 @@ import {
   chromeAvailable,
 } from "./helpers/integration-gate.ts";
 
-test("browserIntegrationSkipReason requires OPENKLIP_INTEGRATION", async () => {
+test("browserIntegrationSkipReason requires OPENKLIP_INTEGRATION=1", () => {
   const prev = process.env.OPENKLIP_INTEGRATION;
   delete process.env.OPENKLIP_INTEGRATION;
   try {
-    const reason = await browserIntegrationSkipReason({
-      serverUrl: "http://localhost:4399/edgaras-raw",
+    const reason = browserIntegrationSkipReason({
+      serverUrl: "http://localhost:4399/fixture",
     });
     assert.equal(typeof reason, "string");
     assert.match(reason as string, /OPENKLIP_INTEGRATION/);
