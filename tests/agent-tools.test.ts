@@ -647,6 +647,144 @@ test("brief_set appends a brief-set entry to the action history", async () => {
   });
 });
 
+const AUDIT_BRIEF =
+  "Audience: founders. Goal: demo. Must use: at least two aerial b-roll shots and one still image. Music: keep the bed subtle. Avoid: cutting the sentence about working in my own world. Target length: about 90 seconds.";
+
+function sec(n: number): number {
+  return Math.round(n * SAMPLE_RATE);
+}
+
+function auditPassProject(slug: string) {
+  const words = [];
+  for (let i = 0; i < 200; i++) {
+    words.push({
+      id: `w${i}`,
+      text: `word${i}`,
+      startSample: sec(i * 0.45),
+      endSample: sec(i * 0.45 + 0.4),
+      deleted: false,
+    });
+  }
+  words.push(
+    {
+      id: "w200",
+      text: "working",
+      startSample: sec(84.5),
+      endSample: sec(84.8),
+      deleted: false,
+    },
+    {
+      id: "w201",
+      text: "in",
+      startSample: sec(84.8),
+      endSample: sec(84.9),
+      deleted: false,
+    },
+    {
+      id: "w202",
+      text: "my",
+      startSample: sec(84.9),
+      endSample: sec(85),
+      deleted: false,
+    },
+    {
+      id: "w203",
+      text: "own",
+      startSample: sec(85),
+      endSample: sec(85.3),
+      deleted: false,
+    },
+    {
+      id: "w204",
+      text: "world",
+      startSample: sec(85.3),
+      endSample: sec(85.6),
+      deleted: false,
+    }
+  );
+  return makeProject({
+    slug,
+    words,
+    durationSamples: sec(120),
+    broll: [
+      {
+        id: "br1",
+        assetId: "dji-a",
+        startSample: sec(5),
+        endSample: sec(7),
+        srcInSample: 0,
+      },
+      {
+        id: "br2",
+        assetId: "dji-b",
+        startSample: sec(80),
+        endSample: sec(82),
+        srcInSample: 0,
+      },
+    ],
+    stills: [
+      {
+        id: "s1",
+        assetId: "still-a",
+        startSample: sec(20),
+        endSample: sec(23),
+        scale: 1.2,
+        focusX: 0.5,
+        focusY: 0.5,
+      },
+    ],
+    music: [
+      {
+        id: "m1",
+        assetId: "music-a",
+        startSample: 0,
+        endSample: sec(120),
+        srcInSample: 0,
+        gain: 0.25,
+      },
+    ],
+  });
+}
+
+test("brief_audit returns ok when the edit matches the brief", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, auditPassProject(slug));
+    await callAgentTool("brief_set", { slug, text: AUDIT_BRIEF });
+    const result = (await callAgentTool("brief_audit", { slug })) as {
+      ok: boolean;
+      issues: string[];
+    };
+    assert.equal(result.ok, true, result.issues.join("; "));
+  });
+});
+
+test("brief_audit returns issues when the edit fails the brief", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug, durationSamples: sec(10) }));
+    await callAgentTool("brief_set", { slug, text: AUDIT_BRIEF });
+    const result = (await callAgentTool("brief_audit", { slug })) as {
+      ok: boolean;
+      issues: string[];
+    };
+    assert.equal(result.ok, false);
+    assert.ok(result.issues.length > 0);
+  });
+});
+
+test("brief_audit rejects when brief.md is missing", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    await assert.rejects(
+      () => callAgentTool("brief_audit", { slug }),
+      /no brief\.md/
+    );
+  });
+});
+
+test("agentToolManifest includes brief_audit", () => {
+  assert.ok(agentToolNames("mcp").includes("brief_audit"));
+});
+
 // ── AGENT TASK PROGRESS TOOLS: task_step / task_complete ────────────────────
 
 function withTaskId<T>(taskId: string, fn: () => Promise<T>): Promise<T> {

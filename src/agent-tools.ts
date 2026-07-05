@@ -18,6 +18,7 @@ import { ingestBlank } from "./blank-ingest.ts";
 import { measureMusicBpm } from "./bpm.ts";
 import { loadBrief, saveBrief } from "./brief.ts";
 import { logBriefSet } from "./brief-log.ts";
+import { auditProjectForShip } from "./project-brief-audit.ts";
 import { cleanupReport, fillerOnlyCleanupReport } from "./cleanup.ts";
 import { PhraseAnchorSchema, type Project, samplesToSec } from "./edl.ts";
 import { EXPORT_PLATFORM_IDS } from "./export-platforms.ts";
@@ -686,6 +687,20 @@ const queryTools: AgentToolDef[] = [
       await saveBrief(projectSlug, text);
       await logBriefSet(projectSlug, toolActor(), text, toolTaskId());
       return { saved: true, chars: text.trim().length };
+    },
+  }),
+  defineQueryTool({
+    name: "brief_audit",
+    summary:
+      "Check the current edit against brief.md targets (runtime, b-roll/still counts, music gain, protected phrases, overlay visibility in kept ranges).",
+    schema: z.object({ slug }),
+    run: async ({ slug: projectSlug }) => {
+      const brief = await loadBrief(projectSlug);
+      if (!brief?.trim()) {
+        throw new Error(`no brief.md for ${projectSlug}; cannot audit`);
+      }
+      const project = await loadProject(projectSlug);
+      return auditProjectForShip({ briefText: brief, project });
     },
   }),
   defineQueryTool({

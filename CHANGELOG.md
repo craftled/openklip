@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.41.0.1 - 2026-07-05
+
+### Added
+- **MCP `brief_audit`**: agents can check the current edit against `brief.md` targets (runtime, b-roll/still counts, music gain, protected phrases, overlay visibility), parity with `openklip brief <slug> --audit`.
+
+### Changed
+- **Docs**: `CLAUDE.md`, `README.md`, `TODO.md`, and `AGENTS.md` test and MCP tool counts match `bun test` and `openklip tools --json --surface mcp` (1822 tests, 83 MCP tools).
+
 ## 0.41.0.0 - 2026-07-05
 
 ### Added

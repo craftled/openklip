@@ -75,7 +75,7 @@ Agent sidebar chats use `working/chats.json`, not `localStorage` (color scheme a
 
 ## What works today
 
-Verified against the current codebase (`VERSION` / `package.json` `0.41.0.0`, 1780 tests):
+Verified against the current codebase (`VERSION` / `package.json` `0.41.0.0`, 1822 tests):
 
 - **Ingest**: video → local transcript + preview proxy + `project.json` (`openklip ingest`; refuses re-ingest unless `--force`)
 - **Transcript editing**: click words to toggle `deleted`; `openklip cut` / `cut --text` / `restore` on CLI
@@ -119,7 +119,7 @@ Verified against the current codebase (`VERSION` / `package.json` `0.41.0.0`, 17
 - **Browser editor**: open `http://localhost:<port>/<slug>` or `/?slug=<slug>` after `openklip serve`; script-first transcript editing (select words, Delete to cut)
 - **Workspace**: macOS folder picker on empty landing; inline project create; projects root persisted in `.openklip/projects-root`
 - **CLI**: full edit surface; `openklip actions --json` mutations manifest; `openklip tools --json` full agent tool list
-- **MCP server**: `openklip mcp` (stdio) exposes 82 tools across query, mutation, task progress, revert, and export surfaces; `.cursor/mcp.json` wired for Cursor
+- **MCP server**: `openklip mcp` (stdio) exposes 83 tools across query, mutation, task progress, revert, and export surfaces; `.cursor/mcp.json` wired for Cursor
 - **Edit templates**: `templates/<id>/skill.md` playbooks; `openklip template set`; brand presets at ingest (`openklip brand`)
 - **Agent selector**: drive filler cuts via Claude Code, Codex, Cursor, or Grok subscription CLIs
 - **Design system**: default shadcn/ui tokens with Base UI primitives (`app/globals.css`, `components.json`); light/dark via `.dark` class; icons via `web/lib/icon.tsx`
