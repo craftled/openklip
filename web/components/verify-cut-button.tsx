@@ -11,7 +11,7 @@ import { verifyProjectCut } from "../../app/agent-actions.ts";
 // The verify loop, one click: re-transcribe the rendered cut (output/out.mp4)
 // and check it against the EDL. Uses the local Whisper path, so it is not gated
 // on an agent being connected. Reports the verdict via a toast.
-export function VerifyCutButton() {
+export function VerifyCutButton({ className }: { className?: string }) {
   const { activeSlug } = useAgentChat();
   const [verifying, setVerifying] = useState(false);
 
@@ -41,6 +41,7 @@ export function VerifyCutButton() {
     <ActionStatusButton
       busy={verifying}
       busyLabel="Verifying cut…"
+      className={className}
       disabled={verifying}
       icon={Check}
       label="Verify cut"
