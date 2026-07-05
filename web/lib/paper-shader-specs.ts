@@ -14,13 +14,23 @@ import {
   dotGridFragmentShader,
   dotOrbitFragmentShader,
   emptyPixel,
+  flutedGlassFragmentShader,
   GemSmokeShapes,
+  GlassDistortionShapes,
+  GlassGridShapes,
   GrainGradientShapes,
   gemSmokeFragmentShader,
   getShaderColorFromString,
   getShaderNoiseTexture,
   godRaysFragmentShader,
   grainGradientFragmentShader,
+  halftoneCmykFragmentShader,
+  HalftoneCmykTypes,
+  halftoneDotsFragmentShader,
+  HalftoneDotsGrids,
+  HalftoneDotsTypes,
+  heatmapFragmentShader,
+  imageDitheringFragmentShader,
   LiquidMetalShapes,
   liquidMetalFragmentShader,
   meshGradientFragmentShader,
@@ -43,6 +53,10 @@ import {
   waterFragmentShader,
   wavesFragmentShader,
 } from "@paper-design/shaders";
+import {
+  getCachedGraphicImage,
+  imageAspectFromCached,
+} from "./graphic-image-cache.ts";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -72,7 +86,12 @@ export type ShaderId =
   | "voronoi"
   | "warp"
   | "water"
-  | "waves";
+  | "waves"
+  | "flutedGlass"
+  | "halftoneCmyk"
+  | "halftoneDots"
+  | "heatmap"
+  | "imageDithering";
 
 export const SHADER_IDS: readonly ShaderId[] = [
   "meshGradient",
@@ -99,6 +118,11 @@ export const SHADER_IDS: readonly ShaderId[] = [
   "warp",
   "water",
   "waves",
+  "flutedGlass",
+  "halftoneCmyk",
+  "halftoneDots",
+  "heatmap",
+  "imageDithering",
 ];
 
 export type GraphicParams = Record<string, string | number | boolean>;
@@ -281,6 +305,24 @@ function emptyPixelImage(): HTMLImageElement | undefined {
   return _emptyPixelCache;
 }
 
+function imageUniform(
+  params: GraphicParams,
+  shaderId: ShaderId
+): HTMLImageElement | undefined {
+  const src = params._imageSrc;
+  if (typeof src === "string" && src.length > 0) {
+    return getCachedGraphicImage(src, shaderId) ?? emptyPixelImage();
+  }
+  return emptyPixelImage();
+}
+
+function imageAspectUniform(
+  params: GraphicParams,
+  shaderId: ShaderId
+): number {
+  return imageAspectFromCached(params, shaderId);
+}
+
 // ---------------------------------------------------------------------------
 // Main spec factory
 // ---------------------------------------------------------------------------
@@ -437,6 +479,8 @@ export function shaderSpecFor(
         DEFAULT_SHADER_COLORS,
         6
       );
+      const hasImage =
+        typeof params._imageSrc === "string" && params._imageSrc.length > 0;
       return {
         fragmentShader: gemSmokeFragmentShader,
         speed,
@@ -445,9 +489,9 @@ export function shaderSpecFor(
           u_colorBack: colorParam(params.colorBack, "#000000"),
           u_colors: colors,
           u_colorsCount: colors.length,
-          u_image: emptyPixelImage(),
-          u_imageAspectRatio: numberParam(params.imageAspectRatio, 1),
-          u_isImage: false,
+          u_image: imageUniform(params, "gemSmoke"),
+          u_imageAspectRatio: imageAspectUniform(params, "gemSmoke"),
+          u_isImage: hasImage,
           u_shape: enumParam(GemSmokeShapes, params.shape, "diamond"),
           u_innerDistortion: clamp01(numberParam(params.innerDistortion, 0.5)),
           u_outerDistortion: clamp01(numberParam(params.outerDistortion, 0.1)),
@@ -488,6 +532,8 @@ export function shaderSpecFor(
     }
 
     case "liquidMetal": {
+      const hasImage =
+        typeof params._imageSrc === "string" && params._imageSrc.length > 0;
       return {
         fragmentShader: liquidMetalFragmentShader,
         speed,
@@ -495,9 +541,9 @@ export function shaderSpecFor(
           ...sizing,
           u_colorBack: colorParam(params.colorBack, "#000000"),
           u_colorTint: colorParam(params.colorTint, "#ffffff"),
-          u_image: emptyPixelImage(),
-          u_imageAspectRatio: numberParam(params.imageAspectRatio, 1),
-          u_isImage: false,
+          u_image: imageUniform(params, "liquidMetal"),
+          u_imageAspectRatio: imageAspectUniform(params, "liquidMetal"),
+          u_isImage: hasImage,
           u_shape: enumParam(LiquidMetalShapes, params.shape, "diamond"),
           u_distortion: clamp01(numberParam(params.distortion, 0.07)),
           u_repetition: clamp(numberParam(params.repetition, 2), 1, 10),
@@ -868,6 +914,154 @@ export function shaderSpecFor(
           u_spacing: clamp(numberParam(params.spacing, 1), 0, 2),
           u_proportion: clamp01(numberParam(params.proportion, 0.5)),
           u_softness: clamp01(numberParam(params.softness, 0.5)),
+        },
+      };
+    }
+
+    case "flutedGlass": {
+      const sizing = baseSizingUniforms(params);
+      return {
+        fragmentShader: flutedGlassFragmentShader,
+        speed,
+        uniforms: {
+          ...sizing,
+          u_image: imageUniform(params, "flutedGlass"),
+          u_imageAspectRatio: imageAspectUniform(params, "flutedGlass"),
+          u_colorBack: colorParam(params.colorBack, "#000000"),
+          u_colorShadow: colorParam(params.colorShadow, "#000000"),
+          u_colorHighlight: colorParam(params.colorHighlight, "#ffffff"),
+          u_size: clamp(numberParam(params.size, 0.5), 0.01, 2),
+          u_shadows: clamp01(numberParam(params.shadows, 0.25)),
+          u_angle: numberParam(params.angle, 0),
+          u_stretch: clamp01(numberParam(params.stretch, 0.5)),
+          u_shape: enumParam(GlassGridShapes, params.shape, "lines"),
+          u_distortion: clamp01(numberParam(params.distortion, 0.5)),
+          u_highlights: clamp01(numberParam(params.highlights, 0.5)),
+          u_distortionShape: enumParam(
+            GlassDistortionShapes,
+            params.distortionShape,
+            "prism"
+          ),
+          u_shift: clamp(numberParam(params.shift, 0), -1, 1),
+          u_blur: clamp01(numberParam(params.blur, 0.15)),
+          u_edges: clamp01(numberParam(params.edges, 0.2)),
+          u_marginLeft: numberParam(params.marginLeft, 0),
+          u_marginRight: numberParam(params.marginRight, 0),
+          u_marginTop: numberParam(params.marginTop, 0),
+          u_marginBottom: numberParam(params.marginBottom, 0),
+          u_grainMixer: clamp01(numberParam(params.grainMixer, 0.15)),
+          u_grainOverlay: clamp01(numberParam(params.grainOverlay, 0.12)),
+        },
+      };
+    }
+
+    case "halftoneDots": {
+      return {
+        fragmentShader: halftoneDotsFragmentShader,
+        speed,
+        uniforms: {
+          u_rotation: numberParam(params.rotation, 0),
+          u_colorFront: colorParam(params.colorFront, "#000000"),
+          u_colorBack: colorParam(params.colorBack, "#ffffff"),
+          u_radius: clamp01(numberParam(params.radius, 0.5)),
+          u_contrast: clamp(numberParam(params.contrast, 1), 0.5, 2),
+          u_image: imageUniform(params, "halftoneDots"),
+          u_imageAspectRatio: imageAspectUniform(params, "halftoneDots"),
+          u_size: clamp(numberParam(params.size, 2), 0.5, 20),
+          u_grainMixer: clamp01(numberParam(params.grainMixer, 0.15)),
+          u_grainOverlay: clamp01(numberParam(params.grainOverlay, 0.12)),
+          u_grainSize: clamp(numberParam(params.grainSize, 1), 0.5, 5),
+          u_grid: enumParam(HalftoneDotsGrids, params.grid, "square"),
+          u_originalColors:
+            typeof params.originalColors === "boolean"
+              ? params.originalColors
+              : true,
+          u_inverted:
+            typeof params.inverted === "boolean" ? params.inverted : false,
+          u_type: enumParam(HalftoneDotsTypes, params.type, "classic"),
+        },
+      };
+    }
+
+    case "halftoneCmyk": {
+      return {
+        fragmentShader: halftoneCmykFragmentShader,
+        speed: 0,
+        uniforms: {
+          u_image: imageUniform(params, "halftoneCmyk"),
+          u_imageAspectRatio: imageAspectUniform(params, "halftoneCmyk"),
+          u_colorBack: colorParam(params.colorBack, "#ffffff"),
+          u_colorC: colorParam(params.colorC, "#00ffff"),
+          u_colorM: colorParam(params.colorM, "#ff00ff"),
+          u_colorY: colorParam(params.colorY, "#ffff00"),
+          u_colorK: colorParam(params.colorK, "#000000"),
+          u_size: clamp(numberParam(params.size, 2), 0.5, 20),
+          u_minDot: clamp01(numberParam(params.minDot, 0.1)),
+          u_contrast: clamp(numberParam(params.contrast, 1), 0.5, 2),
+          u_grainSize: clamp(numberParam(params.grainSize, 1), 0.5, 5),
+          u_grainMixer: clamp01(numberParam(params.grainMixer, 0.15)),
+          u_grainOverlay: clamp01(numberParam(params.grainOverlay, 0.12)),
+          u_gridNoise: clamp01(numberParam(params.gridNoise, 0.1)),
+          u_softness: clamp01(numberParam(params.softness, 0.2)),
+          u_floodC: clamp01(numberParam(params.floodC, 0)),
+          u_floodM: clamp01(numberParam(params.floodM, 0)),
+          u_floodY: clamp01(numberParam(params.floodY, 0)),
+          u_floodK: clamp01(numberParam(params.floodK, 0)),
+          u_gainC: clamp(numberParam(params.gainC, 1), 0, 2),
+          u_gainM: clamp(numberParam(params.gainM, 1), 0, 2),
+          u_gainY: clamp(numberParam(params.gainY, 1), 0, 2),
+          u_gainK: clamp(numberParam(params.gainK, 1), 0, 2),
+          u_type: enumParam(HalftoneCmykTypes, params.type, "dots"),
+          u_noiseTexture: getNoiseTexture(),
+        },
+      };
+    }
+
+    case "heatmap": {
+      const colors = shaderColorUniforms(
+        params.colors,
+        ["#0000ff", "#00ffff", "#ffff00", "#ff0000"],
+        10
+      );
+      return {
+        fragmentShader: heatmapFragmentShader,
+        speed,
+        uniforms: {
+          u_image: imageUniform(params, "heatmap"),
+          u_imageAspectRatio: imageAspectUniform(params, "heatmap"),
+          u_colorBack: colorParam(params.colorBack, "#000000"),
+          u_colors: colors,
+          u_colorsCount: colors.length,
+          u_angle: numberParam(params.angle, 0),
+          u_noise: clamp01(numberParam(params.noise, 0.25)),
+          u_innerGlow: clamp01(numberParam(params.innerGlow, 0.5)),
+          u_outerGlow: clamp01(numberParam(params.outerGlow, 0.5)),
+          u_contour: clamp01(numberParam(params.contour, 0.5)),
+        },
+      };
+    }
+
+    case "imageDithering": {
+      const sizing = baseSizingUniforms(params);
+      return {
+        fragmentShader: imageDitheringFragmentShader,
+        speed: 0,
+        uniforms: {
+          ...sizing,
+          u_image: imageUniform(params, "imageDithering"),
+          u_imageAspectRatio: imageAspectUniform(params, "imageDithering"),
+          u_colorFront: colorParam(params.colorFront, "#000000"),
+          u_colorBack: colorParam(params.colorBack, "#ffffff"),
+          u_colorHighlight: colorParam(params.colorHighlight, "#ffffff"),
+          u_type: enumParam(DitheringTypes, params.type, "4x4"),
+          u_pxSize: clamp(numberParam(params.size, 2.5), MIN_SIZE, MAX_SIZE),
+          u_originalColors:
+            typeof params.originalColors === "boolean"
+              ? params.originalColors
+              : true,
+          u_inverted:
+            typeof params.inverted === "boolean" ? params.inverted : false,
+          u_colorSteps: clamp(numberParam(params.colorSteps, 4), 2, 16),
         },
       };
     }

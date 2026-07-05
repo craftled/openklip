@@ -23,7 +23,7 @@ import {
   toastProjectCreateFailed,
   toastWorkspacePickFailed,
 } from "@/lib/app-toast";
-import { APP_ICON_CLASS, Check, Film, FolderOpen, Upload } from "@/lib/icon";
+import { APP_ICON_CLASS, Check, Film, FolderOpen, LayoutTemplate, Upload } from "@/lib/icon";
 import { selectDroppedVideo } from "@/lib/project-intake";
 import { workspacePickerToasts } from "@/lib/toast-notifications";
 import { cn } from "@/lib/utils";
@@ -87,11 +87,13 @@ function StepPill({
 }
 
 export function NewProjectDialog({
+  onBlankSelected,
   onFolderChosen,
   onOpenChange,
   onVideoSelected,
   open,
 }: {
+  onBlankSelected?: () => void | Promise<void>;
   onFolderChosen?: () => void;
   onOpenChange: (open: boolean) => void;
   onVideoSelected: (file: File) => void | Promise<void>;
@@ -320,6 +322,20 @@ export function NewProjectDialog({
                 <Upload data-icon="inline-start" />
                 Choose video…
               </Button>
+              {onBlankSelected ? (
+                <Button
+                  className="mt-2"
+                  onClick={() => {
+                    onOpenChange(false);
+                    void onBlankSelected();
+                  }}
+                  type="button"
+                  variant="outline"
+                >
+                  <LayoutTemplate data-icon="inline-start" />
+                  Blank canvas…
+                </Button>
+              ) : null}
             </div>
             {workspace?.pickerSupported || workspace?.configured ? null : (
               <p className="text-muted-foreground text-xs leading-relaxed">

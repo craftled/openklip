@@ -56,7 +56,7 @@ import { AgentChatProvider } from "@/components/agent-chat-context";
 import { AgentChatPanel } from "@/components/agent-chat-panel";
 import { AgentSidebar } from "@/components/agent-sidebar";
 import { withAssetKind } from "@/components/asset-bin";
-import { AudioControls, type AudioPatch } from "@/components/audio-controls";
+import { AudioControls, type AudioMeasureView, type AudioPatch } from "@/components/audio-controls";
 import { BriefEditor } from "@/components/brief-editor";
 import { CaptionStylePicker } from "@/components/caption-style-picker";
 import {
@@ -97,6 +97,12 @@ import {
   type MusicPlacementView,
   MusicSectionControls,
 } from "@/components/music-controls";
+import {
+  DEFAULT_GRAPHIC_SPAN_SEC,
+  GraphicSectionControls,
+  type GraphicSpanMode,
+  useGraphicTemplates,
+} from "@/components/graphic-picker-controls";
 import { OverlaySortable } from "@/components/overlay-sortable";
 import { PLAYER_SPEEDS, PlayerControls } from "@/components/player-controls";
 import { PreviewOverlays } from "@/components/preview-overlays";
@@ -542,6 +548,25 @@ export function App({
   const [chosenMusicAsset, setChosenMusicAsset] = useState(
     initialProject.assets?.find((a) => a.kind === "music")?.id ?? ""
   );
+  const [musicBpmByAsset, setMusicBpmByAsset] = useState<
+    Record<string, { bpm: number; confidence: number }>
+  >({});
+  const [bpmDetectingAssetId, setBpmDetectingAssetId] = useState<string | null>(
+    null
+  );
+  const [audioMeasure, setAudioMeasure] = useState<AudioMeasureView | null>(
+    null
+  );
+  const [audioMeasuring, setAudioMeasuring] = useState(false);
+  const graphicTemplates = useGraphicTemplates(project.slug);
+  const [chosenGraphicTemplate, setChosenGraphicTemplate] = useState("");
+  const [graphicParamDraft, setGraphicParamDraft] = useState<
+    Record<string, string | number | boolean>
+  >({});
+  const [graphicSpanMode, setGraphicSpanMode] =
+    useState<GraphicSpanMode>("seconds");
+  const [graphicBeatCount, setGraphicBeatCount] = useState(4);
+  const [graphicMusicAssetId, setGraphicMusicAssetId] = useState("");
 
   // G1: a GUI revert (HistoryPanel's onReverted prop) is the only place a
   // server action can rewrite an ALREADY-OPEN project's revision out from
@@ -1213,9 +1238,108 @@ export function App({
     [enqueueSave]
   );
 
-  // Music placement dispatches through the music-add/music-set/music-rm
-  // registry actions (history logs them) with optimistic setProject; the add
-  // reconciles the optimistic row with the server-assigned id and clamps.
+  const addGraphicPlacement = () => {
+    if (!chosenGraphicTemplate) {
+      return;
+    }
+    const durationSec = project.durationSamples / project.sampleRate;
+    const fromSec = curSec;
+    let toSec = Math.min(curSec + DEFAULT_GRAPHIC_SPAN_SEC, durationSec);
+    const beatsPayload =
+      graphicSpanMode === "beats" &&
+      graphicMusicAssetId &&
+      musicBpmByAsset[graphicMusicAssetId]
+        ? {
+            beats: graphicBeatCount,
+            musicAssetId: graphicMusicAssetId,
+          }
+        : undefined;
+    if (toSec - fromSec <= 0.05 && !beatsPayload) {
+      return;
+    }
+    const optimisticId = `g${Date.now()}`;
+    const item = {
+      id: optimisticId,
+      template: chosenGraphicTemplate,
+      type: "template" as const,
+      track: "broll",
+      startSample: Math.round(fromSec * sr),
+      endSample: Math.round(toSec * sr),
+      params: { ...graphicParamDraft },
+    };
+    setProject((prev) => ({
+      ...prev,
+      graphics: [...(prev.graphics ?? []), item],
+    }));
+    enqueueSave(async () => {
+      const r = await runGuiAction(project.slug, "graphic-add", {
+        template: item.template,
+        fromSec,
+        toSec,
+        params: item.params,
+        track: item.track,
+        ...beatsPayload,
+      });
+      if (r.ok) {
+        const saved = r.data.result as typeof item;
+        setProject((prev) => ({
+          ...prev,
+          graphics: (prev.graphics ?? []).map((g) =>
+            g.id === optimisticId ? { ...g, ...saved } : g
+          ),
+        }));
+      }
+      return r;
+    });
+  };
+
+  const addGraphicAtCutSeams = () => {
+    if (!chosenGraphicTemplate) {
+      return;
+    }
+    enqueueSave(async () => {
+      const r = await runGuiAction(project.slug, "graphic-add-cuts", {
+        template: chosenGraphicTemplate,
+        track: "title",
+        params:
+          Object.keys(graphicParamDraft).length > 0
+            ? graphicParamDraft
+            : undefined,
+      });
+      if (r.ok) {
+        const data = r.data.result as {
+          items?: Array<{
+            id: string;
+            template: string;
+            startSample: number;
+            endSample: number;
+            track: string;
+            params: Record<string, string | number | boolean>;
+          }>;
+        };
+        const placed = data.items ?? [];
+        if (placed.length > 0) {
+          setProject((prev) => ({
+            ...prev,
+            graphics: [
+              ...(prev.graphics ?? []),
+              ...placed.map((g) => ({
+                id: g.id,
+                template: g.template,
+                type: "template" as const,
+                track: g.track,
+                startSample: g.startSample,
+                endSample: g.endSample,
+                params: g.params,
+              })),
+            ],
+          }));
+        }
+      }
+      return r;
+    });
+  };
+
   const addMusicPlacement = () => {
     if (!chosenMusicAsset) {
       return;
@@ -1497,6 +1621,56 @@ export function App({
     }));
     enqueueSave(() => runGuiAction(project.slug, "audio", patch));
   };
+  const detectMusicBpm = useCallback(
+    async (assetId: string) => {
+      setBpmDetectingAssetId(assetId);
+      try {
+        const res = await fetch(
+          `/api/projects/${encodeURIComponent(project.slug)}/bpm?assetId=${encodeURIComponent(assetId)}`
+        );
+        const data = (await res.json()) as {
+          bpm?: number;
+          confidence?: number;
+          error?: string;
+        };
+        if (!(res.ok && typeof data.bpm === "number" && typeof data.confidence === "number")) {
+          throw new Error(data.error ?? "BPM detection failed");
+        }
+        const { bpm, confidence } = data;
+        setMusicBpmByAsset((prev) => ({
+          ...prev,
+          [assetId]: { bpm, confidence },
+        }));
+      } catch (e) {
+        toastError((e as Error).message);
+      } finally {
+        setBpmDetectingAssetId(null);
+      }
+    },
+    [project.slug]
+  );
+  const measureAudioLoudness = useCallback(async () => {
+    setAudioMeasuring(true);
+    try {
+      const res = await fetch(
+        `/api/projects/${encodeURIComponent(project.slug)}/audio-measure`
+      );
+      const data = (await res.json()) as AudioMeasureView & { error?: string };
+      if (!res.ok) {
+        throw new Error(data.error ?? "Loudness measure failed");
+      }
+      setAudioMeasure({
+        integratedLufs: data.integratedLufs,
+        truePeakDbtp: data.truePeakDbtp,
+        lra: data.lra,
+        source: data.source,
+      });
+    } catch (e) {
+      toastError((e as Error).message);
+    } finally {
+      setAudioMeasuring(false);
+    }
+  }, [project.slug]);
   const patchExport = useCallback(
     (patch: ExportPatch) => {
       setProject((prev) => {
@@ -2941,7 +3115,9 @@ export function App({
                   {selGraphicKeyframes.length === 0 ? (
                     <p className="text-muted-foreground text-xs">
                       No keyframes yet. Scrub the playhead inside this graphic
-                      and add one below.
+                      and add one below. For build timing (stagger, entrance
+                      duration), use graphic-set params inDurFrames and
+                      staggerFrames via CLI or MCP.
                     </p>
                   ) : (
                     selGraphicKeyframes.map((kf, index) => {
@@ -3367,10 +3543,61 @@ export function App({
             <Section title="Takes">
               <TakesPanel onAssembled={onHistoryReverted} slug={project.slug} />
             </Section>
+            <Section title="Graphics">
+              <GraphicSectionControls
+                assets={(project.assets ?? []).map((a) => ({
+                  id: a.id,
+                  name: a.name,
+                  kind: a.kind ?? "broll",
+                }))}
+                beatCount={graphicBeatCount}
+                bpmByAssetId={musicBpmByAsset}
+                bpmDetectingAssetId={bpmDetectingAssetId}
+                chosenMusicAssetId={graphicMusicAssetId}
+                chosenTemplateId={
+                  graphicTemplates.some((t) => t.id === chosenGraphicTemplate)
+                    ? chosenGraphicTemplate
+                    : ""
+                }
+                durationSec={project.durationSamples / sr}
+                musicAssets={musicAssets.map((a) => ({
+                  id: a.id,
+                  name: a.name,
+                }))}
+                onAdd={addGraphicPlacement}
+                onAddAtCuts={addGraphicAtCutSeams}
+                onBeatCountChange={setGraphicBeatCount}
+                onChooseMusicAsset={setGraphicMusicAssetId}
+                onChooseTemplate={(id) => {
+                  setChosenGraphicTemplate(id);
+                  const template = graphicTemplates.find((t) => t.id === id);
+                  if (!template) {
+                    setGraphicParamDraft({});
+                    return;
+                  }
+                  const defaults: Record<string, string | number | boolean> =
+                    {};
+                  for (const [key, spec] of Object.entries(template.params)) {
+                    defaults[key] = spec.default;
+                  }
+                  setGraphicParamDraft(defaults);
+                }}
+                onDetectBpm={detectMusicBpm}
+                onParamChange={(key, value) => {
+                  setGraphicParamDraft((prev) => ({ ...prev, [key]: value }));
+                }}
+                onSpanModeChange={setGraphicSpanMode}
+                paramDraft={graphicParamDraft}
+                spanMode={graphicSpanMode}
+                templates={graphicTemplates}
+              />
+            </Section>
             <Section title="Music">
               <MusicSectionControls
                 assetName={assetName}
                 assets={musicAssets.map((a) => ({ id: a.id, name: a.name }))}
+                bpmByAssetId={musicBpmByAsset}
+                bpmDetectingAssetId={bpmDetectingAssetId}
                 chosenAssetId={
                   musicAssets.some((a) => a.id === chosenMusicAsset)
                     ? chosenMusicAsset
@@ -3378,6 +3605,7 @@ export function App({
                 }
                 onAdd={addMusicPlacement}
                 onChooseAsset={setChosenMusicAsset}
+                onDetectBpm={detectMusicBpm}
                 onPatch={patchMusicPlacement}
                 onRemove={removeMusicPlacement}
                 placements={project.music ?? []}
@@ -3388,6 +3616,9 @@ export function App({
               <AudioControls
                 applying={pendingSaves > 0}
                 audio={project.audio ?? DEFAULT_AUDIO}
+                measure={audioMeasure}
+                measuring={audioMeasuring}
+                onMeasure={measureAudioLoudness}
                 onPatchAudio={patchAudio}
                 onPatchSnap={patchSnap}
                 snap={project.cuts?.snap ?? DEFAULT_CUT_SNAP}
@@ -3454,6 +3685,7 @@ export function App({
                 curSample={Math.round(playerSec * sr)}
                 graphics={project.graphics ?? []}
                 sampleRate={sr}
+                slug={project.slug}
                 titles={project.titles ?? []}
               />
             )}
@@ -3772,6 +4004,7 @@ export function App({
                               curSample={curSample}
                               graphics={project.graphics ?? []}
                               sampleRate={sr}
+                              slug={project.slug}
                               titles={project.titles ?? []}
                             />
                             <CutTransitionSweep ref={sweepRef} />

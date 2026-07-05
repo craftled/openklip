@@ -62,12 +62,14 @@ function MusicPlacementRow({
   onPatch,
   onRemove,
   sampleRate,
+  bpm,
 }: {
   m: MusicPlacementView;
   name: string;
   onPatch: (id: string, patch: MusicPlacementPatch) => void;
   onRemove: (id: string) => void;
   sampleRate: number;
+  bpm?: number;
 }) {
   const [gainDraft, setGainDraft] = useState<number | null>(null);
   const gain = gainDraft ?? m.gain;
@@ -80,6 +82,7 @@ function MusicPlacementRow({
         <span className="min-w-0 flex-1 truncate">{name}</span>
         <span className="shrink-0 text-muted-foreground tabular-nums">
           {fromSec.toFixed(1)}s–{toSec.toFixed(1)}s
+          {bpm !== undefined ? ` · ${bpm} BPM` : ""}
         </span>
       </div>
       <ElasticSlider
@@ -183,6 +186,21 @@ function MusicPlacementRow({
   );
 }
 
+export interface MusicSectionControlsProps {
+  assetName: (id: string) => string;
+  assets: MusicAssetOption[];
+  bpmByAssetId?: Record<string, { bpm: number; confidence: number }>;
+  bpmDetectingAssetId?: string | null;
+  chosenAssetId: string;
+  onAdd: () => void;
+  onChooseAsset: (id: string) => void;
+  onDetectBpm?: (assetId: string) => void;
+  onPatch: (id: string, patch: MusicPlacementPatch) => void;
+  onRemove: (id: string) => void;
+  placements: MusicPlacementView[];
+  sampleRate: number;
+}
+
 // Presentational music placement controls for the Config panel, extracted from
 // app.tsx so the markup is testable with renderToStaticMarkup (the
 // export-options-form.tsx precedent). All state flows through props; the
@@ -190,24 +208,17 @@ function MusicPlacementRow({
 export function MusicSectionControls({
   assetName,
   assets,
+  bpmByAssetId = {},
+  bpmDetectingAssetId = null,
   chosenAssetId,
   onAdd,
   onChooseAsset,
+  onDetectBpm,
   onPatch,
   onRemove,
   placements,
   sampleRate,
-}: {
-  assetName: (id: string) => string;
-  assets: MusicAssetOption[];
-  chosenAssetId: string;
-  onAdd: () => void;
-  onChooseAsset: (id: string) => void;
-  onPatch: (id: string, patch: MusicPlacementPatch) => void;
-  onRemove: (id: string) => void;
-  placements: MusicPlacementView[];
-  sampleRate: number;
-}) {
+}: MusicSectionControlsProps) {
   return (
     <div className="flex flex-col gap-2" data-music-section>
       {placements.length === 0 ? (
@@ -250,6 +261,31 @@ export function MusicSectionControls({
               <Music data-icon="inline-start" /> Place at playhead
             </Button>
           </div>
+          {chosenAssetId && onDetectBpm ? (
+            <div className="flex items-center gap-1.5">
+              <Button
+                data-music-bpm-detect
+                disabled={!chosenAssetId || bpmDetectingAssetId === chosenAssetId}
+                onClick={() => onDetectBpm(chosenAssetId)}
+                size="sm"
+                variant="outline"
+              >
+                {bpmDetectingAssetId === chosenAssetId
+                  ? "Detecting BPM…"
+                  : "Detect BPM"}
+              </Button>
+              {bpmByAssetId[chosenAssetId] ? (
+                <span
+                  className="text-muted-foreground text-xs tabular-nums"
+                  data-music-bpm-result
+                >
+                  {bpmByAssetId[chosenAssetId].bpm} BPM (
+                  {Math.round(bpmByAssetId[chosenAssetId].confidence * 100)}%
+                  conf)
+                </span>
+              ) : null}
+            </div>
+          ) : null}
           <p className="text-muted-foreground text-xs leading-snug">
             {assets.length === 0
               ? "Drop an audio file into the asset bin to add music."
@@ -265,6 +301,7 @@ export function MusicSectionControls({
             onPatch={onPatch}
             onRemove={onRemove}
             sampleRate={sampleRate}
+            bpm={bpmByAssetId[m.assetId]?.bpm}
           />
         ))
       )}

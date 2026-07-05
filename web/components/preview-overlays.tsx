@@ -25,6 +25,7 @@ interface PreviewOverlaysProps {
   curSample: number;
   graphics: GraphicItem[];
   sampleRate: number;
+  slug: string;
   titles: OverlayTitleItem[];
 }
 
@@ -39,6 +40,7 @@ export function PreviewOverlays({
   curSample,
   graphics,
   sampleRate,
+  slug,
   titles,
 }: PreviewOverlaysProps) {
   const curSec = curSample / sampleRate;
@@ -85,6 +87,7 @@ export function PreviewOverlays({
             graphic={g}
             key={g.id}
             sampleRate={sampleRate}
+            slug={slug}
           />
         )
       )}

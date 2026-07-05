@@ -12,11 +12,14 @@ import { ShaderMount } from "@paper-design/shaders";
 import { cubicBezier, easeInOut, easeOut } from "motion";
 import type { Keyframe } from "../../src/keyframes.ts";
 import { evaluateKeyframes } from "../../src/keyframes.ts";
+import { loadGraphicImage } from "./graphic-image-cache.ts";
 import {
   SHADER_IDS,
   type ShaderId,
   shaderSpecFor,
 } from "./paper-shader-specs.ts";
+
+export { ensureGraphicImagesReady } from "./graphic-image-cache.ts";
 
 export interface GraphicFrameOptions {
   height: number;
@@ -389,13 +392,34 @@ export function applyGraphicParams(
       el.textContent = String(params[key]);
     }
   }
-  // Propagate an `accent` param to a CSS variable the templates read via
-  // var(--accent, ...), matching the titles.ts accent treatment.
   if (typeof params.accent === "string") {
     root.style.setProperty("--accent", params.accent);
   }
   for (const host of shaderHosts(root)) {
     mountOrUpdateShader(host, params);
+    const shaderId = host.getAttribute("data-shader");
+    const src = params._imageSrc;
+    if (
+      typeof src === "string" &&
+      src.length > 0 &&
+      shaderId &&
+      SHADER_IDS.includes(shaderId as ShaderId)
+    ) {
+      void loadGraphicImage(src, { heatmap: shaderId === "heatmap" }).then(
+        () => {
+          mountOrUpdateShader(host, params);
+        }
+      );
+    }
+  }
+  const timingBound = root.querySelectorAll<HTMLElement>("[data-timing-bind]");
+  for (const el of Array.from(timingBound)) {
+    if (typeof params.staggerFrames === "number") {
+      el.setAttribute("data-stagger", String(Math.round(params.staggerFrames)));
+    }
+    if (typeof params.inDurFrames === "number") {
+      el.setAttribute("data-in-dur", String(Math.round(params.inDurFrames)));
+    }
   }
 }
 

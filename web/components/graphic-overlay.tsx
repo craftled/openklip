@@ -6,8 +6,10 @@ import {
   applyGraphicFrame,
   applyGraphicParams,
   disposeGraphicRuntime,
+  ensureGraphicImagesReady,
   graphicFrameAt,
 } from "@/lib/graphic-runtime";
+import { graphicRequiresImageAsset } from "../../src/graphics.ts";
 
 // One active graphic overlay rendered live over the <video>, driven by the SAME
 // scheduler-derived sample position the export rasterizer uses. The composition
@@ -38,12 +40,18 @@ interface Composition {
 // immutable per template, so every overlay instance shares one fetch.
 const compCache = new Map<string, Promise<Composition | null>>();
 
-function loadComposition(template: string): Promise<Composition | null> {
-  const cached = compCache.get(template);
+function loadComposition(
+  template: string,
+  slug: string
+): Promise<Composition | null> {
+  const cacheKey = `${slug}:${template}`;
+  const cached = compCache.get(cacheKey);
   if (cached) {
     return cached;
   }
-  const promise = fetch(`/media/graphic/${encodeURIComponent(template)}`)
+  const promise = fetch(
+    `/media/graphic/${encodeURIComponent(template)}?slug=${encodeURIComponent(slug)}`
+  )
     .then(async (res) => {
       if (!res.ok) {
         return null;
@@ -63,18 +71,35 @@ function loadComposition(template: string): Promise<Composition | null> {
       };
     })
     .catch(() => null);
-  compCache.set(template, promise);
+  compCache.set(cacheKey, promise);
   return promise;
+}
+
+function previewParams(
+  slug: string,
+  graphic: GraphicItem
+): Record<string, string | number | boolean> {
+  const params = { ...graphic.params };
+  if (
+    graphicRequiresImageAsset(graphic.template) &&
+    typeof params.assetId === "string" &&
+    params.assetId.length > 0
+  ) {
+    params._imageSrc = `/media/asset/${encodeURIComponent(params.assetId)}?slug=${encodeURIComponent(slug)}`;
+  }
+  return params;
 }
 
 export function GraphicOverlay({
   graphic,
   curSample,
   sampleRate,
+  slug,
 }: {
   graphic: GraphicItem;
   curSample: number;
   sampleRate: number;
+  slug: string;
 }) {
   const [comp, setComp] = useState<Composition | null>(null);
   const boxRef = useRef<HTMLDivElement | null>(null);
@@ -85,7 +110,7 @@ export function GraphicOverlay({
   // Fetch (cached) the composition fragment for this template.
   useEffect(() => {
     let alive = true;
-    loadComposition(graphic.template).then((c) => {
+    loadComposition(graphic.template, slug).then((c) => {
       if (alive) {
         setComp(c);
       }
@@ -93,7 +118,7 @@ export function GraphicOverlay({
     return () => {
       alive = false;
     };
-  }, [graphic.template]);
+  }, [graphic.template, slug]);
 
   // Inject the fragment once per composition, then capture the [data-graphic-root].
   useLayoutEffect(() => {
@@ -119,8 +144,14 @@ export function GraphicOverlay({
     if (!root) {
       return;
     }
-    applyGraphicParams(root, graphic.params);
-  }, [graphic.params]);
+    const params = previewParams(slug, graphic);
+    void ensureGraphicImagesReady(
+      params,
+      root.querySelector("[data-shader]")?.getAttribute("data-shader")
+    ).then(() => {
+      applyGraphicParams(root, params);
+    });
+  }, [graphic.params, graphic.template, slug]);
 
   // Keep the intrinsic stage scaled to fill the fluid preview box.
   useLayoutEffect(() => {
