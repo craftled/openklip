@@ -1,5 +1,9 @@
 #!/usr/bin/env bun
-import { setExportSettings, summarize } from "../src/actions.ts";
+import {
+  setCaptionInset,
+  setExportSettings,
+  summarize,
+} from "../src/actions.ts";
 import type { CropMode, ExportCrop, Project } from "../src/edl.ts";
 import { exportCut } from "../src/exporter.ts";
 import { mutateProject } from "../src/projectStore.ts";
@@ -138,6 +142,9 @@ if (import.meta.main) {
           cropMode,
           crop: visionCrop,
         });
+        if (!p.captions.insetPlatform) {
+          setCaptionInset(p, { enabled: true, platform: "generic" });
+        }
       },
       { action: "export-set", actor: "agent" }
     );

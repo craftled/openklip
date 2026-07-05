@@ -1,5 +1,6 @@
 "use client";
 
+import { buildTransitionGateFromProject } from "@engine/cut-transition-gate";
 import type {
   ColorAdjust,
   Project as EngineProject,
@@ -244,6 +245,7 @@ export function App({
     previewMuted,
     previewPip,
     previewRate,
+    previewTransitionNoticeText,
     rangesRef,
     setLoop,
     sweepRef,
@@ -308,13 +310,15 @@ export function App({
     () =>
       buildCleanupCandidates(
         project as unknown as EngineProject,
-        project.silences
+        project.silences,
+        project.brief
       ),
     [
       project.slug,
       project.words,
       project.cuts,
       project.silences,
+      project.brief,
       project.broll,
       project.titles,
       project.zooms,
@@ -694,6 +698,12 @@ export function App({
                 durationMs: 500,
               }
             }
+            getTransitionGate={() =>
+              buildTransitionGateFromProject(
+                projectRef.current as unknown as EngineProject,
+                rangesRef.current
+              )
+            }
             onClose={() => setCinema(false)}
             onExport={onExport}
             onToggleCaptions={toggleCaptions}
@@ -709,6 +719,7 @@ export function App({
                 titles={project.titles ?? []}
               />
             )}
+            previewTransitionNoticeText={previewTransitionNoticeText}
             projectName={project.slug}
             src={`/media/proxy.mp4?v=${project.mediaVersion ?? 0}`}
           />
@@ -785,6 +796,7 @@ export function App({
                   previewPip,
                   previewRate,
                   previewReframe,
+                  previewTransitionNoticeText,
                   sampleRate: sr,
                   safeAreaGuide,
                   slug: project.slug,

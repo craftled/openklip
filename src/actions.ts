@@ -49,6 +49,7 @@ import {
   PRODUCT_ANNOUNCEMENT_CATALOG,
   ProductAnnouncementCatalogSchema,
 } from "./product-announcement.ts";
+import { CAPTION_INSET_PLATFORMS } from "./safe-areas.ts";
 
 // Apply an optional `note` patch to an overlay item: a non-empty string sets the
 // rationale, an empty string CLEARS it (delete-on-empty, mirroring look-lut), and
@@ -1163,6 +1164,29 @@ export function setCaptionStyle(project: Project, style: string): Project {
     );
   }
   project.captions = { ...project.captions, style };
+  return project;
+}
+
+export function setCaptionInset(
+  project: Project,
+  input: { enabled: boolean; platform?: string }
+): Project {
+  if (!input.enabled) {
+    const next = { ...project.captions };
+    delete next.insetPlatform;
+    project.captions = next;
+    return project;
+  }
+  const platform = input.platform ?? "generic";
+  if (!(CAPTION_INSET_PLATFORMS as readonly string[]).includes(platform)) {
+    throw new Error(
+      `unknown caption inset platform "${platform}". Valid: ${CAPTION_INSET_PLATFORMS.join(", ")}`
+    );
+  }
+  project.captions = {
+    ...project.captions,
+    insetPlatform: platform as (typeof CAPTION_INSET_PLATFORMS)[number],
+  };
   return project;
 }
 

@@ -16,7 +16,7 @@ test("make-short loop: export-set 9:16 then shorts preset resolves vertical outp
   });
   assert.equal(resolved.aspect, "9:16");
   assert.equal(resolved.maxHeight, 1920);
-  assert.equal(resolved.fps, 30);
+  assert.equal(resolved.fps, undefined);
   assert.equal(resolved.compression, "social");
   assert.equal(resolved.loudnessTargetLufs, -14);
 });

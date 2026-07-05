@@ -25,11 +25,7 @@ import { logBriefSet } from "./brief-log.ts";
 import { BROLL_AUDIO_MODE_IDS } from "./broll-audio.ts";
 import { BROLL_DISPLAY_IDS } from "./broll-display.ts";
 import { isCaptionStyleId, listCaptionStyles } from "./caption-styles.ts";
-import {
-  cleanupReport,
-  fillerOnlyCleanupReport,
-  partitionSafeCandidates,
-} from "./cleanup.ts";
+import { buildCleanupReport, partitionSafeCandidates } from "./cleanup.ts";
 import {
   runOverlays,
   runRanges,
@@ -39,6 +35,7 @@ import {
   runTranscriptSpan,
 } from "./cli-query.ts";
 import { colorAdjustSummary } from "./color-adjust.ts";
+import { transitionExportPreview } from "./cut-transition-gate.ts";
 import { runDoctor } from "./doctor.ts";
 import {
   type Broll,
@@ -105,7 +102,7 @@ import {
   loadProject as storeLoadProject,
 } from "./projectStore.ts";
 import { matchesAuthorFilter } from "./provenance.ts";
-import { expandWordTokens } from "./query.ts";
+import { expandWordTokens, listRanges } from "./query.ts";
 import { placeFromPhrase } from "./reanchor.ts";
 import {
   actionManifest,
@@ -114,7 +111,9 @@ import {
   type Surface,
 } from "./registry.ts";
 import { type RevertTarget, revertProject } from "./revert.ts";
+import { CAPTION_INSET_PLATFORMS } from "./safe-areas.ts";
 import { analyzeSceneLog } from "./scene-log.ts";
+import { resolveSourceMediaStatus } from "./source-media.ts";
 import {
   applyProjectTemplate,
   listTemplates,
@@ -1687,6 +1686,33 @@ try {
       console.log(`captions style: ${project.captions.style}`);
       break;
     }
+    case "captions-inset": {
+      const validPlatforms = CAPTION_INSET_PLATFORMS.join(", ");
+      const usage = `usage: openklip captions-inset <slug> on|off [--platform ${validPlatforms}]`;
+      if (!(rest[0] && rest[1])) {
+        throw new Error(usage);
+      }
+      const enabled = rest[1] === "on";
+      if (rest[1] !== "on" && rest[1] !== "off") {
+        throw new Error(usage);
+      }
+      let platform: string | undefined;
+      const platformIdx = rest.indexOf("--platform");
+      if (platformIdx !== -1) {
+        platform = rest[platformIdx + 1];
+        if (!platform) {
+          throw new Error(usage);
+        }
+      }
+      const { project } = await runLoggedAction(rest[0], "captions-inset", {
+        enabled,
+        platform: platform as
+          | (typeof CAPTION_INSET_PLATFORMS)[number]
+          | undefined,
+      });
+      console.log(`captions inset: ${project.captions.insetPlatform ?? "off"}`);
+      break;
+    }
     case "look": {
       const filterUsage = `openklip look <slug> filter <${FILTER_NAMES.join("|")}>`;
       if (!(rest[0] && rest[1] && rest[2])) {
@@ -2071,12 +2097,33 @@ try {
       }
       const project = await loadProject(rest[0]);
       const silences = await loadSilencesForCli(project);
+      const statusDir = projectPaths(rest[0]).dir;
       if (rest.includes("--json")) {
-        process.stdout.write(runStatusJson(project, silences));
+        process.stdout.write(runStatusJson(project, silences, statusDir));
         break;
       }
       const s = summarize(project, silences);
+      const sourceMedia = resolveSourceMediaStatus({
+        dir: statusDir,
+        source: project.source,
+        proxy: project.proxy,
+      });
+      const transitionPreview = transitionExportPreview(
+        project,
+        listRanges(project, silences)
+      );
       console.log(`project: ${project.slug}`);
+      if (sourceMedia.warn) {
+        console.log(`  warning:      ${sourceMedia.warn}`);
+      }
+      if (transitionPreview.type !== "none" && !transitionPreview.wouldApply) {
+        const reasonLabel = transitionPreview.fallbackReason
+          ? cutTransitionFallbackReasonLabel(transitionPreview.fallbackReason)
+          : "not supported for this export";
+        console.log(
+          `  transition:   ${transitionPreview.type} requested but export will hard-cut (${reasonLabel})`
+        );
+      }
       if (project.template) {
         console.log(`  template:     ${project.template}`);
       }
@@ -2146,6 +2193,7 @@ try {
       }
       const slug = rest[0];
       const project = await loadProject(slug);
+      const briefText = await loadBrief(slug).catch(() => undefined);
       const silences = await loadAudioAnalysis(slug)
         .then((a) => a.silences)
         .catch(() => null);
@@ -2154,9 +2202,11 @@ try {
           "warning: no audio analysis yet; dead-air candidates skipped (re-ingest or open the project once with analysis available)"
         );
       }
-      const report = silences
-        ? cleanupReport(project, silences)
-        : fillerOnlyCleanupReport(project);
+      const report = buildCleanupReport({
+        project,
+        silences,
+        briefText,
+      });
 
       if (rest.includes("--apply-safe")) {
         const { fillerIds, deadAirSpans } = partitionSafeCandidates(
@@ -2758,6 +2808,9 @@ try {
       const gifCapNote = r.gif?.capped
         ? `, gif capped at ${r.gif.width}px/${r.gif.fps}fps`
         : "";
+      if (r.sourceMediaWarn) {
+        console.warn(`warning: ${r.sourceMediaWarn}`);
+      }
       console.log(
         `exported ${r.ranges} ranges, ${r.durationSec.toFixed(1)}s (${r.height}p, ${r.fps}fps, ${r.compression}${formatNote}${platformNote}${loudnessNote}${transitionNote}${gifCapNote}, music ${r.music}) -> ${r.out}`
       );

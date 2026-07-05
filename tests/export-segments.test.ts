@@ -28,7 +28,7 @@ test("shouldUseSegmentExport when kept duration is a small fraction of source", 
   );
 });
 
-test("shouldUseSegmentExport rejects when overlays need the full source graph", () => {
+test("shouldUseSegmentExport rejects b-roll and rich graphics", () => {
   assert.equal(
     shouldUseSegmentExport({
       ranges,
@@ -39,6 +39,20 @@ test("shouldUseSegmentExport rejects when overlays need the full source graph", 
       hasMusic: false,
     }),
     false
+  );
+});
+
+test("shouldUseSegmentExport allows music and stills on overlay-light timelines", () => {
+  assert.equal(
+    shouldUseSegmentExport({
+      ranges,
+      sourceDurationSec: 600,
+      hasBroll: false,
+      hasStills: true,
+      hasRichGraphics: false,
+      hasMusic: true,
+    }),
+    true
   );
 });
 

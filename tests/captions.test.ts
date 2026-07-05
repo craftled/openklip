@@ -142,8 +142,6 @@ test("buildAss omits dialogue lines hidden by hero title overlap", () => {
   assert.match(ass, /Dialogue: 0,0:00:05\.00,0:00:06\.00,CapBottom/);
 });
 
-// ── caption style presets (buildAss consumes CaptionStyleDef) ────────────────
-
 test("buildAss header uses WrapStyle 0 (libass smart wrapping) for every preset", () => {
   // Finding 1: WrapStyle 2 (no wrap) let a 6-word bold-caps portrait group
   // clip off-frame at 1080x1920. WrapStyle 0 is a deliberate header change
@@ -442,4 +440,20 @@ test("keptWordsInOutputTime: deleted words never emit", () => {
   };
   const out = keptWordsInOutputTime(project, [{ startSec: 0, endSec: 1 }]);
   assert.equal(out.length, 0);
+});
+
+test("buildAss insetPlatform raises bottom margin on vertical exports", () => {
+  const capMarginV = (ass: string): number => {
+    const line = ass.split("\n").find((row) => row.startsWith("Style: Cap,"));
+    assert.ok(line);
+    const parts = line.split(",");
+    return Number(parts.at(-2));
+  };
+  const plain = buildAss(GROUPS, { width: 1080, height: 1920 });
+  const inset = buildAss(GROUPS, {
+    width: 1080,
+    height: 1920,
+    insetPlatform: "generic",
+  });
+  assert.ok(capMarginV(inset) > capMarginV(plain));
 });

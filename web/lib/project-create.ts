@@ -74,6 +74,67 @@ export async function createProjectFromVideo(
   return await pollIngestJob(data.jobId, onProgress);
 }
 
+export async function createProjectFromFolder(
+  files: File[],
+  onProgress?: (p: IngestProgressView) => void,
+  options?: ProjectCreateOptions
+): Promise<string> {
+  const fd = new FormData();
+  for (const file of files) {
+    fd.append("files", file);
+  }
+  const url = options?.force
+    ? "/api/projects/folder?force=1"
+    : "/api/projects/folder";
+  const res = await fetch(url, { method: "POST", body: fd });
+  const data = (await res.json()) as {
+    code?: string;
+    error?: string;
+    jobId?: string;
+  };
+  if (res.status === 409 && conflictOffersOverwrite(data)) {
+    throw new ProjectExistsError(
+      data.error ?? "A project for this video already exists"
+    );
+  }
+  if (!(res.ok && data.jobId)) {
+    throw new Error(data.error ?? `Folder import failed (${res.status})`);
+  }
+  return await pollIngestJob(data.jobId, onProgress);
+}
+
+export async function createProjectFromUrl(
+  videoUrl: string,
+  onProgress?: (p: IngestProgressView) => void,
+  options?: ProjectCreateOptions
+): Promise<string> {
+  const endpoint = options?.force
+    ? "/api/projects/url?force=1"
+    : "/api/projects/url";
+  const res = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url: videoUrl }),
+  });
+  const data = (await res.json()) as {
+    code?: string;
+    error?: string;
+    jobId?: string;
+  };
+  if (res.status === 409 && conflictOffersOverwrite(data)) {
+    throw new ProjectExistsError(
+      data.error ?? "A project for this URL already exists"
+    );
+  }
+  if (res.status === 503) {
+    throw new Error(data.error ?? "URL import unavailable (install yt-dlp)");
+  }
+  if (!(res.ok && data.jobId)) {
+    throw new Error(data.error ?? `URL import failed (${res.status})`);
+  }
+  return await pollIngestJob(data.jobId, onProgress);
+}
+
 export async function createBlankProject(input?: {
   slug?: string;
   durationSec?: number;

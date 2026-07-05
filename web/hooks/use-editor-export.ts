@@ -6,6 +6,7 @@ import {
   toastError,
   toastInfo,
   toastPromise,
+  toastProxyExportWarning,
   toastSuccess,
   toastTransitionFallback,
 } from "@/lib/app-toast";
@@ -64,6 +65,7 @@ export function useEditorExport({
         void toastPromise(exportRun, exportPromiseMessages());
         const result = await exportRun;
         toastTransitionFallback(result.transition);
+        toastProxyExportWarning(result.sourceMediaWarn);
         if (options?.destination === "clipboard") {
           toastInfo("Export path ready", result.out, {
             duration: 15_000,

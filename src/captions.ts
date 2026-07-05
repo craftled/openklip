@@ -11,6 +11,8 @@ import { colorToHex } from "./color.ts";
 // Type-only import: erased at compile time, so this module stays a pure,
 // browser-safe leaf (compiledTimeline.ts depends on that).
 import type { Project, Range } from "./edl.ts";
+import type { CaptionInsetPlatform } from "./safe-areas.ts";
+import { getSafeAreaInsets } from "./safe-areas.ts";
 
 export interface CaptionWord {
   endSec: number;
@@ -138,6 +140,8 @@ function assEscape(s: string): string {
 export interface AssOptions {
   accent?: string;
   height: number;
+  /** When set on vertical exports, lifts captions above platform safe-area chrome. */
+  insetPlatform?: CaptionInsetPlatform;
   placement?:
     | CaptionPlacement
     | ((
@@ -193,10 +197,16 @@ export function captionPlacementForGroup(
 
 function marginForPlacement(
   height: number,
-  placement: CaptionPlacement
+  placement: CaptionPlacement,
+  insetPlatform?: CaptionInsetPlatform
 ): number {
   const marginRatio = placement === "raised" ? 0.24 : 0.07;
-  return Math.round(height * marginRatio);
+  let marginV = Math.round(height * marginRatio);
+  if (insetPlatform && placement === "bottom") {
+    const insets = getSafeAreaInsets(insetPlatform);
+    marginV += Math.round(height * insets.bottom);
+  }
+  return marginV;
 }
 
 // Fields: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour,
@@ -267,13 +277,13 @@ export function buildAss(groups: CaptionGroup[], opts: AssOptions): string {
           styleLine(
             "CapBottom",
             fontSize,
-            marginForPlacement(opts.height, "bottom"),
+            marginForPlacement(opts.height, "bottom", opts.insetPlatform),
             styleDef
           ),
           styleLine(
             "CapRaised",
             fontSize,
-            marginForPlacement(opts.height, "raised"),
+            marginForPlacement(opts.height, "raised", opts.insetPlatform),
             styleDef
           ),
         ]
@@ -281,7 +291,7 @@ export function buildAss(groups: CaptionGroup[], opts: AssOptions): string {
           styleLine(
             "Cap",
             fontSize,
-            marginForPlacement(opts.height, placement),
+            marginForPlacement(opts.height, placement, opts.insetPlatform),
             styleDef
           ),
         ];

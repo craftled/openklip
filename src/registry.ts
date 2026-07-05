@@ -32,6 +32,7 @@ import {
   restoreAll,
   setAssetFlags,
   setAudio,
+  setCaptionInset,
   setCaptionMaxWords,
   setCaptionStyle,
   setCaptions,
@@ -69,6 +70,7 @@ import {
   validateProductAnnouncementSpec,
 } from "./product-announcement.ts";
 import { reanchorOne, reanchorProject } from "./reanchor.ts";
+import { CAPTION_INSET_PLATFORMS } from "./safe-areas.ts";
 
 // Where an action is exposed. The CLI dispatch, the editor's server actions, and
 // the agent-facing manifest each filter the registry by surface.
@@ -501,6 +503,22 @@ export const actions: ActionDef[] = [
     run: (p, i) => {
       setCaptionStyle(p, i.style);
       return { style: p.captions.style };
+    },
+  }),
+  defineAction({
+    name: "captions-inset",
+    summary:
+      "Toggle vertical-export caption safe-area inset (generic|tiktok|reels|youtube-shorts).",
+    surfaces: ["cli", "gui", "mcp"],
+    schema: z.object({
+      enabled: z.boolean(),
+      platform: z.enum(CAPTION_INSET_PLATFORMS).optional(),
+    }),
+    run: (p, i) => {
+      setCaptionInset(p, i);
+      return {
+        insetPlatform: p.captions.insetPlatform ?? null,
+      };
     },
   }),
   defineAction({

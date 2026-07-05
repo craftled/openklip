@@ -80,10 +80,9 @@ const PLATFORMS: readonly ExportPlatformDef[] = [
     id: "shorts",
     label: "Shorts / Reels / TikTok",
     summary:
-      "9:16 vertical, 30fps, 1080p-class height, social compression, -14 LUFS.",
+      "9:16 vertical, source fps, 1080p-class height, social compression, -14 LUFS.",
     aspect: "9:16",
     compression: "social",
-    fps: 30,
     maxHeight: 1920,
     targetLufs: -14,
   },

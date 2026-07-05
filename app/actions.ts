@@ -308,6 +308,7 @@ export async function exportProject(
       reason?: CutTransitionFallbackReason;
       type: CutTransitionType;
     };
+    sourceMediaWarn?: string;
   }>
 > {
   try {

@@ -140,10 +140,14 @@ test("shouldApplyCutTransition: false when b-roll overlay present", () => {
   );
 });
 
-test("shouldApplyCutTransition: false when music present", () => {
+test("shouldApplyCutTransition: true when only music or stills are present", () => {
   assert.equal(
     shouldApplyCutTransition("dip", { ...gate, hasMusic: true }),
-    false
+    true
+  );
+  assert.equal(
+    shouldApplyCutTransition("crossfade", { ...gate, hasStills: true }),
+    true
   );
 });
 
@@ -170,17 +174,14 @@ test("cutTransitionFallbackReason: overlays-present when b-roll present", () => 
   );
 });
 
-test("cutTransitionFallbackReason: overlays-present when music present", () => {
+test("cutTransitionFallbackReason: music and stills do not block overlay-light transitions", () => {
   assert.equal(
     cutTransitionFallbackReason({ ...gate, hasMusic: true }),
-    "overlays-present"
+    undefined
   );
-});
-
-test("cutTransitionFallbackReason: overlays-present when stills present", () => {
   assert.equal(
     cutTransitionFallbackReason({ ...gate, hasStills: true }),
-    "overlays-present"
+    undefined
   );
 });
 
@@ -225,7 +226,7 @@ test("cutTransitionFallbackReasonLabel: readable text for each reason", () => {
   );
   assert.equal(
     cutTransitionFallbackReasonLabel("overlays-present"),
-    "b-roll, stills, music, or graphics present"
+    "b-roll or rich graphics present"
   );
   assert.equal(
     cutTransitionFallbackReasonLabel("too-many-ranges"),

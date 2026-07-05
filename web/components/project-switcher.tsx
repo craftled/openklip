@@ -69,6 +69,8 @@ export function ProjectSwitcher({
     createPhase,
     createdSlug,
     creating,
+    ingestFiles,
+    ingestUrl,
     ingestVideo,
     pendingOverwrite,
     progress,
@@ -131,12 +133,19 @@ export function ProjectSwitcher({
       ) : null}
       <NewProjectDialog
         onBlankSelected={() => void createBlank()}
+        onFolderSelected={ingestFiles}
         onOpenChange={setNewProjectOpen}
+        onUrlSelected={ingestUrl}
         onVideoSelected={ingestVideo}
         open={newProjectOpen}
       />
       <ProjectOverwriteDialog
-        fileName={pendingOverwrite?.file.name ?? ""}
+        fileName={
+          pendingOverwrite?.file?.name ??
+          pendingOverwrite?.files?.[0]?.name ??
+          pendingOverwrite?.url ??
+          ""
+        }
         onCancel={cancelOverwrite}
         onConfirm={confirmOverwrite}
         open={pendingOverwrite !== null}

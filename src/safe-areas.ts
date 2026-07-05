@@ -20,6 +20,16 @@ export interface SafeAreaInsets {
 /** Active guide platforms (excludes "off"). */
 export type SafeAreaGuidePlatform = Exclude<SafeAreaPlatform, "off">;
 
+/** Platforms available for export caption inset (same insets as preview guides). */
+export const CAPTION_INSET_PLATFORMS = [
+  "generic",
+  "tiktok",
+  "reels",
+  "youtube-shorts",
+] as const satisfies readonly SafeAreaGuidePlatform[];
+
+export type CaptionInsetPlatform = (typeof CAPTION_INSET_PLATFORMS)[number];
+
 const INSETS: Record<SafeAreaGuidePlatform, SafeAreaInsets> = {
   // Bottom-heavy: caption + like/comment stack on TikTok.
   tiktok: { top: 0.1, bottom: 0.22, left: 0.05, right: 0.05 },

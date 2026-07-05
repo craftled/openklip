@@ -1,4 +1,5 @@
 import type { SilenceSpan } from "./audio-analysis-core.ts";
+import { parseCleanupPhraseLists } from "./cleanup-phrases.ts";
 import {
   effectiveRanges,
   type Project,
@@ -8,10 +9,12 @@ import {
 import { summarize } from "./summary.ts";
 
 export interface BriefTargets {
+  alwaysCutPhrases: string[];
   avoidPhrases: string[];
   maxMusicGain: number;
   minBroll: number;
   minStill: number;
+  neverCutPhrases: string[];
   targetLengthSec: number;
   targetLengthToleranceSec: number;
 }
@@ -29,10 +32,20 @@ const DEFAULT_TARGETS: BriefTargets = {
   minStill: 1,
   maxMusicGain: 0.35,
   avoidPhrases: [],
+  alwaysCutPhrases: [],
+  neverCutPhrases: [],
 };
 
 export function parseBriefTargets(briefText: string): BriefTargets {
-  const targets: BriefTargets = { ...DEFAULT_TARGETS, avoidPhrases: [] };
+  const targets: BriefTargets = {
+    ...DEFAULT_TARGETS,
+    avoidPhrases: [],
+    alwaysCutPhrases: [],
+    neverCutPhrases: [],
+  };
+  const cleanupLists = parseCleanupPhraseLists(briefText);
+  targets.alwaysCutPhrases = cleanupLists.alwaysCut;
+  targets.neverCutPhrases = cleanupLists.neverCut;
 
   const lengthMatch = briefText.match(
     /target length:\s*about\s*(\d+)\s*seconds?/i
@@ -211,9 +224,15 @@ export function auditProjectForShip(input: {
     }
   }
 
-  for (const phrase of targets.avoidPhrases) {
+  for (const phrase of [...targets.avoidPhrases, ...targets.neverCutPhrases]) {
     if (!protectedPhraseKept(input.project, phrase)) {
       issues.push(`protected phrase was cut: "${phrase}"`);
+    }
+  }
+
+  for (const phrase of targets.alwaysCutPhrases) {
+    if (phraseWordsKept(input.project, phrase)) {
+      warnings.push(`always-cut phrase still kept: "${phrase}"`);
     }
   }
 

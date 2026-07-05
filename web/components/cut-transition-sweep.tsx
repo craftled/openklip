@@ -1,6 +1,7 @@
 "use client";
 
 import type { CutTransition } from "@engine/edl";
+import type { SegmentExportGate } from "@engine/export-segments";
 import { useEffect, useImperativeHandle, useRef } from "react";
 import {
   type CutTransitionSweepController,
@@ -9,7 +10,7 @@ import {
 } from "@/lib/cut-transition-sweep";
 
 export interface CutTransitionSweepHandle {
-  play: (transition: CutTransition) => void;
+  play: (transition: CutTransition, gate?: SegmentExportGate) => void;
 }
 
 export interface CutTransitionSweepProps {
@@ -41,8 +42,8 @@ export function CutTransitionSweep({ ref }: CutTransitionSweepProps) {
   useImperativeHandle(
     ref,
     () => ({
-      play: (transition: CutTransition) => {
-        controllerRef.current?.play(transition, prefersReducedMotion());
+      play: (transition, gate) => {
+        controllerRef.current?.play(transition, prefersReducedMotion(), gate);
       },
     }),
     []

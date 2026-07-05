@@ -9,17 +9,22 @@ import {
 } from "@/lib/app-toast";
 import {
   createBlankProject,
+  createProjectFromFolder,
+  createProjectFromUrl,
   type IngestProgressView,
   type ProjectCreateOptions,
   ProjectExistsError,
 } from "@/lib/project-create";
+import { selectDroppedIntake } from "@/lib/project-intake";
 import { projectIngestLoadingMessage } from "@/lib/toast-notifications";
 import { SUCCESS_CHECK_HOLD_MS } from "../../src/successCheck.ts";
 
 export interface PendingOverwrite {
-  file: File;
+  file?: File;
+  files?: File[];
   /** Server copy explaining the conflict (names the existing slug). */
   message: string;
+  url?: string;
 }
 
 // A 409 on a non-forced create is actionable: surface an explicit replace
@@ -37,10 +42,22 @@ export function overwriteDecision(
 
 export function useProjectCreate({
   onCreateProject,
+  onCreateFolder = createProjectFromFolder,
+  onCreateUrl = createProjectFromUrl,
   onProjectCreated,
 }: {
   onCreateProject: (
     file: File,
+    onProgress: (p: IngestProgressView) => void,
+    options?: ProjectCreateOptions
+  ) => Promise<string>;
+  onCreateFolder?: (
+    files: File[],
+    onProgress: (p: IngestProgressView) => void,
+    options?: ProjectCreateOptions
+  ) => Promise<string>;
+  onCreateUrl?: (
+    url: string,
     onProgress: (p: IngestProgressView) => void,
     options?: ProjectCreateOptions
   ) => Promise<string>;
@@ -86,9 +103,102 @@ export function useProjectCreate({
     [onCreateProject, onProjectCreated]
   );
 
+  const runFolderCreate = useCallback(
+    async (files: File[], force: boolean) => {
+      setCreatePhase("creating");
+      setCreatedSlug(null);
+      setProgress(null);
+      const loadingId = toastLoading(projectIngestLoadingMessage());
+      try {
+        const slug = await onCreateFolder(files, setProgress, { force });
+        toastDismiss(loadingId);
+        setCreatedSlug(slug);
+        setCreatePhase("success");
+        await new Promise((resolve) => {
+          window.setTimeout(resolve, SUCCESS_CHECK_HOLD_MS);
+        });
+        onProjectCreated(slug);
+      } catch (e) {
+        toastDismiss(loadingId);
+        if (overwriteDecision(e, force) === "offer-overwrite") {
+          setPendingOverwrite({ files, message: (e as Error).message });
+        } else {
+          toastProjectCreateFailed((e as Error).message);
+        }
+      } finally {
+        setCreatePhase(null);
+        setCreatedSlug(null);
+        setProgress(null);
+      }
+    },
+    [onCreateFolder, onProjectCreated]
+  );
+
+  const runUrlCreate = useCallback(
+    async (videoUrl: string, force: boolean) => {
+      setCreatePhase("creating");
+      setCreatedSlug(null);
+      setProgress(null);
+      const loadingId = toastLoading(projectIngestLoadingMessage());
+      try {
+        const slug = await onCreateUrl(videoUrl, setProgress, { force });
+        toastDismiss(loadingId);
+        setCreatedSlug(slug);
+        setCreatePhase("success");
+        await new Promise((resolve) => {
+          window.setTimeout(resolve, SUCCESS_CHECK_HOLD_MS);
+        });
+        onProjectCreated(slug);
+      } catch (e) {
+        toastDismiss(loadingId);
+        if (overwriteDecision(e, force) === "offer-overwrite") {
+          setPendingOverwrite({ url: videoUrl, message: (e as Error).message });
+        } else {
+          toastProjectCreateFailed((e as Error).message);
+        }
+      } finally {
+        setCreatePhase(null);
+        setCreatedSlug(null);
+        setProgress(null);
+      }
+    },
+    [onCreateUrl, onProjectCreated]
+  );
+
   const ingestVideo = useCallback(
     (file: File) => runCreate(file, false),
     [runCreate]
+  );
+
+  const ingestFiles = useCallback(
+    (files: File[]) => {
+      const intake = selectDroppedIntake(
+        files.map((file) => ({ name: file.name, size: file.size }))
+      );
+      if ("error" in intake) {
+        toastProjectCreateFailed(intake.error);
+        return;
+      }
+      if (intake.kind === "single") {
+        const match = files.find((file) => file.name === intake.file.name);
+        if (match) {
+          runCreate(match, false);
+        }
+        return;
+      }
+      const matched = files.filter((file) =>
+        intake.files.some((entry) => entry.name === file.name)
+      );
+      if (matched.length > 0) {
+        void runFolderCreate(matched, false);
+      }
+    },
+    [runCreate, runFolderCreate]
+  );
+
+  const ingestUrl = useCallback(
+    (videoUrl: string) => runUrlCreate(videoUrl, false),
+    [runUrlCreate]
   );
 
   const createBlank = useCallback(async () => {
@@ -119,10 +229,20 @@ export function useProjectCreate({
     if (!pendingOverwrite) {
       return;
     }
-    const { file } = pendingOverwrite;
+    const { file, files, url } = pendingOverwrite;
     setPendingOverwrite(null);
-    void runCreate(file, true);
-  }, [pendingOverwrite, runCreate]);
+    if (url) {
+      void runUrlCreate(url, true);
+      return;
+    }
+    if (files && files.length > 0) {
+      void runFolderCreate(files, true);
+      return;
+    }
+    if (file) {
+      void runCreate(file, true);
+    }
+  }, [pendingOverwrite, runCreate, runFolderCreate, runUrlCreate]);
 
   const cancelOverwrite = useCallback(() => {
     setPendingOverwrite(null);
@@ -135,6 +255,8 @@ export function useProjectCreate({
     createPhase,
     createdSlug,
     creating,
+    ingestFiles,
+    ingestUrl,
     ingestVideo,
     pendingOverwrite,
     progress,

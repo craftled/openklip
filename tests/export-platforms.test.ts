@@ -74,11 +74,11 @@ test("linkedin expands to web/30fps/1080", () => {
   assert.equal(def.maxHeight, 1080);
 });
 
-test("shorts expands to 9:16 vertical, social/30fps/1920", () => {
+test("shorts expands to 9:16 vertical, social/source fps/1920", () => {
   const def = exportPlatform("shorts");
   assert.equal(def.aspect, "9:16");
   assert.equal(def.compression, "social");
-  assert.equal(def.fps, 30);
+  assert.equal(def.fps, undefined);
   assert.equal(def.maxHeight, 1920);
   assert.equal(def.targetLufs, -14);
 });

@@ -75,7 +75,7 @@ Agent sidebar chats use `working/chats.json`, not `localStorage` (color scheme a
 
 ## What works today
 
-Verified against the current codebase (`VERSION` / `package.json` `0.41.0.2`, 1831 tests: 1829 pass, 2 skip without `OPENKLIP_INTEGRATION=1`):
+Verified against the current codebase (`VERSION` / `package.json` `0.41.0.3`, 1859 tests: 1857 pass, 2 skip without `OPENKLIP_INTEGRATION=1`):
 
 - **Ingest**: video → local transcript + preview proxy + `project.json` (`openklip ingest`; refuses re-ingest unless `--force`)
 - **Transcript editing**: click words to toggle `deleted`; `openklip cut` / `cut --text` / `restore` on CLI
@@ -90,13 +90,13 @@ Verified against the current codebase (`VERSION` / `package.json` `0.41.0.2`, 18
 - **Captions**: preview overlay + ASS burn-in on export; five style presets (`boxed`, `clean`, `karaoke`, `bold-caps`, `minimal`) defined once and rendered identically by both (`openklip captions-style <slug> <style>`, Config panel picker); unknown/missing style ids fall back to `boxed` on load
 - **Assets**: register b-roll, music, stills; sidebar asset bin with upload + `assets/` folder sync; upload from chat `+`
 - **Overlays**: b-roll cover, Ken Burns stills, push-in zooms, title cards (lower / center / hero), vignette; phrase helpers (`*-add-phrase`) on CLI
-- **Export**: ffmpeg composes kept ranges + overlays + captions; GUI export dialog picks max height (720p / 1080p / 4K), compression preset (studio / social / web / web-low), output frame rate (source / 24 / 25 / 30 / 48 / 60), output format (MP4 / GIF, GIF has no audio and is capped at 960px width / 15fps / 5 minutes kept duration), destination (file / clipboard, clipboard copies the exported path as text), and platform preset with a live size/time estimate; height, compression, frame rate, format, and platform settings match on CLI (`--height`, `--fps`, `--compression`, `--format`, `--platform`), MCP, and the export API. The GIF width cap can be overridden per export up to a 1920px hard ceiling via CLI `--gif-max-width`, the MCP `export` tool, the export route, the export server action, and (as of v0.33.0.1) a GUI numeric input next to the GIF format hint. Destination stays GUI-only, since Clipboard is a client-side browser API call with no CLI/MCP equivalent
-- **Export platform presets**: Platform picker (GUI) and `--platform <id>` (CLI/MCP): `youtube`, `youtube-4k`, `x`, `linkedin`, and **`shorts`** (9:16 vertical, 30fps, 1920 height cap, -14 LUFS). Any control changed after picking a platform still wins; `--loudness <lufs>` overrides loudness for one export only
+- **Export**: ffmpeg composes kept ranges + overlays + captions; segment input seeking applies on sparse voice-only and **overlay-light** timelines (music and stills allowed; b-roll and rich graphics still use full-source decode); GUI export dialog picks max height (720p / 1080p / 4K), compression preset (studio / social / web / web-low), output frame rate (source / 24 / 25 / 30 / 48 / 60), output format (MP4 / GIF, GIF has no audio and is capped at 960px width / 15fps / 5 minutes kept duration), destination (file / clipboard, clipboard copies the exported path as text), and platform preset with a live size/time estimate; height, compression, frame rate, format, and platform settings match on CLI (`--height`, `--fps`, `--compression`, `--format`, `--platform`), MCP, and the export API. The GIF width cap can be overridden per export up to a 1920px hard ceiling via CLI `--gif-max-width`, the MCP `export` tool, the export route, the export server action, and (as of v0.33.0.1) a GUI numeric input next to the GIF format hint. Destination stays GUI-only, since Clipboard is a client-side browser API call with no CLI/MCP equivalent
+- **Export platform presets**: Platform picker (GUI) and `--platform <id>` (CLI/MCP): `youtube`, `youtube-4k`, `x`, `linkedin`, and **`shorts`** (9:16 vertical, source fps, 1920 height cap, -14 LUFS). Any control changed after picking a platform still wins; `--loudness <lufs>` overrides loudness for one export only
 - **Vertical reframe (Shorts)**: `project.export` stores aspect (`source`, `16:9`, `9:16`, `1:1`) and crop (focus X/Y, zoom 1-3) shared by preview and ffmpeg export; GUI Reframe controls, orientation toggle (16:9 / 9:16 / 1:1), Manual / Scene / Vision crop modes, Fill / Split vertical layout, safe-area preview guides (TikTok, Reels, YouTube Shorts, generic); `openklip export-set`, `openklip vision-focus` (macOS), `bun run agent-make-short`
 - **Vision reframe sidecar** (macOS): `tools/vision-focus.swift` detects face center, falls back to attention saliency, attaches on-frame OCR text; GUI **Vision focus** button in Reframe; enriches speaker `sceneLog` segments with `focusX`/`focusY`
 - **LLM highlight detection**: `openklip highlights-detect <slug>` finds short-form clip candidates; `openklip export-highlight <slug> all` renders each to `output/highlights/{id}.mp4`; GUI **Highlights** panel (detect, list, seek)
 - **Music placement**: place a registered music asset under the edit with gain (0-2 in preview via Web Audio), fades, source in-point, and trim/loop mode (`openklip music-add` / `music-set` / `music-rm`); Config panel Music section, placed-music timeline track with drag-trim handles (parity with b-roll clips), preview bed with a mute toggle, mixed into the export by ffmpeg
-- **Cleanup review**: deterministic filler-word detection (isolated disfluencies auto-safe; ambiguous words and phrases flagged review) plus dead-air detection from real audio analysis, with per-candidate risk and an "apply all safe" batch action; Cleanup section in the Config panel, `openklip cleanup <slug> [--json] [--apply-safe]`, MCP `cleanup_report`
+- **Cleanup review**: deterministic filler-word detection (isolated disfluencies auto-safe; ambiguous words and phrases flagged review) plus dead-air detection from real audio analysis, with per-candidate risk and an "apply all safe" batch action; `brief.md` and `project.cuts.cleanupPhrases` support **Always cut** / **Never cut** lists; Cleanup section in the Config panel, `openklip cleanup <slug> [--json] [--apply-safe]`, MCP `cleanup_report`
 - **VAD snap + seam crossfades**: cut boundaries optionally snap onto detected silence (`cuts.snap`) and export joins the resulting seams with equal-power crossfades that reuse a few ms of removed audio to avoid clicks; wired through the exporter, preview scheduler, and every CLI/MCP range/status query so they all agree; Config panel Audio section, GUI/MCP `cuts-snap` action, and CLI `openklip cuts-snap`
 - **Ducking, loudness, voice highpass, and de-essing**: export-only audio quality pass sidechain-ducks the music bed under speech, applies single-pass loudness normalization toward a target LUFS, can highpass the voice track, and can de-ess it (ffmpeg's `deesser` filter, intensity 0-1); `openklip audio <slug>` and the Config panel Audio section (preview audio stays unprocessed)
 - **Blank canvas projects**: create motion-from-scratch without camera footage (`openklip ingest --blank`, MCP `blank_ingest`, GUI New project → Blank canvas)
@@ -115,7 +115,7 @@ Verified against the current codebase (`VERSION` / `package.json` `0.41.0.2`, 18
 - **Project brief**: `brief.md` at the project root holds audience, goal, tone, must-use assets, avoid list, target length, and export formats; agents read it on every chat/edit prompt (2000-char bounded); GUI Brief section in the Config panel; `openklip brief <slug> [--set <text...> | --file <path>]` and MCP `brief_get` / `brief_set`
 - **Agent tasks with live progress**: every tool-calling chat edit gets a visible task (`working/tasks.json`); the chat panel's task progress card polls every 2 seconds while running and shows each step plus a cancel button that kills the underlying agent process; the agent signals completion explicitly (`task_step` / `task_complete` MCP tools) instead of relying on heuristics; agents can list past tasks with `openklip tasks <slug> [--limit] [--status] [--actor]` or MCP `task_list`
 - **Make-a-draft, make-short, make-highlights, and revise-draft playbooks**: `templates/make-draft/skill.md` turns one prompt into a full first draft (respects asset must-use/avoid flags); `templates/make-short/skill.md` and `bun run agent-make-short` derive a vertical short; `templates/make-highlights/skill.md` finds clip candidates and trims each to a short; `templates/revise-draft/skill.md` applies targeted revisions or whole-task revert; export skills call `brief_audit` before export when a brief exists
-- **Browser project creation**: upload a video in the New Project dialog or drop one onto the empty workspace; format-validated on client and server, source persisted into the project folder, explicit overwrite confirm on name collisions, ingest progress overlay, editor opens on completion
+- **Browser project creation**: upload a video in the New Project dialog, **Import folder…** (largest video ingests, other media lands in `assets/`), **Import from URL** (yt-dlp on PATH), or drop one or many files onto the empty workspace; uploads stream to disk with size caps (12 GB project, 4 GB asset); format-validated on client and server, source persisted into the project folder, explicit overwrite confirm on name collisions, ingest progress overlay, editor opens on completion
 - **Browser editor**: open `http://localhost:<port>/<slug>` or `/?slug=<slug>` after `openklip serve`; script-first transcript editing (select words, Delete to cut)
 - **Workspace**: macOS folder picker on empty landing; inline project create; projects root persisted in `.openklip/projects-root`
 - **CLI**: full edit surface; `openklip actions --json` mutations manifest; `openklip tools --json` full agent tool list; `openklip brief <slug> --audit` ship-readiness check against `brief.md`
@@ -145,7 +145,9 @@ See `templates/make-short/skill.md` (one short from an existing edit) and `templ
 
 ## Quick start
 
-**Requirements:** Bun 1.3.14+, Node 24+ (`package.json` `engines`).
+**Platform:** OpenKlip targets **macOS** today. Ingest (Whisper), export (ffmpeg), rich graphics (headless Chrome), and Vision reframe assume a Mac dev environment. The CLI and MCP server may run elsewhere for read/query workflows, but the full edit loop is macOS-only for now.
+
+**Requirements:** Bun 1.3.14+, Node 24+ (`package.json` `engines`), macOS for the full pipeline.
 
 ```bash
 bun install
@@ -178,6 +180,18 @@ openklip export <slug> --platform youtube-4k --loudness -13
 
 In Cursor, enable the bundled MCP server (`.cursor/mcp.json`) and call the same tools without shelling out. Tool manifest: `openklip tools --json --surface mcp`.
 
+### Agent capability matrix
+
+| Agent / surface | Mutate `project.json` in chat | Typical workflow |
+| --- | --- | --- |
+| **Cursor** (MCP enabled) | Yes, via 83 MCP tools | Chat edits call `cut`, `broll-add`, `export`, etc. directly |
+| **Claude Code / Desktop** (MCP enabled) | Yes, via MCP | Same tool surface as Cursor |
+| **Codex** | CLI hints in chat | Run `openklip` commands the model suggests |
+| **Grok / other CLIs** | CLI hints in chat | Agent selector shells out for filler cuts; mutations via terminal |
+| **Deterministic scripts** | CLI only | `bun run agent-demo`, `bun run agent-smoke-audit`, `bun run agent-make-short` |
+
+GUI human edits and CLI/MCP mutations all write the same `project.json`. Reload the browser after external edits.
+
 **Agent provenance (optional env):** set these when spawning agent edits so action history records who changed what. The GUI shows attribution only when Settings → Appearance → **Show edit attribution** is enabled (default off).
 
 | Variable | Example | Purpose |
@@ -190,11 +204,14 @@ In Cursor, enable the bundled MCP server (`.cursor/mcp.json`) and call the same 
 
 GUI human edits use `human:local` automatically. Full detail: **[AGENTS.md](./AGENTS.md)**.
 
-Deterministic script:
+Deterministic scripts:
 
 ```bash
 bun run agent-demo <slug> --phrases scripts/example-phrases.txt --export
+bun run agent-smoke-audit   # lavfi fixture (CI); --real for edgaras-raw when present; --all for both
 ```
+
+Ingester plugins: `openklip ingesters` lists manifests under `ingesters/` (URL download via yt-dlp, folder import documented in `ingesters/folder/`).
 
 Command reference: **[AGENTS.md](./AGENTS.md)**. Mutation manifest: `openklip actions --json`.
 
@@ -219,7 +236,7 @@ bun test
 bun run build
 ```
 
-GitHub Actions (`.github/workflows/ci.yml`): `check`, `typecheck`, `test`, `build` on push/PR to `main`.
+GitHub Actions (`.github/workflows/ci.yml`): `check`, `typecheck`, `test`, `agent-smoke-audit`, `build` on push/PR to `main`.
 
 Roadmap, known gaps, and post-MVP ideas: **[TODO.md](./TODO.md)**.
 

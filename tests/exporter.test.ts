@@ -29,6 +29,7 @@ import {
   survivingRanges,
 } from "../src/edl.ts";
 import {
+  assertJsonRenderGraphicsExportable,
   buildAudioParts,
   buildMusicFilterParts,
   buildSeamedVoiceParts,
@@ -56,6 +57,7 @@ import {
 } from "../src/exporter.ts";
 import { FFMPEG, FFPROBE, probe, run } from "../src/ffmpeg.ts";
 import { projectPaths } from "../src/paths.ts";
+import { PRODUCT_ANNOUNCEMENT_CATALOG } from "../src/product-announcement.ts";
 import {
   makeProject,
   withTempProjectsRoot,
@@ -110,9 +112,26 @@ test("chooseSourceInput gives an actionable error when no video input exists", (
           proxy: "proxy.mp4",
           source: join(dir, "missing.mp4"),
         }),
-      /missing source video/
+      /No source or proxy/
     );
   });
+});
+
+test("assertJsonRenderGraphicsExportable throws before export when spec is invalid", () => {
+  const p = makeProject();
+  p.graphics = [
+    {
+      id: "g1",
+      type: "json-render",
+      template: PRODUCT_ANNOUNCEMENT_CATALOG,
+      catalog: PRODUCT_ANNOUNCEMENT_CATALOG,
+      spec: { root: "bad", elements: {} },
+      startSample: 0,
+      endSample: Math.round(2 * SAMPLE_RATE),
+      params: {},
+    },
+  ];
+  assert.throws(() => assertJsonRenderGraphicsExportable(p), /invalid spec/);
 });
 
 test("chooseAssetInput falls back to the proxied project asset when the source asset is missing", () => {
@@ -3208,7 +3227,7 @@ test("CLI export with a transition set and b-roll present reports the fallback a
     const result = await runCli(["export", slug]);
     assert.equal(result.code, 0, result.out);
     assert.match(result.out, /transition crossfade requested but not applied/);
-    assert.match(result.out, /b-roll, stills, music, or graphics present/);
+    assert.match(result.out, /b-roll or rich graphics present/);
   });
 });
 

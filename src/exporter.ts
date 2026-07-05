@@ -19,6 +19,7 @@ import {
   type TitleSpan,
 } from "./captions.ts";
 import { colorAdjustFilter } from "./color-adjust.ts";
+import { buildTransitionGateFromProject } from "./cut-transition-gate.ts";
 import {
   type Asset,
   type Audio,
@@ -31,6 +32,7 @@ import {
   ExportSettingsSchema,
   intersectRangesWithSpan,
   type MusicPlacement,
+  type Project,
   ProjectSchema,
   type Range,
   rangesForExport,
@@ -60,6 +62,7 @@ import {
   buildSegmentVideoTransitionFilter,
   type CutTransitionFallbackReason,
   cutTransitionFallbackReason,
+  overlayInputBase,
   shouldApplyCutTransition,
   shouldUseSegmentExport,
 } from "./export-segments.ts";
@@ -87,6 +90,8 @@ import {
   PRODUCT_ANNOUNCEMENT_WIDTH,
   validateProductAnnouncementSpec,
 } from "./product-announcement.ts";
+import type { SourceMediaKind } from "./source-media.ts";
+import { resolveSourceMediaStatus } from "./source-media.ts";
 import { buildTitlesAss, type TitleItem } from "./titles.ts";
 import { buildZoompanZExpr, type ZoomWindow } from "./zoom-ramp.ts";
 
@@ -299,16 +304,28 @@ export function chooseSourceInput(input: {
   proxy: string;
   source: string;
 }): InputChoice {
-  if (existsSync(input.source)) {
-    return { kind: "original", path: input.source };
+  const status = resolveSourceMediaStatus(input);
+  if (status.kind === "missing") {
+    throw new Error(status.warn ?? `missing source video: ${input.source}`);
   }
-  const proxy = projectRelativePath(input.dir, input.proxy);
-  if (existsSync(proxy)) {
-    return { kind: "proxy", path: proxy };
+  return { kind: status.kind, path: status.path };
+}
+
+/** Fail export before ffmpeg when any json-render overlay has an invalid spec. */
+export function assertJsonRenderGraphicsExportable(project: Project): void {
+  for (const g of project.graphics ?? []) {
+    if ((g.type ?? "template") !== "json-render") {
+      continue;
+    }
+    const validation = validateProductAnnouncementSpec(g.spec);
+    if (validation.success && validation.spec) {
+      continue;
+    }
+    const issue = validation.issues[0] ?? "validation failed";
+    throw new Error(
+      `cannot export: json-render graphic "${g.id}" has an invalid spec (${issue})`
+    );
   }
-  throw new Error(
-    `missing source video: ${input.source}. Also could not find proxy fallback: ${proxy}`
-  );
 }
 
 export function chooseAssetInput(
@@ -950,6 +967,10 @@ export async function exportCut(
     reason?: CutTransitionFallbackReason;
     type: CutTransitionType;
   };
+  /** Which ingest video file was read (original source vs 720p proxy fallback). */
+  sourceMedia: SourceMediaKind;
+  /** Present when export used proxy because the original source file is missing. */
+  sourceMediaWarn?: string;
 }> {
   // ONE resolution point: a platform preset only fills gaps left unset by
   // the caller, so every surface (CLI/route/action/MCP) gets platform
@@ -989,6 +1010,7 @@ export async function exportCut(
   if (ranges.length === 0) {
     throw new Error("nothing to export (all words deleted)");
   }
+  assertJsonRenderGraphicsExportable(project);
   // GIF-only hard duration ceiling, checked before any ffmpeg pass runs (the
   // mp4 pipeline below is unaffected: this only rejects when format is
   // "gif"). See GIF_MAX_DURATION_SEC above for the reasoning.
@@ -1001,6 +1023,11 @@ export async function exportCut(
     }
   }
   const sr = project.sampleRate;
+  const sourceMediaStatus = resolveSourceMediaStatus({
+    dir: p.dir,
+    proxy: project.proxy,
+    source: project.source,
+  });
   const sourceInput = chooseSourceInput({
     dir: p.dir,
     proxy: project.proxy,
@@ -1029,6 +1056,21 @@ export async function exportCut(
     .map((r) => `between(t,${sec(r.startSec)},${sec(r.endSec)})`)
     .join("+");
 
+  const cutTransition = project.look?.transition ?? {
+    type: "none" as const,
+    durationMs: 500,
+  };
+  const transitionGate = buildTransitionGateFromProject(project, ranges);
+  const applyTransition = shouldApplyCutTransition(
+    cutTransition.type,
+    transitionGate
+  );
+  const segmentMode =
+    applyTransition ||
+    (shouldUseSegmentExport(transitionGate) &&
+      !shouldUseSeamedVoice(ranges, project.cuts.snap));
+  const overlayBase = overlayInputBase(segmentMode, ranges.length);
+
   // b-roll -> output windows
   const assetById = new Map(project.assets.map((a) => [a.id, a]));
   const plans: BrollPlan[] = [];
@@ -1040,7 +1082,7 @@ export async function exportCut(
     plans.push(
       ...planBrollForRanges({
         broll: b,
-        firstInputIndex: plans.length + 1,
+        firstInputIndex: overlayBase + plans.length,
         ranges,
         sampleRate: sr,
         srcPath: chooseAssetInput(p.dir, asset).path,
@@ -1073,7 +1115,7 @@ export async function exportCut(
     })
     .filter((x): x is NonNullable<typeof x> => x !== null)
     // Still inputs follow the source (0) and all b-roll plan inputs.
-    .map((sp, i) => ({ ...sp, inputIndex: 1 + plans.length + i }));
+    .map((sp, i) => ({ ...sp, inputIndex: overlayBase + plans.length + i }));
 
   // graphics -> output windows. Each Graphic overlay is rendered through the
   // renderer seam (src/graphic-render.ts) into an overlay asset keyed to its
@@ -1103,7 +1145,10 @@ export async function exportCut(
         if (g.type === "json-render") {
           const validation = validateProductAnnouncementSpec(g.spec);
           if (!(validation.success && validation.spec)) {
-            return null;
+            const issue = validation.issues[0] ?? "validation failed";
+            throw new Error(
+              `cannot export: json-render graphic "${g.id}" has an invalid spec (${issue})`
+            );
           }
           const { renderProductAnnouncementHtml } = await import(
             "./product-announcement-html.tsx"
@@ -1223,7 +1268,7 @@ export async function exportCut(
   );
   const richGraphics = richRendered.map((x, j) => ({
     ...x,
-    inputIndex: 1 + plans.length + stillPlans.length + j,
+    inputIndex: overlayBase + plans.length + stillPlans.length + j,
   }));
 
   // music -> ONE continuous output window per placement (the bed keeps playing
@@ -1243,7 +1288,7 @@ export async function exportCut(
     })),
     {
       firstInputIndex:
-        1 + plans.length + stillPlans.length + richGraphics.length,
+        overlayBase + plans.length + stillPlans.length + richGraphics.length,
     }
   );
 
@@ -1300,6 +1345,8 @@ export async function exportCut(
         assPath,
         buildAss(groups, {
           height: outH,
+          insetPlatform:
+            outH > outW ? project.captions?.insetPlatform : undefined,
           placement: (_group, span) =>
             captionPlacementForSpan(span.startSec, span.endSec, titleSpans),
           style: captionStyle(project.captions?.style),
@@ -1311,45 +1358,6 @@ export async function exportCut(
 
   // ---- filtergraph ----
   const parts: string[] = [];
-  const sourceDurationSec = project.durationSamples / sr;
-  const cutTransition = project.look?.transition ?? {
-    type: "none" as const,
-    durationMs: 500,
-  };
-  const transitionGate = {
-    ranges,
-    sourceDurationSec,
-    hasBroll: plans.length > 0,
-    hasStills: stillPlans.length > 0,
-    hasRichGraphics: richGraphics.length > 0,
-    hasMusic: musicWindows.length > 0,
-  };
-  const applyTransition = shouldApplyCutTransition(
-    cutTransition.type,
-    transitionGate
-  );
-  // Records what actually happened to project.look.transition for this
-  // export: "none" reports cleanly with no applied/reason noise, and a
-  // requested transition always reports whether it applied and, if it fell
-  // back to a hard cut, why (see shouldApplyCutTransition's gate order).
-  const transitionResult: {
-    applied: boolean;
-    reason?: CutTransitionFallbackReason;
-    type: CutTransitionType;
-  } =
-    cutTransition.type === "none"
-      ? { applied: false, type: "none" }
-      : {
-          applied: applyTransition,
-          type: cutTransition.type,
-          ...(applyTransition
-            ? {}
-            : { reason: cutTransitionFallbackReason(transitionGate) }),
-        };
-  const segmentMode =
-    applyTransition ||
-    (shouldUseSegmentExport(transitionGate) &&
-      !shouldUseSeamedVoice(ranges, project.cuts.snap));
   const fpsRetime = fpsFilterFor(sourceMeta.fps, resolved.fps);
   if (segmentMode) {
     if (applyTransition) {
@@ -1552,6 +1560,35 @@ export async function exportCut(
       loudnormMeasured,
     });
 
+  const transitionResult: {
+    applied: boolean;
+    reason?: CutTransitionFallbackReason;
+    type: CutTransitionType;
+  } =
+    cutTransition.type === "none"
+      ? { applied: false, type: "none" }
+      : {
+          applied: applyTransition,
+          type: cutTransition.type,
+          ...(applyTransition
+            ? {}
+            : { reason: cutTransitionFallbackReason(transitionGate) }),
+        };
+
+  const overlayInputArgs = [
+    ...plans.flatMap((pl) => ["-i", pl.srcPath]),
+    ...stillPlans.flatMap((sp) => [
+      "-loop",
+      "1",
+      "-t",
+      sec(sp.outEnd - sp.outStart),
+      "-i",
+      sp.srcPath,
+    ]),
+    ...richGraphics.flatMap((rg) => ["-i", rg.asset.assetPath]),
+    ...musicGraph.inputArgs,
+  ];
+
   const useTwoPassLoudnorm =
     audioLoudness &&
     project.audio.loudness.enabled &&
@@ -1562,8 +1599,11 @@ export async function exportCut(
     const probeWav = join(p.working, `.loudnorm-probe-${process.pid}.wav`);
     const probeParts = [...parts, ...buildAudioFilterParts()];
     const probeInputs = segmentMode
-      ? buildSegmentInputArgs(ranges, sourceInput.path)
-      : ["-i", sourceInput.path];
+      ? [
+          ...buildSegmentInputArgs(ranges, sourceInput.path),
+          ...overlayInputArgs,
+        ]
+      : ["-i", sourceInput.path, ...overlayInputArgs];
     await run(
       FFMPEG,
       [
@@ -1591,22 +1631,8 @@ export async function exportCut(
   parts.push(...buildAudioFilterParts(loudnormMeasured));
 
   const inputs = segmentMode
-    ? [...buildSegmentInputArgs(ranges, sourceInput.path)]
-    : [
-        "-i",
-        sourceInput.path,
-        ...plans.flatMap((pl) => ["-i", pl.srcPath]),
-        ...stillPlans.flatMap((sp) => [
-          "-loop",
-          "1",
-          "-t",
-          sec(sp.outEnd - sp.outStart),
-          "-i",
-          sp.srcPath,
-        ]),
-        ...richGraphics.flatMap((rg) => ["-i", rg.asset.assetPath]),
-        ...musicGraph.inputArgs,
-      ];
+    ? [...buildSegmentInputArgs(ranges, sourceInput.path), ...overlayInputArgs]
+    : ["-i", sourceInput.path, ...overlayInputArgs];
   // Render to unique tmp siblings, then rename only the final deliverable into
   // place on success. ffmpeg writing the public output path in place means a
   // GUI export racing an agent export can corrupt that file. GIF export also
@@ -1743,5 +1769,9 @@ export async function exportCut(
     },
     segmentMode,
     transition: transitionResult,
+    sourceMedia: sourceMediaStatus.kind,
+    ...(sourceMediaStatus.warn === undefined
+      ? {}
+      : { sourceMediaWarn: sourceMediaStatus.warn }),
   };
 }

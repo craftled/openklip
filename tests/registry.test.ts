@@ -97,6 +97,7 @@ const EXPECTED = [
   "captions",
   "captions-max",
   "captions-style",
+  "captions-inset",
   "pad",
   "cuts-snap",
   "dead-air-add",
@@ -436,6 +437,20 @@ test("captions-style: sets a valid preset id and surfaces to cli/gui/mcp", () =>
 test("captions-style: rejects an unknown style id", () => {
   const p = makeProject();
   assert.throws(() => runAction("captions-style", p, { style: "not-a-style" }));
+});
+
+test("captions-inset: enables generic platform inset on vertical export settings", () => {
+  const p = makeProject();
+  const action = getAction("captions-inset");
+  assert.ok(action?.surfaces.includes("mcp"));
+  const result = runAction("captions-inset", p, {
+    enabled: true,
+    platform: "tiktok",
+  }) as { insetPlatform: string | null };
+  assert.equal(result.insetPlatform, "tiktok");
+  assert.equal(p.captions.insetPlatform, "tiktok");
+  runAction("captions-inset", p, { enabled: false });
+  assert.equal(p.captions.insetPlatform, undefined);
 });
 
 test("reorder: restacks within a track", () => {

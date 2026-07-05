@@ -22,6 +22,30 @@ export interface SegmentExportGate {
   sourceDurationSec: number;
 }
 
+/** Overlays that force full-source decode (per-range seeking cannot compose these). */
+export function requiresFullSourceDecode(gate: {
+  hasBroll: boolean;
+  hasRichGraphics: boolean;
+}): boolean {
+  return gate.hasBroll || gate.hasRichGraphics;
+}
+
+/** ffmpeg `-i` count for the main source before overlay asset inputs. */
+export function segmentSourceInputCount(
+  segmentMode: boolean,
+  rangeCount: number
+): number {
+  return segmentMode ? rangeCount : 1;
+}
+
+/** First `-i` index for overlay assets (b-roll, stills, rich graphics, music). */
+export function overlayInputBase(
+  segmentMode: boolean,
+  rangeCount: number
+): number {
+  return segmentSourceInputCount(segmentMode, rangeCount);
+}
+
 /** Per-range input seeking avoids decoding the full source for sparse short cuts. */
 export function shouldUseSegmentExport(gate: SegmentExportGate): boolean {
   if (gate.ranges.length === 0) {
@@ -30,12 +54,7 @@ export function shouldUseSegmentExport(gate: SegmentExportGate): boolean {
   if (gate.ranges.length > SEGMENT_EXPORT_MAX_RANGES) {
     return false;
   }
-  if (
-    gate.hasBroll ||
-    gate.hasStills ||
-    gate.hasRichGraphics ||
-    gate.hasMusic
-  ) {
+  if (requiresFullSourceDecode(gate)) {
     return false;
   }
   const keptSec = totalDurationSec(gate.ranges);
@@ -129,15 +148,9 @@ export function shouldApplyCutTransition(
   if (gate.ranges.length < 2) {
     return false;
   }
-  // Transitions are incompatible with overlays: the segment path is
-  // unavailable when b-roll, stills, music, or rich graphics are present,
-  // so fall back to a hard cut.
-  if (
-    gate.hasBroll ||
-    gate.hasStills ||
-    gate.hasRichGraphics ||
-    gate.hasMusic
-  ) {
+  // Transitions are incompatible with b-roll and rich graphics: those paths
+  // require full-source decode, so the segment transition chain is unavailable.
+  if (requiresFullSourceDecode(gate)) {
     return false;
   }
   if (gate.ranges.length > SEGMENT_EXPORT_MAX_RANGES) {
@@ -164,12 +177,7 @@ export function cutTransitionFallbackReason(
   if (gate.ranges.length < 2) {
     return "too-few-ranges";
   }
-  if (
-    gate.hasBroll ||
-    gate.hasStills ||
-    gate.hasRichGraphics ||
-    gate.hasMusic
-  ) {
+  if (requiresFullSourceDecode(gate)) {
     return "overlays-present";
   }
   if (gate.ranges.length > SEGMENT_EXPORT_MAX_RANGES) {
@@ -187,7 +195,7 @@ export function cutTransitionFallbackReasonLabel(
     case "too-few-ranges":
       return "fewer than two kept ranges";
     case "overlays-present":
-      return "b-roll, stills, music, or graphics present";
+      return "b-roll or rich graphics present";
     case "too-many-ranges":
       return "too many kept ranges";
     default:

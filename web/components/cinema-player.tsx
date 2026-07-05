@@ -1,6 +1,7 @@
 "use client";
 
 import type { CutTransition, Range } from "@engine/edl";
+import type { SegmentExportGate } from "@engine/export-segments";
 import {
   outputPositionSec,
   sourceSecForOutputPosition,
@@ -20,6 +21,7 @@ import {
   PlayerControls,
   PLAYER_SPEEDS as SPEEDS,
 } from "@/components/player-controls";
+import { PreviewTransitionNotice } from "@/components/preview-transition-notice";
 import { Button } from "@/components/ui/button";
 import { Download, Play, X } from "@/lib/icon";
 import { cn } from "@/lib/utils";
@@ -48,6 +50,8 @@ interface CinemaPlayerProps {
   getRanges: () => Range[];
   /** Decorative cut-boundary sweep transition, matching project.look.transition. */
   getTransition?: () => CutTransition;
+  /** Export transition gate for honest preview sweeps. */
+  getTransitionGate?: () => SegmentExportGate;
   /** Optional eyebrow above/beside the name (e.g. "Cut preview"). */
   label?: string;
   /** Close the cinema overlay. */
@@ -63,6 +67,8 @@ interface CinemaPlayerProps {
    */
   overlay?: (curSourceSec: number) => ReactNode;
   poster?: string;
+  /** When set, export will hard-cut despite a requested transition. */
+  previewTransitionNoticeText?: string | null;
   /** Shown top-left, replacing Linear's "Episode 01". */
   projectName: string;
   /** Source URL for the video (e.g. the proxy). */
@@ -103,6 +109,8 @@ export function CinemaPlayer({
   poster,
   getRanges,
   getTransition,
+  getTransitionGate,
+  previewTransitionNoticeText,
   durationSec,
 }: CinemaPlayerProps) {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -119,6 +127,8 @@ export function CinemaPlayer({
   getRangesRef.current = getRanges;
   const getTransitionRef = useRef(getTransition);
   getTransitionRef.current = getTransition;
+  const getTransitionGateRef = useRef(getTransitionGate);
+  getTransitionGateRef.current = getTransitionGate;
 
   const [playing, setPlaying] = useState(false);
   // Cut-space (output) position, in seconds: what the scrubber shows.
@@ -217,7 +227,8 @@ export function CinemaPlayer({
       setCurOutputSec(outputPositionSec(getRangesRef.current(), sourceSec));
     };
     sched.onEnd = () => setPlaying(false);
-    sched.onCutBoundary = (transition) => sweepRef.current?.play(transition);
+    sched.onCutBoundary = (transition) =>
+      sweepRef.current?.play(transition, getTransitionGateRef.current?.());
     schedRef.current = sched;
     return () => {
       sched.dispose();
@@ -446,6 +457,7 @@ export function CinemaPlayer({
       )}
 
       {/* Decorative cut-boundary sweep, matching the inline preview. */}
+      <PreviewTransitionNotice message={previewTransitionNoticeText ?? null} />
       <CutTransitionSweep ref={sweepRef} />
 
       {/* Center play affordance when paused */}

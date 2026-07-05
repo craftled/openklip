@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.41.0.3 - 2026-07-06
+
+### Added
+- **Agent smoke audit** (`bun run agent-smoke-audit`): deterministic lavfi fixture in CI; `--real` / `--all` for `edgaras-raw` when present (doctor, brief audit, export, structural verify).
+- **Brief-driven cleanup phrases**: `Always cut:` / `Never cut:` in `brief.md` and optional `project.cuts.cleanupPhrases`; wired to cleanup CLI/MCP/GUI and `brief_audit`.
+- **Folder import (GUI)**: New project **Import folder…**, multi-file drop on empty workspace, `POST /api/projects/folder` (largest video ingests, sidecars in `assets/`).
+- **URL import (GUI)**: New project **Import from URL** via yt-dlp (`POST /api/projects/url`, `createProjectFromUrl`).
+- **Streaming uploads + size caps**: 12 GB project / 4 GB asset limits with streamed writes (`src/upload-stream.ts`, 413 on oversize).
+- **Caption safe-area inset on vertical export**: `captions.insetPlatform`, `openklip captions-inset`, MCP `captions-inset`; `agent-make-short` enables `generic` by default.
+- **Proxy-only export warning**: CLI/MCP/GUI surface when export falls back to the 720p proxy (`sourceMediaWarn`).
+
+### Changed
+- **Segment export**: music beds and still overlays can ride segment mode; b-roll and rich graphics still force full-source decode.
+- **Shorts platform preset**: uses **source fps** (no hard 30fps pin) to avoid judder on 24/25fps footage.
+- **Json-render export**: invalid specs fail before ffmpeg (no silent skip on export).
+- **Preview transition fallback**: amber badge when export will hard-cut instead of applying the requested transition.
+- **Known limitations + README** synced for intake, segment export, cleanup phrases, and caption inset.
+
+### Fixed
+- **Typecheck**: folder ingest route imports from `../post.ts`; duplicate `loadBrief` in `agent-tools.ts`; missing `colorAdjustSummary`, `Project`, `sourceMediaWarn`, and `EngineProject` casts.
+
 ## 0.41.0.2 - 2026-07-05
 
 ### Added

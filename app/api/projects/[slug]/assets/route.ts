@@ -1,6 +1,10 @@
 import { listAssetsByKind, registerAssetBytes } from "@engine/assets";
 import { type Asset, type AssetKind, AssetKindSchema } from "@engine/edl";
 import { loadProject } from "@engine/projectStore";
+import {
+  MAX_ASSET_UPLOAD_BYTES,
+  uploadTooLargeMessage,
+} from "@engine/upload-limits";
 import type { NextRequest } from "next/server";
 
 export const runtime = "nodejs";
@@ -31,6 +35,18 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     const file = form.get("file");
     if (!(file instanceof File)) {
       return Response.json({ error: "missing file field" }, { status: 400 });
+    }
+    if (file.size > MAX_ASSET_UPLOAD_BYTES) {
+      return Response.json(
+        {
+          error: uploadTooLargeMessage(
+            file.name,
+            file.size,
+            MAX_ASSET_UPLOAD_BYTES
+          ),
+        },
+        { status: 413 }
+      );
     }
     const kindRaw = form.get("kind");
     let kind: AssetKind | undefined;

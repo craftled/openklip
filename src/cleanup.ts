@@ -4,6 +4,14 @@
 // already-computed SilenceSpan[] (see src/audio-analysis.ts loadAudioAnalysis)
 // so this module has no node imports and no IO of its own.
 import type { SilenceSpan } from "./audio-analysis-core.ts";
+import type { CleanupPhraseConfig } from "./cleanup-phrases.ts";
+import {
+  DEFAULT_FILLER_PHRASES,
+  fillerPhraseOptsFromConfig,
+  filterNeverCutCandidates,
+  neverCutWordIds,
+  resolveCleanupPhrases,
+} from "./cleanup-phrases.ts";
 import { type Project, SAMPLE_RATE, samplesToSec, type Word } from "./edl.ts";
 import { findPhraseRuns, normalizeText } from "./phrase-match.ts";
 
@@ -51,7 +59,9 @@ const CORE_FILLER_TOKENS = new Set([
 // a lone occurrence is never touched.
 const REVIEW_REPEAT_TOKENS = new Set(["like", "so"]);
 
-const DEFAULT_FILLER_PHRASES = ["you know", "sort of", "kind of", "i mean"];
+export interface CleanupReportOpts {
+  phraseConfig?: CleanupPhraseConfig;
+}
 
 const DEFAULT_DEAD_AIR_MIN_SEC = 0.7;
 const DEFAULT_DEAD_AIR_KEEP_PAD_SEC = 0.15;
@@ -66,6 +76,8 @@ const OVERLAY_PROXIMITY_SEC = 0.3;
 
 export interface FillerCandidatesOpts {
   phrases?: string[];
+  /** Multi-word phrases flagged safe (auto-apply) instead of review. */
+  safePhrases?: string[];
   tokens?: string[];
 }
 
@@ -149,6 +161,9 @@ export function fillerCandidates(
     (opts.tokens ?? [...CORE_FILLER_TOKENS]).map((t) => normalizeText(t))
   );
   const phrases = opts.phrases ?? DEFAULT_FILLER_PHRASES;
+  const safePhraseSet = new Set(
+    (opts.safePhrases ?? []).map((phrase) => normalizeText(phrase))
+  );
   const keptWords = project.words.filter((w) => !w.deleted);
 
   const candidates: CleanupCandidate[] = [];
@@ -172,6 +187,7 @@ export function fillerCandidates(
   }
 
   for (const phrase of phrases) {
+    const risk = safePhraseSet.has(normalizeText(phrase)) ? "safe" : "review";
     for (const r of findPhraseRuns(project, phrase, { all: true })) {
       candidates.push({
         id: `f-${r.ids[0]}`,
@@ -181,7 +197,7 @@ export function fillerCandidates(
         endSec: r.toSec,
         text: r.text,
         reason: `filler phrase "${phrase}"`,
-        risk: "review",
+        risk,
         estSavedSec: Math.max(0, r.toSec - r.fromSec),
       });
     }
@@ -308,15 +324,54 @@ function isNearOverlay(
   );
 }
 
+function fillerOptsFromPhraseConfig(
+  phraseConfig?: CleanupPhraseConfig
+): FillerCandidatesOpts | undefined {
+  if (!phraseConfig || phraseConfig.alwaysCut.length === 0) {
+    return;
+  }
+  const mapped = fillerPhraseOptsFromConfig(phraseConfig);
+  const tokens =
+    mapped.extraTokens.length > 0
+      ? [...CORE_FILLER_TOKENS, ...mapped.extraTokens]
+      : undefined;
+  return {
+    phrases: [...DEFAULT_FILLER_PHRASES, ...mapped.extraPhrases],
+    safePhrases: mapped.safePhrases,
+    tokens,
+  };
+}
+
+function applyPhraseConfigToReport(
+  project: Project,
+  report: CleanupReport,
+  phraseConfig?: CleanupPhraseConfig
+): CleanupReport {
+  if (!phraseConfig || phraseConfig.neverCut.length === 0) {
+    return report;
+  }
+  const blocked = neverCutWordIds(project, phraseConfig.neverCut);
+  const candidates = filterNeverCutCandidates(report.candidates, blocked);
+  return {
+    ...report,
+    candidates,
+    fillerCount: candidates.filter((c) => c.kind === "filler").length,
+    deadAirCount: candidates.filter((c) => c.kind === "dead-air").length,
+    estSavedSec: candidates.reduce((sum, c) => sum + c.estSavedSec, 0),
+  };
+}
+
 // Full cleanup report: filler + dead-air candidates, merged and sorted, with
 // any candidate within OVERLAY_PROXIMITY_SEC of a broll/title/zoom/still/
 // graphic span forced to "review" and called out in warnings (an automatic
 // cut there risks visibly shifting that overlay's timing).
 export function cleanupReport(
   project: Project,
-  silences: SilenceSpan[]
+  silences: SilenceSpan[],
+  opts: CleanupReportOpts = {}
 ): CleanupReport {
-  const filler = fillerCandidates(project);
+  const fillerOpts = fillerOptsFromPhraseConfig(opts.phraseConfig);
+  const filler = fillerCandidates(project, fillerOpts ?? {});
   const deadAir = deadAirCandidates(project, silences);
   const candidates = [...filler, ...deadAir].sort(
     (a, b) => a.startSec - b.startSec
@@ -349,13 +404,17 @@ export function cleanupReport(
 
   const estSavedSec = candidates.reduce((sum, c) => sum + c.estSavedSec, 0);
 
-  return {
-    candidates,
-    fillerCount: filler.length,
-    deadAirCount: deadAir.length,
-    estSavedSec,
-    warnings,
-  };
+  return applyPhraseConfigToReport(
+    project,
+    {
+      candidates,
+      fillerCount: filler.length,
+      deadAirCount: deadAir.length,
+      estSavedSec,
+      warnings,
+    },
+    opts.phraseConfig
+  );
 }
 
 // M1: the shared "no audio analysis yet" fallback, previously copy-pasted
@@ -369,15 +428,37 @@ export function cleanupReport(
 export const CLEANUP_DEGRADED_WARNING =
   "dead-air detection needs audio analysis (enable snap or open once with analysis available)";
 
-export function fillerOnlyCleanupReport(project: Project): CleanupReport {
-  const candidates = fillerCandidates(project);
-  return {
-    candidates,
-    fillerCount: candidates.length,
-    deadAirCount: 0,
-    estSavedSec: candidates.reduce((sum, c) => sum + c.estSavedSec, 0),
-    warnings: [CLEANUP_DEGRADED_WARNING],
-  };
+export function fillerOnlyCleanupReport(
+  project: Project,
+  opts: CleanupReportOpts = {}
+): CleanupReport {
+  const fillerOpts = fillerOptsFromPhraseConfig(opts.phraseConfig);
+  const candidates = fillerCandidates(project, fillerOpts ?? {});
+  return applyPhraseConfigToReport(
+    project,
+    {
+      candidates,
+      fillerCount: candidates.length,
+      deadAirCount: 0,
+      estSavedSec: candidates.reduce((sum, c) => sum + c.estSavedSec, 0),
+      warnings: [CLEANUP_DEGRADED_WARNING],
+    },
+    opts.phraseConfig
+  );
+}
+
+export function buildCleanupReport(input: {
+  briefText?: string;
+  project: Project;
+  silences: SilenceSpan[] | null | undefined;
+}): CleanupReport {
+  const phraseConfig = resolveCleanupPhrases({
+    project: input.project,
+    briefText: input.briefText,
+  });
+  return input.silences
+    ? cleanupReport(input.project, input.silences, { phraseConfig })
+    : fillerOnlyCleanupReport(input.project, { phraseConfig });
 }
 
 // M2: partition a cleanup report's candidates into the two shapes the "apply

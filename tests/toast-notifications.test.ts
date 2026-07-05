@@ -27,6 +27,7 @@ import {
   projectDeletedToast,
   projectDeleteFailedToast,
   projectIngestLoadingMessage,
+  proxyExportWarningToast,
   revealFailedToast,
   revertFailedToast,
   revertSucceededToast,
@@ -68,6 +69,19 @@ test("exportFailedToast", () => {
   });
 });
 
+test("proxyExportWarningToast: info toast when exporting from proxy", () => {
+  const payload = proxyExportWarningToast(
+    "Original source missing; exports use the 720p proxy."
+  );
+  assert.equal(payload?.kind, "info");
+  assert.equal(payload?.title, "Exporting from proxy");
+  assert.match(payload?.description ?? "", /720p proxy/);
+});
+
+test("proxyExportWarningToast: null when no warning", () => {
+  assert.equal(proxyExportWarningToast(undefined), null);
+});
+
 test("transitionFallbackToast: null when no transition was requested", () => {
   assert.equal(transitionFallbackToast({ type: "none", applied: false }), null);
 });
@@ -88,10 +102,7 @@ test("transitionFallbackToast: info toast explaining the fallback when overlays 
   assert.equal(payload?.kind, "info");
   assert.equal(payload?.title, "Transition not applied");
   assert.match(payload?.description ?? "", /crossfade/);
-  assert.match(
-    payload?.description ?? "",
-    /b-roll, stills, music, or graphics present/
-  );
+  assert.match(payload?.description ?? "", /b-roll or rich graphics present/);
 });
 
 test("transitionFallbackToast: info toast for dip requested but too few ranges", () => {

@@ -11,6 +11,7 @@ import {
 import type { GraphicItem } from "@/components/graphic-overlay";
 import { PlayerControls } from "@/components/player-controls";
 import { PreviewOverlays } from "@/components/preview-overlays";
+import { PreviewTransitionNotice } from "@/components/preview-transition-notice";
 import { SafeAreaGuides } from "@/components/safe-area-guides";
 import { ORIENTATION_RATIO, type Orientation } from "@/lib/preview-layout";
 import { cn } from "@/lib/utils";
@@ -50,6 +51,7 @@ export interface EditorPreviewPaneProps {
   previewPip: boolean;
   previewRate: number;
   previewReframe: boolean;
+  previewTransitionNoticeText?: string | null;
   safeAreaGuide: SafeAreaPlatform;
   sampleRate: number;
   slug: string;
@@ -99,6 +101,7 @@ export function EditorPreviewPane({
   previewPip,
   previewRate,
   previewReframe,
+  previewTransitionNoticeText,
   sampleRate,
   safeAreaGuide,
   slug,
@@ -184,6 +187,9 @@ export function EditorPreviewPane({
             sampleRate={sampleRate}
             slug={slug}
             titles={titles}
+          />
+          <PreviewTransitionNotice
+            message={previewTransitionNoticeText ?? null}
           />
           <CutTransitionSweep ref={sweepRef} />
           {exporting || pendingSaves > 0 ? (

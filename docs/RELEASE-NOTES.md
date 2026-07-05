@@ -2,7 +2,27 @@
 
 Use these bodies when publishing releases. Each section matches a tag in `CHANGELOG.md` without duplicating the full changelog. **Known gaps:** always link to [TODO.md](../TODO.md#known-limitations); do not duplicate the list here.
 
-Publishing status checked on 2026-07-05 (`gh release list`): GitHub releases are published through `v0.41.0.2`. Tag `v0.41.0.2` targets `main` at merge commit `c071fbe` (PR #77).
+Publishing status checked on 2026-07-06 (`gh release list`): GitHub releases are published through `v0.41.0.2`. This section is the draft body for `v0.41.0.3`.
+
+---
+
+## v0.41.0.3
+
+**Trust, agent loop, intake, and shorts polish (Ships A-D).**
+
+### Highlights
+- **Agent smoke audit**: `bun run agent-smoke-audit` in CI; `--real` for live `edgaras-raw` when present.
+- **Intake**: folder drop + URL import (yt-dlp) in New project; streaming uploads with size caps.
+- **Export trust**: json-render invalid specs fail before ffmpeg; proxy-only export warning; preview transition fallback badge.
+- **Shorts**: source fps on the `shorts` preset; optional caption safe-area inset on 9:16 export.
+- **Cleanup phrases**: brief `Always cut:` / `Never cut:` lists extend filler detection.
+- **Segment export**: music and stills can use segment seeking on sparse cuts.
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#04103---2026-07-06)
 
 ---
 

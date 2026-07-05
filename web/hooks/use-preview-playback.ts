@@ -9,6 +9,10 @@ import { PLAYER_SPEEDS } from "@/components/player-controls";
 import { toastNothingToPlay, toastPlaybackFailed } from "@/lib/app-toast";
 import { musicPreviewTime } from "@/lib/music-preview";
 import { setMusicPreviewGain } from "@/lib/music-preview-audio";
+import {
+  buildTransitionGateFromProject,
+  previewTransitionNotice,
+} from "../../src/cut-transition-gate.ts";
 import { outputPositionSec } from "../../src/schedulerLogic.ts";
 import { type ZoomWindow, zoomFactorAtSec } from "../../src/zoom-ramp.ts";
 import { CutScheduler } from "../scheduler.ts";
@@ -79,6 +83,33 @@ export function usePreviewPlayback({
   loopRef.current = loop;
   rangesRef.current = ranges;
 
+  const transitionGate = useMemo(() => {
+    if (!project) {
+      return {
+        ranges,
+        sourceDurationSec: 0,
+        hasBroll: false,
+        hasStills: false,
+        hasMusic: false,
+        hasRichGraphics: false,
+      };
+    }
+    return buildTransitionGateFromProject(project, ranges);
+  }, [project, ranges]);
+  const transitionGateRef = useRef(transitionGate);
+  transitionGateRef.current = transitionGate;
+
+  const previewTransitionNoticeText = useMemo(() => {
+    if (!project) {
+      return null;
+    }
+    const transition = project.look?.transition ?? {
+      type: "none" as const,
+      durationMs: 500,
+    };
+    return previewTransitionNotice(transition, transitionGate);
+  }, [project, transitionGate]);
+
   const curSec = curSample / sr;
   const outPos = useMemo(
     () => outputPositionSec(ranges, curSec),
@@ -142,7 +173,8 @@ export function usePreviewPlayback({
       );
     };
     sched.onEnd = () => setPlaying(false);
-    sched.onCutBoundary = (transition) => sweepRef.current?.play(transition);
+    sched.onCutBoundary = (transition) =>
+      sweepRef.current?.play(transition, transitionGateRef.current);
     schedRef.current = sched;
   }, [project, sr]);
 
@@ -422,6 +454,7 @@ export function usePreviewPlayback({
     previewMuted,
     previewPip,
     previewRate,
+    previewTransitionNoticeText,
     rangesRef,
     schedRef,
     setCurSample,

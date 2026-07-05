@@ -14,6 +14,7 @@ import {
   IconLayoutGrid,
   IconLayoutSidebarLeftCollapse,
   IconLayoutSidebarRightCollapse,
+  IconLink,
   IconLoader2,
   IconMaximize,
   IconMessageCircle,
@@ -108,6 +109,7 @@ export const FolderOpen = IconFolderOpen;
 export const GripVertical = IconGripVertical;
 export const ImageIcon = IconPhoto;
 export const LayoutTemplate = IconLayoutGrid;
+export const Link2 = IconLink;
 export const Loader2Icon = IconLoader2;
 export const Maximize = IconMaximize;
 export const MessageSquare = IconMessageCircle;

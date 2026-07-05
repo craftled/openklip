@@ -34,7 +34,7 @@ import {
 import { toastProjectCreateFailed } from "@/lib/app-toast";
 import { APP_ICON_CLASS, FolderOpen, Plus, SettingsIcon } from "@/lib/icon";
 import { createProjectFromVideo } from "@/lib/project-create";
-import { selectDroppedVideo } from "@/lib/project-intake";
+import { selectDroppedIntake } from "@/lib/project-intake";
 import type { SettingsSectionId } from "@/lib/settings-navigation";
 import {
   SIDEBAR_LEADING_GLYPH_CLASS,
@@ -98,6 +98,8 @@ export function EmptyWorkspace() {
     createPhase,
     createdSlug,
     creating,
+    ingestFiles,
+    ingestUrl,
     ingestVideo,
     pendingOverwrite,
     progress,
@@ -142,12 +144,31 @@ export function EmptyWorkspace() {
     if (!dropEnabled) {
       return;
     }
-    const picked = selectDroppedVideo(Array.from(e.dataTransfer.files));
+    const picked = selectDroppedIntake(
+      Array.from(e.dataTransfer.files).map((file) => ({
+        name: file.name,
+        size: file.size,
+      }))
+    );
     if ("error" in picked) {
       toastProjectCreateFailed(picked.error);
       return;
     }
-    void ingestVideo(picked.file);
+    if (picked.kind === "single") {
+      const match = Array.from(e.dataTransfer.files).find(
+        (file) => file.name === picked.file.name
+      );
+      if (match) {
+        void ingestVideo(match);
+      }
+      return;
+    }
+    const matched = Array.from(e.dataTransfer.files).filter((file) =>
+      picked.files.some((entry) => entry.name === file.name)
+    );
+    if (matched.length > 0) {
+      void ingestFiles(matched);
+    }
   };
 
   return (
@@ -168,6 +189,7 @@ export function EmptyWorkspace() {
               // Keep the last known workspace state.
             });
         }}
+        onFolderSelected={ingestFiles}
         onOpenChange={(open) => {
           setDialogOpen(open);
           if (!open) {
@@ -178,11 +200,17 @@ export function EmptyWorkspace() {
               });
           }
         }}
+        onUrlSelected={ingestUrl}
         onVideoSelected={ingestVideo}
         open={dialogOpen}
       />
       <ProjectOverwriteDialog
-        fileName={pendingOverwrite?.file.name ?? ""}
+        fileName={
+          pendingOverwrite?.file?.name ??
+          pendingOverwrite?.files?.[0]?.name ??
+          pendingOverwrite?.url ??
+          ""
+        }
         onCancel={cancelOverwrite}
         onConfirm={confirmOverwrite}
         open={pendingOverwrite !== null}

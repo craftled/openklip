@@ -1,4 +1,6 @@
 import type { CutTransition } from "@engine/edl";
+import type { SegmentExportGate } from "@engine/export-segments";
+import { shouldApplyCutTransition } from "@engine/export-segments";
 import {
   type CutTransitionSweepPlan,
   cutTransitionSweepPlan,
@@ -58,7 +60,11 @@ export function prefersReducedMotion(): boolean {
 
 export interface CutTransitionSweepController {
   destroy: () => void;
-  play: (transition: CutTransition, reducedMotion: boolean) => void;
+  play: (
+    transition: CutTransition,
+    reducedMotion: boolean,
+    gate?: SegmentExportGate
+  ) => void;
 }
 
 const NOOP_CONTROLLER: CutTransitionSweepController = {
@@ -84,7 +90,14 @@ export function createCutTransitionSweepController(
     return NOOP_CONTROLLER;
   }
   return {
-    play: (transition, reducedMotion) => {
+    play: (transition, reducedMotion, gate) => {
+      if (
+        gate &&
+        transition.type !== "none" &&
+        !shouldApplyCutTransition(transition.type, gate)
+      ) {
+        return;
+      }
       const plan = cutTransitionSweepPlan(transition, reducedMotion);
       if (!plan) {
         return;

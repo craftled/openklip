@@ -11,6 +11,7 @@ import {
   ProductAnnouncementCatalogSchema,
   ProductAnnouncementSpecSchema,
 } from "./product-announcement.ts";
+import { CAPTION_INSET_PLATFORMS } from "./safe-areas.ts";
 
 // Canonical time base: integer audio samples at 48 kHz. Preview and export both
 // derive seconds from this one grid via samplesToSec() so they cannot drift.
@@ -448,11 +449,18 @@ export const DeadAirSpanSchema = z.object({
 });
 export type DeadAirSpan = z.infer<typeof DeadAirSpanSchema>;
 
+export const CleanupPhrasesSchema = z.object({
+  alwaysCut: z.array(z.string()).default([]),
+  neverCut: z.array(z.string()).default([]),
+});
+
 export const CutsSchema = z
   .object({
     snap: CutSnapSchema,
     /** Source-time spans removed from kept ranges; applied by effectiveRanges. */
     deadAir: z.array(DeadAirSpanSchema).default([]),
+    /** Optional per-project cleanup phrase overrides (brief lists still apply). */
+    cleanupPhrases: CleanupPhrasesSchema.optional(),
   })
   .default({
     snap: {
@@ -604,6 +612,8 @@ export const ProjectSchema = z
          * rejects invalid ids.
          */
         style: z.enum(CAPTION_STYLE_IDS).catch(DEFAULT_CAPTION_STYLE),
+        /** Lift captions on vertical export using platform safe-area insets. */
+        insetPlatform: z.enum(CAPTION_INSET_PLATFORMS).optional(),
       })
       .default({ enabled: true, maxWords: 6, style: DEFAULT_CAPTION_STYLE }),
     assets: z.array(AssetSchema).default([]),

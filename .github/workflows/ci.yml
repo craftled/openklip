@@ -30,6 +30,9 @@ jobs:
       - name: Unit tests
         run: bun test
 
+      - name: Agent loop smoke audit
+        run: bun run agent-smoke-audit
+
       - name: Build
         run: bun run build
 

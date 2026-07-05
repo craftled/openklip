@@ -1,10 +1,15 @@
 import { existsSync } from "node:fs";
-import { copyFile, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import type { Take } from "@engine/edl";
 import { startIngestJob } from "@engine/ingest-jobs";
 import { assertValidSlug, projectPaths, slugFromVideo } from "@engine/paths";
+import {
+  MAX_ASSET_UPLOAD_BYTES,
+  uploadTooLargeMessage,
+} from "@engine/upload-limits";
+import { writeUploadToFile } from "@engine/upload-stream";
 import {
   isSupportedVideoFilename,
   unsupportedVideoMessage,
@@ -92,6 +97,18 @@ export function createTakesPost({ loadIngestTake, tempRoot }: TakesPostDeps) {
         { status: 400 }
       );
     }
+    if (file.size > MAX_ASSET_UPLOAD_BYTES) {
+      return Response.json(
+        {
+          error: uploadTooLargeMessage(
+            file.name,
+            file.size,
+            MAX_ASSET_UPLOAD_BYTES
+          ),
+        },
+        { status: 413 }
+      );
+    }
 
     const idRaw = form.get("id");
     const labelRaw = form.get("label");
@@ -117,7 +134,7 @@ export function createTakesPost({ loadIngestTake, tempRoot }: TakesPostDeps) {
     );
     const tmpPath = join(tmpDir, filename);
     try {
-      await writeFile(tmpPath, new Uint8Array(await file.arrayBuffer()));
+      await writeUploadToFile(tmpPath, file);
       const ingestTake = await loadIngestTake();
 
       const job = startIngestJob({

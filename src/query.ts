@@ -1,6 +1,7 @@
 import { summarize } from "./actions.ts";
 import type { SilenceSpan } from "./audio-analysis-core.ts";
 import { DEFAULT_CAPTION_STYLE } from "./caption-styles.ts";
+import type { CutTransitionType } from "./edl.ts";
 import {
   type CutSnap,
   CutsSchema,
@@ -10,9 +11,10 @@ import {
   rangesForExport,
   samplesToSec,
 } from "./edl.ts";
-import type { Keyframe } from "./keyframes.ts";
+import type { CutTransitionFallbackReason } from "./export-segments.ts";
 import { findPhraseRuns, type PhraseRun } from "./phrase-match.ts";
 import { validateProductAnnouncementSpec } from "./product-announcement.ts";
+import type { SourceMediaKind } from "./source-media.ts";
 
 export interface TranscriptWordView {
   deleted: boolean;
@@ -134,11 +136,27 @@ export interface ProjectStatusJson {
     clipCount: number;
   };
   keptDurationSec: number;
-  look: { vignette: boolean; filter: Filter; lut?: string };
+  look: {
+    vignette: boolean;
+    filter: Filter;
+    lut?: string;
+    transition?: {
+      durationMs: number;
+      type: CutTransitionType;
+      export?: {
+        fallbackReason?: CutTransitionFallbackReason;
+        wouldApply: boolean;
+      };
+    };
+  };
   overlays: OverlayViews;
   padMs: number;
   ranges: Array<{ endSec: number; startSec: number }>;
   slug: string;
+  sourceMedia?: {
+    kind: SourceMediaKind;
+    warn?: string;
+  };
   template?: string;
   words: { deleted: number; kept: number; total: number };
 }
@@ -335,10 +353,23 @@ export function listOverlays(project: Project): OverlayViews {
 
 export function projectStatus(
   project: Project,
-  silences?: SilenceSpan[]
+  silences?: SilenceSpan[],
+  extras?: {
+    sourceMedia?: { kind: SourceMediaKind; warn?: string };
+    transitionExport?: {
+      durationMs: number;
+      fallbackReason?: CutTransitionFallbackReason;
+      type: CutTransitionType;
+      wouldApply: boolean;
+    };
+  }
 ): ProjectStatusJson {
   const s = summarize(project, silences);
   const cuts = CutsSchema.parse(project.cuts ?? {});
+  const transition = project.look?.transition ?? {
+    type: "none" as const,
+    durationMs: 500,
+  };
   return {
     slug: project.slug,
     template: project.template,
@@ -369,7 +400,33 @@ export function projectStatus(
       vignette: project.look?.vignette ?? false,
       filter: project.look?.filter ?? "none",
       ...(project.look?.lut ? { lut: project.look.lut } : {}),
+      transition: {
+        type: transition.type,
+        durationMs: transition.durationMs,
+        ...(extras?.transitionExport === undefined
+          ? {}
+          : {
+              export: {
+                wouldApply: extras.transitionExport.wouldApply,
+                ...(extras.transitionExport.fallbackReason === undefined
+                  ? {}
+                  : {
+                      fallbackReason: extras.transitionExport.fallbackReason,
+                    }),
+              },
+            }),
+      },
     },
+    ...(extras?.sourceMedia === undefined
+      ? {}
+      : {
+          sourceMedia: {
+            kind: extras.sourceMedia.kind,
+            ...(extras.sourceMedia.warn === undefined
+              ? {}
+              : { warn: extras.sourceMedia.warn }),
+          },
+        }),
     export: {
       aspect: project.export?.aspect ?? "source",
       crop: {

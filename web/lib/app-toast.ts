@@ -18,6 +18,7 @@ import {
   projectCreateFailedToast,
   projectDeletedToast,
   projectDeleteFailedToast,
+  proxyExportWarningToast,
   revealFailedToast,
   revertFailedToast,
   revertSucceededToast,
@@ -285,6 +286,13 @@ export function toastTransitionFallback(
   transition: ExportTransitionResultData
 ): void {
   const payload = transitionFallbackToast(transition);
+  if (payload) {
+    show(payload);
+  }
+}
+
+export function toastProxyExportWarning(warn: string | undefined): void {
+  const payload = proxyExportWarningToast(warn);
   if (payload) {
     show(payload);
   }

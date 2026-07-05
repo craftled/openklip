@@ -1,4 +1,5 @@
 import type { SilenceSpan } from "./audio-analysis-core.ts";
+import { transitionExportPreview } from "./cut-transition-gate.ts";
 import type { Project } from "./edl.ts";
 import {
   grepTranscript,
@@ -9,6 +10,7 @@ import {
   wordSpan,
 } from "./query.ts";
 import { placeFromPhrase } from "./reanchor.ts";
+import { resolveSourceMediaStatus } from "./source-media.ts";
 
 // Re-exported so existing importers of the min-span constant keep one source of
 // truth; ownership now lives in reanchor.ts alongside the resolver.
@@ -161,9 +163,23 @@ export function runOverlays(
 
 export function runStatusJson(
   project: Project,
-  silences?: SilenceSpan[]
+  silences?: SilenceSpan[],
+  projectDir?: string
 ): string {
-  return jsonOut(projectStatus(project, silences));
+  const ranges = listRanges(project, silences);
+  const extras = {
+    transitionExport: transitionExportPreview(project, ranges),
+    ...(projectDir === undefined
+      ? {}
+      : {
+          sourceMedia: resolveSourceMediaStatus({
+            dir: projectDir,
+            source: project.source,
+            proxy: project.proxy,
+          }),
+        }),
+  };
+  return jsonOut(projectStatus(project, silences, extras));
 }
 
 // Resolve a spoken phrase to an overlay placement span. Delegates to the pure

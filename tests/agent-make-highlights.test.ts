@@ -43,10 +43,10 @@ test("make-highlights: previewHighlightExports lists clip ids and output paths",
   assert.equal(preview[1]?.id, "h2");
 });
 
-test("make-highlights: shorts platform preset resolves 9:16 1920p 30fps social", () => {
+test("make-highlights: shorts platform preset resolves 9:16 1920p source fps social", () => {
   const resolved = resolvePlatformOptions("shorts", {});
   assert.equal(resolved.aspect, "9:16");
   assert.equal(resolved.maxHeight, 1920);
-  assert.equal(resolved.fps, 30);
+  assert.equal(resolved.fps, undefined);
   assert.equal(resolved.compression, "social");
 });

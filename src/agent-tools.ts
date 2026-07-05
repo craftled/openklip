@@ -18,7 +18,8 @@ import { ingestBlank } from "./blank-ingest.ts";
 import { measureMusicBpm } from "./bpm.ts";
 import { loadBrief, saveBrief } from "./brief.ts";
 import { logBriefSet } from "./brief-log.ts";
-import { cleanupReport, fillerOnlyCleanupReport } from "./cleanup.ts";
+import { buildCleanupReport } from "./cleanup.ts";
+import { transitionExportPreview } from "./cut-transition-gate.ts";
 import { PhraseAnchorSchema, type Project, samplesToSec } from "./edl.ts";
 import { EXPORT_PLATFORM_IDS } from "./export-platforms.ts";
 import {
@@ -35,6 +36,7 @@ import {
   loadGraphicManifest,
 } from "./graphics.ts";
 import { listLuts } from "./lut.ts";
+import { projectPaths } from "./paths.ts";
 import { auditProjectForShip } from "./project-brief-audit.ts";
 import {
   listHistorySnapshotRevisions,
@@ -59,6 +61,7 @@ import {
   type Surface,
 } from "./registry.ts";
 import { type RevertTarget, revertProject } from "./revert.ts";
+import { resolveSourceMediaStatus } from "./source-media.ts";
 import {
   applyProjectTemplate,
   listTemplates,
@@ -368,7 +371,16 @@ const queryTools: AgentToolDef[] = [
     run: async ({ slug: projectSlug }) => {
       const project = await loadProject(projectSlug);
       const silences = await loadSilences(project);
-      return projectStatus(project, silences);
+      const ranges = listRanges(project, silences);
+      const { dir } = projectPaths(projectSlug);
+      return projectStatus(project, silences, {
+        sourceMedia: resolveSourceMediaStatus({
+          dir,
+          source: project.source,
+          proxy: project.proxy,
+        }),
+        transitionExport: transitionExportPreview(project, ranges),
+      });
     },
   }),
   defineQueryTool({
@@ -501,13 +513,22 @@ const queryTools: AgentToolDef[] = [
     schema: z.object({ slug }),
     run: async ({ slug: projectSlug }) => {
       const project = await loadProject(projectSlug);
+      const briefText = await loadBrief(projectSlug).catch(() => undefined);
       try {
         const analysis = await loadAudioAnalysis(projectSlug);
-        return cleanupReport(project, analysis.silences);
+        return buildCleanupReport({
+          project,
+          silences: analysis.silences,
+          briefText,
+        });
       } catch {
         // No audio analysis yet (project never re-ingested since
         // audio16k.f32 was introduced): degrade to filler-only.
-        return fillerOnlyCleanupReport(project);
+        return buildCleanupReport({
+          project,
+          silences: null,
+          briefText,
+        });
       }
     },
   }),

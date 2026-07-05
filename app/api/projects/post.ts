@@ -11,6 +11,11 @@ import type { IngestProgress } from "@engine/ingest-types";
 import { projectPaths, slugFromVideo } from "@engine/paths";
 import { withProjectLock } from "@engine/project-lock";
 import {
+  MAX_PROJECT_UPLOAD_BYTES,
+  uploadTooLargeMessage,
+} from "@engine/upload-limits";
+import { writeUploadToFile } from "@engine/upload-stream";
+import {
   isSupportedVideoFilename,
   unsupportedVideoMessage,
 } from "@engine/video-formats";
@@ -37,7 +42,7 @@ export async function loadProjectIngest(): Promise<IngestFn> {
 // gone (src/exporter.ts, src/doctor.ts). Persist the upload at the project
 // root next to project.json (NOT assets/, which folder-sync would register
 // as b-roll) and repoint source at that absolute path.
-async function persistUploadedSource(
+export async function persistUploadedSource(
   slug: string,
   filename: string,
   tmpPath: string
@@ -71,6 +76,18 @@ export function createProjectsPost({ loadIngest, tempRoot }: ProjectsPostDeps) {
       return Response.json(
         { error: unsupportedVideoMessage(file.name) },
         { status: 400 }
+      );
+    }
+    if (file.size > MAX_PROJECT_UPLOAD_BYTES) {
+      return Response.json(
+        {
+          error: uploadTooLargeMessage(
+            "Upload",
+            file.size,
+            MAX_PROJECT_UPLOAD_BYTES
+          ),
+        },
+        { status: 413 }
       );
     }
     const force = new URL(req.url).searchParams.get("force") === "1";
@@ -117,7 +134,7 @@ export function createProjectsPost({ loadIngest, tempRoot }: ProjectsPostDeps) {
     }
     const tmpPath = join(tmpDir, filename);
     try {
-      await writeFile(tmpPath, new Uint8Array(await file.arrayBuffer()));
+      await writeUploadToFile(tmpPath, file);
       const ingest = await loadIngest();
 
       const job = startIngestJob({

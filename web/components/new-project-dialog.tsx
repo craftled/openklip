@@ -16,6 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import {
   applyToasts,
@@ -29,9 +30,10 @@ import {
   Film,
   FolderOpen,
   LayoutTemplate,
+  Link2,
   Upload,
 } from "@/lib/icon";
-import { selectDroppedVideo } from "@/lib/project-intake";
+import { selectDroppedIntake } from "@/lib/project-intake";
 import { workspacePickerToasts } from "@/lib/toast-notifications";
 import { cn } from "@/lib/utils";
 import {
@@ -96,21 +98,27 @@ function StepPill({
 export function NewProjectDialog({
   onBlankSelected,
   onFolderChosen,
+  onFolderSelected,
   onOpenChange,
+  onUrlSelected,
   onVideoSelected,
   open,
 }: {
   onBlankSelected?: () => void | Promise<void>;
   onFolderChosen?: () => void;
+  onFolderSelected?: (files: File[]) => void | Promise<void>;
   onOpenChange: (open: boolean) => void;
+  onUrlSelected?: (url: string) => void | Promise<void>;
   onVideoSelected: (file: File) => void | Promise<void>;
   open: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
   const [workspace, setWorkspace] = useState<WorkspaceInfo | null>(null);
   const [loadingWorkspace, setLoadingWorkspace] = useState(false);
   const [pickingFolder, setPickingFolder] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const [urlDraft, setUrlDraft] = useState("");
   const [step, setStep] = useState<NewProjectStep>("folder");
 
   const refreshWorkspace = useCallback(async () => {
@@ -191,6 +199,24 @@ export function NewProjectDialog({
     void onVideoSelected(file);
   };
 
+  const submitFolder = (files: File[]) => {
+    if (files.length === 0 || !onFolderSelected) {
+      return;
+    }
+    onOpenChange(false);
+    void onFolderSelected(files);
+  };
+
+  const submitUrl = () => {
+    const trimmed = urlDraft.trim();
+    if (!(trimmed && onUrlSelected)) {
+      return;
+    }
+    onOpenChange(false);
+    setUrlDraft("");
+    void onUrlSelected(trimmed);
+  };
+
   // Shared client-side format gate for both the drop zone and the file
   // picker: a .txt should fail here with actionable copy, not minutes later
   // in ffprobe.
@@ -198,12 +224,22 @@ export function NewProjectDialog({
     if (files.length === 0) {
       return;
     }
-    const picked = selectDroppedVideo(files);
+    const picked = selectDroppedIntake(
+      files.map((file) => ({ name: file.name, size: file.size }))
+    );
     if ("error" in picked) {
       toastProjectCreateFailed(picked.error);
       return;
     }
-    submitVideo(picked.file);
+    if (picked.kind === "single") {
+      const match = files.find((file) => file.name === picked.file.name);
+      submitVideo(match);
+      return;
+    }
+    const matched = files.filter((file) =>
+      picked.files.some((entry) => entry.name === file.name)
+    );
+    submitFolder([...matched]);
   };
 
   const onDrop = (e: DragEvent<HTMLDivElement>) => {
@@ -315,10 +351,10 @@ export function NewProjectDialog({
               <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-full bg-muted">
                 <Film className={APP_ICON_CLASS} />
               </div>
-              <p className="font-medium text-sm">Drop a video here</p>
+              <p className="font-medium text-sm">Drop a video or folder here</p>
               <p className="mt-1 text-muted-foreground text-xs">
-                {SUPPORTED_VIDEO_LABEL}. OpenKlip transcribes speech and builds
-                your edit.
+                {SUPPORTED_VIDEO_LABEL}. Multi-file drops import the largest
+                video and register the rest in assets/.
               </p>
               <Button
                 className="mt-4"
@@ -329,6 +365,17 @@ export function NewProjectDialog({
                 <Upload data-icon="inline-start" />
                 Choose video…
               </Button>
+              {onFolderSelected ? (
+                <Button
+                  className="mt-2"
+                  onClick={() => folderInputRef.current?.click()}
+                  type="button"
+                  variant="outline"
+                >
+                  <FolderOpen data-icon="inline-start" />
+                  Import folder…
+                </Button>
+              ) : null}
               {onBlankSelected ? (
                 <Button
                   className="mt-2"
@@ -344,6 +391,37 @@ export function NewProjectDialog({
                 </Button>
               ) : null}
             </div>
+            {onUrlSelected ? (
+              <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-4 text-left">
+                <p className="font-medium text-sm">Import from URL</p>
+                <p className="text-muted-foreground text-xs leading-relaxed">
+                  Download with yt-dlp (must be on PATH; not bundled).
+                </p>
+                <div className="flex gap-2">
+                  <Input
+                    aria-label="Video URL"
+                    onChange={(e) => setUrlDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        submitUrl();
+                      }
+                    }}
+                    placeholder="https://…"
+                    value={urlDraft}
+                  />
+                  <Button
+                    disabled={!urlDraft.trim()}
+                    onClick={submitUrl}
+                    type="button"
+                    variant="secondary"
+                  >
+                    <Link2 data-icon="inline-start" />
+                    Import
+                  </Button>
+                </div>
+              </div>
+            ) : null}
             {workspace?.pickerSupported || workspace?.configured ? null : (
               <p className="text-muted-foreground text-xs leading-relaxed">
                 Set <code>OPENKLIP_PROJECTS_ROOT</code> to choose a custom
@@ -364,6 +442,20 @@ export function NewProjectDialog({
           }}
           ref={inputRef}
           type="file"
+        />
+        <input
+          className="hidden"
+          onChange={(e) => {
+            const files = Array.from(e.target.files ?? []);
+            e.target.value = "";
+            intakeFiles(files);
+          }}
+          ref={folderInputRef}
+          type="file"
+          {...({ webkitdirectory: "", directory: "" } as Record<
+            string,
+            string
+          >)}
         />
       </DialogContent>
     </Dialog>

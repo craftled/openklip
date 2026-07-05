@@ -71,11 +71,11 @@ test("make-short: scene mode with no sceneLog falls back to current crop", () =>
   assert.equal(project.export?.crop.focusX, 0.25);
 });
 
-test("make-short: shorts platform preset resolves 9:16 1920p 30fps social", () => {
+test("make-short: shorts platform preset resolves 9:16 1920p source fps social", () => {
   const resolved = resolvePlatformOptions("shorts", {});
   assert.equal(resolved.aspect, "9:16");
   assert.equal(resolved.maxHeight, 1920);
-  assert.equal(resolved.fps, 30);
+  assert.equal(resolved.fps, undefined);
   assert.equal(resolved.compression, "social");
   assert.equal(resolved.loudnessTargetLufs, -14);
 });

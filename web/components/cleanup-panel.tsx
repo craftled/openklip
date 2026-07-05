@@ -2,10 +2,9 @@
 
 import type { SilenceSpan } from "@engine/audio-analysis-core";
 import {
+  buildCleanupReport,
   type CleanupCandidate,
   type CleanupReport,
-  cleanupReport,
-  fillerOnlyCleanupReport,
 } from "@engine/cleanup";
 import type { Project } from "@engine/edl";
 import { Badge } from "@/components/ui/badge";
@@ -31,11 +30,14 @@ const MAX_ROWS = 200;
 // loadAudioAnalysis produces, filler detection does not.
 export function buildCleanupCandidates(
   project: Project,
-  silences: SilenceSpan[] | null | undefined
+  silences: SilenceSpan[] | null | undefined,
+  briefText?: string | null
 ): CleanupReport {
-  return silences
-    ? cleanupReport(project, silences)
-    : fillerOnlyCleanupReport(project);
+  return buildCleanupReport({
+    project,
+    silences,
+    briefText: briefText ?? undefined,
+  });
 }
 
 // m:ss timecode, matching web/components/transcript-search.tsx's

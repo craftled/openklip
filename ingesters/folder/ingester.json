@@ -1,0 +1,15 @@
+{
+  "id": "folder",
+  "label": "Import folder",
+  "description": "Pick a folder of media: the largest video becomes the project source; other videos, stills, and audio land in assets/. GUI: New project → Import folder.",
+  "command": "openklip",
+  "args": ["ingest", "{primary}", "--force"],
+  "fields": [
+    {
+      "name": "primary",
+      "label": "Primary video path",
+      "type": "path",
+      "required": true
+    }
+  ]
+}
