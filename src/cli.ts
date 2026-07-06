@@ -72,6 +72,14 @@ import {
   parseExportFpsFlag,
   parseExportLoudnessFlag,
 } from "./exporter.ts";
+import {
+  FEATURE_GROUP_IDS,
+  type FeatureGroupId,
+  featureGroups,
+  featureManifest,
+  featureTable,
+  listFeatures,
+} from "./features.ts";
 import { FFMPEG, FFPROBE } from "./ffmpeg.ts";
 import { FILTER_NAMES, isFilter } from "./filter.ts";
 import { resolveGraphicPhraseParams } from "./graphic-phrase.ts";
@@ -3465,6 +3473,53 @@ try {
         );
       }
       console.log(`\n${list.length} ingester(s)`);
+      break;
+    }
+    case "features": {
+      const surfaceArg = flagValue(rest, "--surface");
+      if (
+        surfaceArg !== undefined &&
+        surfaceArg !== "cli" &&
+        surfaceArg !== "gui" &&
+        surfaceArg !== "mcp"
+      ) {
+        throw new Error("--surface must be cli, gui, or mcp");
+      }
+      const groupArg = flagValue(rest, "--group");
+      if (
+        groupArg !== undefined &&
+        !(FEATURE_GROUP_IDS as readonly string[]).includes(groupArg)
+      ) {
+        throw new Error(
+          `--group must be one of: ${FEATURE_GROUP_IDS.join(", ")}`
+        );
+      }
+      const listOpts = {
+        surface: surfaceArg as Surface | undefined,
+        group: groupArg as FeatureGroupId | undefined,
+      };
+      if (rest.includes("--json")) {
+        console.log(JSON.stringify(featureManifest(listOpts), null, 2));
+        break;
+      }
+      if (groupArg) {
+        console.log(featureTable(listOpts));
+        console.log(`\n${listFeatures(listOpts).length} feature(s)`);
+        break;
+      }
+      for (const group of featureGroups) {
+        const items = listFeatures({ ...listOpts, group: group.id });
+        if (items.length === 0) {
+          continue;
+        }
+        console.log(`\n${group.title}`);
+        for (const feature of items) {
+          console.log(
+            `  ${feature.title.padEnd(42)} ${feature.surfaces.join(", ")}`
+          );
+        }
+      }
+      console.log(`\n${listFeatures(listOpts).length} feature(s)`);
       break;
     }
     case "luts": {

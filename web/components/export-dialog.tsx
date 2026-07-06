@@ -407,8 +407,9 @@ export function ExportDialog({
 
         <AlertDialogFooter className="items-end gap-3 sm:justify-between">
           <p className="text-muted-foreground text-xs sm:max-w-[55%] sm:text-left">
-            Estimation: Export time {formatDurationEstimate(estimate.exportTimeSec)}.
-            Output size {formatBytes(estimate.outputBytes)}.
+            Estimation: Export time{" "}
+            {formatDurationEstimate(estimate.exportTimeSec)}. Output size{" "}
+            {formatBytes(estimate.outputBytes)}.
             {estimate.note ? ` ${estimate.note}` : ""}
           </p>
           <div className="flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row">

@@ -50,11 +50,7 @@ const ExportRequestSchema = z
       .max(GIF_MAX_WIDTH_OVERRIDE_CEILING_PX)
       .optional(),
     height: z.number().int().positive().max(4320).optional(),
-    loudnessTargetLufs: z
-      .number()
-      .min(-30)
-      .max(-10)
-      .optional(),
+    loudnessTargetLufs: z.number().min(-30).max(-10).optional(),
     loudnessNormalize: z.boolean().optional(),
     platform: z.enum(EXPORT_PLATFORM_IDS).optional(),
   })

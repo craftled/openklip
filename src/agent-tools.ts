@@ -35,6 +35,7 @@ import {
   exportCut,
   GIF_MAX_WIDTH_OVERRIDE_CEILING_PX,
 } from "./exporter.ts";
+import { FEATURE_GROUP_IDS, featureManifest } from "./features.ts";
 import { resolveGraphicPhraseParams } from "./graphic-phrase.ts";
 import { finalizeGraphicSpan } from "./graphic-placement.ts";
 import {
@@ -385,7 +386,7 @@ const queryTools: AgentToolDef[] = [
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             message:
-              'Provide exactly one of text or phrase (same as CLI broll-suggest).',
+              "Provide exactly one of text or phrase (same as CLI broll-suggest).",
           });
         }
       }),
@@ -643,6 +644,16 @@ const queryTools: AgentToolDef[] = [
     summary: "List edit templates (templates/*/skill.md).",
     schema: z.object({}),
     run: () => ({ templates: listTemplates() }),
+  }),
+  defineQueryTool({
+    name: "features_list",
+    summary:
+      "List shipped product capabilities with surfaces and related tools/actions.",
+    schema: z.object({
+      group: z.enum(FEATURE_GROUP_IDS).optional(),
+      surface: z.enum(["cli", "gui", "mcp"]).optional(),
+    }),
+    run: ({ group, surface }) => featureManifest({ group, surface }),
   }),
   defineQueryTool({
     name: "luts",
@@ -1175,7 +1186,7 @@ const queryTools: AgentToolDef[] = [
         .describe('Highlight id (for example "h1") or "all"'),
       platform: z.enum(EXPORT_PLATFORM_IDS).optional(),
     }),
-    run: async ({ slug: projectSlug, clipId, platform }) => {
+    run: ({ slug: projectSlug, clipId, platform }) => {
       const exportOpts = platform ? { platform } : {};
       if (clipId === "all") {
         return exportAllHighlights(projectSlug, exportOpts);

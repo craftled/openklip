@@ -158,7 +158,10 @@ export function NewProjectDialog({
   const onSetWorkspacePath = async () => {
     const trimmed = pathDraft.trim();
     if (!trimmed) {
-      toastError("Enter a folder path", "Projects will be stored in this directory.");
+      toastError(
+        "Enter a folder path",
+        "Projects will be stored in this directory."
+      );
       return;
     }
     setSettingPath(true);

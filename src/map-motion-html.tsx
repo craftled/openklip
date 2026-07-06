@@ -15,8 +15,6 @@ export function renderMapMotionHtml(spec: MapMotionSpec): string {
 </div>`;
 }
 
-export async function renderMapMotionHtmlFromUnknown(
-  rawSpec: unknown
-): Promise<string> {
-  return Promise.resolve(renderMapMotionHtml(assertMapMotionSpec(rawSpec)));
+export function renderMapMotionHtmlFromUnknown(rawSpec: unknown): string {
+  return renderMapMotionHtml(assertMapMotionSpec(rawSpec));
 }

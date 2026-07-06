@@ -59,9 +59,9 @@ function renderPanel(
   return renderToStaticMarkup(
     <TakesPanelView
       addTakeBusy={false}
-      addTakeProgress={null}
       addTakeError={null}
       addTakeLabel=""
+      addTakeProgress={null}
       anchorWordId={null}
       assembleError={null}
       assembling={false}

@@ -106,6 +106,7 @@ Time is integer audio samples at 48 kHz. The CLI takes seconds where a human num
 | Read action history (newest first) | `openklip history <slug> [--limit] [--task] [--action] [--actor]` |
 | List agent task records (newest first) | `openklip tasks <slug> [--limit] [--status] [--actor]` |
 | List ingester plugins | `openklip ingesters` |
+| List shipped product capabilities | `openklip features` |
 | List the action registry (mutations only) | `openklip actions` |
 | List all agent tools (query + mutate + export) | `openklip tools` |
 | MCP server (stdio) | `openklip mcp` or `bun run mcp` |
@@ -265,6 +266,7 @@ Workflow: `take-add` each recording, read `take_transcript <slug> <takeId>` to f
 | `openklip history <slug> [--limit N] [--task <id>] [--action <name>] [--actor <name>]` | Action history log, newest first, plus which revisions have a revert snapshot. `--limit` defaults to 50 (max 200); `--task`/`--action`/`--actor` filter to one agent task, action name, or actor (`human\|agent\|cli\|mcp\|system`), combining with AND semantics. Prints a distinct message when a filter matches nothing versus when the project genuinely has no history yet. |
 | `openklip tasks <slug> [--limit N] [--status <status>] [--actor <name>]` | Agent task records, newest first: id, status, start time, request text. `--limit` defaults to 20 (max 100); `--status` filters to one of `pending\|running\|blocked\|failed\|completed\|cancelled`; `--actor` filters to `human\|agent\|cli\|mcp\|system`, combining with `--status` (AND semantics). Tasks created before the actor field existed have no recorded actor and are not matched by `--actor`. |
 | `openklip ingesters` | List ingester plugins (`ingesters/<id>/ingester.json`): declarative seams for non-file media import (URL, batch, etc.). |
+| `openklip features` | **Product capabilities:** human-facing feature catalog from `src/features.ts` with surfaces and links to tools/actions. `--json`; `--group <id>`; `--surface cli\|gui\|mcp`. |
 | `openklip actions` | **Mutations only:** every `project.json` edit action (cut, broll, title, zoom, still, captions, look, pad, reorder). `--json` emits JSON Schema (`inputSchema` shape). |
 | `openklip tools` | **Full agent surface:** query tools (`transcript_grep`, `project_status`, …), registry mutations, phrase-add helpers, and `export`. Same manifest the MCP server exposes. `--json`; `--surface mcp` filters. |
 | `openklip mcp` | Start the MCP stdio server (`src/mcp-server.ts`). Cursor: `.cursor/mcp.json` in repo root. Set `OPENKLIP_PROJECTS_ROOT` in the server env if projects live outside the repo. |
@@ -291,7 +293,7 @@ The tool-calling edit prompt (`buildEditPrompt` in `src/agent-driver.ts`) advert
 
 | Layer | MCP tool names | Same as CLI |
 | --- | --- | --- |
-| Query | `list_projects`, `blank_ingest`, `transcript_grep`, `transcript_phrase`, `scene_log`, `highlights_list`, `highlights_detect`, `project_status`, `project_overlays`, `cleanup_report`, `history_list`, `task_list`, `template_list`, `graphic_list`, `graphic_show`, `load_skill`, `music_bpm`, `audio_measure`, `doctor`, `broll_suggest`, … | `openklip transcript grep`, `status --json`, `overlays --json`, `highlights`, `highlights-detect`, `cleanup --json`, `openklip history`, `openklip tasks`, `openklip template list`, `openklip ingest --blank`, `openklip graphic list`, `openklip bpm`, `openklip audio measure`, `openklip doctor`, `openklip broll-suggest` |
+| Query | `list_projects`, `blank_ingest`, `transcript_grep`, `transcript_phrase`, `scene_log`, `highlights_list`, `highlights_detect`, `project_status`, `project_overlays`, `cleanup_report`, `history_list`, `task_list`, `template_list`, `features_list`, `graphic_list`, `graphic_show`, `load_skill`, `music_bpm`, `audio_measure`, `doctor`, `broll_suggest`, … | `openklip transcript grep`, `status --json`, `overlays --json`, `highlights`, `highlights-detect`, `cleanup --json`, `openklip history`, `openklip tasks`, `openklip template list`, `openklip features`, `openklip ingest --blank`, `openklip graphic list`, `openklip bpm`, `openklip audio measure`, `openklip doctor`, `openklip broll-suggest` |
 | Mutate | `cut`, `cut-text`, `broll-add`, `title-set`, `word-text`, `dead-air-add`, `dead-air-rm`, `audio`, `captions-style`, `captions-inset`, `take_add`, … | `openklip cut`, `broll-add`, `word-text`, `dead-air-rm`, `audio`, `captions-style`, `captions-inset`, `openklip take-add`, … |
 | Phrase compose | `title-add-phrase`, `zoom-add-phrase`, `broll-add-phrase`, `graphic-add-phrase` | `openklip title-add-phrase`, … |
 | Brief | `brief_get`, `brief_set`, `brief_audit` | `openklip brief`, `openklip brief --set`, `openklip brief --audit` |

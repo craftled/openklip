@@ -10,7 +10,7 @@ import {
 } from "node:path";
 import type { Actor } from "./action-log.ts";
 import { removeAsset } from "./actions.ts";
-import { inferAssetKind, isRecognizedAssetFile } from "./asset-filenames.ts";
+import { inferAssetKind } from "./asset-filenames.ts";
 import {
   type Asset,
   type AssetKind,
@@ -23,6 +23,7 @@ import { assetProxyRelative, projectPaths, slugify } from "./paths.ts";
 import { mutateProject } from "./projectStore.ts";
 import { cwdPath } from "./repo-paths.ts";
 
+// biome-ignore lint/performance/noBarrelFile: re-export asset filename helpers for callers that already import from assets.ts
 export { inferAssetKind, isRecognizedAssetFile } from "./asset-filenames.ts";
 
 const STILL_HOLD_SEC = 3;

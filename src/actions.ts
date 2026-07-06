@@ -1176,7 +1176,7 @@ export function setCaptionInset(
 ): Project {
   if (!input.enabled) {
     const next = { ...project.captions };
-    delete next.insetPlatform;
+    next.insetPlatform = undefined;
     project.captions = next;
     return project;
   }

@@ -7,6 +7,7 @@ import {
   reserveIngestSlug,
   startIngestJob,
 } from "@engine/ingest-jobs";
+import { IngestPersistError } from "@engine/ingest-persist-error";
 import { projectPaths, slugFromVideo } from "@engine/paths";
 import {
   downloadVideoFromUrl,
@@ -15,7 +16,6 @@ import {
 import type { NextRequest } from "next/server";
 import type { IngestFn } from "../post.ts";
 import { persistUploadedSource } from "../post.ts";
-import { IngestPersistError } from "@engine/ingest-persist-error";
 
 export interface UrlProjectsPostDeps {
   loadIngest: () => Promise<IngestFn>;
@@ -39,11 +39,7 @@ export function createUrlProjectsPost({
 
     const force = new URL(req.url).searchParams.get("force") === "1";
     let tmpDir: string;
-    try {
-      tmpDir = await mkdtemp(join(tempRoot ?? tmpdir(), "openklip-url-"));
-    } catch (error) {
-      throw error;
-    }
+    tmpDir = await mkdtemp(join(tempRoot ?? tmpdir(), "openklip-url-"));
 
     let slug = "";
     try {

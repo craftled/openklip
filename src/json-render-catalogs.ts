@@ -4,7 +4,6 @@ import {
   MAP_MOTION_FPS,
   MAP_MOTION_HEIGHT,
   MAP_MOTION_WIDTH,
-  MapMotionCatalogSchema,
   type MapMotionSpec,
   validateMapMotionSpec,
 } from "./map-motion.ts";
@@ -13,7 +12,6 @@ import {
   PRODUCT_ANNOUNCEMENT_FPS,
   PRODUCT_ANNOUNCEMENT_HEIGHT,
   PRODUCT_ANNOUNCEMENT_WIDTH,
-  ProductAnnouncementCatalogSchema,
   type ProductAnnouncementSpec,
   validateProductAnnouncementSpec,
 } from "./product-announcement.ts";
@@ -119,6 +117,7 @@ export function jsonRenderCatalogIdsLabel(): string {
   return JSON_RENDER_CATALOG_IDS.join(", ");
 }
 
+// biome-ignore lint/performance/noBarrelFile: catalog registry re-exports keep json-render imports on one path
 export { MAP_MOTION_CATALOG, MapMotionCatalogSchema } from "./map-motion.ts";
 export {
   PRODUCT_ANNOUNCEMENT_CATALOG,

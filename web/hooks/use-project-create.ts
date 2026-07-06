@@ -4,16 +4,16 @@ import { useCallback, useState } from "react";
 import type { ProjectCreatePhase } from "@/components/project-create-overlay";
 import {
   toastDismiss,
+  toastIngestPartialSuccess,
   toastLoading,
   toastProjectCreateFailed,
-  toastIngestPartialSuccess,
 } from "@/lib/app-toast";
 import {
   createBlankProject,
   createProjectFromFolder,
   createProjectFromUrl,
-  type IngestProgressView,
   IngestPartialSuccessError,
+  type IngestProgressView,
   type ProjectCreateOptions,
   ProjectExistsError,
 } from "@/lib/project-create";
@@ -42,7 +42,9 @@ export function overwriteDecision(
     : "fail";
 }
 
-function isPartialIngestSuccess(error: unknown): error is IngestPartialSuccessError {
+function isPartialIngestSuccess(
+  error: unknown
+): error is IngestPartialSuccessError {
   return error instanceof IngestPartialSuccessError;
 }
 

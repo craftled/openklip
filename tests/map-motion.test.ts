@@ -48,10 +48,7 @@ describe("map-motion spec", () => {
 describe("json-render catalog registry", () => {
   it("validates product-announcement through the registry", () => {
     const spec = sampleProductAnnouncementSpec;
-    const result = validateJsonRenderSpec(
-      PRODUCT_ANNOUNCEMENT_CATALOG,
-      spec
-    );
+    const result = validateJsonRenderSpec(PRODUCT_ANNOUNCEMENT_CATALOG, spec);
     expect(result.success).toBe(true);
     assertJsonRenderSpec(PRODUCT_ANNOUNCEMENT_CATALOG, spec);
   });

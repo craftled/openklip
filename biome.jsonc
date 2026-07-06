@@ -43,6 +43,22 @@
   },
   "overrides": [
     {
+      "includes": ["web/components/ui/map.tsx"],
+      "linter": {
+        "rules": {
+          "a11y": {
+            "noSvgWithoutTitle": "off"
+          },
+          "complexity": {
+            "useOptionalChain": "off"
+          },
+          "suspicious": {
+            "noShadowRestrictedNames": "off"
+          }
+        }
+      }
+    },
+    {
       "includes": ["web/components/agents-ui/**", "web/hooks/agents-ui/**"],
       "linter": {
         "enabled": false

@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import puppeteer from "puppeteer-core";
-import { chromeAvailable } from "./helpers/integration-gate.ts";
 import { prepareIntegrationEditorFixture } from "./helpers/integration-editor-fixture.ts";
+import { chromeAvailable } from "./helpers/integration-gate.ts";
 import { spawnIntegrationServer } from "./helpers/integration-server.ts";
 
 const CHROME_PATH =
