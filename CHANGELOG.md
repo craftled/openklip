@@ -12,6 +12,11 @@
 - **json-render catalogs**: generalized registry (`src/json-render-catalogs.ts`) so `product-announcement` and `map-motion` share validation, preview dispatch, and export paths.
 - **Headless export**: map-motion overlays use a dedicated MapLibre runtime bundle with per-frame idle waits before screenshot.
 
+### Fixed
+- **Map-motion preview/export parity**: preview uses the same programmatic MapLibre layers as headless export (no duplicate route/arc overlays); markers mode renders pins and labels in export.
+- **Map-motion export timeouts**: headless map load and per-frame idle waits fail fast on tile/CDN errors instead of hanging indefinitely.
+- **MCP `broll_suggest`**: rejects calls with neither `text` nor `phrase` (CLI parity).
+
 ## 0.41.0.4 - 2026-07-06
 
 ### Added
