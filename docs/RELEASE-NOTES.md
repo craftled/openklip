@@ -2,7 +2,25 @@
 
 Use these bodies when publishing releases. Each section matches a tag in `CHANGELOG.md` without duplicating the full changelog. **Known gaps:** always link to [TODO.md](../TODO.md#known-limitations); do not duplicate the list here.
 
-Publishing status checked on 2026-07-06: GitHub releases published through `v0.41.1.0` (`gh release view v0.41.1.0`). `v0.41.1.0` merged to `main` at `cea7939` (PR #78).
+Publishing status checked on 2026-07-06: GitHub releases published through `v0.41.1.0` (`gh release view v0.41.1.0`). `v0.41.1.1` ships from PR #79 (`release/v0.41.1.1`).
+
+---
+
+## v0.41.1.1
+
+**Viral launch playbook, Settings Features panel, and b-roll suggest benchmark.**
+
+### Highlights
+- **Viral launch**: `templates/viral-launch/skill.md` for hook-first social launch edits (`--platform x` / `shorts`).
+- **Settings Features**: read-only capability list in Settings → Features.
+- **B-roll benchmark**: `fixtures/broll-suggest/` labeled spans + `tests/broll-suggest-benchmark.test.ts` (10/10 on `edgaras-raw` when present).
+- **Tests**: 1901 tests (1898 pass, 3 skip); 89 MCP tools.
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#04111---2026-07-06)
 
 ---
 

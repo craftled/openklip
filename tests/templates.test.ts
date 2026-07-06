@@ -57,6 +57,9 @@ test("listTemplates finds the make-draft, make-short, make-highlights, and revis
     "motion-canvas should be auto-listed from templates/"
   );
   assert.equal(motionCanvas?.label, "Motion canvas");
+  const viralLaunch = list.find((t) => t.id === "viral-launch");
+  assert.ok(viralLaunch, "viral-launch should be auto-listed from templates/");
+  assert.equal(viralLaunch?.label, "Viral launch");
 });
 
 test("loadTemplateSkill reads the make-draft, make-short, make-highlights, and revise-draft playbooks", () => {
@@ -78,6 +81,10 @@ test("loadTemplateSkill reads the make-draft, make-short, make-highlights, and r
   assert.match(reviseDraft, /task_complete/);
   assert.match(reviseDraft, /revert/);
   assert.match(reviseDraft, /project_overlays/);
+
+  const viralLaunch = loadTemplateSkill("viral-launch");
+  assert.match(viralLaunch, /Earned-attention/);
+  assert.match(viralLaunch, /--platform x/);
   assert.match(reviseDraft, /graphic-set/);
 });
 
