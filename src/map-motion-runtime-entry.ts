@@ -73,10 +73,31 @@ async function ensureMapMotionReady(): Promise<HeadlessMapMotion> {
   }
   const spec = readMapMotionSpec();
   const instance = createMapMotionInstance(spec);
-  await new Promise<void>((resolve) => {
-    (instance.map as unknown as maplibregl.Map).once("load", () => {
-      initMapMotionLayers(instance.map, spec);
+  const mapInstance = instance.map as unknown as maplibregl.Map;
+  await new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error("map-motion map load timed out after 60s"));
+    }, 60_000);
+    const finish = (error?: Error) => {
+      clearTimeout(timer);
+      if (error) {
+        reject(error);
+        return;
+      }
       resolve();
+    };
+    mapInstance.once("error", (event) => {
+      finish(
+        new Error(`map-motion map error: ${event.error?.message ?? "unknown"}`)
+      );
+    });
+    mapInstance.once("load", () => {
+      try {
+        initMapMotionLayers(instance.map, spec);
+        finish();
+      } catch (error) {
+        finish(error instanceof Error ? error : new Error(String(error)));
+      }
     });
   });
   await instance.waitIdle();

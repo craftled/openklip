@@ -1,20 +1,11 @@
 "use client";
 
 import { useLayoutEffect } from "react";
-import {
-  Map as MapView,
-  MapArc,
-  MapMarker,
-  MapRoute,
-  MarkerContent,
-  MarkerLabel,
-  useMap,
-} from "@/components/ui/map";
+import { Map as MapView, useMap } from "@/components/ui/map";
 import {
   applyMapMotionFrame,
   initMapMotionLayers,
   type MapMotionMap,
-  specRouteCoordinates,
 } from "@/lib/map-motion-runtime";
 import {
   MAP_MOTION_FPS,
@@ -60,7 +51,6 @@ export function MapMotionFrame({
   frame: number;
   spec: MapMotionSpec;
 }) {
-  const coords = specRouteCoordinates(spec);
   const projection =
     spec.projection === "globe" ? ({ type: "globe" } as const) : undefined;
 
@@ -83,44 +73,6 @@ export function MapMotionFrame({
         theme={spec.theme}
       >
         <MapMotionDriver durFrames={durFrames} frame={frame} spec={spec} />
-        {spec.mode === "route" || spec.mode === "globe" ? (
-          <MapRoute
-            color={spec.style.lineColor}
-            coordinates={coords}
-            interactive={false}
-            width={spec.style.lineWidth}
-          />
-        ) : null}
-        {spec.mode === "arc" && spec.points.length >= 2 ? (
-          <MapArc
-            curvature={spec.style.arcCurvature}
-            data={[
-              {
-                id: "arc-1",
-                from: [spec.points[0].lng, spec.points[0].lat],
-                to: [spec.points[1].lng, spec.points[1].lat],
-              },
-            ]}
-            interactive={false}
-            paint={{
-              "line-color": spec.style.lineColor,
-              "line-width": spec.style.lineWidth,
-            }}
-          />
-        ) : null}
-        {spec.points.map((point, index) => (
-          <MapMarker
-            key={`${point.lng}-${point.lat}-${index}`}
-            latitude={point.lat}
-            longitude={point.lng}
-          >
-            <MarkerContent>
-              {point.label ? (
-                <MarkerLabel position="top">{point.label}</MarkerLabel>
-              ) : null}
-            </MarkerContent>
-          </MapMarker>
-        ))}
       </MapView>
     </div>
   );

@@ -357,26 +357,38 @@ const queryTools: AgentToolDef[] = [
     name: "broll_suggest",
     summary:
       "Rank b-roll assets for a spoken span or free-text query using existing asset cards (summary, tags, bestFor). Respects mustUse/avoid flags.",
-    schema: z.object({
-      slug,
-      text: z
-        .string()
-        .min(1)
-        .optional()
-        .describe("Free-text query (spoken topic or keywords)."),
-      phrase: z
-        .string()
-        .min(1)
-        .optional()
-        .describe("Transcript phrase; resolved to kept words before ranking."),
-      top: z
-        .number()
-        .int()
-        .positive()
-        .max(20)
-        .default(5)
-        .describe("Max suggestions to return."),
-    }),
+    schema: z
+      .object({
+        slug,
+        text: z
+          .string()
+          .min(1)
+          .optional()
+          .describe("Free-text query (spoken topic or keywords)."),
+        phrase: z
+          .string()
+          .min(1)
+          .optional()
+          .describe(
+            "Transcript phrase; resolved to kept words before ranking."
+          ),
+        top: z
+          .number()
+          .int()
+          .positive()
+          .max(20)
+          .default(5)
+          .describe("Max suggestions to return."),
+      })
+      .superRefine((input, ctx) => {
+        if (!(input.text || input.phrase) || (input.text && input.phrase)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message:
+              'Provide exactly one of text or phrase (same as CLI broll-suggest).',
+          });
+        }
+      }),
     run: async ({ slug: projectSlug, text, phrase, top }) => {
       const project = await loadProject(projectSlug);
       return suggestBroll(project, { text, phrase, top });

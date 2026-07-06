@@ -239,6 +239,13 @@ test("getAgentTool exposes broll_suggest on mcp surface", () => {
   assert.ok(tool?.surfaces.includes("mcp"));
 });
 
+test("callAgentTool broll_suggest rejects missing text and phrase", async () => {
+  await assert.rejects(
+    () => callAgentTool("broll_suggest", { slug: "demo", top: 3 }),
+    /exactly one of text or phrase/
+  );
+});
+
 test("CLI broll-suggest --text returns ranked asset id", async () => {
   await withTempProjectsRoot(async ({ slug }) => {
     writeFixtureProject(

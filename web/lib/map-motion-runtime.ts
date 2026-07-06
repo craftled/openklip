@@ -5,6 +5,13 @@ export const MAP_MOTION_SOURCE_ID = "ok-map-motion-route";
 export const MAP_MOTION_LAYER_ID = "ok-map-motion-route-layer";
 export const MAP_MOTION_ARC_SOURCE_ID = "ok-map-motion-arc";
 export const MAP_MOTION_ARC_LAYER_ID = "ok-map-motion-arc-layer";
+export const MAP_MOTION_MARKERS_SOURCE_ID = "ok-map-motion-markers";
+export const MAP_MOTION_MARKERS_CIRCLE_LAYER_ID =
+  "ok-map-motion-markers-circle";
+export const MAP_MOTION_MARKERS_LABEL_LAYER_ID = "ok-map-motion-markers-label";
+
+const MAP_IDLE_TIMEOUT_MS = 30_000;
+const MAP_LOAD_TIMEOUT_MS = 60_000;
 
 export const MAP_MOTION_DEFAULT_STYLES = {
   dark: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
@@ -209,6 +216,49 @@ function lineFeature(coordinates: [number, number][]): {
   };
 }
 
+function markerFeatureCollection(spec: MapMotionSpec): {
+  type: "FeatureCollection";
+  features: Array<{
+    type: "Feature";
+    properties: { label: string };
+    geometry: { type: "Point"; coordinates: [number, number] };
+  }>;
+} {
+  return {
+    type: "FeatureCollection",
+    features: spec.points.map((point) => ({
+      type: "Feature",
+      properties: { label: point.label ?? "" },
+      geometry: {
+        type: "Point",
+        coordinates: [point.lng, point.lat],
+      },
+    })),
+  };
+}
+
+function withTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  label: string
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${ms}ms`));
+    }, ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      }
+    );
+  });
+}
+
 export function initMapMotionLayers(
   map: MapMotionMap,
   spec: MapMotionSpec
@@ -263,6 +313,41 @@ export function initMapMotionLayers(
       });
     }
   }
+
+  if (spec.mode === "markers" && !map.getSource(MAP_MOTION_MARKERS_SOURCE_ID)) {
+    map.addSource(MAP_MOTION_MARKERS_SOURCE_ID, {
+      type: "geojson",
+      data: markerFeatureCollection(spec),
+    });
+    map.addLayer({
+      id: MAP_MOTION_MARKERS_CIRCLE_LAYER_ID,
+      type: "circle",
+      source: MAP_MOTION_MARKERS_SOURCE_ID,
+      paint: {
+        "circle-color": style.markerColor,
+        "circle-radius": 8,
+        "circle-stroke-color": "#ffffff",
+        "circle-stroke-width": 2,
+      },
+    });
+    map.addLayer({
+      id: MAP_MOTION_MARKERS_LABEL_LAYER_ID,
+      type: "symbol",
+      source: MAP_MOTION_MARKERS_SOURCE_ID,
+      layout: {
+        "text-field": ["get", "label"],
+        "text-offset": [0, -1.4],
+        "text-anchor": "bottom",
+        "text-size": 12,
+      },
+      paint: {
+        "text-color": style.lineColor,
+        "text-halo-color": "#000000",
+        "text-halo-width": 1,
+      },
+      filter: ["!=", ["get", "label"], ""],
+    });
+  }
 }
 
 export function applyMapMotionFrame(
@@ -315,7 +400,12 @@ export function applyMapMotionFrame(
 }
 
 export function disposeMapMotion(map: MapMotionMap): void {
-  for (const layerId of [MAP_MOTION_LAYER_ID, MAP_MOTION_ARC_LAYER_ID]) {
+  for (const layerId of [
+    MAP_MOTION_LAYER_ID,
+    MAP_MOTION_ARC_LAYER_ID,
+    MAP_MOTION_MARKERS_LABEL_LAYER_ID,
+    MAP_MOTION_MARKERS_CIRCLE_LAYER_ID,
+  ]) {
     try {
       if (map.getLayer(layerId)) {
         map.removeLayer(layerId);
@@ -324,7 +414,11 @@ export function disposeMapMotion(map: MapMotionMap): void {
       // ignore teardown races
     }
   }
-  for (const sourceId of [MAP_MOTION_SOURCE_ID, MAP_MOTION_ARC_SOURCE_ID]) {
+  for (const sourceId of [
+    MAP_MOTION_SOURCE_ID,
+    MAP_MOTION_ARC_SOURCE_ID,
+    MAP_MOTION_MARKERS_SOURCE_ID,
+  ]) {
     try {
       if (map.getSource(sourceId)) {
         map.removeSource(sourceId);
@@ -336,8 +430,9 @@ export function disposeMapMotion(map: MapMotionMap): void {
 }
 
 export function waitMapIdle(map: MapMotionMap): Promise<void> {
-  return new Promise((resolve) => {
+  const idle = new Promise<void>((resolve) => {
     map.once("idle", resolve);
     map.triggerRepaint?.();
   });
+  return withTimeout(idle, MAP_IDLE_TIMEOUT_MS, "map idle wait");
 }
