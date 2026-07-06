@@ -1,8 +1,21 @@
-import ffmpegStatic from "ffmpeg-static";
-import ffprobeStatic from "ffprobe-static";
+import { createRequire } from "node:module";
 
-export const FFMPEG = (ffmpegStatic as unknown as string) ?? "ffmpeg";
-export const FFPROBE = (ffprobeStatic as { path: string }).path ?? "ffprobe";
+const require = createRequire(import.meta.url);
+
+function optionalRequire<T>(id: string): T | null {
+  try {
+    return require(id) as T;
+  } catch {
+    return null;
+  }
+}
+
+export const FFMPEG =
+  optionalRequire<string>("ffmpeg-static") ?? process.env.FFMPEG ?? "ffmpeg";
+export const FFPROBE =
+  optionalRequire<{ path?: string }>("ffprobe-static")?.path ??
+  process.env.FFPROBE ??
+  "ffprobe";
 
 export async function run(
   bin: string,
