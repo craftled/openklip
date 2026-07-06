@@ -26,21 +26,18 @@ export function EditorRightRail({
 
   return (
     <>
-      <Sidebar
-        className="hidden xl:flex"
-        collapsible="offcanvas"
-        data-editor-right-rail
-        side="right"
-      >
-        <SidebarContent className="min-h-0 flex-1 gap-0 overflow-hidden p-0">
-          <AgentChatPanel
-            onAssetsUpdated={onAssetsUpdated}
-            showSidebarTrigger
-            slug={slug}
-          />
-        </SidebarContent>
-        <SidebarRail />
-      </Sidebar>
+      <div className="hidden xl:contents" data-desktop-right-rail>
+        <Sidebar collapsible="offcanvas" data-editor-right-rail side="right">
+          <SidebarContent className="min-h-0 flex-1 gap-0 overflow-hidden p-0">
+            <AgentChatPanel
+              onAssetsUpdated={onAssetsUpdated}
+              showSidebarTrigger
+              slug={slug}
+            />
+          </SidebarContent>
+          <SidebarRail />
+        </Sidebar>
+      </div>
       {mobilePanel === "chat" ? (
         <div className="fixed inset-0 z-50 xl:hidden" data-mobile-right-rail>
           <button

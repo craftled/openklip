@@ -42,6 +42,8 @@ function minimalProps(
 
 test("EditorRightRail renders desktop chat sidebar", () => {
   const html = renderRail(minimalProps());
+  assert.match(html, /data-desktop-right-rail/);
+  assert.match(html, /hidden xl:contents/);
   assert.match(html, /data-editor-right-rail/);
   assert.match(html, /data-sidebar="sidebar"/);
   assert.match(html, /Toggle chat sidebar/);
