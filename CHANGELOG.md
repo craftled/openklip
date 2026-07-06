@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.41.1.1 - 2026-07-06
+
+### Added
+- **Viral launch playbook**: `templates/viral-launch/skill.md` edit template for scroll-stopping social launch videos (hook-first cuts, plain problem setup, early motion, `--platform x` / `shorts` export); auto-listed via `openklip template list` and MCP `load_skill`.
+
 ## 0.41.1.0 - 2026-07-06
 
 ### Added
