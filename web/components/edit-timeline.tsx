@@ -117,9 +117,9 @@ interface EditTimelineProps {
   zooms: TimelineClip[];
 }
 
-const LABEL_W = 76;
-const RULER_H = 22;
-const TRACK_H = 30;
+const LABEL_W = 104;
+const RULER_H = 20;
+const TRACK_H = 28;
 const HANDLE_W = 6;
 
 function TimelineToolbar({
@@ -136,34 +136,40 @@ function TimelineToolbar({
   zoom: number;
 }) {
   return (
-    <div className="flex items-center justify-end gap-1 border-foreground/10 border-b px-2 py-1.5">
+    <div className="flex h-8 items-center justify-end gap-1 border-border/60 border-b bg-muted/20 px-2 text-[11px]">
       <Button
         aria-label={snappingEnabled ? "Disable snap" : "Enable snap"}
         aria-pressed={snappingEnabled}
+        className={cn(
+          "h-6 rounded px-2 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground",
+          snappingEnabled && "bg-muted text-foreground"
+        )}
         onClick={onSnapToggle}
         size="sm"
         title="Snap to words and clips"
-        variant={snappingEnabled ? "secondary" : "ghost"}
+        variant="ghost"
       >
         <Scan data-icon="inline-start" />
       </Button>
       <Button
         aria-label="Zoom out"
+        className="size-6 rounded text-muted-foreground"
         disabled={zoom <= MIN_TIMELINE_ZOOM}
         onClick={onZoomOut}
-        size="sm"
+        size="icon-sm"
         variant="ghost"
       >
         −
       </Button>
-      <span className="min-w-[3rem] text-center text-muted-foreground text-xs tabular-nums">
+      <span className="min-w-9 text-center font-medium text-[11px] text-muted-foreground tabular-nums">
         {Math.round(zoom * 100)}%
       </span>
       <Button
         aria-label="Zoom in"
+        className="size-6 rounded text-muted-foreground"
         disabled={zoom >= MAX_TIMELINE_ZOOM}
         onClick={onZoomIn}
-        size="sm"
+        size="icon-sm"
         variant="ghost"
       >
         +
@@ -222,7 +228,7 @@ function LibraryBlock({
   return (
     <div
       className={cn(
-        "absolute top-1 bottom-1 truncate rounded border border-dashed px-1 text-xs leading-none opacity-75",
+        "absolute top-1 bottom-1 truncate rounded-[4px] border border-dashed px-1.5 pt-1 font-medium text-[11px] leading-none opacity-70",
         className
       )}
       style={{
@@ -375,9 +381,9 @@ function EditableClipBlock({
   return (
     <div
       className={cn(
-        "absolute top-1 bottom-1 cursor-grab truncate rounded text-xs leading-none transition-opacity hover:opacity-100 active:cursor-grabbing",
+        "absolute top-[4px] bottom-[4px] cursor-grab truncate rounded-[4px] border border-black/10 font-medium text-[11px] leading-none transition-opacity hover:opacity-100 active:cursor-grabbing dark:border-white/10",
         active
-          ? "z-20 ring-2 ring-ring ring-offset-1 ring-offset-background"
+          ? "z-20 ring-1 ring-ring ring-offset-1 ring-offset-background"
           : "z-10 opacity-90",
         className
       )}
@@ -397,13 +403,13 @@ function EditableClipBlock({
     >
       <button
         aria-label={`Resize start: ${clip.label}`}
-        className="absolute top-0 bottom-0 left-0 z-30 cursor-ew-resize rounded-l bg-foreground/15 opacity-0 hover:opacity-100"
+        className="absolute top-0 bottom-0 left-0 z-30 cursor-ew-resize rounded-l bg-foreground/20 opacity-0 hover:opacity-100"
         data-handle="start"
         onPointerDown={(e) => beginDrag(e, "resize-start")}
         style={{ width: HANDLE_W }}
         type="button"
       />
-      <span className="pointer-events-none block truncate px-1.5 py-0.5 text-left">
+      <span className="pointer-events-none block truncate px-1.5 pt-1 text-left">
         {clip.label}
       </span>
       {clip.keyframes?.map((kf, index) => {
@@ -415,7 +421,7 @@ function EditableClipBlock({
         return (
           <button
             aria-label={`Keyframe ${kf.property} at ${Math.round(fraction * 100)}%`}
-            className="absolute bottom-0.5 z-40 size-1.5 rotate-45 border border-foreground/70 bg-primary shadow-sm hover:bg-primary/80 dark:border-primary-foreground/40"
+            className="absolute bottom-0.5 z-40 size-1.5 rotate-45 border border-background/70 bg-foreground/80 shadow-sm hover:bg-foreground"
             key={`${kf.sampleOffset}-${kf.property}-${index}`}
             onPointerDown={(e) => {
               e.preventDefault();
@@ -431,7 +437,7 @@ function EditableClipBlock({
       })}
       <button
         aria-label={`Resize end: ${clip.label}`}
-        className="absolute top-0 right-0 bottom-0 z-30 cursor-ew-resize rounded-r bg-foreground/15 opacity-0 hover:opacity-100"
+        className="absolute top-0 right-0 bottom-0 z-30 cursor-ew-resize rounded-r bg-foreground/20 opacity-0 hover:opacity-100"
         data-handle="end"
         onPointerDown={(e) => beginDrag(e, "resize-end")}
         style={{ width: HANDLE_W }}
@@ -463,16 +469,16 @@ function TrackRow({
   zoom: number;
 }) {
   return (
-    <div className="flex border-foreground/10 border-b last:border-b-0">
+    <div className="flex w-full border-border/50 border-b last:border-b-0">
       <div
-        className="sticky left-0 z-20 flex shrink-0 items-center gap-1.5 border-border border-r bg-muted px-2 text-muted-foreground text-xs shadow-[1px_0_0_var(--border)]"
+        className="sticky left-0 z-20 flex shrink-0 items-center gap-2 border-border/60 border-r bg-muted/35 px-3 font-medium text-[11px] text-muted-foreground shadow-[1px_0_0_var(--border)]"
         style={{ width: LABEL_W }}
       >
-        <Icon className={APP_ICON_CLASS} />
+        <Icon className={cn(APP_ICON_CLASS, "size-3.5 opacity-50")} />
         <span className="truncate">{label}</span>
       </div>
       <div
-        className="relative shrink-0 cursor-pointer overflow-hidden bg-background/50"
+        className="relative shrink-0 cursor-pointer overflow-hidden bg-muted/15"
         onClick={(e) => seekFromClick(e, onSeek, scrollLeft, zoom)}
         ref={trackRef}
         role="presentation"
@@ -488,6 +494,11 @@ function TrackRow({
         ))}
         {children}
       </div>
+      <div
+        aria-hidden="true"
+        className="min-w-0 flex-1 bg-muted/15"
+        style={{ height: TRACK_H }}
+      />
     </div>
   );
 }
@@ -611,6 +622,7 @@ export function EditTimeline({
 
   const contentWidthPx = timelineContentWidthPx(durationSec, zoom);
   const canvasWidthPx = LABEL_W + contentWidthPx;
+  const canvasWidth = `max(100%, ${canvasWidthPx}px)`;
   const playheadPx = secToPx(curSec, zoom);
   const playheadSample = Math.round(curSec * sampleRate);
   const snapThresholdSamples = defaultSnapThresholdSamples(sampleRate);
@@ -646,7 +658,7 @@ export function EditTimeline({
   };
 
   return (
-    <div className="bg-foreground/2">
+    <div className="overflow-hidden border-border/60 border-t bg-background text-[11px] shadow-[inset_0_1px_0_rgb(255_255_255/0.45)] dark:shadow-none">
       <TimelineToolbar
         onSnapToggle={() => setSnappingEnabled((v) => !v)}
         onZoomIn={() =>
@@ -658,15 +670,19 @@ export function EditTimeline({
         snappingEnabled={snappingEnabled}
         zoom={zoom}
       />
-      <div className="overflow-x-auto" onScroll={onScroll} ref={scrollRef}>
-        <div className="relative" style={{ width: canvasWidthPx }}>
-          <div className="flex border-foreground/10 border-b">
+      <div
+        className="overflow-x-auto overscroll-x-contain"
+        onScroll={onScroll}
+        ref={scrollRef}
+      >
+        <div className="relative" style={{ width: canvasWidth }}>
+          <div className="flex w-full border-border/50 border-b">
             <div
-              className="sticky left-0 z-30 shrink-0 border-foreground/10 border-r bg-muted shadow-[1px_0_0_var(--border)]"
+              className="sticky left-0 z-30 shrink-0 border-border/60 border-r bg-muted/35 shadow-[1px_0_0_var(--border)]"
               style={{ width: LABEL_W, height: RULER_H }}
             />
             <div
-              className="relative shrink-0 cursor-pointer bg-muted/40"
+              className="relative shrink-0 cursor-pointer bg-muted/15"
               onClick={(e) => seekFromClick(e, onSeek, scrollLeft, zoom)}
               role="presentation"
               style={{ width: contentWidthPx, height: RULER_H }}
@@ -681,7 +697,7 @@ export function EditTimeline({
               ))}
               {ticks.map((t) => (
                 <span
-                  className="absolute top-0 text-muted-foreground text-xs tabular-nums"
+                  className="absolute top-1 font-medium text-[10px] text-muted-foreground tabular-nums"
                   key={t}
                   style={{
                     left: secToPx(t, zoom),
@@ -692,6 +708,11 @@ export function EditTimeline({
                 </span>
               ))}
             </div>
+            <div
+              aria-hidden="true"
+              className="min-w-0 flex-1 bg-muted/15"
+              style={{ height: RULER_H }}
+            />
           </div>
 
           <TrackRow
@@ -727,11 +748,11 @@ export function EditTimeline({
                   }
                   aria-pressed={w.deleted}
                   className={cn(
-                    "absolute top-2 bottom-2 cursor-pointer rounded-sm border border-transparent",
+                    "absolute top-[9px] bottom-[9px] cursor-pointer rounded-[2px] border border-transparent",
                     w.deleted
-                      ? "bg-foreground/10 hover:bg-foreground/15"
-                      : "bg-foreground/10 hover:bg-foreground/20",
-                    inSel && "border-ring bg-accent"
+                      ? "bg-muted hover:bg-muted/80"
+                      : "bg-muted-foreground/25 hover:bg-muted-foreground/35",
+                    inSel && "border-ring bg-primary/30"
                   )}
                   key={w.id}
                   onClick={(e) => {
@@ -753,7 +774,7 @@ export function EditTimeline({
 
           <ClipTrack
             {...clipTrackProps}
-            clipClassName="bg-muted text-foreground"
+            clipClassName="bg-sky-600/85 text-white"
             clips={broll}
             icon={Film}
             label="B-roll"
@@ -762,7 +783,7 @@ export function EditTimeline({
 
           <ClipTrack
             {...clipTrackProps}
-            clipClassName="bg-secondary text-secondary-foreground"
+            clipClassName="bg-violet-600/80 text-white"
             clips={zooms}
             icon={ZoomIn}
             label="Push-in"
@@ -771,7 +792,7 @@ export function EditTimeline({
 
           <ClipTrack
             {...clipTrackProps}
-            clipClassName="border border-border bg-accent text-accent-foreground"
+            clipClassName="bg-fuchsia-700/80 text-white"
             clips={titles}
             icon={Type}
             label="Titles"
@@ -780,7 +801,7 @@ export function EditTimeline({
 
           <ClipTrack
             {...clipTrackProps}
-            clipClassName="border border-border bg-primary/20 text-foreground"
+            clipClassName="bg-cyan-700/80 text-white"
             clips={graphics}
             icon={Sparkles}
             label="Graphics"
@@ -789,7 +810,7 @@ export function EditTimeline({
 
           <ClipTrack
             {...clipTrackProps}
-            clipClassName="border border-border bg-muted/60 text-foreground"
+            clipClassName="bg-amber-700/80 text-white"
             clips={stills}
             icon={ImageIcon}
             label="Stills"
@@ -799,7 +820,7 @@ export function EditTimeline({
           {music.length > 0 && (
             <ClipTrack
               {...clipTrackProps}
-              clipClassName="border border-border bg-muted/70 text-foreground"
+              clipClassName="bg-emerald-700/80 text-white"
               clips={music}
               icon={Music}
               label="Music"
@@ -819,7 +840,7 @@ export function EditTimeline({
             >
               {libraryMusic.map((clip) => (
                 <LibraryBlock
-                  className="border-border bg-muted/50 text-foreground"
+                  className="border-border bg-muted/60 text-muted-foreground"
                   clip={clip}
                   key={clip.id}
                   zoom={zoom}
@@ -840,7 +861,7 @@ export function EditTimeline({
             >
               {libraryStills.map((clip) => (
                 <LibraryBlock
-                  className="border-border bg-muted/40 text-foreground"
+                  className="border-border bg-muted/50 text-muted-foreground"
                   clip={clip}
                   key={clip.id}
                   zoom={zoom}
@@ -854,17 +875,17 @@ export function EditTimeline({
             style={{ left: LABEL_W, width: contentWidthPx }}
           >
             <div
-              className="absolute inset-y-0 w-px bg-primary"
+              className="absolute inset-y-0 w-px bg-[#2494ff]"
               style={{ left: playheadPx }}
             />
             <div
-              className="absolute top-0 -translate-x-1/2 rounded-sm bg-primary px-1.5 py-0.5 font-medium text-primary-foreground text-xs tabular-nums"
+              className="absolute top-0 -translate-x-1/2 rounded-sm bg-[#2494ff] px-1.5 py-0.5 font-medium text-[10px] text-white tabular-nums"
               style={{ left: playheadPx }}
             >
               {fmtTime(curSec)}
             </div>
             <div
-              className="absolute top-0 size-2 -translate-x-1/2 rounded-full bg-primary"
+              className="absolute top-0 size-2 -translate-x-1/2 rounded-full bg-[#2494ff]"
               style={{ left: playheadPx, marginTop: RULER_H - 4 }}
             />
           </div>

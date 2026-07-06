@@ -44,11 +44,11 @@ export function TimelineDrawer({
           </Button>
         }
       />
-      <DrawerContent className="max-h-[85vh]">
-        <DrawerHeader className="pb-2">
-          <DrawerTitle className="flex items-center justify-between font-medium text-sm">
+      <DrawerContent className="max-h-[85vh] overflow-hidden border-border bg-background text-foreground">
+        <DrawerHeader className="border-border/60 border-b px-3 py-2">
+          <DrawerTitle className="flex items-center justify-between font-medium text-xs">
             <span>Timeline</span>
-            <span className="font-normal text-muted-foreground tabular-nums">
+            <span className="font-normal text-[11px] text-muted-foreground tabular-nums">
               {fmtTime(curSec)} / {fmtTime(durationSec)}
             </span>
           </DrawerTitle>
