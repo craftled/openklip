@@ -2,6 +2,10 @@
 
 import type { Keyframe } from "@engine/keyframes";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  type GraphicComposition,
+  loadGraphicComposition,
+} from "@/lib/graphic-composition-load";
 import { ensureGraphicImagesReady } from "@/lib/graphic-image-cache";
 import {
   applyGraphicFrame,
@@ -27,52 +31,6 @@ export interface GraphicItem {
   template: string;
   track: string;
   type?: "template" | "json-render";
-}
-
-interface Composition {
-  fps: number;
-  height: number;
-  html: string;
-  width: number;
-}
-
-// Module-level cache keyed by template id: the fragment + intrinsic metadata are
-// immutable per template, so every overlay instance shares one fetch.
-const compCache = new Map<string, Promise<Composition | null>>();
-
-function loadComposition(
-  template: string,
-  slug: string
-): Promise<Composition | null> {
-  const cacheKey = `${slug}:${template}`;
-  const cached = compCache.get(cacheKey);
-  if (cached) {
-    return cached;
-  }
-  const promise = fetch(
-    `/media/graphic/${encodeURIComponent(template)}?slug=${encodeURIComponent(slug)}`
-  )
-    .then(async (res) => {
-      if (!res.ok) {
-        return null;
-      }
-      const data = (await res.json()) as {
-        html?: string;
-        manifest?: { width: number; height: number; fps?: number };
-      };
-      if (!(data.html && data.manifest)) {
-        return null;
-      }
-      return {
-        html: data.html,
-        width: data.manifest.width,
-        height: data.manifest.height,
-        fps: data.manifest.fps ?? 30,
-      };
-    })
-    .catch(() => null);
-  compCache.set(cacheKey, promise);
-  return promise;
 }
 
 function previewParams(
@@ -101,7 +59,7 @@ export function GraphicOverlay({
   sampleRate: number;
   slug: string;
 }) {
-  const [comp, setComp] = useState<Composition | null>(null);
+  const [comp, setComp] = useState<GraphicComposition | null>(null);
   const boxRef = useRef<HTMLDivElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const rootRef = useRef<HTMLElement | null>(null);
@@ -110,7 +68,7 @@ export function GraphicOverlay({
   // Fetch (cached) the composition fragment for this template.
   useEffect(() => {
     let alive = true;
-    loadComposition(graphic.template, slug).then((c) => {
+    loadGraphicComposition(graphic.template, slug).then((c) => {
       if (alive) {
         setComp(c);
       }

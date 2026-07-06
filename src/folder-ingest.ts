@@ -1,6 +1,6 @@
 // Folder batch intake: pick one primary video for ingest, treat the rest as
 // assets/ sidecars. Pure over { name, size }[] so GUI and API share logic.
-import { isRecognizedAssetFile } from "./assets.ts";
+import { isRecognizedAssetFile } from "./asset-filenames.ts";
 import {
   isSupportedVideoFilename,
   unsupportedVideoMessage,

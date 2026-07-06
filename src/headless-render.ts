@@ -22,7 +22,10 @@ import type { Browser } from "puppeteer-core";
 import { SAMPLE_RATE } from "./edl.ts";
 import { FFMPEG, run } from "./ffmpeg.ts";
 import type { Keyframe } from "./keyframes.ts";
-import { graphicRuntimeEntryPath } from "./script-paths.ts";
+import {
+  graphicRuntimeEntryPath,
+  mapMotionRuntimeEntryPath,
+} from "./script-paths.ts";
 
 export interface HeadlessRenderInput {
   compositionHtml: string;
@@ -37,6 +40,16 @@ export interface HeadlessRenderInput {
 
 const CHROME_HINT =
   "chrome-headless-shell not found. Install it once with: bunx puppeteer browsers install chrome-headless-shell";
+
+const MAPLIBRE_CSS =
+  "https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css";
+
+function isMapMotionHtml(compositionHtml: string): boolean {
+  return (
+    compositionHtml.includes('data-map-motion="true"') ||
+    compositionHtml.includes('id="map-motion-root"')
+  );
+}
 
 // chrome-headless-shell lands under ~/.cache/puppeteer/chrome-headless-shell/
 // <platform-build>/chrome-headless-shell-<platform>/chrome-headless-shell.
@@ -64,16 +77,15 @@ function findChrome(): string {
   throw new Error(CHROME_HINT);
 }
 
-// Bundle web/lib/graphic-runtime.ts (+ motion) into an IIFE exposing
-// window.__okGraphic. Built once per process and cached.
-let runtimeBundle: string | null = null;
-async function buildRuntimeBundle(): Promise<string> {
-  if (runtimeBundle !== null) {
-    return runtimeBundle;
+const runtimeBundleCache = new Map<string, string>();
+
+async function buildRuntimeBundle(entryPath: string): Promise<string> {
+  const cached = runtimeBundleCache.get(entryPath);
+  if (cached !== undefined) {
+    return cached;
   }
-  const entry = graphicRuntimeEntryPath();
   const out = await Bun.build({
-    entrypoints: [entry],
+    entrypoints: [entryPath],
     target: "browser",
     format: "iife",
     minify: true,
@@ -83,8 +95,9 @@ async function buildRuntimeBundle(): Promise<string> {
       `failed to bundle graphic runtime: ${out.logs.map(String).join("; ")}`
     );
   }
-  runtimeBundle = await out.outputs[0].text();
-  return runtimeBundle;
+  const bundle = await out.outputs[0].text();
+  runtimeBundleCache.set(entryPath, bundle);
+  return bundle;
 }
 
 const pad5 = (n: number): string => String(n).padStart(5, "0");
@@ -107,8 +120,11 @@ export async function renderHeadlessAlpha(
       `rich graphic is too long to render: ${secs}s (${input.durFrames} frames) exceeds the ${MAX_RICH_SECONDS}s cap. Shorten the graphic's span, or use a kind:"text" template (no per-frame capture).`
     );
   }
+  const mapMotion = isMapMotionHtml(input.compositionHtml);
   const chrome = findChrome();
-  const bundle = await buildRuntimeBundle();
+  const bundle = await buildRuntimeBundle(
+    mapMotion ? mapMotionRuntimeEntryPath() : graphicRuntimeEntryPath()
+  );
   const puppeteer = (await import("puppeteer-core")).default;
 
   // browser + framesDir are assigned INSIDE the try so the finally always cleans
@@ -137,102 +153,150 @@ export async function renderHeadlessAlpha(
       height: input.height,
       deviceScaleFactor: 1,
     });
+    const mapCss = mapMotion
+      ? `<link rel="stylesheet" href="${MAPLIBRE_CSS}">`
+      : "";
     await page.setContent(
-      `<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;padding:0;background:transparent;overflow:hidden}</style></head><body>${input.compositionHtml}</body></html>`,
+      `<!doctype html><html><head><meta charset="utf-8">${mapCss}<style>html,body{margin:0;padding:0;background:transparent;overflow:hidden}</style></head><body>${input.compositionHtml}</body></html>`,
       { waitUntil: "load" }
     );
     // Block until webfonts settle so glyph metrics match the preview.
     await page.evaluate(() => document.fonts.ready);
     await page.addScriptTag({ content: bundle });
 
-    await page.evaluate(async (params: unknown) => {
-      const api = (
-        window as unknown as {
-          __okGraphic: {
-            ensureGraphicImagesReady: (
-              p: unknown,
-              shaderId?: string | null
-            ) => Promise<void>;
-          };
-        }
-      ).__okGraphic;
-      const root = document.querySelector("[data-shader]");
-      await api.ensureGraphicImagesReady(
-        params,
-        root?.getAttribute("data-shader")
-      );
-    }, input.params);
+    if (mapMotion) {
+      await page.evaluate(async () => {
+        const api = (
+          window as unknown as {
+            __okGraphic: {
+              ensureMapMotionReady: () => Promise<void>;
+            };
+          }
+        ).__okGraphic;
+        await api.ensureMapMotionReady();
+      });
+    } else {
+      await page.evaluate(async (params: unknown) => {
+        const api = (
+          window as unknown as {
+            __okGraphic: {
+              ensureGraphicImagesReady: (
+                p: unknown,
+                shaderId?: string | null
+              ) => Promise<void>;
+            };
+          }
+        ).__okGraphic;
+        const root = document.querySelector("[data-shader]");
+        await api.ensureGraphicImagesReady(
+          params,
+          root?.getAttribute("data-shader")
+        );
+      }, input.params);
 
-    // Params are static for the whole render. Bind text/accent ONCE, not per
-    // frame (the per-frame loop only re-seeks the animation).
-    await page.evaluate((params: unknown) => {
-      const api = (
-        window as unknown as {
-          __okGraphic: {
-            applyGraphicParams: (r: Element, p: unknown) => void;
-          };
+      // Params are static for the whole render. Bind text/accent ONCE, not per
+      // frame (the per-frame loop only re-seeks the animation).
+      await page.evaluate((params: unknown) => {
+        const api = (
+          window as unknown as {
+            __okGraphic: {
+              applyGraphicParams: (r: Element, p: unknown) => void;
+            };
+          }
+        ).__okGraphic;
+        const root = document.querySelector("[data-graphic-root]");
+        if (root) {
+          api.applyGraphicParams(root, params);
         }
-      ).__okGraphic;
-      const root = document.querySelector("[data-graphic-root]");
-      if (root) {
-        api.applyGraphicParams(root, params);
-      }
-    }, input.params);
+      }, input.params);
+    }
 
     for (let f = 0; f < input.durFrames; f++) {
       const sampleOffset = Math.floor((f * SAMPLE_RATE) / input.fps);
-      await page.evaluate(
-        (
-          frame: number,
-          durFrames: number,
-          height: number,
-          width: number,
-          keyframes: unknown,
-          sampleOffsetArg: number
-        ) => {
-          const api = (
-            window as unknown as {
-              __okGraphic: {
-                applyGraphicFrame: (
-                  r: Element,
-                  fr: number,
-                  df: number,
-                  h: number,
-                  opts?: {
-                    width: number;
-                    height: number;
-                    keyframes?: unknown;
-                    sampleOffset?: number;
-                  }
-                ) => void;
-              };
+      if (mapMotion) {
+        await page.evaluate(
+          async (frame: number, durFrames: number) => {
+            const api = (
+              window as unknown as {
+                __okGraphic: {
+                  applyMapMotionFrame: (
+                    fr: number,
+                    df: number
+                  ) => Promise<void>;
+                };
+              }
+            ).__okGraphic;
+            await api.applyMapMotionFrame(frame, durFrames);
+          },
+          f,
+          input.durFrames
+        );
+      } else {
+        await page.evaluate(
+          (
+            frame: number,
+            durFrames: number,
+            height: number,
+            width: number,
+            keyframes: unknown,
+            sampleOffsetArg: number
+          ) => {
+            const api = (
+              window as unknown as {
+                __okGraphic: {
+                  applyGraphicFrame: (
+                    r: Element,
+                    fr: number,
+                    df: number,
+                    h: number,
+                    opts?: {
+                      width: number;
+                      height: number;
+                      keyframes?: unknown;
+                      sampleOffset?: number;
+                    }
+                  ) => void;
+                };
+              }
+            ).__okGraphic;
+            const root = document.querySelector("[data-graphic-root]");
+            if (!root) {
+              return;
             }
-          ).__okGraphic;
-          const root = document.querySelector("[data-graphic-root]");
-          if (!root) {
-            return;
-          }
-          api.applyGraphicFrame(root, frame, durFrames, height, {
-            width,
-            height,
-            keyframes,
-            sampleOffset: sampleOffsetArg,
-          });
-        },
-        f,
-        input.durFrames,
-        input.height,
-        input.width,
-        input.keyframes,
-        sampleOffset
-      );
+            api.applyGraphicFrame(root, frame, durFrames, height, {
+              width,
+              height,
+              keyframes,
+              sampleOffset: sampleOffsetArg,
+            });
+          },
+          f,
+          input.durFrames,
+          input.height,
+          input.width,
+          input.keyframes,
+          sampleOffset
+        );
+      }
       const buf = (await page.screenshot({
-        omitBackground: true,
+        omitBackground: !mapMotion,
         type: "png",
         clip: { x: 0, y: 0, width: input.width, height: input.height },
       })) as Uint8Array;
       await writeFile(join(framesDir, `frame-${pad5(f)}.png`), buf);
     }
+
+    if (mapMotion) {
+      await page.evaluate(() => {
+        const api = (
+          window as unknown as {
+            __okGraphic: { disposeMapMotion: () => void };
+          }
+        ).__okGraphic;
+        api.disposeMapMotion();
+      });
+    }
+
     await browser.close();
 
     // ProRes 4444 in a MOV preserves alpha reliably (native encoder, no libvpx

@@ -6,11 +6,11 @@ import {
 } from "./audio-analysis-core.ts";
 import { CAPTION_STYLE_IDS, DEFAULT_CAPTION_STYLE } from "./caption-styles.ts";
 import { ExportLayoutSchema, SplitVerticalSchema } from "./export-layout.ts";
-import { KeyframeSchema } from "./keyframes.ts";
 import {
-  ProductAnnouncementCatalogSchema,
-  ProductAnnouncementSpecSchema,
-} from "./product-announcement.ts";
+  JsonRenderCatalogSchema,
+  validateJsonRenderSpec,
+} from "./json-render-catalogs.ts";
+import { KeyframeSchema } from "./keyframes.ts";
 import { CAPTION_INSET_PLATFORMS } from "./safe-areas.ts";
 
 // Canonical time base: integer audio samples at 48 kHz. Preview and export both
@@ -252,8 +252,8 @@ export const GraphicSchema = z
     id: z.string(),
     type: z.enum(["template", "json-render"]).optional(),
     template: z.string(),
-    catalog: ProductAnnouncementCatalogSchema.optional(),
-    spec: ProductAnnouncementSpecSchema.optional(),
+    catalog: JsonRenderCatalogSchema.optional(),
+    spec: z.unknown().optional(),
     params: z
       .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
       .default({}),
@@ -291,6 +291,18 @@ export const GraphicSchema = z
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "json-render graphics require a spec",
+        path: ["spec"],
+      });
+      return;
+    }
+    if (!graphic.catalog) {
+      return;
+    }
+    const validation = validateJsonRenderSpec(graphic.catalog, graphic.spec);
+    if (!validation.success) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: validation.issues[0] ?? "invalid json-render spec",
         path: ["spec"],
       });
     }

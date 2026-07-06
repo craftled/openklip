@@ -68,6 +68,7 @@ import {
 } from "./export-segments.ts";
 import { FFMPEG, probe, run } from "./ffmpeg.ts";
 import { filterChain } from "./filter.ts";
+import { clampGifDimensions, GIF_MAX_DURATION_SEC } from "./gif-export.ts";
 import { enrichGraphicParamsWithImage } from "./graphic-image.ts";
 import { renderGraphicOverlay } from "./graphic-render.ts";
 import {
@@ -75,6 +76,10 @@ import {
   type GraphicManifest,
   loadGraphicManifest,
 } from "./graphics.ts";
+import {
+  jsonRenderCatalogDef,
+  validateJsonRenderSpec,
+} from "./json-render-catalogs.ts";
 import { buildStillZoompan } from "./ken-burns.ts";
 import {
   analyzeLoudnormPass,
@@ -83,13 +88,6 @@ import {
 } from "./loudnorm-two-pass.ts";
 import { lut3dExpr, lutPath } from "./lut.ts";
 import { projectPaths } from "./paths.ts";
-import {
-  PRODUCT_ANNOUNCEMENT_CATALOG,
-  PRODUCT_ANNOUNCEMENT_FPS,
-  PRODUCT_ANNOUNCEMENT_HEIGHT,
-  PRODUCT_ANNOUNCEMENT_WIDTH,
-  validateProductAnnouncementSpec,
-} from "./product-announcement.ts";
 import type { SourceMediaKind } from "./source-media.ts";
 import { resolveSourceMediaStatus } from "./source-media.ts";
 import { buildTitlesAss, type TitleItem } from "./titles.ts";
@@ -116,74 +114,13 @@ export const EXPORT_FORMATS = ["mp4", "gif"] as const;
 
 export type ExportFormat = (typeof EXPORT_FORMATS)[number];
 
-// GIF export caps (TODO.md known limitation: "no size or duration cap"). A
-// GIF's file size and encode time scale primarily with frame count (fps x
-// duration) and pixel count (width x height), so both are bounded here. The
-// mp4 pipeline (outW/outH/outFps above) is completely untouched by these
-// constants; they apply ONLY to the GIF-specific second pass.
-//
-// GIF_MAX_WIDTH_PX (960): the common "shareable GIF" ceiling (matches the
-// smaller 640px cap scripts/record-demo-gif.sh already uses for the README
-// demo, scaled up for a general-purpose export) - wide enough to stay
-// legible, narrow enough to keep a multi-second GIF in the low tens of MB.
-// GIF_MAX_FPS (15): halves (or more) the frame count versus a 30/60fps
-// source while staying smooth enough for palette-limited GIF playback; the
-// same rate scripts/record-demo-gif.sh already uses for the README demo.
-export const GIF_MAX_WIDTH_PX = 960;
-export const GIF_MAX_FPS = 15;
-// GIF_MAX_WIDTH_OVERRIDE_CEILING_PX (1920): TODO.md's known limitation ("no
-// user-facing control to customize these ceilings") is addressed via
-// ExportOptions.gifMaxWidth, but an unbounded override would let a caller
-// request e.g. gifMaxWidth: 999999 and produce a multi-GB file. This is the
-// hard ceiling ANY gifMaxWidth override clamps to, regardless of caller
-// (CLI/route/action/MCP all validate against it too, but this is the
-// store-layer clamp that protects exportCut even if a surface's own check is
-// bypassed). 1920 (Full HD) is a generous "still shareable" upper bound, well
-// above the 960px default, while remaining far short of an unbounded value.
-export const GIF_MAX_WIDTH_OVERRIDE_CEILING_PX = 1920;
-// GIF_MAX_DURATION_SEC (300 = 5 minutes): even a small-pixel, low-fps GIF of
-// a very long clip is still an enormous frame count, and a multi-minute
-// palettegen/paletteuse pass is a poor experience with no progress feedback.
-// This is a hard ceiling on GIF exports specifically; mp4 export (the
-// default) has no such limit. 5 minutes is generous for a "shareable clip"
-// deliverable while still catching accidental whole-recording GIF exports.
-export const GIF_MAX_DURATION_SEC = 300;
-
-/**
- * Clamp GIF-specific output width/fps down to the ceilings above. Passes
- * values through unchanged when already at or under the cap. When width is
- * capped, height is derived with the same round-to-nearest-even convention
- * resolveExportDimensions (export-aspect.ts) already uses elsewhere in this
- * file, so the GIF keeps the export's aspect ratio.
- *
- * `maxWidth` overrides GIF_MAX_WIDTH_PX for this export only (see
- * ExportOptions.gifMaxWidth); omitted, it falls back to the default ceiling.
- * Either way the effective ceiling is itself clamped to
- * GIF_MAX_WIDTH_OVERRIDE_CEILING_PX (and never below 1px), so an out-of-range
- * override cannot produce an unbounded GIF even if a caller bypasses the
- * bounds each surface (CLI/route/action/MCP) enforces before reaching here.
- */
-export function clampGifDimensions(input: {
-  fps: number;
-  height: number;
-  maxWidth?: number;
-  width: number;
-}): { fps: number; height: number; width: number } {
-  const fps = Math.min(input.fps, GIF_MAX_FPS);
-  const maxWidth = Math.min(
-    Math.max(input.maxWidth ?? GIF_MAX_WIDTH_PX, 1),
-    GIF_MAX_WIDTH_OVERRIDE_CEILING_PX
-  );
-  if (input.width <= maxWidth) {
-    return { fps, height: input.height, width: input.width };
-  }
-  const width = maxWidth;
-  const height = Math.max(
-    2,
-    Math.round((input.height * width) / input.width / 2) * 2
-  );
-  return { fps, height, width };
-}
+export {
+  clampGifDimensions,
+  GIF_MAX_DURATION_SEC,
+  GIF_MAX_FPS,
+  GIF_MAX_WIDTH_OVERRIDE_CEILING_PX,
+  GIF_MAX_WIDTH_PX,
+} from "./gif-export.ts";
 
 export interface ExportOptions {
   /** Output aspect for this export; defaults to project.export then platform. */
@@ -204,6 +141,11 @@ export interface ExportOptions {
    */
   gifMaxWidth?: number;
   /**
+   * When false, skip loudness normalization for this export even when a
+   * platform preset or project.audio.loudness would otherwise apply.
+   */
+  loudnessNormalize?: boolean;
+  /**
    * Export-invocation-only loudness normalization target (LUFS, -30..-10).
    * Applies loudnorm at this target for THIS export regardless of the
    * project's saved audio.loudness setting; never mutates the project.
@@ -211,11 +153,6 @@ export interface ExportOptions {
    * how fps/maxHeight bounds are enforced today.
    */
   loudnessTargetLufs?: number;
-  /**
-   * When false, skip loudness normalization for this export even when a
-   * platform preset or project.audio.loudness would otherwise apply.
-   */
-  loudnessNormalize?: boolean;
   maxHeight?: number; // e.g. 1080 -> downscale output (and speed up filtering/encode)
   /** Final output path; defaults to output/out.mp4. */
   outPath?: string;
@@ -293,9 +230,7 @@ export function parseExportLoudnessFlag(raw: string): number | "off" {
   }
   const lufs = Number(raw);
   if (!(Number.isFinite(lufs) && lufs >= -30 && lufs <= -10)) {
-    throw new Error(
-      '--loudness must be "off" or a number between -30 and -10'
-    );
+    throw new Error('--loudness must be "off" or a number between -30 and -10');
   }
   return lufs;
 }
@@ -327,7 +262,12 @@ export function assertJsonRenderGraphicsExportable(project: Project): void {
     if ((g.type ?? "template") !== "json-render") {
       continue;
     }
-    const validation = validateProductAnnouncementSpec(g.spec);
+    if (!g.catalog) {
+      throw new Error(
+        `cannot export: json-render graphic "${g.id}" is missing a catalog`
+      );
+    }
+    const validation = validateJsonRenderSpec(g.catalog, g.spec);
     if (validation.success && validation.spec) {
       continue;
     }
@@ -1155,36 +1095,37 @@ export async function exportCut(
           return null;
         }
         if (g.type === "json-render") {
-          const validation = validateProductAnnouncementSpec(g.spec);
+          if (!g.catalog) {
+            throw new Error(
+              `cannot export: json-render graphic "${g.id}" is missing a catalog`
+            );
+          }
+          const catalogDef = jsonRenderCatalogDef(g.catalog);
+          const validation = validateJsonRenderSpec(g.catalog, g.spec);
           if (!(validation.success && validation.spec)) {
             const issue = validation.issues[0] ?? "validation failed";
             throw new Error(
               `cannot export: json-render graphic "${g.id}" has an invalid spec (${issue})`
             );
           }
-          const { renderProductAnnouncementHtml } = await import(
-            "./product-announcement-html.tsx"
-          );
-          const params: Record<string, string | number | boolean> = {};
           const manifest: GraphicManifest = {
-            id: PRODUCT_ANNOUNCEMENT_CATALOG,
-            name: "Product announcement",
+            id: catalogDef.id,
+            name: catalogDef.name,
             kind: "rich",
-            width: PRODUCT_ANNOUNCEMENT_WIDTH,
-            height: PRODUCT_ANNOUNCEMENT_HEIGHT,
-            fps: PRODUCT_ANNOUNCEMENT_FPS,
+            width: catalogDef.width,
+            height: catalogDef.height,
+            fps: catalogDef.fps,
             params: {},
           };
+          const emptyParams = {} as Record<string, string | number | boolean>;
           return {
             graphic: g,
             outStart: win.outStart,
             outEnd: win.outEnd,
             durationSamples: graphicWindowDurationSamples(win, sr),
             manifest,
-            params,
-            compositionHtml: await renderProductAnnouncementHtml(
-              validation.spec
-            ),
+            params: emptyParams,
+            compositionHtml: await catalogDef.renderExportHtml(validation.spec),
           };
         }
         const manifest: GraphicManifest = loadGraphicManifest(g.template, {

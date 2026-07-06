@@ -1,0 +1,16 @@
+{
+  "mode": "route",
+  "theme": "dark",
+  "projection": "mercator",
+  "animation": "routeReveal",
+  "points": [
+    { "lng": -74.006, "lat": 40.7128, "label": "NYC" },
+    { "lng": -118.2437, "lat": 34.0522, "label": "LA" }
+  ],
+  "style": {
+    "lineColor": "#4285F4",
+    "lineWidth": 4,
+    "markerColor": "#3b82f6",
+    "arcCurvature": 0.2
+  }
+}

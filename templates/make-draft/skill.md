@@ -10,7 +10,7 @@ One prompt to a full first draft: cuts, captions, titles, b-roll or stills, musi
 ## 1. Understand the project
 
 - Call project_status, then brief_get. When a brief exists, follow its audience, goal, tone, must-use assets, avoid list, and target length over any default below.
-- Call list_assets and asset_cards to learn what media exists and what each clip is best for. Use transcript_grep or transcript_span for the shape of the talk; never dump the whole transcript.
+- Call list_assets and asset_cards to learn what media exists and what each clip is best for. When several clips could fit a span, call broll_suggest with the spoken phrase or topic before placing b-roll. Use transcript_grep or transcript_span for the shape of the talk; never dump the whole transcript.
 
 ## 2. Cut
 
@@ -31,7 +31,7 @@ One prompt to a full first draft: cuts, captions, titles, b-roll or stills, musi
 
 ## 4. B-roll and stills
 
-- Cover one to three spans with b-roll using broll-add-phrase, 2 to 6 seconds each, matched by the asset cards' bestFor and tags.
+- Cover one to three spans with b-roll using broll-add-phrase, 2 to 6 seconds each. Prefer broll_suggest (or the cards' bestFor and tags) to pick the asset id before placing.
 - Where a visual beat needs texture and no b-roll fits, place a still with still-add (Ken Burns is applied automatically).
 - Respect the brief's must-use and avoid lists, and each asset's `mustUse` / `avoid` flags from list_assets.
 

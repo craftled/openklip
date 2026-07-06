@@ -3,12 +3,14 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { applyGraphicFrame, graphicFrameAt } from "@/lib/graphic-runtime";
 import {
-  PRODUCT_ANNOUNCEMENT_FPS,
-  PRODUCT_ANNOUNCEMENT_HEIGHT,
-  PRODUCT_ANNOUNCEMENT_WIDTH,
-  type ProductAnnouncementSpec,
-  validateProductAnnouncementSpec,
-} from "../../src/product-announcement.ts";
+  jsonRenderCatalogDef,
+  MAP_MOTION_CATALOG,
+  PRODUCT_ANNOUNCEMENT_CATALOG,
+  validateJsonRenderSpec,
+} from "../../src/json-render-catalogs.ts";
+import type { MapMotionSpec } from "../../src/map-motion.ts";
+import type { ProductAnnouncementSpec } from "../../src/product-announcement.ts";
+import { MapMotionFrame } from "./map-motion-frame";
 import { ProductAnnouncementFrame } from "./product-announcement-frame";
 
 export interface JsonRenderGraphicItem {
@@ -22,8 +24,8 @@ export interface JsonRenderGraphicItem {
 }
 
 export function JsonRenderGraphicOverlay({
-  graphic,
   curSample,
+  graphic,
   sampleRate,
 }: {
   curSample: number;
@@ -34,10 +36,64 @@ export function JsonRenderGraphicOverlay({
   const stageRef = useRef<HTMLDivElement | null>(null);
   const rootRef = useRef<HTMLElement | null>(null);
   const [scale, setScale] = useState(1);
-  const validation = useMemo(
-    () => validateProductAnnouncementSpec(graphic.spec),
-    [graphic.spec]
+
+  const catalog = graphic.catalog ?? PRODUCT_ANNOUNCEMENT_CATALOG;
+  const catalogDef = jsonRenderCatalogDef(
+    catalog as typeof PRODUCT_ANNOUNCEMENT_CATALOG | typeof MAP_MOTION_CATALOG
   );
+  const validation = useMemo(
+    () => validateJsonRenderSpec(catalogDef.id, graphic.spec),
+    [catalogDef.id, graphic.spec]
+  );
+
+  const frameState = useMemo(
+    () =>
+      graphicFrameAt(
+        curSample,
+        graphic.startSample,
+        graphic.endSample,
+        sampleRate,
+        catalogDef.fps
+      ),
+    [
+      curSample,
+      sampleRate,
+      graphic.startSample,
+      graphic.endSample,
+      catalogDef.fps,
+    ]
+  );
+
+  useLayoutEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) {
+      return;
+    }
+    rootRef.current =
+      stage.querySelector<HTMLElement>("[data-graphic-root]") ?? stage;
+  }, [validation.spec, catalogDef.id]);
+
+  useLayoutEffect(() => {
+    if (catalogDef.id === MAP_MOTION_CATALOG) {
+      return;
+    }
+    const root = rootRef.current;
+    if (!root) {
+      return;
+    }
+    applyGraphicFrame(
+      root,
+      frameState.frame,
+      frameState.durFrames,
+      catalogDef.height
+    );
+  }, [
+    catalogDef.height,
+    catalogDef.id,
+    frameState.durFrames,
+    frameState.frame,
+    validation.spec,
+  ]);
 
   useLayoutEffect(() => {
     const box = boxRef.current;
@@ -47,44 +103,14 @@ export function JsonRenderGraphicOverlay({
     const update = () => {
       const w = box.clientWidth;
       if (w > 0) {
-        setScale(w / PRODUCT_ANNOUNCEMENT_WIDTH);
+        setScale(w / catalogDef.width);
       }
     };
     update();
     const ro = new ResizeObserver(update);
     ro.observe(box);
     return () => ro.disconnect();
-  }, []);
-
-  useLayoutEffect(() => {
-    const stage = stageRef.current;
-    if (!stage) {
-      return;
-    }
-    rootRef.current =
-      stage.querySelector<HTMLElement>("[data-graphic-root]") ?? stage;
-  }, [validation.spec]);
-
-  useLayoutEffect(() => {
-    const root = rootRef.current;
-    if (!root) {
-      return;
-    }
-    const { frame, durFrames } = graphicFrameAt(
-      curSample,
-      graphic.startSample,
-      graphic.endSample,
-      sampleRate,
-      PRODUCT_ANNOUNCEMENT_FPS
-    );
-    applyGraphicFrame(root, frame, durFrames, PRODUCT_ANNOUNCEMENT_HEIGHT);
-  }, [
-    curSample,
-    sampleRate,
-    graphic.startSample,
-    graphic.endSample,
-    validation.spec,
-  ]);
+  }, [catalogDef.width]);
 
   if (!(validation.success && validation.spec)) {
     return (
@@ -107,14 +133,22 @@ export function JsonRenderGraphicOverlay({
         className="absolute top-0 left-0 origin-top-left"
         ref={stageRef}
         style={{
-          width: PRODUCT_ANNOUNCEMENT_WIDTH,
-          height: PRODUCT_ANNOUNCEMENT_HEIGHT,
+          height: catalogDef.height,
           transform: `scale(${scale})`,
+          width: catalogDef.width,
         }}
       >
-        <ProductAnnouncementFrame
-          spec={validation.spec as ProductAnnouncementSpec}
-        />
+        {catalogDef.id === MAP_MOTION_CATALOG ? (
+          <MapMotionFrame
+            durFrames={frameState.durFrames}
+            frame={frameState.frame}
+            spec={validation.spec as MapMotionSpec}
+          />
+        ) : (
+          <ProductAnnouncementFrame
+            spec={validation.spec as ProductAnnouncementSpec}
+          />
+        )}
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { GraphicTemplatePreviewHover } from "@/components/graphic-template-preview-hover";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -213,19 +214,44 @@ export function GraphicSectionControls({
           >
             <SelectValue placeholder="Choose template" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="z-50">
             {groups.map((group) => (
               <SelectGroup key={group.pack}>
                 <SelectLabel>{group.label}</SelectLabel>
                 {group.items.map((t) => (
                   <SelectItem key={t.id} value={t.id}>
-                    {t.name}
+                    <GraphicTemplatePreviewHover
+                      side="left"
+                      slug={slug}
+                      template={t}
+                    >
+                      {t.name}
+                    </GraphicTemplatePreviewHover>
                   </SelectItem>
                 ))}
               </SelectGroup>
             ))}
           </SelectContent>
         </Select>
+        {selected ? (
+          <GraphicTemplatePreviewHover
+            params={paramDraft}
+            side="left"
+            slug={slug}
+            template={selected}
+          >
+            <Button
+              aria-label={`Preview ${selected.name}`}
+              data-graphic-template-preview
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              <LayoutTemplate data-icon="inline-start" />
+              Preview
+            </Button>
+          </GraphicTemplatePreviewHover>
+        ) : null}
         <Button
           aria-label="Place graphic at playhead"
           data-graphic-add

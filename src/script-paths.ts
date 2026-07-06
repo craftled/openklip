@@ -11,3 +11,7 @@ export function transcribeScriptPath(): string {
 export function graphicRuntimeEntryPath(): string {
   return repoPath("src", "graphic-runtime-entry.ts");
 }
+
+export function mapMotionRuntimeEntryPath(): string {
+  return repoPath("src", "map-motion-runtime-entry.ts");
+}

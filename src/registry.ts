@@ -62,13 +62,12 @@ import {
 } from "./edl.ts";
 import { EXPORT_ASPECT_IDS } from "./export-aspect.ts";
 import { addGraphicsAtCutSeams } from "./graphic-cut-transitions.ts";
-import { KeyframeSchema } from "./keyframes.ts";
 import {
-  PRODUCT_ANNOUNCEMENT_CATALOG,
-  ProductAnnouncementCatalogSchema,
-  ProductAnnouncementSpecSchema,
-  validateProductAnnouncementSpec,
-} from "./product-announcement.ts";
+  JsonRenderCatalogSchema,
+  jsonRenderCatalogIdsLabel,
+  validateJsonRenderSpec,
+} from "./json-render-catalogs.ts";
+import { KeyframeSchema } from "./keyframes.ts";
 import { reanchorOne, reanchorProject } from "./reanchor.ts";
 import { CAPTION_INSET_PLATFORMS } from "./safe-areas.ts";
 
@@ -114,18 +113,51 @@ const position = z.enum([
   "callout",
 ]);
 const track = z.enum(["broll", "title", "zoom"]);
-const ProductAnnouncementActionSpecSchema =
-  ProductAnnouncementSpecSchema.superRefine((spec, ctx) => {
-    const validation = validateProductAnnouncementSpec(spec);
+const JsonRenderActionSpecSchema = z
+  .object({
+    catalog: JsonRenderCatalogSchema,
+    fromSec: sec,
+    toSec: sec,
+    spec: z.unknown(),
+    track: track.optional(),
+    note: z.string().optional(),
+    anchor: PhraseAnchorSchema.optional(),
+  })
+  .superRefine((input, ctx) => {
+    const validation = validateJsonRenderSpec(input.catalog, input.spec);
     if (validation.success) {
       return;
     }
-    for (const issue of validation.issues) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: `invalid product announcement spec: ${issue}`,
-      });
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: validation.issues[0] ?? "invalid json-render spec",
+      path: ["spec"],
+    });
+  });
+
+const JsonRenderSetSchema = z
+  .object({
+    id: z.string(),
+    catalog: JsonRenderCatalogSchema.optional(),
+    fromSec: sec.optional(),
+    toSec: sec.optional(),
+    spec: z.unknown().optional(),
+    track: track.optional(),
+    note: z.string().optional(),
+  })
+  .superRefine((input, ctx) => {
+    if (input.spec === undefined || input.catalog === undefined) {
+      return;
     }
+    const validation = validateJsonRenderSpec(input.catalog, input.spec);
+    if (validation.success) {
+      return;
+    }
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: validation.issues[0] ?? "invalid json-render spec",
+      path: ["spec"],
+    });
   });
 
 export const actions: ActionDef[] = [
@@ -416,37 +448,16 @@ export const actions: ActionDef[] = [
   }),
   defineAction({
     name: "json-graphic-add",
-    summary:
-      "Overlay a validated json-render product announcement spec over a source-time span.",
+    summary: `Overlay a validated json-render spec over a source-time span (${jsonRenderCatalogIdsLabel()}).`,
     surfaces: ["cli", "gui", "mcp"],
-    schema: z.object({
-      catalog: ProductAnnouncementCatalogSchema,
-      fromSec: sec,
-      toSec: sec,
-      spec: ProductAnnouncementActionSpecSchema,
-      track: track.optional(),
-      note: z.string().optional(),
-      anchor: PhraseAnchorSchema.optional(),
-    }),
-    run: (p, i) =>
-      addJsonGraphic(p, {
-        ...i,
-        catalog: i.catalog ?? PRODUCT_ANNOUNCEMENT_CATALOG,
-      }),
+    schema: JsonRenderActionSpecSchema,
+    run: (p, i) => addJsonGraphic(p, i),
   }),
   defineAction({
     name: "json-graphic-set",
     summary: "Patch a json-render graphic overlay (spec, span, track).",
     surfaces: ["cli", "gui", "mcp"],
-    schema: z.object({
-      id: z.string(),
-      catalog: ProductAnnouncementCatalogSchema.optional(),
-      fromSec: sec.optional(),
-      toSec: sec.optional(),
-      spec: ProductAnnouncementActionSpecSchema.optional(),
-      track: track.optional(),
-      note: z.string().optional(),
-    }),
+    schema: JsonRenderSetSchema,
     run: (p, i) => updateJsonGraphic(p, i.id, i),
   }),
   defineAction({

@@ -2,7 +2,26 @@
 
 Use these bodies when publishing releases. Each section matches a tag in `CHANGELOG.md` without duplicating the full changelog. **Known gaps:** always link to [TODO.md](../TODO.md#known-limitations); do not duplicate the list here.
 
-Publishing status checked on 2026-07-06 (`gh release list`): GitHub releases are published through `v0.41.0.4` (tag `9383595` on `main`).
+Publishing status checked on 2026-07-06 (`gh release list`): GitHub releases are published through `v0.41.0.4` on `main`. `v0.41.1.0` is staged on PR #78 (`feat/map-graphics`), pending merge and tag.
+
+---
+
+## v0.41.1.0
+
+**Map motion graphics, b-roll suggest, and graphic picker previews.**
+
+### Highlights
+- **Map motion** (`map-motion`): json-render catalog with MapLibre GL for route reveals, arcs, globe flyovers, and markers; CLI `json-graphic-add <slug> map-motion`, MCP parity, skill at `templates/map-motion/skill.md`.
+- **B-roll suggest**: `openklip broll-suggest` and MCP `broll_suggest` rank assets from existing cards (`summary`, `tags`, `bestFor`).
+- **Graphic previews**: hover and button previews in Config → Graphics (`web/components/graphic-template-preview.tsx`).
+- **json-render registry**: `product-announcement` and `map-motion` share validation, preview, and export paths.
+- **Tests**: 1888 tests (1885 pass, 3 skip); 89 MCP tools.
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#04110---2026-07-06)
 
 ---
 

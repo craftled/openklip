@@ -551,13 +551,13 @@ Goal: agents can choose the right media, not just any media.
   - [ ] Edit suggested focus.
   - [ ] Expose through CLI/MCP.
   - Verification: edited card affects later agent placement.
-- [ ] Add b-roll match suggestions.
-  - [ ] Input: transcript span.
-  - [ ] Output: ranked assets with reason.
-  - [ ] Use existing cards first.
+- [x] Add b-roll match suggestions.
+  - [x] Input: transcript span or free text (`--phrase` / `--text`, MCP `phrase` / `text`).
+  - [x] Output: ranked assets with reason (weighted card fields + mustUse/avoid).
+  - [x] Use existing cards first.
   - [ ] Optionally use embeddings later.
-  - [ ] Let user or agent apply suggestion.
-  - Verification: deterministic fixture ranks expected asset from card tags.
+  - [x] Let user or agent apply suggestion (`broll-add-phrase` after suggest).
+  - Verification: deterministic fixture ranks expected asset from card tags (`tests/broll-suggest.test.ts`).
 - [x] Add must-use and do-not-use asset flags.
   - [x] UI controls. Verified 2026-07-03: asset bin badges/toggles (`web/components/asset-bin.tsx`).
   - [x] CLI/MCP actions. Verified 2026-07-03: `asset-flags` registry action, `openklip asset-flags`.

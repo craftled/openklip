@@ -14,9 +14,9 @@ See `AGENTS.md` for the full OpenKlip edit loop, CLI commands, MCP tools, and gu
 
 ## Current release memory
 
-- Code truth checked on 2026-07-06: `VERSION` and `package.json` are `0.41.0.4`; `bun test` runs 1867 tests (1864 pass, 3 skip without `OPENKLIP_INTEGRATION=1`); `openklip tools --json --surface mcp` lists 88 MCP tools; `openklip actions --json` lists 44 registry actions.
+- Code truth checked on 2026-07-06: `VERSION` and `package.json` are `0.41.1.0`; `bun test` runs 1888 tests (1885 pass, 3 skip without `OPENKLIP_INTEGRATION=1`); `openklip tools --json --surface mcp` lists 89 MCP tools; `openklip actions --json` lists 44 registry actions.
 - Release docs: `CHANGELOG.md` is authoritative history, `docs/RELEASE-NOTES.md` holds GitHub release bodies, and `TODO.md#known-limitations` is the single current gaps list.
-- Published GitHub releases run through `v0.41.0.4` (`gh release view v0.41.0.4`). Release bodies live in `docs/RELEASE-NOTES.md` (extract the matching version section at ship). `v0.41.0.4` shipped direct to `main` at `9383595`.
+- Published GitHub releases run through `v0.41.0.4` (`gh release view v0.41.0.4`). `v0.41.1.0` is on branch `feat/map-graphics` (PR #78, pending merge). Release bodies live in `docs/RELEASE-NOTES.md` (extract the matching version section at ship).
 
 ## Subagent fleet (cost routing)
 

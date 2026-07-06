@@ -24,6 +24,11 @@ import { loadBrief, saveBrief } from "./brief.ts";
 import { logBriefSet } from "./brief-log.ts";
 import { BROLL_AUDIO_MODE_IDS } from "./broll-audio.ts";
 import { BROLL_DISPLAY_IDS } from "./broll-display.ts";
+import {
+  formatBrollSuggestHuman,
+  formatBrollSuggestJson,
+  suggestBroll,
+} from "./broll-suggest.ts";
 import { isCaptionStyleId, listCaptionStyles } from "./caption-styles.ts";
 import { buildCleanupReport, partitionSafeCandidates } from "./cleanup.ts";
 import {
@@ -80,6 +85,10 @@ import { exportAllHighlights, exportHighlight } from "./highlight-export.ts";
 import { detectHighlights, highlightClipLines } from "./highlights.ts";
 import { ingest } from "./ingest.ts";
 import { loadIngesters } from "./ingesters.ts";
+import {
+  isJsonRenderCatalogId,
+  jsonRenderCatalogIdsLabel,
+} from "./json-render-catalogs.ts";
 import { type Keyframe, KeyframeSchema } from "./keyframes.ts";
 import { listLuts, lutPath } from "./lut.ts";
 import { startMcpServer } from "./mcp-server.ts";
@@ -92,7 +101,6 @@ import {
   resolvePackagePass,
 } from "./package-pass.ts";
 import { projectPaths } from "./paths.ts";
-import { PRODUCT_ANNOUNCEMENT_CATALOG } from "./product-announcement.ts";
 import { auditProjectForShip } from "./project-brief-audit.ts";
 import {
   latestProject,
@@ -135,6 +143,11 @@ function help(): void {
 Discovery
   openklip list                      list projects (most recent first)
   openklip assets <slug>             list registered media assets
+  openklip broll-suggest <slug>      rank b-roll for a spoken span or keywords
+                                       --text "..."   free-text query
+                                       --phrase "..." transcript phrase
+                                       --top <n>      max suggestions (default 5)
+                                       --json
 
 Setup
   openklip ingest <video>            transcribe + build a project
@@ -217,8 +230,8 @@ Overlays
   openklip graphic-add-cuts <slug> <transition-template>
                                      place transition-* at every kept-range cut seam
                                        --duration <sec>  --param key=value  --track broll|title|zoom
-  openklip json-graphic-add <slug> product-announcement <fromSec> <toSec>
-                                     overlay a validated json-render announcement spec
+  openklip json-graphic-add <slug> <catalog> <fromSec> <toSec>
+                                     overlay a validated json-render spec (catalogs: ${jsonRenderCatalogIdsLabel()})
                                        --spec-file spec.json  --track broll|title|zoom
   openklip json-graphic-set <slug> <graphicId>
                                      patch a json-render graphic (--from --to --spec-file --track)
@@ -621,6 +634,35 @@ try {
         );
       }
       console.log(`\n${project.assets.length} asset(s)`);
+      break;
+    }
+    case "broll-suggest": {
+      if (!rest[0]) {
+        throw new Error(
+          'usage: openklip broll-suggest <slug> (--text "..." | --phrase "...") [--top N] [--json]'
+        );
+      }
+      const slug = rest[0];
+      const tail = rest.slice(1);
+      const text = flagValue(tail, "--text");
+      const phrase = flagValue(tail, "--phrase");
+      const topRaw = flagValue(tail, "--top");
+      const top = topRaw === undefined ? undefined : Number(topRaw);
+      if (top !== undefined && !(Number.isInteger(top) && top > 0)) {
+        throw new Error("--top must be a positive integer");
+      }
+      if (!(text || phrase) || (text && phrase)) {
+        throw new Error(
+          'usage: openklip broll-suggest <slug> (--text "..." | --phrase "...") [--top N] [--json]'
+        );
+      }
+      const project = await loadProject(slug);
+      const result = suggestBroll(project, { text, phrase, top });
+      process.stdout.write(
+        tail.includes("--json")
+          ? formatBrollSuggestJson(result)
+          : formatBrollSuggestHuman(result)
+      );
       break;
     }
     case "analyze": {
@@ -1382,14 +1424,14 @@ try {
     case "json-graphic-add": {
       if (!(rest[0] && rest[1] && rest[2] && rest[3])) {
         throw new Error(
-          "usage: openklip json-graphic-add <slug> product-announcement <fromSec> <toSec> --spec-file spec.json [--track broll|title|zoom]"
+          `usage: openklip json-graphic-add <slug> <catalog> <fromSec> <toSec> --spec-file spec.json [--track broll|title|zoom] (catalogs: ${jsonRenderCatalogIdsLabel()})`
         );
       }
       const slug = rest[0];
       const catalog = rest[1];
-      if (catalog !== PRODUCT_ANNOUNCEMENT_CATALOG) {
+      if (!isJsonRenderCatalogId(catalog)) {
         throw new Error(
-          `unknown json-render catalog "${catalog}". Available: ${PRODUCT_ANNOUNCEMENT_CATALOG}`
+          `unknown json-render catalog "${catalog}". Available: ${jsonRenderCatalogIdsLabel()}`
         );
       }
       const fromSec = Number(rest[2]);

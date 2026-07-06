@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.41.1.0 - 2026-07-06
+
+### Added
+- **Map motion graphics (`map-motion`)**: json-render catalog with mapcn (MapLibre GL) for animated route reveals, arcs, globe flyovers, and markers; CLI `json-graphic-add <slug> map-motion`, MCP parity, frame-pure preview/export via `web/lib/map-motion-runtime.ts`, skill at `templates/map-motion/skill.md`.
+- **B-roll suggest**: `openklip broll-suggest` and MCP `broll_suggest` rank registered assets against a spoken phrase or free-text query (`src/broll-suggest.ts`, `src/broll-rank.ts`).
+- **Graphic template previews**: hover previews in the graphics picker (`web/components/graphic-template-preview.tsx`).
+- **mapcn map component**: bundled via shadcn at `web/components/ui/map.tsx` with MapLibre GL dependency.
+
+### Changed
+- **json-render catalogs**: generalized registry (`src/json-render-catalogs.ts`) so `product-announcement` and `map-motion` share validation, preview dispatch, and export paths.
+- **Headless export**: map-motion overlays use a dedicated MapLibre runtime bundle with per-frame idle waits before screenshot.
+
+### Fixed
+- **Map-motion preview/export parity**: preview uses the same programmatic MapLibre layers as headless export (no duplicate route/arc overlays); markers mode renders pins and labels in export.
+- **Map-motion export timeouts**: headless map load and per-frame idle waits fail fast on tile/CDN errors instead of hanging indefinitely.
+- **MCP `broll_suggest`**: rejects calls with neither `text` nor `phrase` (CLI parity).
+
 ## 0.41.0.4 - 2026-07-06
 
 ### Added
