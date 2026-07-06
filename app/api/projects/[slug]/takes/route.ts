@@ -3,6 +3,7 @@ import { copyFile, mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import type { Take } from "@engine/edl";
+import type { IngestProgress } from "@engine/ingest-types";
 import { startIngestJob } from "@engine/ingest-jobs";
 import { assertValidSlug, projectPaths, slugFromVideo } from "@engine/paths";
 import {
@@ -27,7 +28,11 @@ interface RouteParams {
 export type IngestTakeFn = (
   slug: string,
   videoArg: string,
-  opts?: { id?: string; label?: string }
+  opts?: {
+    id?: string;
+    label?: string;
+    onProgress?: (progress: IngestProgress) => void;
+  }
 ) => Promise<Take>;
 
 export interface TakesPostDeps {
@@ -140,7 +145,7 @@ export function createTakesPost({ loadIngestTake, tempRoot }: TakesPostDeps) {
       const job = startIngestJob({
         filename: file.name,
         slug: `${slug}/takes/${id}`,
-        run: async () => {
+        run: async (onProgress) => {
           // ingestTake records whatever path it is given as the take's
           // `source`, and the temp upload dir is deleted once this job
           // settles. Copy into the project's takes/ parking lot FIRST (a
@@ -156,7 +161,11 @@ export function createTakesPost({ loadIngestTake, tempRoot }: TakesPostDeps) {
           try {
             await mkdir(takesRoot, { recursive: true });
             await copyFile(tmpPath, durablePath);
-            const take = await ingestTake(slug, durablePath, { id, label });
+            const take = await ingestTake(slug, durablePath, {
+              id,
+              label,
+              onProgress,
+            });
             return take.id;
           } catch (error) {
             await rm(durablePath, { force: true });

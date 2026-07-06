@@ -7,6 +7,7 @@ import {
   bootstrapSmokeFixture,
   resolveRealSmokeSlug,
   runAgentSmokeAudit,
+  runReviseDraftSmokeAudit,
   SMOKE_SLUG,
   verifyExportStructural,
 } from "../src/agent-smoke-audit.ts";
@@ -55,6 +56,17 @@ test("runAgentSmokeAudit passes the deterministic loop", {
     result.ok,
     true,
     result.steps.map((s) => `${s.name}:${s.detail}`).join("; ")
+  );
+});
+
+test("runReviseDraftSmokeAudit passes the deterministic revise loop", {
+  skip: FFMPEG_OK ? false : "ffmpeg binary unavailable",
+}, async () => {
+  const result = await runReviseDraftSmokeAudit();
+  assert.equal(
+    result.ok,
+    true,
+    result.steps.map((step) => `${step.name}:${step.detail}`).join("; ")
   );
 });
 

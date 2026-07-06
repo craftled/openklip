@@ -39,6 +39,7 @@ import { cn } from "@/lib/utils";
 import {
   fetchWorkspace,
   pickWorkspaceFolder,
+  setWorkspacePath,
   type WorkspaceInfo,
 } from "@/lib/workspace-client";
 import {
@@ -52,7 +53,7 @@ function initialStep(workspace: WorkspaceInfo | null): NewProjectStep {
   if (!workspace) {
     return "folder";
   }
-  if (workspace.configured || !workspace.pickerSupported) {
+  if (workspace.configured) {
     return "video";
   }
   return "folder";
@@ -117,6 +118,8 @@ export function NewProjectDialog({
   const [workspace, setWorkspace] = useState<WorkspaceInfo | null>(null);
   const [loadingWorkspace, setLoadingWorkspace] = useState(false);
   const [pickingFolder, setPickingFolder] = useState(false);
+  const [pathDraft, setPathDraft] = useState("");
+  const [settingPath, setSettingPath] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [urlDraft, setUrlDraft] = useState("");
   const [step, setStep] = useState<NewProjectStep>("folder");
@@ -151,6 +154,47 @@ export function NewProjectDialog({
       alive = false;
     };
   }, [open, refreshWorkspace]);
+
+  const onSetWorkspacePath = async () => {
+    const trimmed = pathDraft.trim();
+    if (!trimmed) {
+      toastError("Enter a folder path", "Projects will be stored in this directory.");
+      return;
+    }
+    setSettingPath(true);
+    try {
+      const result = await setWorkspacePath(trimmed);
+      applyToasts(
+        workspacePickerToasts({
+          root: result.root,
+          projects: result.projects.map((project) => ({
+            slug: project.slug,
+          })),
+        })
+      );
+      setWorkspace((prev) =>
+        prev
+          ? {
+              ...prev,
+              configured: true,
+              displayRoot: result.displayRoot,
+              root: result.root,
+            }
+          : {
+              configured: true,
+              displayRoot: result.displayRoot,
+              pickerSupported: false,
+              root: result.root,
+            }
+      );
+      setStep("video");
+      onFolderChosen?.();
+    } catch (e) {
+      toastWorkspacePickFailed((e as Error).message);
+    } finally {
+      setSettingPath(false);
+    }
+  };
 
   const onChooseFolder = async () => {
     setPickingFolder(true);
@@ -249,8 +293,7 @@ export function NewProjectDialog({
   };
 
   const folderDone = step === "video";
-  const showFolderStep =
-    workspace?.pickerSupported && !workspace.configured && step === "folder";
+  const showFolderStep = !workspace?.configured && step === "folder";
 
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
@@ -268,19 +311,17 @@ export function NewProjectDialog({
         </DialogHeader>
 
         <div className="flex flex-wrap gap-2">
-          {workspace?.pickerSupported ? (
-            <StepPill
-              active={Boolean(showFolderStep)}
-              done={folderDone}
-              label="Choose folder"
-              step={1}
-            />
-          ) : null}
+          <StepPill
+            active={Boolean(showFolderStep)}
+            done={folderDone}
+            label="Choose folder"
+            step={1}
+          />
           <StepPill
             active={!showFolderStep}
             done={false}
             label="Add video"
-            step={workspace?.pickerSupported ? 2 : 1}
+            step={2}
           />
         </div>
 
@@ -309,15 +350,34 @@ export function NewProjectDialog({
                 </div>
               </div>
             </div>
-            <DialogFooter className="sm:justify-start">
-              <Button
-                disabled={pickingFolder || !workspace?.pickerSupported}
-                onClick={() => void onChooseFolder()}
-                type="button"
-              >
-                <FolderOpen data-icon="inline-start" />
-                {pickingFolder ? "Choosing…" : "Choose folder…"}
-              </Button>
+            <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-start">
+              {workspace?.pickerSupported ? (
+                <Button
+                  disabled={pickingFolder || settingPath}
+                  onClick={() => void onChooseFolder()}
+                  type="button"
+                >
+                  <FolderOpen data-icon="inline-start" />
+                  {pickingFolder ? "Choosing…" : "Choose folder…"}
+                </Button>
+              ) : (
+                <>
+                  <Input
+                    className="font-mono text-xs"
+                    disabled={settingPath}
+                    onChange={(e) => setPathDraft(e.target.value)}
+                    placeholder="/Users/you/Movies/OpenKlip"
+                    value={pathDraft}
+                  />
+                  <Button
+                    disabled={settingPath || pathDraft.trim().length === 0}
+                    onClick={() => void onSetWorkspacePath()}
+                    type="button"
+                  >
+                    {settingPath ? "Saving…" : "Use this folder"}
+                  </Button>
+                </>
+              )}
             </DialogFooter>
           </div>
         ) : (

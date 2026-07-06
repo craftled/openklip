@@ -9,7 +9,20 @@ interface IngestJobView {
   error?: string;
   progress?: IngestProgressView;
   slug: string;
-  status: "running" | "done" | "error";
+  status: "running" | "done" | "error" | "partial";
+  warning?: string;
+}
+
+export class IngestPartialSuccessError extends Error {
+  readonly slug: string;
+  readonly warning: string;
+
+  constructor(slug: string, warning: string) {
+    super(warning);
+    this.name = "IngestPartialSuccessError";
+    this.slug = slug;
+    this.warning = warning;
+  }
 }
 
 export interface ProjectCreateOptions {
@@ -170,6 +183,13 @@ async function pollIngestJob(
     }
     if (job.status === "done") {
       return job.slug;
+    }
+    if (job.status === "partial") {
+      throw new IngestPartialSuccessError(
+        job.slug,
+        job.warning ??
+          "Project was created but the original source could not be saved. Exports will use the proxy."
+      );
     }
     if (job.status === "error") {
       throw new Error(job.error ?? "Ingest failed");

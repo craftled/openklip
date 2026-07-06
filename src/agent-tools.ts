@@ -10,7 +10,10 @@ import {
   listAgentTasks,
   setAgentTaskStep,
 } from "./agent-tasks.ts";
-import { assembleFromSelection, listTakes, loadTake } from "./assembly.ts";
+import { assembleFromSelection, ingestTake, listTakes, loadTake } from "./assembly.ts";
+import { runDoctor } from "./doctor.ts";
+import { exportAllHighlights, exportHighlight } from "./highlight-export.ts";
+import { detectHighlights, highlightClipLines } from "./highlights.ts";
 import { loadAudioAnalysis } from "./audio-analysis.ts";
 import type { SilenceSpan } from "./audio-analysis-core.ts";
 import { measureProjectAudio } from "./audio-measure.ts";
@@ -1035,6 +1038,12 @@ const queryTools: AgentToolDef[] = [
         .describe(
           "Loudness normalization target (LUFS) for this export only; overrides project.audio.loudness without mutating the project"
         ),
+      loudnessNormalize: z
+        .boolean()
+        .optional()
+        .describe(
+          "When false, skip loudness normalization for this export even if a platform preset or project.audio.loudness would apply"
+        ),
     }),
     run: async ({
       slug: projectSlug,
@@ -1047,6 +1056,7 @@ const queryTools: AgentToolDef[] = [
       gifMaxWidth,
       platform,
       loudnessTargetLufs,
+      loudnessNormalize,
     }) =>
       exportCut(projectSlug, {
         aspect,
@@ -1056,9 +1066,103 @@ const queryTools: AgentToolDef[] = [
         fps,
         gifMaxWidth,
         loudnessTargetLufs,
+        loudnessNormalize,
         maxHeight,
         platform,
       }),
+  }),
+  defineQueryTool({
+    name: "doctor",
+    summary:
+      "Health check: ffmpeg, Whisper script, and optional project media (source, proxy, assets).",
+    schema: z.object({ slug: slug.optional() }),
+    run: async ({ slug: projectSlug }) => runDoctor(projectSlug),
+  }),
+  defineQueryTool({
+    name: "highlights_detect",
+    summary:
+      "Run an LLM over the timed transcript to detect short-form clip candidates and save them on project.json.",
+    schema: z.object({
+      slug,
+      agent: z.string().min(1).default("claude-opus-4-8"),
+      maxClips: z.number().int().positive().max(20).default(5),
+      targetClipSec: z.number().positive().max(120).default(45),
+    }),
+    run: async ({
+      slug: projectSlug,
+      agent,
+      maxClips,
+      targetClipSec,
+    }) => {
+      const project = await loadProject(projectSlug);
+      const highlights = await detectHighlights(project, {
+        agent,
+        maxClips,
+        targetClipSec,
+      });
+      if (!highlights) {
+        throw new Error("highlight detection failed (no valid clips returned)");
+      }
+      await mutateProject(
+        projectSlug,
+        (draft) => {
+          draft.highlights = highlights;
+        },
+        {
+          action: "highlights-detect",
+          actor: toolActor(),
+          input: { agent, maxClips, targetClipSec },
+          taskId: toolTaskId(),
+        }
+      );
+      return {
+        highlights,
+        summary: highlightClipLines(highlights),
+      };
+    },
+  }),
+  defineQueryTool({
+    name: "export_highlight",
+    summary:
+      "Export one or all stored highlight clips to output/highlights/{id}.mp4 without mutating the edit.",
+    schema: z.object({
+      slug,
+      clipId: z
+        .string()
+        .min(1)
+        .describe('Highlight id (for example "h1") or "all"'),
+      platform: z.enum(EXPORT_PLATFORM_IDS).optional(),
+    }),
+    run: async ({ slug: projectSlug, clipId, platform }) => {
+      const exportOpts = platform ? { platform } : {};
+      if (clipId === "all") {
+        return exportAllHighlights(projectSlug, exportOpts);
+      }
+      return exportHighlight(projectSlug, clipId, exportOpts);
+    },
+  }),
+  defineQueryTool({
+    name: "take_add",
+    summary:
+      "Ingest an alternate take from a local video file into takes/<id>/ (probe, proxy, Whisper).",
+    schema: z.object({
+      slug,
+      videoPath: z
+        .string()
+        .min(1)
+        .describe("Absolute or cwd-relative path to the take video on disk"),
+      id: z.string().min(1).optional(),
+      label: z.string().optional(),
+    }),
+    run: async ({ slug: projectSlug, videoPath, id, label }) => {
+      const take = await ingestTake(projectSlug, videoPath, { id, label });
+      return {
+        id: take.id,
+        label: take.label,
+        durationSec: samplesToSec(take.durationSamples),
+        words: take.words.length,
+      };
+    },
   }),
   defineQueryTool({
     name: "verify",

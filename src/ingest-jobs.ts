@@ -4,9 +4,10 @@
 // in memory, which fits OpenKlip's local single-process server (the running
 // `serve` / dev process owns it); it is not durable across restarts.
 import { randomUUID } from "node:crypto";
+import { isIngestPersistError } from "./ingest-persist-error.ts";
 import type { IngestProgress } from "./ingest-types.ts";
 
-export type IngestJobStatus = "running" | "done" | "error";
+export type IngestJobStatus = "running" | "done" | "error" | "partial";
 
 export interface IngestJob {
   error?: string;
@@ -17,6 +18,8 @@ export interface IngestJob {
   /** Target/created project slug. */
   slug: string;
   status: IngestJobStatus;
+  /** Set when ingest finished but a follow-up step failed (e.g. source persist). */
+  warning?: string;
 }
 
 const jobs = new Map<string, IngestJob>();
@@ -80,6 +83,12 @@ export function startIngestJob(input: {
         job.status = "done";
       },
       (e: unknown) => {
+        if (isIngestPersistError(e)) {
+          job.slug = e.slug;
+          job.status = "partial";
+          job.warning = e.message;
+          return;
+        }
         job.status = "error";
         job.error = (e as Error).message;
       }

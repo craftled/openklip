@@ -6,12 +6,14 @@ import {
   toastDismiss,
   toastLoading,
   toastProjectCreateFailed,
+  toastIngestPartialSuccess,
 } from "@/lib/app-toast";
 import {
   createBlankProject,
   createProjectFromFolder,
   createProjectFromUrl,
   type IngestProgressView,
+  IngestPartialSuccessError,
   type ProjectCreateOptions,
   ProjectExistsError,
 } from "@/lib/project-create";
@@ -38,6 +40,30 @@ export function overwriteDecision(
   return !force && error instanceof ProjectExistsError
     ? "offer-overwrite"
     : "fail";
+}
+
+function isPartialIngestSuccess(error: unknown): error is IngestPartialSuccessError {
+  return error instanceof IngestPartialSuccessError;
+}
+
+async function finishCreateWithOptionalPartialWarning(
+  slug: string,
+  partialWarning: string | undefined,
+  loadingId: string | number,
+  setCreatedSlug: (slug: string) => void,
+  setCreatePhase: (phase: ProjectCreatePhase | null) => void,
+  onProjectCreated: (slug: string) => void
+): Promise<void> {
+  toastDismiss(loadingId);
+  if (partialWarning) {
+    toastIngestPartialSuccess(partialWarning);
+  }
+  setCreatedSlug(slug);
+  setCreatePhase("success");
+  await new Promise((resolve) => {
+    window.setTimeout(resolve, SUCCESS_CHECK_HOLD_MS);
+  });
+  onProjectCreated(slug);
 }
 
 export function useProjectCreate({
@@ -80,14 +106,26 @@ export function useProjectCreate({
       const loadingId = toastLoading(projectIngestLoadingMessage());
       try {
         const slug = await onCreateProject(file, setProgress, { force });
-        toastDismiss(loadingId);
-        setCreatedSlug(slug);
-        setCreatePhase("success");
-        await new Promise((resolve) => {
-          window.setTimeout(resolve, SUCCESS_CHECK_HOLD_MS);
-        });
-        onProjectCreated(slug);
+        await finishCreateWithOptionalPartialWarning(
+          slug,
+          undefined,
+          loadingId,
+          setCreatedSlug,
+          setCreatePhase,
+          onProjectCreated
+        );
       } catch (e) {
+        if (isPartialIngestSuccess(e)) {
+          await finishCreateWithOptionalPartialWarning(
+            e.slug,
+            e.warning,
+            loadingId,
+            setCreatedSlug,
+            setCreatePhase,
+            onProjectCreated
+          );
+          return;
+        }
         toastDismiss(loadingId);
         if (overwriteDecision(e, force) === "offer-overwrite") {
           setPendingOverwrite({ file, message: (e as Error).message });
@@ -111,14 +149,26 @@ export function useProjectCreate({
       const loadingId = toastLoading(projectIngestLoadingMessage());
       try {
         const slug = await onCreateFolder(files, setProgress, { force });
-        toastDismiss(loadingId);
-        setCreatedSlug(slug);
-        setCreatePhase("success");
-        await new Promise((resolve) => {
-          window.setTimeout(resolve, SUCCESS_CHECK_HOLD_MS);
-        });
-        onProjectCreated(slug);
+        await finishCreateWithOptionalPartialWarning(
+          slug,
+          undefined,
+          loadingId,
+          setCreatedSlug,
+          setCreatePhase,
+          onProjectCreated
+        );
       } catch (e) {
+        if (isPartialIngestSuccess(e)) {
+          await finishCreateWithOptionalPartialWarning(
+            e.slug,
+            e.warning,
+            loadingId,
+            setCreatedSlug,
+            setCreatePhase,
+            onProjectCreated
+          );
+          return;
+        }
         toastDismiss(loadingId);
         if (overwriteDecision(e, force) === "offer-overwrite") {
           setPendingOverwrite({ files, message: (e as Error).message });
@@ -142,14 +192,26 @@ export function useProjectCreate({
       const loadingId = toastLoading(projectIngestLoadingMessage());
       try {
         const slug = await onCreateUrl(videoUrl, setProgress, { force });
-        toastDismiss(loadingId);
-        setCreatedSlug(slug);
-        setCreatePhase("success");
-        await new Promise((resolve) => {
-          window.setTimeout(resolve, SUCCESS_CHECK_HOLD_MS);
-        });
-        onProjectCreated(slug);
+        await finishCreateWithOptionalPartialWarning(
+          slug,
+          undefined,
+          loadingId,
+          setCreatedSlug,
+          setCreatePhase,
+          onProjectCreated
+        );
       } catch (e) {
+        if (isPartialIngestSuccess(e)) {
+          await finishCreateWithOptionalPartialWarning(
+            e.slug,
+            e.warning,
+            loadingId,
+            setCreatedSlug,
+            setCreatePhase,
+            onProjectCreated
+          );
+          return;
+        }
         toastDismiss(loadingId);
         if (overwriteDecision(e, force) === "offer-overwrite") {
           setPendingOverwrite({ url: videoUrl, message: (e as Error).message });

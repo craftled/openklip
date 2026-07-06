@@ -8,6 +8,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import {
   buildExportOptions,
   effectiveMaxHeight,
+  estimateExportOutput,
   outputDimensionsForMaxHeight,
   resolveGifMaxWidthSubmission,
 } from "../web/components/export-dialog.tsx";
@@ -94,6 +95,30 @@ test("destination and format toggles are enabled (no longer out of scope)", () =
 test("GIF format selection shows a no-audio hint", () => {
   const html = renderForm({ format: "gif" });
   assert.match(html, /no audio/i);
+});
+
+test("estimateExportOutput uses a separate GIF profile", () => {
+  const mp4 = estimateExportOutput({
+    compression: "social",
+    durationSec: 60,
+    dims: { width: 1280, height: 720 },
+    format: "mp4",
+    sourceFps: 30,
+    sourceHeight: 720,
+    sourceWidth: 1280,
+  });
+  const gif = estimateExportOutput({
+    compression: "social",
+    durationSec: 60,
+    dims: { width: 1280, height: 720 },
+    format: "gif",
+    sourceFps: 30,
+    sourceHeight: 720,
+    sourceWidth: 1280,
+  });
+  assert.notEqual(gif.outputBytes, mp4.outputBytes);
+  assert.notEqual(gif.exportTimeSec, mp4.exportTimeSec);
+  assert.match(gif.note ?? "", /GIF estimate/i);
 });
 
 test("MP4 format selection does not show the no-audio hint", () => {

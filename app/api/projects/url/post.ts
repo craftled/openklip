@@ -15,6 +15,7 @@ import {
 import type { NextRequest } from "next/server";
 import type { IngestFn } from "../post.ts";
 import { persistUploadedSource } from "../post.ts";
+import { IngestPersistError } from "@engine/ingest-persist-error";
 
 export interface UrlProjectsPostDeps {
   loadIngest: () => Promise<IngestFn>;
@@ -77,7 +78,11 @@ export function createUrlProjectsPost({
         run: async (onProgress) => {
           try {
             const createdSlug = await ingest(downloaded, { force, onProgress });
-            await persistUploadedSource(createdSlug, filename, downloaded);
+            try {
+              await persistUploadedSource(createdSlug, filename, downloaded);
+            } catch (persistError) {
+              throw new IngestPersistError(createdSlug, persistError);
+            }
             return createdSlug;
           } finally {
             await rm(tmpDir, { recursive: true, force: true });

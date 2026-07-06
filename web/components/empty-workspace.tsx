@@ -69,7 +69,7 @@ export function EmptyWorkspace() {
           return;
         }
         setWorkspace(info);
-        if (!info.configured && info.pickerSupported) {
+        if (!info.configured) {
           setDialogOpen(true);
         }
       })
@@ -111,7 +111,7 @@ export function EmptyWorkspace() {
   const onIngested = useCallback(() => router.refresh(), [router]);
   const inboxJobs = useInboxWatch(onIngested);
 
-  const folderReady = workspace?.configured || !workspace?.pickerSupported;
+  const folderReady = Boolean(workspace?.configured);
   // Whole-workspace drop is live only once the folder is ready, no create is
   // already in flight, and no overwrite confirmation is pending (a drop while
   // the dialog is open would start a second create behind it).

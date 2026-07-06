@@ -211,6 +211,11 @@ export interface ExportOptions {
    * how fps/maxHeight bounds are enforced today.
    */
   loudnessTargetLufs?: number;
+  /**
+   * When false, skip loudness normalization for this export even when a
+   * platform preset or project.audio.loudness would otherwise apply.
+   */
+  loudnessNormalize?: boolean;
   maxHeight?: number; // e.g. 1080 -> downscale output (and speed up filtering/encode)
   /** Final output path; defaults to output/out.mp4. */
   outPath?: string;
@@ -282,10 +287,15 @@ export function parseExportFpsFlag(raw: string): number {
 // (edl.ts's z.number().min(-30).max(-10)). Lives here rather than cli.ts for
 // the same reason as parseExportFpsFlag: cli.ts runs its command switch at
 // module scope and cannot be imported by tests.
-export function parseExportLoudnessFlag(raw: string): number {
+export function parseExportLoudnessFlag(raw: string): number | "off" {
+  if (raw === "off") {
+    return "off";
+  }
   const lufs = Number(raw);
   if (!(Number.isFinite(lufs) && lufs >= -30 && lufs <= -10)) {
-    throw new Error("--loudness must be a number between -30 and -10");
+    throw new Error(
+      '--loudness must be "off" or a number between -30 and -10'
+    );
   }
   return lufs;
 }
@@ -949,6 +959,8 @@ export async function exportCut(
    * (project.audio.loudness.enabled, an explicit loudnessTargetLufs, or a
    * platform preset's targetLufs); undefined when no normalization ran. */
   loudnessTargetLufs?: number;
+  /** Present when the caller explicitly disabled loudness normalization. */
+  loudnessNormalize?: false;
   audio: {
     seams: boolean;
     ducking: boolean;
@@ -1531,10 +1543,12 @@ export async function exportCut(
   // The effective target for THIS export: an explicit/platform override
   // wins over the project's saved audio.loudness, which never gets touched.
   const effectiveLoudnessTarget =
-    resolved.loudnessTargetLufs ??
-    (project.audio.loudness.enabled
-      ? project.audio.loudness.targetLufs
-      : undefined);
+    resolved.loudnessNormalize === false
+      ? undefined
+      : (resolved.loudnessTargetLufs ??
+        (project.audio.loudness.enabled
+          ? project.audio.loudness.targetLufs
+          : undefined));
   const audioLoudness = effectiveLoudnessTarget !== undefined;
   const brollAudioGraph = buildBrollAudioFilterGraph(
     plans.map((pl) => ({
@@ -1761,6 +1775,9 @@ export async function exportCut(
       : undefined,
     platform: resolved.platform,
     loudnessTargetLufs: effectiveLoudnessTarget,
+    ...(resolved.loudnessNormalize === false
+      ? { loudnessNormalize: false as const }
+      : {}),
     audio: {
       seams: audioSeams,
       ducking: audioDucking,

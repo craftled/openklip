@@ -19,6 +19,7 @@ import { writeUploadToFile } from "@engine/upload-stream";
 import type { NextRequest } from "next/server";
 import type { IngestFn } from "../post.ts";
 import { persistUploadedSource } from "../post.ts";
+import { IngestPersistError } from "@engine/ingest-persist-error";
 
 export interface FolderProjectsPostDeps {
   loadIngest: () => Promise<IngestFn>;
@@ -132,7 +133,11 @@ export function createFolderProjectsPost({
         run: async (onProgress) => {
           try {
             const createdSlug = await ingest(tmpPrimary, { force, onProgress });
-            await persistUploadedSource(createdSlug, filename, tmpPrimary);
+            try {
+              await persistUploadedSource(createdSlug, filename, tmpPrimary);
+            } catch (persistError) {
+              throw new IngestPersistError(createdSlug, persistError);
+            }
             const assetsDir = projectPaths(createdSlug).assets;
             await mkdir(assetsDir, { recursive: true });
             for (const asset of assetFiles) {

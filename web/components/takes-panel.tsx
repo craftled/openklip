@@ -102,6 +102,7 @@ function SegmentRow({
 
 export interface TakesPanelViewProps {
   addTakeBusy: boolean;
+  addTakeProgress: string | null;
   addTakeError: string | null;
   addTakeLabel: string;
   anchorWordId: string | null;
@@ -132,12 +133,14 @@ function AddTakeControl({
   label,
   onFile,
   onLabelChange,
+  progressMessage,
 }: {
   busy: boolean;
   error: string | null;
   label: string;
   onFile: (file: File) => void;
   onLabelChange: (value: string) => void;
+  progressMessage: string | null;
 }) {
   return (
     <div
@@ -159,7 +162,7 @@ function AddTakeControl({
           ) : (
             <Upload aria-hidden className="size-3.5 shrink-0" />
           )}
-          <span>{busy ? "Ingesting take…" : "Add take"}</span>
+          <span>{busy ? (progressMessage ?? "Ingesting take…") : "Add take"}</span>
           <input
             accept={SUPPORTED_VIDEO_ACCEPT}
             className="hidden"
@@ -196,6 +199,7 @@ function AddTakeControl({
  * renderToStaticMarkup. */
 export function TakesPanelView({
   addTakeBusy,
+  addTakeProgress,
   addTakeError,
   addTakeLabel,
   anchorWordId,
@@ -229,6 +233,7 @@ export function TakesPanelView({
         label={addTakeLabel}
         onFile={onAddTakeFile}
         onLabelChange={onAddTakeLabelChange}
+        progressMessage={addTakeProgress}
       />
 
       {takes.length === 0 ? (
@@ -379,6 +384,7 @@ export function TakesPanel({ onAssembled, slug }: TakesPanelProps) {
   const [forceArmed, setForceArmed] = useState(false);
   const [assembleError, setAssembleError] = useState<string | null>(null);
   const [addTakeBusy, setAddTakeBusy] = useState(false);
+  const [addTakeProgress, setAddTakeProgress] = useState<string | null>(null);
   const [addTakeError, setAddTakeError] = useState<string | null>(null);
   const [addTakeLabel, setAddTakeLabel] = useState("");
 
@@ -416,10 +422,18 @@ export function TakesPanel({ onAssembled, slug }: TakesPanelProps) {
         return;
       }
       setAddTakeError(null);
+      setAddTakeProgress(null);
       setAddTakeBusy(true);
-      void ingestTakeFromVideo(slug, picked.file, {
-        label: addTakeLabel.trim() || undefined,
-      })
+      void ingestTakeFromVideo(
+        slug,
+        picked.file,
+        {
+          label: addTakeLabel.trim() || undefined,
+        },
+        (progress) => {
+          setAddTakeProgress(progress.message);
+        }
+      )
         .then(async () => {
           setAddTakeLabel("");
           await reloadTakes();
@@ -429,6 +443,7 @@ export function TakesPanel({ onAssembled, slug }: TakesPanelProps) {
         })
         .finally(() => {
           setAddTakeBusy(false);
+          setAddTakeProgress(null);
         });
     },
     [addTakeLabel, reloadTakes, slug]
@@ -520,6 +535,7 @@ export function TakesPanel({ onAssembled, slug }: TakesPanelProps) {
   return (
     <TakesPanelView
       addTakeBusy={addTakeBusy}
+      addTakeProgress={addTakeProgress}
       addTakeError={addTakeError}
       addTakeLabel={addTakeLabel}
       anchorWordId={anchorWordId}

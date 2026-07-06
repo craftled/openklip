@@ -124,7 +124,7 @@ Legend: Full means the surface can achieve the same outcome. Partial means the s
 | Create project from video | Full: browser upload and ingest job route exist | Full: `ingest` | Missing direct create tool | Full: `POST /api/projects`, ingest job polling | MCP cannot create a project directly. |
 | Inbox ingest from loose videos | Full: scan-inbox hook | Partial: manual `ingest` | Missing | Full: `POST /api/projects/scan-inbox` | Agent cannot trigger inbox scan through MCP. |
 | Delete project | Full | Missing direct CLI command | Missing | Full: `DELETE /api/projects/[slug]` | UI/API only. Add CLI/MCP if agents should clean projects. |
-| Workspace folder picker | Full on macOS | Partial via env/config file | Missing | Full: `/api/workspace` | Acceptable local app gap for now. |
+| Workspace folder picker | Full on macOS; manual path on Linux/Windows | Partial via env/config file or `POST /api/workspace` `{ action: "set", path }` | Missing | Full: `/api/workspace` | macOS picker gap remains; non-macOS can set root in GUI. |
 | Project status | Full | Full: `status --json` | Full: `project_status` | Partial through page data, no public status route | Good agent parity except HTTP query route. |
 | Transcript list | Full: transcript panel | Full: `transcript` | Full: `transcript_list` | Partial through page data | Good CLI/MCP parity. |
 | Transcript grep/span/phrase | Full: transcript search | Full | Full | Missing public route | Good UI/CLI/MCP parity; weak HTTP parity. |
@@ -334,7 +334,7 @@ Goal: an agent can pursue a video outcome in a visible loop until it produces a 
   - [ ] Export new draft.
   - [ ] Summarize what changed.
   - Verification: user can ask for a specific revision and see exact edits.
-  - Note 2026-07-02: `templates/revise-draft/skill.md` exists (auto-listed in the skills catalog alongside `make-draft`) and instructs each phase above (`project_overlays`/`transcript_grep` reads, targeted edits vs. whole-task `revert`, conditional re-export, a `task_complete` summary of what changed). `tests/templates.test.ts` pins that the file is listed and contains the expected keywords. Updated 2026-07-02: the skill now calls `task_list`/`history_list` (new MCP query tools, also `openklip tasks`/`openklip history` on the CLI) to find the task that produced the current draft instead of only being able to reuse a task id already seen in the same conversation. Left unticked: no live run on a real project has exercised a revision request end to end yet, so the item's own verification line (user asks for a revision, sees exact edits) has not been demonstrated.
+  - Note 2026-07-06: deterministic smoke now covers cut → title → `revert --last` on the lavfi fixture (`bun run agent-smoke-audit --revise`, `tests/agent-smoke-audit.test.ts`). Live user-driven revision on real footage remains manual QA.
 
 ### 2.3 Agent checkpoints and recovery
 

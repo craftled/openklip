@@ -268,14 +268,14 @@ test("POST /api/projects persists the upload and repoints project.json source", 
   });
 });
 
-test("POST /api/projects surfaces a persist failure through the job error", async () => {
+test("POST /api/projects surfaces a persist failure as a partial-success job", async () => {
   await withTempProjectsRoot(async () => {
     const tempRoot = await mkdtemp(join(tmpdir(), "openklip-route-test-"));
     try {
       const post = createProjectsPost({
         // Ingest succeeds but blocks the copy target: a DIRECTORY already
         // sits where persistUploadedSource wants to store clip.mp4, so
-        // copyFile throws and the failure must land in job.error.
+        // copyFile throws and the failure lands in job.warning.
         loadIngest: async () => () => {
           const dir = join(projectsRoot(), "clip");
           mkdirSync(join(dir, "clip.mp4"), { recursive: true });
@@ -297,8 +297,9 @@ test("POST /api/projects surfaces a persist failure through the job error", asyn
       const json = (await res.json()) as { jobId?: string };
       assert.ok(json.jobId);
       const done = await pollJob(json.jobId as string);
-      assert.equal(done.status, "error");
-      assert.match(done.error ?? "", /clip\.mp4|directory/i);
+      assert.equal(done.status, "partial");
+      assert.equal(done.slug, "clip");
+      assert.match(done.warning ?? "", /clip\.mp4|directory/i);
     } finally {
       await rm(tempRoot, { recursive: true, force: true });
     }

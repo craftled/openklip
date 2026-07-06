@@ -15,6 +15,7 @@ import {
   uploadTooLargeMessage,
 } from "@engine/upload-limits";
 import { writeUploadToFile } from "@engine/upload-stream";
+import { IngestPersistError } from "@engine/ingest-persist-error";
 import {
   isSupportedVideoFilename,
   unsupportedVideoMessage,
@@ -144,9 +145,13 @@ export function createProjectsPost({ loadIngest, tempRoot }: ProjectsPostDeps) {
           try {
             const createdSlug = await ingest(tmpPath, { force, onProgress });
             // Copy after ingest resolves (ingest wipes the project dir at
-            // start) and before temp cleanup; a failed copy lands in
-            // job.error and surfaces through the existing poll path.
-            await persistUploadedSource(createdSlug, filename, tmpPath);
+            // start) and before temp cleanup; a failed copy surfaces as a
+            // partial-success job so the GUI can open the project with a warning.
+            try {
+              await persistUploadedSource(createdSlug, filename, tmpPath);
+            } catch (persistError) {
+              throw new IngestPersistError(createdSlug, persistError);
+            }
             return createdSlug;
           } finally {
             await rm(tmpDir, { recursive: true, force: true });

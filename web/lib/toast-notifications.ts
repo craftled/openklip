@@ -73,6 +73,14 @@ export function exportFailedToast(error: string): ToastPayload {
 // already used for the CLI's formatNote/platformNote fragments. Returns null
 // when no transition was requested (type "none") or when it applied as
 // expected, so a normal export stays quiet.
+export function ingestPartialSuccessToast(warning: string): ToastPayload {
+  return {
+    kind: "info",
+    title: "Project created with a warning",
+    description: warning,
+  };
+}
+
 export function proxyExportWarningToast(
   warn: string | undefined
 ): ToastPayload | null {

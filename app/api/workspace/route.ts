@@ -16,11 +16,19 @@ function folderPickerSupported(): boolean {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const WorkspaceRequestSchema = z
-  .object({
-    action: z.literal("pick"),
-  })
-  .strict();
+const WorkspaceRequestSchema = z.discriminatedUnion("action", [
+  z
+    .object({
+      action: z.literal("pick"),
+    })
+    .strict(),
+  z
+    .object({
+      action: z.literal("set"),
+      path: z.string().min(1),
+    })
+    .strict(),
+]);
 
 export function GET(): Response {
   const root = projectsRoot();
@@ -47,6 +55,20 @@ export async function POST(req: Request): Promise<Response> {
       { error: `invalid workspace request: ${parsed.error.message}` },
       { status: 400 }
     );
+  }
+
+  if (parsed.data.action === "set") {
+    try {
+      writeConfiguredProjectsRoot(parsed.data.path);
+      const root = projectsRoot();
+      return Response.json({
+        displayRoot: formatDisplayPath(root),
+        projects: listProjects(),
+        root,
+      });
+    } catch (e) {
+      return Response.json({ error: (e as Error).message }, { status: 400 });
+    }
   }
 
   try {

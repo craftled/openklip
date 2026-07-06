@@ -2,7 +2,26 @@
 
 Use these bodies when publishing releases. Each section matches a tag in `CHANGELOG.md` without duplicating the full changelog. **Known gaps:** always link to [TODO.md](../TODO.md#known-limitations); do not duplicate the list here.
 
-Publishing status checked on 2026-07-06 (`gh release list`): GitHub releases are published through `v0.41.0.3` (tag `2ea691e` on `main`).
+Publishing status checked on 2026-07-06 (`gh release list`): GitHub releases are published through `v0.41.0.3` (tag `2ea691e` on `main`). **v0.41.0.4** ships next.
+
+---
+
+## v0.41.0.4
+
+**MCP parity, intake UX, and export polish (Batches 1-3).**
+
+### Highlights
+- **MCP**: `doctor`, `highlights_detect`, `export_highlight`, `take_add` (88 tools); export `loudnessNormalize: false`.
+- **Agent smoke**: `bun run agent-smoke-audit --revise` for deterministic revise-draft loop.
+- **Intake**: partial-success jobs when source persist fails; Linux/Windows workspace path in New project; take upload phase progress.
+- **Export**: `--loudness off`; GIF-specific size/time estimate in the export dialog.
+- **Tests**: mobile Chat/Config overlay browser integration test; 1867 tests (1864 pass, 3 skip).
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#04104---2026-07-06)
 
 ---
 

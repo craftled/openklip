@@ -10,7 +10,7 @@ import {
 import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { cutWords } from "./actions.ts";
+import { cutWords, addTitle } from "./actions.ts";
 import { loadBrief, saveBrief } from "./brief.ts";
 import { buildCleanupReport, partitionSafeCandidates } from "./cleanup.ts";
 import { runDoctor } from "./doctor.ts";
@@ -20,6 +20,7 @@ import { FFMPEG, probe, run } from "./ffmpeg.ts";
 import { projectPaths, projectsRoot } from "./paths.ts";
 import { auditProjectForShip } from "./project-brief-audit.ts";
 import { loadProject, mutateProject } from "./projectStore.ts";
+import { revertProject } from "./revert.ts";
 import { summarize } from "./summary.ts";
 import { verifyCut } from "./verify.ts";
 
@@ -294,6 +295,97 @@ export async function runAgentSmokeAudit(input?: {
         });
       }
     }
+
+    const ok = steps.every((step) => step.ok);
+    return { ok, slug, steps };
+  } finally {
+    if (prevRoot === undefined) {
+      delete process.env.OPENKLIP_PROJECTS_ROOT;
+    } else {
+      process.env.OPENKLIP_PROJECTS_ROOT = prevRoot;
+    }
+    if (ownedRoot) {
+      rmSync(tempRoot, { recursive: true, force: true });
+    }
+  }
+}
+
+/**
+ * Deterministic revise-draft loop on the lavfi fixture: cut filler, add a
+ * title overlay, revert the title, confirm the cut survived.
+ */
+export async function runReviseDraftSmokeAudit(input?: {
+  projectsRoot?: string;
+}): Promise<SmokeAuditResult> {
+  const steps: SmokeAuditStep[] = [];
+  const tempRoot =
+    input?.projectsRoot ?? mkdtempSync(join(tmpdir(), "openklip-revise-"));
+  const ownedRoot = input?.projectsRoot === undefined;
+  const prevRoot = process.env.OPENKLIP_PROJECTS_ROOT;
+  process.env.OPENKLIP_PROJECTS_ROOT = tempRoot;
+
+  try {
+    const slug = await bootstrapSmokeFixture(tempRoot);
+    const briefText = (await loadBrief(slug)) ?? "";
+    const projectBefore = await loadProject(slug);
+    const report = buildCleanupReport({
+      project: projectBefore,
+      silences: null,
+      briefText,
+    });
+    const { fillerIds } = partitionSafeCandidates(report.candidates);
+
+    await mutateProject(
+      slug,
+      (project) => {
+        cutWords(project, fillerIds, true);
+        return { ids: fillerIds };
+      },
+      { action: "cut", actor: "cli", input: { ids: fillerIds, deleted: true } }
+    );
+
+    await mutateProject(
+      slug,
+      (project) => {
+        const title = addTitle(project, {
+          fromSec: 0,
+          toSec: 2,
+          text: "Revise draft smoke",
+          position: "lower",
+        });
+        return { titleId: title.id };
+      },
+      {
+        action: "title-add",
+        actor: "cli",
+        input: { fromSec: 0, toSec: 2, text: "Revise draft smoke" },
+      }
+    );
+
+    const withTitle = await loadProject(slug);
+    const titleAdded = (withTitle.titles?.length ?? 0) === 1;
+    steps.push({
+      name: "targeted-edit",
+      ok: titleAdded,
+      detail: titleAdded
+        ? "title overlay added after filler cut"
+        : "expected one title overlay",
+    });
+    if (!titleAdded) {
+      return { ok: false, slug, steps };
+    }
+
+    await revertProject(slug, { last: true }, { actor: "cli" });
+
+    const afterRevert = await loadProject(slug);
+    const titleRemoved = (afterRevert.titles?.length ?? 0) === 0;
+    const umStillCut =
+      afterRevert.words.find((word) => word.id === "w1")?.deleted === true;
+    steps.push({
+      name: "revert-last",
+      ok: titleRemoved && umStillCut,
+      detail: "revert removed the title but kept the earlier filler cut",
+    });
 
     const ok = steps.every((step) => step.ok);
     return { ok, slug, steps };

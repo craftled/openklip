@@ -21,6 +21,7 @@ import {
 } from "./edl.ts";
 import { FFMPEG, probe, run } from "./ffmpeg.ts";
 import { buildProxy, extractAudio, transcribeToWords } from "./ingest.ts";
+import type { IngestPhase, IngestProgress } from "./ingest-types.ts";
 import { assertProjectCanBeIngested } from "./ingest-guard.ts";
 import { projectPaths, slugify, takeDir, takeFile } from "./paths.ts";
 import { mutateProject } from "./projectStore.ts";
@@ -38,6 +39,16 @@ function samplesToSecExact(samples: number): number {
   return samples / SAMPLE_RATE;
 }
 
+const TAKE_INGEST_STEPS: ReadonlyArray<{
+  phase: IngestPhase;
+  message: string;
+}> = [
+  { phase: "probe", message: "Probing take" },
+  { phase: "proxy", message: "Building take proxy" },
+  { phase: "audio", message: "Extracting take audio" },
+  { phase: "transcribe", message: "Transcribing take" },
+];
+
 // Ingest one take: probe + 720p proxy + 16k PCM + Whisper, written to
 // takes/<id>/. Takes never enter project.json; they are the raw material an
 // assemble call splices from. The take id defaults to a slug of the file name,
@@ -45,8 +56,27 @@ function samplesToSecExact(samples: number): number {
 export async function ingestTake(
   slug: string,
   videoArg: string,
-  opts?: { id?: string; label?: string }
+  opts?: {
+    id?: string;
+    label?: string;
+    onProgress?: (progress: IngestProgress) => void;
+  }
 ): Promise<Take> {
+  const total = TAKE_INGEST_STEPS.length;
+  const emit = (phase: IngestPhase) => {
+    if (!opts?.onProgress) {
+      return;
+    }
+    const index = TAKE_INGEST_STEPS.findIndex((step) => step.phase === phase);
+    if (index >= 0) {
+      opts.onProgress({
+        phase,
+        message: TAKE_INGEST_STEPS[index].message,
+        step: index + 1,
+        total,
+      });
+    }
+  };
   const source = isAbsolute(videoArg) ? videoArg : cwdPath(videoArg);
   if (!existsSync(source)) {
     throw new Error(`take video not found: ${source}`);
@@ -62,9 +92,13 @@ export async function ingestTake(
   const rawJson = join(dir, "transcript.raw.json");
 
   console.log(`[take] ${takeId} <- ${source}`);
+  emit("probe");
   const meta = await probe(source);
+  emit("proxy");
   await buildProxy(source, proxyPath);
+  emit("audio");
   await extractAudio(source, audioRaw);
+  emit("transcribe");
   const words = await transcribeToWords(audioRaw, rawJson);
 
   const take: Take = TakeSchema.parse({

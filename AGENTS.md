@@ -289,19 +289,21 @@ The tool-calling edit prompt (`buildEditPrompt` in `src/agent-driver.ts`) advert
 
 | Layer | MCP tool names | Same as CLI |
 | --- | --- | --- |
-| Query | `list_projects`, `blank_ingest`, `transcript_grep`, `transcript_phrase`, `scene_log`, `highlights_list`, `project_status`, `project_overlays`, `cleanup_report`, `history_list`, `task_list`, `template_list`, `graphic_list`, `graphic_show`, `load_skill`, `music_bpm`, `audio_measure`, … | `openklip transcript grep`, `status --json`, `overlays --json`, `highlights`, `cleanup --json`, `openklip history`, `openklip tasks`, `openklip template list`, `openklip ingest --blank`, `openklip graphic list`, `openklip bpm`, `openklip audio measure` |
-| Mutate | `cut`, `cut-text`, `broll-add`, `title-set`, `word-text`, `dead-air-add`, `dead-air-rm`, `audio`, `captions-style`, `captions-inset`, … | `openklip cut`, `broll-add`, `word-text`, `dead-air-rm`, `audio`, `captions-style`, `captions-inset`, … |
+| Query | `list_projects`, `blank_ingest`, `transcript_grep`, `transcript_phrase`, `scene_log`, `highlights_list`, `highlights_detect`, `project_status`, `project_overlays`, `cleanup_report`, `history_list`, `task_list`, `template_list`, `graphic_list`, `graphic_show`, `load_skill`, `music_bpm`, `audio_measure`, `doctor`, … | `openklip transcript grep`, `status --json`, `overlays --json`, `highlights`, `highlights-detect`, `cleanup --json`, `openklip history`, `openklip tasks`, `openklip template list`, `openklip ingest --blank`, `openklip graphic list`, `openklip bpm`, `openklip audio measure`, `openklip doctor` |
+| Mutate | `cut`, `cut-text`, `broll-add`, `title-set`, `word-text`, `dead-air-add`, `dead-air-rm`, `audio`, `captions-style`, `captions-inset`, `take_add`, … | `openklip cut`, `broll-add`, `word-text`, `dead-air-rm`, `audio`, `captions-style`, `captions-inset`, `openklip take-add`, … |
 | Phrase compose | `title-add-phrase`, `zoom-add-phrase`, `broll-add-phrase`, `graphic-add-phrase` | `openklip title-add-phrase`, … |
 | Brief | `brief_get`, `brief_set`, `brief_audit` | `openklip brief`, `openklip brief --set`, `openklip brief --audit` |
 | Agent task progress | `task_step`, `task_complete` | no CLI equivalent: scoped to the running agent's own task via `OPENKLIP_TASK_ID` |
 | Revert | `revert` | `openklip revert` |
-| Render | `export` (accepts `format`, `gifMaxWidth`, `platform`, and `loudnessTargetLufs`) | `openklip export --format --gif-max-width --platform --loudness` |
+| Render | `export` (accepts `format`, `gifMaxWidth`, `platform`, `loudnessTargetLufs`, and `loudnessNormalize`), `export_highlight` | `openklip export --format --gif-max-width --platform --loudness`, `openklip export-highlight` |
 
 **Inspect the manifest:** `openklip tools --json --surface mcp`
 
 **Parity rule:** every registry action with `surfaces` including `mcp` is an MCP tool with `{ slug, … }` input. Query tools use snake_case names; mutations keep registry kebab-case names (`broll-add`).
 
 **Optional skills package:** `skills/` ships `SKILL.md` playbooks installable via `npx skills add <owner>/openklip --skill openklip-motion-canvas` (see `skills/README.md`). Same content as `templates/<id>/skill.md`; MCP `load_skill` works without installing.
+
+**Browser integration tests:** `tests/json-graphic-browser.test.ts`, `tests/transcript-diff-browser.test.ts`, and `tests/mobile-overlays-browser.test.ts` skip unless `OPENKLIP_INTEGRATION=1` and Chrome are present. Run with `OPENKLIP_INTEGRATION=1 bun test tests/mobile-overlays-browser.test.ts` (set `OPENKLIP_CHROME_PATH` when needed). CI runs them in the `integration` job.
 
 ## External generative media (optional)
 
@@ -345,11 +347,12 @@ bun run agent-make-short <slug> --dry-run          # preview settings only
 bun run agent-make-short <slug> --skip-export      # reframe only, no render
 ```
 
-`agent-smoke-audit`: deterministic agent-loop smoke (no LLM). CI runs the lavfi fixture; `--real` audits `edgaras-raw` when present; `--all` runs both.
+`agent-smoke-audit`: deterministic agent-loop smoke (no LLM). CI runs the lavfi fixture; `--real` audits `edgaras-raw` when present; `--revise` runs the revise-draft cut/title/revert loop; `--all` runs both fixtures plus revise.
 
 ```bash
 bun run agent-smoke-audit
 bun run agent-smoke-audit --real    # skip gracefully when edgaras-raw absent
+bun run agent-smoke-audit --revise
 bun run agent-smoke-audit --all
 ```
 

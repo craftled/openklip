@@ -18,6 +18,7 @@ import {
   projectCreateFailedToast,
   projectDeletedToast,
   projectDeleteFailedToast,
+  ingestPartialSuccessToast,
   proxyExportWarningToast,
   revealFailedToast,
   revertFailedToast,
@@ -289,6 +290,10 @@ export function toastTransitionFallback(
   if (payload) {
     show(payload);
   }
+}
+
+export function toastIngestPartialSuccess(warning: string): void {
+  show(ingestPartialSuccessToast(warning));
 }
 
 export function toastProxyExportWarning(warn: string | undefined): void {

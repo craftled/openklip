@@ -7,6 +7,10 @@ import {
   exportPlatform,
 } from "@engine/export-platforms";
 import type { ExportCompression, ExportFormat } from "@engine/exporter";
+import {
+  clampGifDimensions,
+  GIF_MAX_FPS,
+} from "@engine/exporter";
 import { type ReactElement, type ReactNode, useMemo, useState } from "react";
 import {
   COMPRESSION_COPY,
@@ -212,6 +216,53 @@ function formatDurationEstimate(sec: number): string {
   return rem > 0 ? `${min}m ${rem}s` : `${min} minutes`;
 }
 
+export function estimateExportOutput(input: {
+  compression: ExportCompression;
+  durationSec: number;
+  dims: { width: number; height: number };
+  format: ExportFormat;
+  gifMaxWidth?: number;
+  sourceFps: number;
+  sourceHeight: number;
+  sourceWidth: number;
+}): { exportTimeSec: number; note?: string; outputBytes: number } {
+  const compressionMeta = COMPRESSION_COPY[input.compression];
+  const pixelScale =
+    (input.dims.width * input.dims.height) /
+    (input.sourceWidth * input.sourceHeight);
+
+  if (input.format === "gif") {
+    const gifDims = clampGifDimensions({
+      width: input.dims.width,
+      height: input.dims.height,
+      fps: Math.min(Math.round(input.sourceFps), GIF_MAX_FPS),
+      maxWidth: input.gifMaxWidth,
+    });
+    const gifPixelScale =
+      (gifDims.width * gifDims.height) /
+      (input.sourceWidth * input.sourceHeight);
+    const frameFactor = gifDims.fps / Math.max(1, input.sourceFps);
+    return {
+      exportTimeSec: Math.max(
+        3,
+        input.durationSec * gifPixelScale * frameFactor * 2.4
+      ),
+      outputBytes:
+        input.durationSec * gifDims.fps * gifDims.width * gifDims.height * 0.08,
+      note: "GIF estimate includes palette pass; actual size varies with motion.",
+    };
+  }
+
+  return {
+    exportTimeSec: Math.max(
+      3,
+      input.durationSec * pixelScale * compressionMeta.speedFactor * 0.9
+    ),
+    outputBytes:
+      input.durationSec * compressionMeta.mbps * 1_000_000 * 0.125 * pixelScale,
+  };
+}
+
 export function ExportDialog({
   children,
   defaultResolution,
@@ -283,14 +334,29 @@ export function ExportDialog({
     [activeAspect, activeMaxHeight, sourceHeight, sourceWidth]
   );
 
-  const compressionMeta = COMPRESSION_COPY[compression];
-  const pixelScale = (dims.width * dims.height) / (sourceWidth * sourceHeight);
-  const exportTimeSec = Math.max(
-    3,
-    durationSec * pixelScale * compressionMeta.speedFactor * 0.9
+  const estimate = useMemo(
+    () =>
+      estimateExportOutput({
+        compression,
+        durationSec,
+        dims,
+        format,
+        gifMaxWidth: resolveGifMaxWidthSubmission(gifMaxWidth, format),
+        sourceFps,
+        sourceHeight,
+        sourceWidth,
+      }),
+    [
+      compression,
+      dims,
+      durationSec,
+      format,
+      gifMaxWidth,
+      sourceFps,
+      sourceHeight,
+      sourceWidth,
+    ]
   );
-  const outputBytes =
-    durationSec * compressionMeta.mbps * 1_000_000 * 0.125 * pixelScale;
 
   const handleExport = async () => {
     setOpen(false);
@@ -344,8 +410,9 @@ export function ExportDialog({
 
         <AlertDialogFooter className="items-end gap-3 sm:justify-between">
           <p className="text-muted-foreground text-xs sm:max-w-[55%] sm:text-left">
-            Estimation: Export time {formatDurationEstimate(exportTimeSec)}.
-            Output size {formatBytes(outputBytes)}.
+            Estimation: Export time {formatDurationEstimate(estimate.exportTimeSec)}.
+            Output size {formatBytes(estimate.outputBytes)}.
+            {estimate.note ? ` ${estimate.note}` : ""}
           </p>
           <div className="flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row">
             <AlertDialogCancel>Cancel</AlertDialogCancel>

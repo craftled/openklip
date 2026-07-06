@@ -75,7 +75,7 @@ Agent sidebar chats use `working/chats.json`, not `localStorage` (color scheme a
 
 ## What works today
 
-Verified against the current codebase (`VERSION` / `package.json` `0.41.0.3`, 1859 tests: 1857 pass, 2 skip without `OPENKLIP_INTEGRATION=1`):
+Verified against the current codebase (`VERSION` / `package.json` `0.41.0.4`, 1867 tests: 1864 pass, 3 skip without `OPENKLIP_INTEGRATION=1`):
 
 - **Ingest**: video → local transcript + preview proxy + `project.json` (`openklip ingest`; refuses re-ingest unless `--force`)
 - **Transcript editing**: click words to toggle `deleted`; `openklip cut` / `cut --text` / `restore` on CLI
@@ -184,11 +184,22 @@ In Cursor, enable the bundled MCP server (`.cursor/mcp.json`) and call the same 
 
 | Agent / surface | Mutate `project.json` in chat | Typical workflow |
 | --- | --- | --- |
-| **Cursor** (MCP enabled) | Yes, via 84 MCP tools | Chat edits call `cut`, `broll-add`, `export`, etc. directly |
+| **Cursor** (MCP enabled) | Yes, via 88 MCP tools | Chat edits call `cut`, `broll-add`, `export`, etc. directly |
 | **Claude Code / Desktop** (MCP enabled) | Yes, via MCP | Same tool surface as Cursor |
 | **Codex** | CLI hints in chat | Run `openklip` commands the model suggests |
 | **Grok / other CLIs** | CLI hints in chat | Agent selector shells out for filler cuts; mutations via terminal |
 | **Deterministic scripts** | CLI only | `bun run agent-demo`, `bun run agent-smoke-audit`, `bun run agent-make-short` |
+
+### Browser integration tests
+
+Three editor flows have optional headless Chrome tests that boot a real Next dev server against a fixture project: `tests/json-graphic-browser.test.ts`, `tests/transcript-diff-browser.test.ts`, and `tests/mobile-overlays-browser.test.ts`. They skip in the default `bun test` run. To run them locally:
+
+```bash
+OPENKLIP_INTEGRATION=1 bun test tests/transcript-diff-browser.test.ts
+OPENKLIP_INTEGRATION=1 bun test tests/mobile-overlays-browser.test.ts
+```
+
+Set `OPENKLIP_CHROME_PATH` when Chrome is not at the default macOS path. CI runs these in the `integration` job.
 
 GUI human edits and CLI/MCP mutations all write the same `project.json`. Reload the browser after external edits.
 

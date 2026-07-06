@@ -8,11 +8,13 @@
 import {
   runAgentSmokeAudit,
   runRealFixtureSmokeAudit,
+  runReviseDraftSmokeAudit,
 } from "../src/agent-smoke-audit.ts";
 
 const fullVerify = process.argv.includes("--full-verify");
 const realOnly = process.argv.includes("--real");
 const runAll = process.argv.includes("--all");
+const runRevise = process.argv.includes("--revise");
 
 function printResult(
   label: string,
@@ -35,6 +37,11 @@ try {
   if (!realOnly) {
     const stub = await runAgentSmokeAudit({ fullVerify });
     ok = printResult("agent-smoke-audit (lavfi fixture)", stub) && ok;
+  }
+
+  if (runRevise || runAll) {
+    const revise = await runReviseDraftSmokeAudit();
+    ok = printResult("agent-smoke-audit (revise-draft fixture)", revise) && ok;
   }
 
   if (realOnly || runAll) {

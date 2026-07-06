@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.41.0.4 - 2026-07-06
+
+### Added
+- **MCP parity tools**: `doctor`, `highlights_detect`, `export_highlight`, and `take_add` (88 MCP tools total).
+- **Revise-draft smoke audit**: `bun run agent-smoke-audit --revise` exercises cut → title → `revert --last` on the lavfi fixture.
+- **Export loudness off**: `openklip export --loudness off` and MCP `loudnessNormalize: false` skip normalization even with platform presets.
+- **Linux/Windows workspace path**: `POST /api/workspace` `{ action: "set", path }` and a path field in the New project dialog when the macOS picker is unavailable.
+- **Take ingest progress**: phase messages (probe/proxy/audio/transcribe) in the Takes panel during GUI upload.
+- **GIF export estimate**: export dialog uses a separate clamped-width/fps profile with a distinct note.
+- **Mobile overlay integration test**: `tests/mobile-overlays-browser.test.ts` (skips unless `OPENKLIP_INTEGRATION=1`).
+
+### Changed
+- **Ingest partial success**: when source persist fails after a successful ingest, the job finishes as `partial`, the project opens with a warning toast, and exports fall back to the proxy until fixed.
+- **Docs**: README, AGENTS, TODO, CLAUDE, and checklist synced for new MCP tools, integration tests, and closed known-limitation gaps.
+
+### Fixed
+- **Export result typing**: `loudnessNormalize: false` on `exportCut` return type for CLI summary parity.
+
 ## 0.41.0.3 - 2026-07-06
 
 ### Added

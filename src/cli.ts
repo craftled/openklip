@@ -2750,14 +2750,20 @@ try {
         platform = platformRaw;
       }
       let loudnessTargetLufs: number | undefined;
+      let loudnessNormalize: boolean | undefined;
       if (rest.includes("--loudness")) {
         const loudnessRaw = flagValue(rest, "--loudness");
         if (loudnessRaw === undefined) {
           throw new Error(
-            "--loudness requires a value (a number between -30 and -10)"
+            '--loudness requires a value ("off" or a number between -30 and -10)'
           );
         }
-        loudnessTargetLufs = parseExportLoudnessFlag(loudnessRaw);
+        const parsedLoudness = parseExportLoudnessFlag(loudnessRaw);
+        if (parsedLoudness === "off") {
+          loudnessNormalize = false;
+        } else {
+          loudnessTargetLufs = parsedLoudness;
+        }
       }
       const aspectRaw = flagValue(rest, "--aspect");
       const aspect =
@@ -2783,15 +2789,18 @@ try {
         fps,
         gifMaxWidth,
         loudnessTargetLufs,
+        loudnessNormalize,
         maxHeight,
         platform,
       });
       const formatNote = r.format === "mp4" ? "" : `, format ${r.format}`;
       const platformNote = r.platform ? `, platform ${r.platform}` : "";
       const loudnessNote =
-        r.loudnessTargetLufs === undefined
-          ? ""
-          : `, loudness ${r.loudnessTargetLufs} LUFS`;
+        r.loudnessNormalize === false
+          ? ", loudness off"
+          : r.loudnessTargetLufs === undefined
+            ? ""
+            : `, loudness ${r.loudnessTargetLufs} LUFS`;
       const transitionNote = ((): string => {
         const t = r.transition;
         if (t.type === "none") {

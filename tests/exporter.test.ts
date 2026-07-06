@@ -521,14 +521,15 @@ test("parseExportFpsFlag accepts integers 1-120 and rejects the rest", () => {
   }
 });
 
-test("parseExportLoudnessFlag accepts -30..-10 and rejects the rest", () => {
+test("parseExportLoudnessFlag accepts off, -30..-10, and rejects the rest", () => {
+  assert.equal(parseExportLoudnessFlag("off"), "off");
   assert.equal(parseExportLoudnessFlag("-18"), -18);
   assert.equal(parseExportLoudnessFlag("-30"), -30);
   assert.equal(parseExportLoudnessFlag("-10"), -10);
   for (const raw of ["-5", "-31", "0", "not-a-number"]) {
     assert.throws(
       () => parseExportLoudnessFlag(raw),
-      /--loudness must be a number between -30 and -10/,
+      /--loudness must be "off" or a number between -30 and -10/,
       raw
     );
   }
@@ -2797,7 +2798,10 @@ test("CLI export --loudness -5 (out of -30..-10 range) errors and states the val
     writeFixtureProject(slug, makeProject({ slug }));
     const result = await runCli(["export", slug, "--loudness", "-5"]);
     assert.notEqual(result.code, 0);
-    assert.match(result.out, /--loudness must be a number between -30 and -10/);
+    assert.match(
+      result.out,
+      /--loudness must be "off" or a number between -30 and -10/
+    );
   });
 });
 
