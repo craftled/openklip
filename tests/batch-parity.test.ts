@@ -1,16 +1,13 @@
 import assert from "node:assert/strict";
-import { test } from "node:test";
-import {
-  agentToolNames,
-  callAgentTool,
-} from "../src/agent-tools.ts";
-import { runDoctor } from "../src/doctor.ts";
-import { parseExportLoudnessFlag } from "../src/exporter.ts";
-import { IngestPersistError } from "../src/ingest-persist-error.ts";
-import { POST } from "../app/api/workspace/route.ts";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { test } from "node:test";
+import { POST } from "../app/api/workspace/route.ts";
+import { agentToolNames, callAgentTool } from "../src/agent-tools.ts";
+import { runDoctor } from "../src/doctor.ts";
+import { parseExportLoudnessFlag } from "../src/exporter.ts";
+import { IngestPersistError } from "../src/ingest-persist-error.ts";
 
 test("agentToolNames includes new MCP parity tools", () => {
   const names = agentToolNames("mcp");

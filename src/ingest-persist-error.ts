@@ -12,6 +12,8 @@ export class IngestPersistError extends Error {
   }
 }
 
-export function isIngestPersistError(error: unknown): error is IngestPersistError {
+export function isIngestPersistError(
+  error: unknown
+): error is IngestPersistError {
   return error instanceof IngestPersistError;
 }

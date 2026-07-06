@@ -9,6 +9,7 @@ import {
   reserveIngestSlug,
   startIngestJob,
 } from "@engine/ingest-jobs";
+import { IngestPersistError } from "@engine/ingest-persist-error";
 import { projectPaths, slugFromVideo } from "@engine/paths";
 import {
   MAX_ASSET_UPLOAD_BYTES,
@@ -19,7 +20,6 @@ import { writeUploadToFile } from "@engine/upload-stream";
 import type { NextRequest } from "next/server";
 import type { IngestFn } from "../post.ts";
 import { persistUploadedSource } from "../post.ts";
-import { IngestPersistError } from "@engine/ingest-persist-error";
 
 export interface FolderProjectsPostDeps {
   loadIngest: () => Promise<IngestFn>;

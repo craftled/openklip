@@ -114,6 +114,7 @@ export const EXPORT_FORMATS = ["mp4", "gif"] as const;
 
 export type ExportFormat = (typeof EXPORT_FORMATS)[number];
 
+// biome-ignore lint/performance/noBarrelFile: re-export gif caps for CLI/MCP/export route parity without widening the exporter import graph
 export {
   clampGifDimensions,
   GIF_MAX_DURATION_SEC,

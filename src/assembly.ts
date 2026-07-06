@@ -21,8 +21,8 @@ import {
 } from "./edl.ts";
 import { FFMPEG, probe, run } from "./ffmpeg.ts";
 import { buildProxy, extractAudio, transcribeToWords } from "./ingest.ts";
-import type { IngestPhase, IngestProgress } from "./ingest-types.ts";
 import { assertProjectCanBeIngested } from "./ingest-guard.ts";
+import type { IngestPhase, IngestProgress } from "./ingest-types.ts";
 import { projectPaths, slugify, takeDir, takeFile } from "./paths.ts";
 import { mutateProject } from "./projectStore.ts";
 import { cwdPath } from "./repo-paths.ts";

@@ -1,22 +1,19 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { OPENKLIP_FEATURE_GROUPS } from "../web/lib/openklip-features.ts";
+import { featureGroups, features } from "../src/features.ts";
 import { normalizeSettingsSection } from "../web/lib/settings-navigation.ts";
 
-test("OPENKLIP_FEATURE_GROUPS lists shipped capability groups", () => {
-  assert.ok(OPENKLIP_FEATURE_GROUPS.length >= 5);
-  for (const group of OPENKLIP_FEATURE_GROUPS) {
-    assert.ok(group.id);
-    assert.ok(group.title);
-    assert.ok(group.features.length > 0);
-    for (const feature of group.features) {
+test("feature registry lists shipped capability groups", () => {
+  assert.ok(featureGroups.length >= 5);
+  for (const group of featureGroups) {
+    const groupFeatures = features.filter((f) => f.group === group.id);
+    assert.ok(groupFeatures.length > 0, `empty group: ${group.id}`);
+    for (const feature of groupFeatures) {
       assert.ok(feature.title);
       assert.ok(feature.description);
     }
   }
-  const titles = OPENKLIP_FEATURE_GROUPS.flatMap((g) =>
-    g.features.map((f) => f.title)
-  );
+  const titles = features.map((f) => f.title);
   assert.ok(titles.includes("B-roll suggest"));
 });
 

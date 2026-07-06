@@ -7,6 +7,7 @@ import {
   reserveIngestSlug,
   startIngestJob,
 } from "@engine/ingest-jobs";
+import { IngestPersistError } from "@engine/ingest-persist-error";
 import type { IngestProgress } from "@engine/ingest-types";
 import { projectPaths, slugFromVideo } from "@engine/paths";
 import { withProjectLock } from "@engine/project-lock";
@@ -15,7 +16,6 @@ import {
   uploadTooLargeMessage,
 } from "@engine/upload-limits";
 import { writeUploadToFile } from "@engine/upload-stream";
-import { IngestPersistError } from "@engine/ingest-persist-error";
 import {
   isSupportedVideoFilename,
   unsupportedVideoMessage,

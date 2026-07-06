@@ -127,14 +127,18 @@ const liveProjectPath = join(projectsRoot(), spansFixture.slug, "project.json");
 const hasLiveEdgaras = existsSync(liveProjectPath);
 
 test("edgaras-raw live project passes labeled b-roll suggest benchmark", {
-  skip: hasLiveEdgaras ? false : "edgaras-raw project not present in projects root",
+  skip: hasLiveEdgaras
+    ? false
+    : "edgaras-raw project not present in projects root",
 }, async () => {
   const project = await loadProject(spansFixture.slug);
   const brollWithCards = project.assets.filter(
     (a) => (a.kind ?? "broll") === "broll" && a.card
   );
   if (brollWithCards.length < 3) {
-    return test.skip("edgaras-raw b-roll assets lack cards; run: openklip analyze edgaras-raw");
+    return test.skip(
+      "edgaras-raw b-roll assets lack cards; run: openklip analyze edgaras-raw"
+    );
   }
 
   let passed = 0;

@@ -59,12 +59,7 @@
           "outdoor",
           "casual"
         ],
-        "bestFor": [
-          "b-roll cover",
-          "location-setup",
-          "intro",
-          "transition"
-        ],
+        "bestFor": ["b-roll cover", "location-setup", "intro", "transition"],
         "analyzedAt": "2026-07-06T11:55:48.636Z",
         "agent": "Claude"
       }

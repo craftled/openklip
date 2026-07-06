@@ -3,8 +3,8 @@ import { copyFile, mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import type { Take } from "@engine/edl";
-import type { IngestProgress } from "@engine/ingest-types";
 import { startIngestJob } from "@engine/ingest-jobs";
+import type { IngestProgress } from "@engine/ingest-types";
 import { assertValidSlug, projectPaths, slugFromVideo } from "@engine/paths";
 import {
   MAX_ASSET_UPLOAD_BYTES,

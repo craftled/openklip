@@ -10,7 +10,7 @@ import {
 import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { cutWords, addTitle } from "./actions.ts";
+import { addTitle, cutWords } from "./actions.ts";
 import { loadBrief, saveBrief } from "./brief.ts";
 import { buildCleanupReport, partitionSafeCandidates } from "./cleanup.ts";
 import { runDoctor } from "./doctor.ts";

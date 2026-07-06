@@ -102,9 +102,9 @@ function SegmentRow({
 
 export interface TakesPanelViewProps {
   addTakeBusy: boolean;
-  addTakeProgress: string | null;
   addTakeError: string | null;
   addTakeLabel: string;
+  addTakeProgress: string | null;
   anchorWordId: string | null;
   assembleError: string | null;
   assembling: boolean;
@@ -162,7 +162,9 @@ function AddTakeControl({
           ) : (
             <Upload aria-hidden className="size-3.5 shrink-0" />
           )}
-          <span>{busy ? (progressMessage ?? "Ingesting take…") : "Add take"}</span>
+          <span>
+            {busy ? (progressMessage ?? "Ingesting take…") : "Add take"}
+          </span>
           <input
             accept={SUPPORTED_VIDEO_ACCEPT}
             className="hidden"
@@ -535,9 +537,9 @@ export function TakesPanel({ onAssembled, slug }: TakesPanelProps) {
   return (
     <TakesPanelView
       addTakeBusy={addTakeBusy}
-      addTakeProgress={addTakeProgress}
       addTakeError={addTakeError}
       addTakeLabel={addTakeLabel}
+      addTakeProgress={addTakeProgress}
       anchorWordId={anchorWordId}
       assembleError={assembleError}
       assembling={assembling}
