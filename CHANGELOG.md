@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.41.1.3 - 2026-07-07
+
+### Changed
+- **Editor chrome follow-up**: PR #83 simplified transcript chrome, moved transcript search behind a compact video-adjacent control, added transcript minute markers and a tighter search/timeline control row, and updated editor chrome tests.
+- **Asset bin UI**: the Assets sidebar now renders a searchable, filterable two-column media grid with compact thumbnails, duration badges, audio waveform tiles, hover previews, and quieter must-use / avoid / delete controls.
+- **Timeline drawer polish**: the bottom timeline drawer is denser and cleaner, with smaller labels, compact toolbar controls, full-width lane backgrounds on short projects, and simpler track colors while keeping token-based styling.
+
+### Fixed
+- **Next dev runtime loading**: `src/ffmpeg.ts` resolves `ffmpeg-static` and `ffprobe-static` through Node runtime `createRequire`, avoiding Turbopack's hashed external-package resolution failure.
+- **History transcript diff SSR**: the heavy `@pierre/diffs` / Shiki transcript diff renderer is client-only, preventing Turbopack from trying to load a hashed `shiki-*` external during server render.
+
 ## 0.41.1.2 - 2026-07-06
 
 ### Added

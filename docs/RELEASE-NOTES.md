@@ -2,7 +2,26 @@
 
 Use these bodies when publishing releases. Each section matches a tag in `CHANGELOG.md` without duplicating the full changelog. **Known gaps:** always link to [TODO.md](../TODO.md#known-limitations); do not duplicate the list here.
 
-Publishing status checked on 2026-07-06: GitHub releases published through `v0.41.1.1` (`gh release view v0.41.1.1`). `v0.41.1.2` is prepared here as a draft from PR #80 and PR #81; publish it only after tagging the synced `main`.
+Publishing status checked on 2026-07-07: GitHub releases published through `v0.41.1.1` (`gh release list`). `v0.41.1.3` is prepared here as a draft from PR #83 plus local follow-ups on `main`; publish it only after pushing, tagging, and verifying the synced `main`. `v0.41.1.2` remains an unpublished prepared docs release.
+
+---
+
+## v0.41.1.3
+
+**Simpler editor chrome, cleaner asset/timeline surfaces, and Next dev runtime fixes.**
+
+### Highlights
+- **Editor chrome follow-up**: PR #83 simplified the transcript/editor surface, moved transcript search into a compact dialog trigger, added transcript minute markers, and kept the bottom timeline entry point close to the preview.
+- **Asset bin refresh**: the Assets sidebar is now a compact searchable grid with media thumbnails, duration badges, audio waveform tiles, hover previews, type filters, upload, and quieter must-use / avoid / delete controls.
+- **Timeline drawer refresh**: the timeline drawer uses smaller labels, compact toolbar controls, full-width lane backgrounds on very short projects, and simpler track colors that stay closer to the app's shadcn token system.
+- **Next dev fixes**: `ffmpeg-static` / `ffprobe-static` resolve at runtime with `createRequire`, and the transcript diff renderer loads client-side so Turbopack no longer trips over hashed `ffmpeg-static-*` or `shiki-*` externals.
+- **Verification**: `bun run typecheck`, targeted `bun run check`, full `bun test` (1901 pass, 3 skip), and browser checks for the local asset/timeline surfaces.
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#04113---2026-07-07)
 
 ---
 
