@@ -196,7 +196,7 @@ const RAW_FEATURES: FeatureDef[] = [
     id: "editor-layout",
     title: "Editor layout",
     description:
-      "Resizable chat sidebar, Properties/Settings below video, transcript toggle, timeline drawer.",
+      "Fixed 20rem shadcn sidebars, unified chat timeline, preview header, transcript, and timeline drawer.",
     group: "preview",
     status: "shipped",
     surfaces: ["gui"],

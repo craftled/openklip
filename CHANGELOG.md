@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.41.1.2 - 2026-07-06
+
+### Added
+- **Unified chat timeline**: the chat rail now renders human messages and thread-linked agent tasks in one `ChatTimeline`, with collapsible task cards, task steps, action-history entries, and MCP tool-call traces stored on `AgentTask.toolCalls`.
+
+### Changed
+- **Editor chrome and sidebars**: the editor now uses fixed 20rem shadcn sidebars on both sides, `SidebarRail` collapse/expand affordances, a left-sidebar Chats/Assets/Config segmented view, and extracted preview header/format/export components. The old px-resizable chat rail and `editor-toolbar` were removed.
+- **Capability registry hardening**: the product capability catalog is code-backed from `src/features.ts` across Settings -> Features, `openklip features`, MCP `features_list`, and `GET /api/features`, with link/title parity tests guarding drift.
+- **Docs and release truth**: version, README, TODO, release-note draft, and memory files now reflect PR #80 and PR #81 on `main` without repeating the current known-gaps list outside `TODO.md`.
+
+### Fixed
+- **Responsive right-rail gap**: the desktop chat rail is wrapped at the layout boundary so the shadcn sidebar gap disappears below `xl`; 1024px and 1279px viewports keep only the left-sidebar gap, while 1280px restores the right chat rail.
+- **CI lint**: restored `bun run check` by adding targeted Biome overrides for shadcn/map and registry re-export patterns.
+
 ## 0.41.1.1 - 2026-07-06
 
 ### Added

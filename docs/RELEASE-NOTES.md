@@ -2,7 +2,27 @@
 
 Use these bodies when publishing releases. Each section matches a tag in `CHANGELOG.md` without duplicating the full changelog. **Known gaps:** always link to [TODO.md](../TODO.md#known-limitations); do not duplicate the list here.
 
-Publishing status checked on 2026-07-06: GitHub releases published through `v0.41.1.1` (`gh release view v0.41.1.1`). `v0.41.1.1` merged to `main` at `7838c53` (PR #79).
+Publishing status checked on 2026-07-06: GitHub releases published through `v0.41.1.1` (`gh release view v0.41.1.1`). `v0.41.1.2` is prepared here as a draft from PR #80 and PR #81; publish it only after tagging the synced `main`.
+
+---
+
+## v0.41.1.2
+
+**Unified chat timeline, shadcn sidebars, and code-backed capability registry.**
+
+### Highlights
+- **Unified chat timeline**: chat messages and thread-linked agent tasks now share one timeline, with collapsible task cards, steps, action-history entries, and MCP tool-call traces.
+- **Editor chrome**: the right chat rail now uses the same shadcn `Sidebar` pattern as the left rail: fixed 20rem width, `SidebarRail`, offcanvas expand affordances, and no px-resizable chat-width state.
+- **Config in the left rail**: the left sidebar now switches between Chats, Assets, and Config, keeping project settings reachable without a separate desktop Config rail.
+- **Preview header extraction**: export, format, safe-area, project title, and time chrome moved into focused preview header components; the old `editor-toolbar` was removed.
+- **Capability registry hardening**: `src/features.ts` is the code-backed source for Settings -> Features, `openklip features`, MCP `features_list`, and `GET /api/features`, with parity tests.
+- **Verification**: local `bun run check`, `bun run typecheck`, `bun test` (1901 pass, 3 skip), `bun run build`; GitHub CI `test` and `integration` passed on PR #81.
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#04112---2026-07-06)
 
 ---
 
