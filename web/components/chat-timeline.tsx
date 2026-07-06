@@ -53,7 +53,7 @@ function TaskStepRow({ step }: { step: AgentTask["steps"][number] }) {
       }
       data-task-step={step.id}
     >
-      <div className="flex items-center gap-1.5 text-[11px] leading-snug">
+      <div className="flex items-center gap-1.5 font-[450] text-[13px] leading-normal">
         {done ? (
           <Check aria-hidden className="size-3 shrink-0 text-foreground" />
         ) : null}
@@ -81,7 +81,7 @@ function TaskStepRow({ step }: { step: AgentTask["steps"][number] }) {
         </span>
       </div>
       {step.note ? (
-        <p className="pl-4 text-[11px] text-muted-foreground leading-snug">
+        <p className="pl-4 font-[450] text-[12px] text-muted-foreground leading-normal">
           {step.note}
         </p>
       ) : null}
@@ -201,8 +201,8 @@ export function ChatTimeline({
 
   if (!thread) {
     return (
-      <MessageScrollerItem className="px-1 py-1">
-        <p className="text-[11px] text-muted-foreground/70 leading-snug">
+      <MessageScrollerItem className="px-1 py-2">
+        <p className="font-[450] text-[12px] text-muted-foreground/70 leading-normal">
           Start a chat. Type / for edit skills, or ask about cuts, filler, and
           overlays.
         </p>
@@ -212,8 +212,8 @@ export function ChatTimeline({
 
   if (events.length === 0) {
     return (
-      <MessageScrollerItem className="px-1 py-1">
-        <p className="text-[11px] text-muted-foreground/70 leading-snug">
+      <MessageScrollerItem className="px-1 py-2">
+        <p className="font-[450] text-[12px] text-muted-foreground/70 leading-normal">
           Start a chat. Type / for edit skills, or ask about cuts, filler, and
           overlays.
         </p>
@@ -229,14 +229,15 @@ export function ChatTimeline({
           const isUser = m.role === "user";
           return (
             <MessageScrollerItem
+              className={isUser ? "py-1.5" : "py-2.5"}
               key={event.id}
               messageId={m.id}
               scrollAnchor={isUser}
             >
-              <Message align={isUser ? "end" : "start"}>
-                <MessageAvatar>
+              <Message align={isUser ? "end" : "start"} className="gap-0">
+                <MessageAvatar className="hidden">
                   <span
-                    className="text-[10px] text-muted-foreground"
+                    className="font-[450] text-[12px] text-muted-foreground"
                     title={isUser ? "You" : agentLabel}
                   >
                     {isUser ? "Y" : "A"}
@@ -245,13 +246,14 @@ export function ChatTimeline({
                 <MessageContent>
                   <Bubble
                     align={isUser ? "end" : "start"}
-                    variant={isUser ? "muted" : "outline"}
+                    className={isUser ? undefined : "max-w-full"}
+                    variant={isUser ? "muted" : "ghost"}
                   >
                     <BubbleContent
                       className={
                         isUser
-                          ? "whitespace-pre-wrap text-[11px] leading-snug"
-                          : "text-[11px] leading-snug"
+                          ? "whitespace-pre-wrap rounded-lg border-0 bg-muted/60 px-3 py-2 font-[450] text-[13px] leading-normal"
+                          : "w-full max-w-full font-[450] text-[13px] leading-normal"
                       }
                     >
                       {isUser ? (
@@ -279,32 +281,29 @@ export function ChatTimeline({
 
         return (
           <MessageScrollerItem
-            className="px-1"
+            className="py-2.5"
             key={event.id}
             messageId={`task:${task.id}`}
           >
             <Collapsible defaultOpen={false} render={<div />}>
-              <div
-                className="rounded-lg border border-sidebar-border/60 bg-sidebar/20 px-2 py-2"
-                data-task-row={task.id}
-              >
+              <div className="px-1 py-1.5" data-task-row={task.id}>
                 <div className="flex items-start gap-2">
                   <div className="min-w-0 flex-1">
-                    <p className="line-clamp-2 text-[11px] text-foreground/90 leading-snug">
+                    <p className="line-clamp-2 font-[450] text-[13px] text-foreground/90 leading-normal">
                       {task.request}
                     </p>
                     <div className="mt-1 flex items-center gap-2">
                       <span className={taskStatusBadgeClass(task.status)}>
                         {taskStatusLabel(task.status)}
                       </span>
-                      <span className="text-[10px] text-muted-foreground tabular-nums">
+                      <span className="font-[450] text-[12px] text-muted-foreground tabular-nums">
                         {formatTaskRelativeTime(task)}
                       </span>
                     </div>
                   </div>
                   {task.status === "running" ? (
                     <Button
-                      className="h-6 px-2 text-[10px]"
+                      className="h-6 border-0 bg-muted/45 px-2 font-[450] text-[12px] shadow-none hover:bg-muted/70"
                       data-task-cancel={task.id}
                       onClick={() => void cancelTask(task.id)}
                       size="xs"
@@ -316,7 +315,7 @@ export function ChatTimeline({
                   ) : null}
                   {hasDetails ? (
                     <CollapsibleTrigger
-                      className="shrink-0 rounded-md px-2 py-1 text-[10px] text-muted-foreground hover:bg-muted"
+                      className="shrink-0 rounded-md px-1.5 py-1 font-[450] text-[12px] text-muted-foreground hover:bg-muted/60"
                       type="button"
                     >
                       Details
@@ -338,7 +337,7 @@ export function ChatTimeline({
                       <div className="mt-2">
                         <Collapsible defaultOpen={false} render={<div />}>
                           <CollapsibleTrigger
-                            className="rounded-md px-2 py-1 text-[10px] text-muted-foreground hover:bg-muted"
+                            className="rounded-md px-1.5 py-1 font-[450] text-[12px] text-muted-foreground hover:bg-muted/60"
                             type="button"
                           >
                             Actions ({event.actions.length})
@@ -347,27 +346,27 @@ export function ChatTimeline({
                             <ul className="flex list-none flex-col gap-1 p-0">
                               {event.actions.map((entry) => (
                                 <li
-                                  className="flex flex-col gap-0.5 rounded-md border border-sidebar-border/60 bg-background/60 px-2 py-1"
+                                  className="flex flex-col gap-0.5 rounded-md bg-muted/25 px-2 py-1"
                                   key={`${task.id}:${entry.at}:${entry.action}`}
                                 >
                                   <div className="flex items-center gap-2">
-                                    <span className="text-[11px] text-foreground/90 leading-snug">
+                                    <span className="font-[450] text-[13px] text-foreground/90 leading-normal">
                                       {entry.action}
                                     </span>
-                                    <span className="rounded-full bg-muted px-1.5 py-px text-[10px] text-muted-foreground leading-none">
+                                    <span className="rounded-full bg-muted px-1.5 py-px font-[450] text-[12px] text-muted-foreground leading-none">
                                       {entry.actor}
                                     </span>
-                                    <span className="ml-auto text-[10px] text-muted-foreground tabular-nums">
+                                    <span className="ml-auto font-[450] text-[12px] text-muted-foreground tabular-nums">
                                       {relativeTimeAgo(entry.at)}
                                     </span>
                                   </div>
                                   {entry.input ? (
-                                    <pre className="whitespace-pre-wrap break-words text-[10px] text-muted-foreground leading-snug">
+                                    <pre className="whitespace-pre-wrap break-words font-[450] text-[12px] text-muted-foreground leading-snug">
                                       {entry.input}
                                     </pre>
                                   ) : null}
                                   {entry.result ? (
-                                    <pre className="whitespace-pre-wrap break-words text-[10px] text-muted-foreground leading-snug">
+                                    <pre className="whitespace-pre-wrap break-words font-[450] text-[12px] text-muted-foreground leading-snug">
                                       {entry.result}
                                     </pre>
                                   ) : null}
@@ -383,7 +382,7 @@ export function ChatTimeline({
                       <div className="mt-2">
                         <Collapsible defaultOpen={false} render={<div />}>
                           <CollapsibleTrigger
-                            className="rounded-md px-2 py-1 text-[10px] text-muted-foreground hover:bg-muted"
+                            className="rounded-md px-1.5 py-1 font-[450] text-[12px] text-muted-foreground hover:bg-muted/60"
                             type="button"
                           >
                             Tools ({toolCalls.length})
@@ -392,27 +391,27 @@ export function ChatTimeline({
                             <ul className="flex list-none flex-col gap-1 p-0">
                               {toolCalls.map((call) => (
                                 <li
-                                  className="flex flex-col gap-0.5 rounded-md border border-sidebar-border/60 bg-background/60 px-2 py-1"
+                                  className="flex flex-col gap-0.5 rounded-md bg-muted/25 px-2 py-1"
                                   key={call.id}
                                 >
                                   <div className="flex items-center gap-2">
-                                    <span className="text-[11px] text-foreground/90 leading-snug">
+                                    <span className="font-[450] text-[13px] text-foreground/90 leading-normal">
                                       {call.toolName}
                                     </span>
-                                    <span className="rounded-full bg-muted px-1.5 py-px text-[10px] text-muted-foreground leading-none">
+                                    <span className="rounded-full bg-muted px-1.5 py-px font-[450] text-[12px] text-muted-foreground leading-none">
                                       {call.ok ? "ok" : "error"}
                                     </span>
-                                    <span className="ml-auto text-[10px] text-muted-foreground tabular-nums">
+                                    <span className="ml-auto font-[450] text-[12px] text-muted-foreground tabular-nums">
                                       {relativeTimeAgo(call.at)}
                                     </span>
                                   </div>
                                   {call.input ? (
-                                    <pre className="whitespace-pre-wrap break-words text-[10px] text-muted-foreground leading-snug">
+                                    <pre className="whitespace-pre-wrap break-words font-[450] text-[12px] text-muted-foreground leading-snug">
                                       {call.input}
                                     </pre>
                                   ) : null}
                                   {call.output ? (
-                                    <pre className="whitespace-pre-wrap break-words text-[10px] text-muted-foreground leading-snug">
+                                    <pre className="whitespace-pre-wrap break-words font-[450] text-[12px] text-muted-foreground leading-snug">
                                       {call.output}
                                     </pre>
                                   ) : null}
@@ -425,17 +424,17 @@ export function ChatTimeline({
                     ) : null}
 
                     {task.blockedQuestion ? (
-                      <p className="mt-2 text-[11px] text-foreground leading-snug">
+                      <p className="mt-2 font-[450] text-[13px] text-foreground leading-normal">
                         {task.blockedQuestion}
                       </p>
                     ) : null}
                     {task.summary ? (
-                      <p className="mt-2 text-[11px] text-muted-foreground leading-snug">
+                      <p className="mt-2 font-[450] text-[12px] text-muted-foreground leading-normal">
                         {task.summary}
                       </p>
                     ) : null}
                     {task.remaining && task.remaining.length > 0 ? (
-                      <ul className="mt-2 list-disc pl-4 text-[11px] text-muted-foreground leading-snug">
+                      <ul className="mt-2 list-disc pl-4 font-[450] text-[12px] text-muted-foreground leading-normal">
                         {task.remaining.map((item) => (
                           <li key={item}>{item}</li>
                         ))}

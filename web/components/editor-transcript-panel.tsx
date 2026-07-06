@@ -205,16 +205,16 @@ export function EditorTranscriptPanel({
     <TooltipProvider>
       <ScrollArea className="h-full min-h-0" ref={scrollAreaRef}>
         <div className="flex min-h-full flex-col px-4 pt-4 pb-12 sm:px-6">
-          <header className="mx-auto mb-4 w-full max-w-[78ch]">
-            <p className="text-muted-foreground text-sm leading-snug">
+          <header className="mx-auto mb-3 w-full max-w-[82ch]">
+            <p className="font-[450] text-[12px] text-muted-foreground/85 leading-normal">
               Edit the script to edit the video. Select words and press{" "}
-              <kbd className="rounded border bg-muted/40 px-1 font-mono text-[0.6875rem]">
+              <kbd className="rounded border bg-muted/35 px-1 font-[450] font-sans text-[12px] text-muted-foreground leading-normal">
                 Delete
               </kbd>{" "}
               to cut.
             </p>
             {cutCount > 0 ? (
-              <p className="mt-1.5 text-muted-foreground text-xs tabular-nums">
+              <p className="mt-1 font-[450] text-[12px] text-muted-foreground/75 tabular-nums leading-normal">
                 {cutCount} {cutCount === 1 ? "word" : "words"} cut from the
                 video
               </p>
@@ -222,7 +222,7 @@ export function EditorTranscriptPanel({
           </header>
 
           {search ? (
-            <div className="mx-auto mb-3 w-full max-w-[80ch]">{search}</div>
+            <div className="mx-auto mb-3 w-full max-w-[82ch]">{search}</div>
           ) : null}
 
           {selection.total > 0 ? (
@@ -253,7 +253,7 @@ export function EditorTranscriptPanel({
             <div
               aria-label="Transcript editor"
               aria-multiline="true"
-              className="mx-auto w-full max-w-[78ch] rounded-md text-left text-[1.0625rem] leading-[1.75] tracking-[0.01em] outline-none selection:bg-primary/20 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+              className="mx-auto w-full max-w-[82ch] rounded-md text-left font-[450] text-[15px] text-foreground/90 leading-6 outline-none selection:bg-primary/15 focus-visible:ring-2 focus-visible:ring-ring/35"
               contentEditable={editorMounted ? true : undefined}
               onBlur={commitEditedText}
               onKeyDown={onEditorKeyDown}
@@ -263,7 +263,7 @@ export function EditorTranscriptPanel({
               tabIndex={0}
             >
               {paragraphs.map((paragraph) => (
-                <p key={paragraph[0]?.word.id}>
+                <p className="mb-2 last:mb-0" key={paragraph[0]?.word.id}>
                   {paragraph.map(({ index, word }) => (
                     <TranscriptWordButton
                       active={
@@ -507,15 +507,15 @@ function TranscriptWordButton({
     <span
       aria-current={active ? "true" : undefined}
       className={cn(
-        "transcript-word cursor-text text-left leading-[inherit] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+        "transcript-word cursor-text text-left leading-[inherit] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35",
         word.deleted &&
-          "text-muted-foreground/80 line-through decoration-1 decoration-muted-foreground/50",
+          "text-muted-foreground/65 line-through decoration-1 decoration-muted-foreground/45",
         active && !word.deleted && "text-foreground",
         inBroll &&
           "underline decoration-1 decoration-border/60 underline-offset-[0.2em] opacity-95",
-        inZoom && !word.deleted && "rounded-sm bg-muted/30",
+        inZoom && !word.deleted && "rounded-sm bg-muted/25",
         isMatch && "bg-primary/10",
-        isActiveMatch && "bg-primary/15 ring-1 ring-primary/40 ring-inset"
+        isActiveMatch && "bg-primary/12 ring-1 ring-primary/35 ring-inset"
       )}
       data-search-match={
         isMatch ? (isActiveMatch ? "active" : "true") : undefined

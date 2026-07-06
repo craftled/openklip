@@ -675,7 +675,7 @@ export function App({
         keyboardShortcut={false}
         style={
           {
-            "--sidebar-width": "20rem",
+            "--sidebar-width": "16rem",
             "--sidebar-width-icon": "3.25rem",
           } as CSSProperties
         }
@@ -746,7 +746,7 @@ export function App({
               keyboardShortcut={false}
               style={
                 {
-                  "--sidebar-width": "20rem",
+                  "--sidebar-width": "30rem",
                   "--sidebar-width-icon": "3.25rem",
                 } as CSSProperties
               }

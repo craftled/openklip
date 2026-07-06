@@ -215,24 +215,24 @@
 
 .transcript-word::before {
   position: absolute;
-  inset-inline: -4px;
+  inset-inline: -2px;
   top: 50%;
   z-index: -1;
-  height: calc(1lh - 4px);
+  height: calc(1lh - 3px);
   content: "";
-  background-color: color-mix(in oklch, var(--foreground) 7.1%, transparent);
-  border-radius: 8px;
+  background-color: color-mix(in oklch, var(--foreground) 5.5%, transparent);
+  border-radius: 5px;
   opacity: 0;
   transform: translateY(-50%);
-  transition: opacity 300ms var(--ease-out);
+  transition: opacity 180ms var(--ease-out);
 }
 
 .dark .transcript-word::before {
-  background-color: color(display-p3 1 1 1 / 0.071);
+  background-color: color(display-p3 1 1 1 / 0.055);
 }
 
 .transcript-word[data-word-active="true"]::before {
-  background-color: color-mix(in oklch, var(--primary) 12%, transparent);
+  background-color: color-mix(in oklch, var(--primary) 9%, transparent);
   opacity: 1;
 }
 

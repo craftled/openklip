@@ -260,14 +260,14 @@ function AgentChatTrail({
               width: TRAIL_PREVIEW_WIDTH,
             }}
           >
-            <p className="truncate font-semibold text-sm leading-none">
+            <p className="truncate font-medium text-[13px] leading-normal">
               {chatTrailLabel(hoveredMessage, agentLabel)}
             </p>
-            <p className="mt-2 max-h-20 overflow-hidden text-muted-foreground text-sm leading-relaxed">
+            <p className="mt-2 max-h-20 overflow-hidden font-[450] text-[12px] text-muted-foreground leading-normal">
               {chatTrailPreview(hoveredMessage.content)}
             </p>
             {hoveredStats ? (
-              <div className="mt-3 flex justify-end gap-4 font-medium text-muted-foreground text-xs leading-none">
+              <div className="mt-3 flex justify-end gap-4 font-[450] text-[12px] text-muted-foreground leading-normal">
                 <span>{pluralizeMetric(hoveredStats.words, "word")}</span>
                 <span>
                   {pluralizeMetric(hoveredStats.characters, "character")}
@@ -300,9 +300,9 @@ export function AgentChatPanel({
 
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden bg-sidebar text-sidebar-foreground">
-      <SidebarHeader className="gap-1 border-sidebar-border/60 border-b px-2 pt-1 pb-1.5">
+      <SidebarHeader className="gap-1 px-2 pt-1 pb-1.5">
         <div className="flex h-6 w-full items-center gap-1.5 pr-0.5 pl-2">
-          <h2 className="min-w-0 flex-1 truncate font-medium text-[11px] text-sidebar-foreground leading-none">
+          <h2 className="min-w-0 flex-1 truncate font-medium text-[13px] text-sidebar-foreground leading-normal">
             {activeThread?.title ?? "Chat"}
           </h2>
           {onClose ? (
@@ -323,7 +323,7 @@ export function AgentChatPanel({
         </div>
         <div className="px-2">
           <span
-            className="inline-flex max-w-full items-center gap-1 rounded-full bg-muted px-1.5 py-px text-[10px] text-muted-foreground leading-none"
+            className="inline-flex max-w-full items-center gap-1 rounded-full bg-muted px-1.5 py-px font-[450] text-[12px] text-muted-foreground leading-normal"
             title={getAgentModelLabel(agent)}
           >
             <AgentProviderIcon className="size-3 shrink-0" value={agent} />
@@ -344,7 +344,7 @@ export function AgentChatPanel({
             messages={activeThread?.messages ?? []}
           />
           <MessageScrollerViewport>
-            <MessageScrollerContent className="min-w-0 justify-end gap-2 px-2 py-2 text-left">
+            <MessageScrollerContent className="min-w-0 justify-end gap-3 px-4 py-4 text-left">
               <ChatTimeline
                 agentLabel={getAgentModelLabel(agent)}
                 chatsLoading={chatsLoading}
@@ -358,7 +358,7 @@ export function AgentChatPanel({
         </MessageScroller>
       </MessageScrollerProvider>
 
-      <div className="flex min-w-0 shrink-0 flex-col gap-2 border-sidebar-border/60 border-t px-2 py-2">
+      <div className="flex min-w-0 shrink-0 flex-col gap-2 px-4 pt-2 pb-4">
         <AgentPromptInput
           activeSlug={activeSlug}
           chatsLoading={chatsLoading}
