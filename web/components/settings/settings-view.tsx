@@ -3,6 +3,7 @@
 import { SettingsAgentPanel } from "@/components/settings/settings-agent-panel";
 import { SettingsAppearancePanel } from "@/components/settings/settings-appearance-panel";
 import { SettingsExportPanel } from "@/components/settings/settings-export-panel";
+import { SettingsFeaturesPanel } from "@/components/settings/settings-features-panel";
 import { SettingsIntegrationsPanel } from "@/components/settings/settings-integrations-panel";
 import type { AgentModelId } from "@/lib/agent-preferences";
 import {
@@ -54,6 +55,7 @@ export function SettingsView({
           {activeSection === "integrations" ? (
             <SettingsIntegrationsPanel />
           ) : null}
+          {activeSection === "features" ? <SettingsFeaturesPanel /> : null}
         </div>
       </div>
     </div>
