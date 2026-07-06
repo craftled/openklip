@@ -1,11 +1,18 @@
 import type { ComponentType } from "react";
-import { Bot, Download, Palette, PlugConnected } from "@/lib/icon";
+import {
+  Bot,
+  Download,
+  LayoutTemplate,
+  Palette,
+  PlugConnected,
+} from "@/lib/icon";
 
 export type SettingsSectionId =
   | "appearance"
   | "export"
   | "agent"
-  | "integrations";
+  | "integrations"
+  | "features";
 
 export interface SettingsNavItem {
   description: string;
@@ -51,12 +58,24 @@ export const SETTINGS_NAV_ITEMS: ReadonlyArray<SettingsNavItem> = [
     description: "Connected services and API keys.",
     icon: PlugConnected,
   },
+  {
+    id: "features",
+    group: "app",
+    label: "Features",
+    description: "Everything OpenKlip can do in this release.",
+    icon: LayoutTemplate,
+  },
 ];
 
 export function normalizeSettingsSection(
   value: string | null | undefined
 ): SettingsSectionId {
-  if (value === "export" || value === "agent" || value === "integrations") {
+  if (
+    value === "export" ||
+    value === "agent" ||
+    value === "integrations" ||
+    value === "features"
+  ) {
     return value;
   }
   return "appearance";
