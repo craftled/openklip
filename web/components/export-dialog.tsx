@@ -7,10 +7,7 @@ import {
   exportPlatform,
 } from "@engine/export-platforms";
 import type { ExportCompression, ExportFormat } from "@engine/exporter";
-import {
-  clampGifDimensions,
-  GIF_MAX_FPS,
-} from "@engine/exporter";
+import { clampGifDimensions, GIF_MAX_FPS } from "@engine/gif-export";
 import { type ReactElement, type ReactNode, useMemo, useState } from "react";
 import {
   COMPRESSION_COPY,

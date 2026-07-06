@@ -19,6 +19,7 @@ test("agentToolNames includes new MCP parity tools", () => {
     "highlights_detect",
     "export_highlight",
     "take_add",
+    "broll_suggest",
   ]) {
     assert.ok(names.includes(tool), `missing MCP tool ${tool}`);
   }

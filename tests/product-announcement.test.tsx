@@ -498,7 +498,7 @@ test("CLI json-graphic-add rejects invalid input without mutating graphics", asy
       invalidSpecPath,
     ]);
     assert.notEqual(invalidComponent.code, 0);
-    assert.match(invalidComponent.out, /invalid product announcement spec/);
+    assert.match(invalidComponent.out, /invalid input for "json-graphic-add": spec:/);
 
     const invalidTiming = await runCli([
       "json-graphic-add",

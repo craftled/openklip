@@ -12,8 +12,8 @@ import {
   samplesToSec,
 } from "./edl.ts";
 import type { CutTransitionFallbackReason } from "./export-segments.ts";
+import { validateJsonRenderSpec } from "./json-render-catalogs.ts";
 import { findPhraseRuns, type PhraseRun } from "./phrase-match.ts";
-import { validateProductAnnouncementSpec } from "./product-announcement.ts";
 import type { SourceMediaKind } from "./source-media.ts";
 
 export interface TranscriptWordView {
@@ -322,8 +322,8 @@ export function listOverlays(project: Project): OverlayViews {
     graphics: (project.graphics ?? []).map((g) => {
       const type = g.type ?? "template";
       const validation =
-        type === "json-render"
-          ? validateProductAnnouncementSpec(g.spec)
+        type === "json-render" && g.catalog
+          ? validateJsonRenderSpec(g.catalog, g.spec)
           : undefined;
       return {
         id: g.id,

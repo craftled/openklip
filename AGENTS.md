@@ -68,6 +68,7 @@ Time is integer audio samples at 48 kHz. The CLI takes seconds where a human num
 | Register a still or music asset | `openklip asset-add <slug> <file> --kind still\|music` |
 | List b-roll assets | `openklip assets <slug>` |
 | Describe media (subagents) | `openklip analyze <slug>` |
+| Rank b-roll for a spoken span | `openklip broll-suggest <slug> --phrase "..."` or `--text "..."` (MCP: `broll_suggest`) |
 | Place / patch / remove b-roll | `openklip broll-add`, `broll-set`, `broll-rm`, `broll-add-phrase` |
 | Place / patch / remove still (Ken Burns) | `openklip still-add`, `still-set`, `still-rm` |
 | Place / patch / remove music placement | `openklip music-add`, `music-set`, `music-rm` |
@@ -130,6 +131,7 @@ Run as `bun run src/cli.ts <command>` (or the `openklip` bin).
 | --- | --- |
 | `openklip list` | List all projects, most recent first. |
 | `openklip assets <slug>` | List registered b-roll assets with ids and durations. |
+| `openklip broll-suggest <slug> (--text "..." \| --phrase "...") [--top N] [--json]` | Rank b-roll assets for a spoken span or keywords using existing asset cards (`summary`, `tags`, `bestFor`). Respects `mustUse` / `avoid`. Assets without cards are listed in `uncarded` with an analyze hint. |
 | `openklip analyze <slug> [--agent <model>]` | One "understand my media" pass: fan out one subagent per un-described asset (b-roll, stills) to write an "asset card", and (if absent) one subagent over the main video's ingest frames to write a `sceneLog` on `project.json` (what is on screen, b-roll opportunities). Idempotent: only missing work runs. |
 | `openklip brief <slug>` | Print the project brief (`brief.md`), or a hint if none exists yet. |
 | `openklip brief <slug> --set <text...>` | Replace the brief with the given text (empty text clears it). |
@@ -289,7 +291,7 @@ The tool-calling edit prompt (`buildEditPrompt` in `src/agent-driver.ts`) advert
 
 | Layer | MCP tool names | Same as CLI |
 | --- | --- | --- |
-| Query | `list_projects`, `blank_ingest`, `transcript_grep`, `transcript_phrase`, `scene_log`, `highlights_list`, `highlights_detect`, `project_status`, `project_overlays`, `cleanup_report`, `history_list`, `task_list`, `template_list`, `graphic_list`, `graphic_show`, `load_skill`, `music_bpm`, `audio_measure`, `doctor`, … | `openklip transcript grep`, `status --json`, `overlays --json`, `highlights`, `highlights-detect`, `cleanup --json`, `openklip history`, `openklip tasks`, `openklip template list`, `openklip ingest --blank`, `openklip graphic list`, `openklip bpm`, `openklip audio measure`, `openklip doctor` |
+| Query | `list_projects`, `blank_ingest`, `transcript_grep`, `transcript_phrase`, `scene_log`, `highlights_list`, `highlights_detect`, `project_status`, `project_overlays`, `cleanup_report`, `history_list`, `task_list`, `template_list`, `graphic_list`, `graphic_show`, `load_skill`, `music_bpm`, `audio_measure`, `doctor`, `broll_suggest`, … | `openklip transcript grep`, `status --json`, `overlays --json`, `highlights`, `highlights-detect`, `cleanup --json`, `openklip history`, `openklip tasks`, `openklip template list`, `openklip ingest --blank`, `openklip graphic list`, `openklip bpm`, `openklip audio measure`, `openklip doctor`, `openklip broll-suggest` |
 | Mutate | `cut`, `cut-text`, `broll-add`, `title-set`, `word-text`, `dead-air-add`, `dead-air-rm`, `audio`, `captions-style`, `captions-inset`, `take_add`, … | `openklip cut`, `broll-add`, `word-text`, `dead-air-rm`, `audio`, `captions-style`, `captions-inset`, `openklip take-add`, … |
 | Phrase compose | `title-add-phrase`, `zoom-add-phrase`, `broll-add-phrase`, `graphic-add-phrase` | `openklip title-add-phrase`, … |
 | Brief | `brief_get`, `brief_set`, `brief_audit` | `openklip brief`, `openklip brief --set`, `openklip brief --audit` |

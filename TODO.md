@@ -143,7 +143,7 @@ Preview cuts now play a decorative `glimm` WebGL sweep at each auto-advance cut 
 - [x] Scene crop mode (`cropMode: scene`): when `openklip analyze` has written a `sceneLog`, export-set in scene mode derives crop focus from speaker spans; segments may carry `focusX`/`focusY` (face center, 0-1) from scene analysis.
 - [x] Face/saliency auto-crop beyond scene-log focus coords (Vision sidecar, per-frame bbox): `tools/vision-focus.swift`, `openklip vision-focus`, `cropMode: vision`, `agent-make-short` enrichment on macOS.
 - [x] Optional macOS Apple Vision sidecar for saliency-based reframe + OCR: face → saliency fallback, `VNRecognizeText` OCR text in sidecar JSON; GUI Vision focus button.
-- [ ] OpenCLIP semantic b-roll matching (deferred - heavy dependency).
+- [x] Card-based b-roll match suggestions: `openklip broll-suggest`, MCP `broll_suggest` (weighted ranker on asset cards; embeddings deferred).
 
 ### Agent
 
@@ -263,7 +263,7 @@ Single list of current gaps (code is truth). README and release notes point here
 - [x] **Split-screen vertical export layout** (`project.export.layout: split-vertical`, `export-set --layout`, GUI Reframe Fill/Split controls).
 - [x] **Faster segment seeking** for long-source short exports (`src/export-segments.ts`, heuristic: kept under 50% of source).
 - [x] **Two-pass loudnorm** and **noise reduction** on export (`src/loudnorm-two-pass.ts`, `audio.noiseReduction`, `loudness.mode`).
-- OpenCLIP semantic b-roll matching.
+- Card-based b-roll suggestions (`broll-suggest` / `broll_suggest`); optional embeddings later if benchmarks warrant.
 - [x] **OS-level file locking** for concurrent CLI + server writes (`project.json.lock` in `mutateProject`, v0.28.0.0).
 - [x] **Demo gif + repo topics** (`bun run demo-gif` → `docs/demo.gif`, `docs/REPO-TOPICS.md`, v0.28.0.0).
 

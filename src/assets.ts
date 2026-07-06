@@ -10,6 +10,7 @@ import {
 } from "node:path";
 import type { Actor } from "./action-log.ts";
 import { removeAsset } from "./actions.ts";
+import { inferAssetKind, isRecognizedAssetFile } from "./asset-filenames.ts";
 import {
   type Asset,
   type AssetKind,
@@ -22,29 +23,9 @@ import { assetProxyRelative, projectPaths, slugify } from "./paths.ts";
 import { mutateProject } from "./projectStore.ts";
 import { cwdPath } from "./repo-paths.ts";
 
-const IMAGE_EXT = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif"]);
-const AUDIO_EXT = new Set([".mp3", ".wav", ".aac", ".m4a", ".flac", ".ogg"]);
+export { inferAssetKind, isRecognizedAssetFile } from "./asset-filenames.ts";
 
 const STILL_HOLD_SEC = 3;
-
-export function inferAssetKind(filename: string): AssetKind {
-  const ext = extname(filename).toLowerCase();
-  if (IMAGE_EXT.has(ext)) {
-    return "still";
-  }
-  if (AUDIO_EXT.has(ext)) {
-    return "music";
-  }
-  return "broll";
-}
-
-const VIDEO_EXT = new Set([".mp4", ".mov", ".m4v", ".webm", ".mkv", ".avi"]);
-
-/** True when the filename looks like a droppable asset (not junk). */
-export function isRecognizedAssetFile(filename: string): boolean {
-  const ext = extname(filename).toLowerCase();
-  return IMAGE_EXT.has(ext) || AUDIO_EXT.has(ext) || VIDEO_EXT.has(ext);
-}
 
 function uniqueAssetId(project: { assets: Asset[] }, base: string): string {
   const taken = new Set(project.assets.map((a) => a.id));

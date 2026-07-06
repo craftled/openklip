@@ -11,7 +11,7 @@ import {
   type SegmentExportGate,
   shouldApplyCutTransition,
 } from "./export-segments.ts";
-import { loadGraphicManifest } from "./graphics.ts";
+import { graphicTemplateIsRich } from "./graphic-template-kind.ts";
 
 export function overlaySpanIntersectsKeptRanges(
   startSample: number,
@@ -27,14 +27,8 @@ export function overlaySpanIntersectsKeptRanges(
   return ranges.some((r) => r.startSec < endSec && r.endSec > startSec);
 }
 
-function graphicIsRich(project: Project, template: string): boolean {
-  try {
-    return (
-      loadGraphicManifest(template, { slug: project.slug }).kind === "rich"
-    );
-  } catch {
-    return false;
-  }
+function graphicIsRich(_project: Project, template: string): boolean {
+  return graphicTemplateIsRich(template);
 }
 
 /** Mirror export-side transition gating for preview and status surfaces. */

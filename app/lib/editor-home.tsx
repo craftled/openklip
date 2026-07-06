@@ -1,12 +1,12 @@
 import { listProjects } from "@engine/projectStore";
 import { App } from "@/app";
-import { EmptyWorkspace } from "@/components/empty-workspace";
 import { loadEditorChats } from "./editor-chats";
 import { loadEditorProject } from "./project-data";
 
 export async function EditorHome({ slug }: { slug?: string | null }) {
   const projects = listProjects();
   if (projects.length === 0) {
+    const { EmptyWorkspace } = await import("@/components/empty-workspace");
     return <EmptyWorkspace />;
   }
 

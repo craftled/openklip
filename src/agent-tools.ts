@@ -10,10 +10,12 @@ import {
   listAgentTasks,
   setAgentTaskStep,
 } from "./agent-tasks.ts";
-import { assembleFromSelection, ingestTake, listTakes, loadTake } from "./assembly.ts";
-import { runDoctor } from "./doctor.ts";
-import { exportAllHighlights, exportHighlight } from "./highlight-export.ts";
-import { detectHighlights, highlightClipLines } from "./highlights.ts";
+import {
+  assembleFromSelection,
+  ingestTake,
+  listTakes,
+  loadTake,
+} from "./assembly.ts";
 import { loadAudioAnalysis } from "./audio-analysis.ts";
 import type { SilenceSpan } from "./audio-analysis-core.ts";
 import { measureProjectAudio } from "./audio-measure.ts";
@@ -21,8 +23,10 @@ import { ingestBlank } from "./blank-ingest.ts";
 import { measureMusicBpm } from "./bpm.ts";
 import { loadBrief, saveBrief } from "./brief.ts";
 import { logBriefSet } from "./brief-log.ts";
+import { suggestBroll } from "./broll-suggest.ts";
 import { buildCleanupReport } from "./cleanup.ts";
 import { transitionExportPreview } from "./cut-transition-gate.ts";
+import { runDoctor } from "./doctor.ts";
 import { PhraseAnchorSchema, type Project, samplesToSec } from "./edl.ts";
 import { EXPORT_PLATFORM_IDS } from "./export-platforms.ts";
 import {
@@ -38,6 +42,8 @@ import {
   listGraphics,
   loadGraphicManifest,
 } from "./graphics.ts";
+import { exportAllHighlights, exportHighlight } from "./highlight-export.ts";
+import { detectHighlights, highlightClipLines } from "./highlights.ts";
 import { listLuts } from "./lut.ts";
 import { projectPaths } from "./paths.ts";
 import { auditProjectForShip } from "./project-brief-audit.ts";
@@ -345,6 +351,35 @@ const queryTools: AgentToolDef[] = [
             suggestedFocus: a.card?.suggestedFocus,
           })),
       };
+    },
+  }),
+  defineQueryTool({
+    name: "broll_suggest",
+    summary:
+      "Rank b-roll assets for a spoken span or free-text query using existing asset cards (summary, tags, bestFor). Respects mustUse/avoid flags.",
+    schema: z.object({
+      slug,
+      text: z
+        .string()
+        .min(1)
+        .optional()
+        .describe("Free-text query (spoken topic or keywords)."),
+      phrase: z
+        .string()
+        .min(1)
+        .optional()
+        .describe("Transcript phrase; resolved to kept words before ranking."),
+      top: z
+        .number()
+        .int()
+        .positive()
+        .max(20)
+        .default(5)
+        .describe("Max suggestions to return."),
+    }),
+    run: async ({ slug: projectSlug, text, phrase, top }) => {
+      const project = await loadProject(projectSlug);
+      return suggestBroll(project, { text, phrase, top });
     },
   }),
   defineQueryTool({
@@ -1088,12 +1123,7 @@ const queryTools: AgentToolDef[] = [
       maxClips: z.number().int().positive().max(20).default(5),
       targetClipSec: z.number().positive().max(120).default(45),
     }),
-    run: async ({
-      slug: projectSlug,
-      agent,
-      maxClips,
-      targetClipSec,
-    }) => {
+    run: async ({ slug: projectSlug, agent, maxClips, targetClipSec }) => {
       const project = await loadProject(projectSlug);
       const highlights = await detectHighlights(project, {
         agent,

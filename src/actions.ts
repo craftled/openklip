@@ -43,12 +43,12 @@ import {
   listGraphics,
   loadGraphicManifest,
 } from "./graphics.ts";
-import { findPhraseRuns } from "./phrase-match.ts";
 import {
-  assertProductAnnouncementSpec,
-  PRODUCT_ANNOUNCEMENT_CATALOG,
-  ProductAnnouncementCatalogSchema,
-} from "./product-announcement.ts";
+  assertJsonRenderSpec,
+  type JsonRenderCatalogId,
+  JsonRenderCatalogSchema,
+} from "./json-render-catalogs.ts";
+import { findPhraseRuns } from "./phrase-match.ts";
 import { CAPTION_INSET_PLATFORMS } from "./safe-areas.ts";
 
 // Apply an optional `note` patch to an overlay item: a non-empty string sets the
@@ -979,7 +979,7 @@ function resolveJsonGraphicSpan(
 export function addJsonGraphic(
   project: Project,
   input: {
-    catalog: typeof PRODUCT_ANNOUNCEMENT_CATALOG;
+    catalog: JsonRenderCatalogId;
     fromSec: number;
     toSec: number;
     spec: unknown;
@@ -997,13 +997,13 @@ export function addJsonGraphic(
     note,
     anchor,
   } = input;
-  ProductAnnouncementCatalogSchema.parse(catalog);
+  JsonRenderCatalogSchema.parse(catalog);
   const span = resolveJsonGraphicSpan(project, fromSec, toSec);
-  const spec = assertProductAnnouncementSpec(rawSpec);
+  const spec = assertJsonRenderSpec(catalog, rawSpec);
   const item: Graphic = {
     id: graphicId(project),
     type: "json-render",
-    template: PRODUCT_ANNOUNCEMENT_CATALOG,
+    template: catalog,
     catalog,
     spec,
     params: {},
@@ -1111,7 +1111,7 @@ export function updateJsonGraphic(
   project: Project,
   id: string,
   patch: {
-    catalog?: typeof PRODUCT_ANNOUNCEMENT_CATALOG;
+    catalog?: JsonRenderCatalogId;
     fromSec?: number;
     toSec?: number;
     spec?: unknown;
@@ -1124,14 +1124,17 @@ export function updateJsonGraphic(
     throw new Error(`graphic "${id}" is not a json-render graphic`);
   }
   const catalog = patch.catalog ?? item.catalog;
-  ProductAnnouncementCatalogSchema.parse(catalog);
+  if (!catalog) {
+    throw new Error(`json-render graphic "${id}" is missing a catalog`);
+  }
+  JsonRenderCatalogSchema.parse(catalog);
   const fromSec = patch.fromSec ?? item.startSample / SAMPLE_RATE;
   const toSec = patch.toSec ?? item.endSample / SAMPLE_RATE;
   const track = patch.track ?? item.track;
   const span = resolveJsonGraphicSpan(project, fromSec, toSec);
   item.catalog = catalog;
-  item.spec = assertProductAnnouncementSpec(patch.spec ?? item.spec);
-  item.template = PRODUCT_ANNOUNCEMENT_CATALOG;
+  item.spec = assertJsonRenderSpec(catalog, patch.spec ?? item.spec);
+  item.template = catalog;
   item.params = {};
   item.track = track;
   item.startSample = Math.round(span.fromSec * SAMPLE_RATE);
