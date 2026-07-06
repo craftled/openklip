@@ -401,24 +401,8 @@ export function AgentSidebar({
           </SidebarContent>
 
           <SidebarFooter className="border-sidebar-border/60 border-t px-2 py-2">
-            <SidebarMenu className="gap-1">
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  className={SIDEBAR_MENU_HEADER_CLASS}
-                  onClick={onToggleColorScheme}
-                  size="sm"
-                >
-                  {colorScheme === "dark" ? (
-                    <Sun className={SIDEBAR_LEADING_GLYPH_CLASS} />
-                  ) : (
-                    <Moon className={SIDEBAR_LEADING_GLYPH_CLASS} />
-                  )}
-                  <span className={SIDEBAR_ROW_LABEL_TEXT_CLASS}>
-                    {colorScheme === "dark" ? "Light mode" : "Dark mode"}
-                  </span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
+            <SidebarMenu className="flex-row items-center gap-1">
+              <SidebarMenuItem className="min-w-0 flex-1">
                 <SidebarMenuButton
                   className={SIDEBAR_MENU_HEADER_CLASS}
                   onClick={onOpenSettings}
@@ -429,7 +413,34 @@ export function AgentSidebar({
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <GitHubStars repo="craftled/openklip" stargazersCount={1} />
+                <SidebarMenuButton
+                  aria-label={
+                    colorScheme === "dark"
+                      ? "Switch to light mode"
+                      : "Switch to dark mode"
+                  }
+                  className={cn(
+                    SIDEBAR_MENU_HEADER_CLASS,
+                    "w-7 justify-center px-1.5"
+                  )}
+                  onClick={onToggleColorScheme}
+                  size="sm"
+                  title={colorScheme === "dark" ? "Light mode" : "Dark mode"}
+                >
+                  {colorScheme === "dark" ? (
+                    <Sun className={SIDEBAR_LEADING_GLYPH_CLASS} />
+                  ) : (
+                    <Moon className={SIDEBAR_LEADING_GLYPH_CLASS} />
+                  )}
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <GitHubStars
+                  className="h-7 w-7 justify-center px-1.5"
+                  repo="craftled/openklip"
+                  showCount={false}
+                  stargazersCount={1}
+                />
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarFooter>

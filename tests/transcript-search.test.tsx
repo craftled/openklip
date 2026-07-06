@@ -30,13 +30,10 @@ function renderSearch(
     <TranscriptSearch
       activeMatchIndex={null}
       matches={[]}
-      mode="kept"
       note=""
       onCutMatches={noop}
-      onModeChange={noop}
       onNoteChange={noop}
       onQueryChange={noop}
-      onRestoreMatches={noop}
       onSearchClear={noop}
       onSeekMatch={noop}
       onSeekNextMatch={noop}
@@ -84,16 +81,12 @@ test("zero matches render a no-matches state with disabled cut buttons", () => {
   );
 });
 
-test("cut mode shows Restore controls instead of Cut", () => {
-  const html = renderSearch({ matches: TWO_MATCHES, mode: "cut" });
-  assert.match(html, /Restore \(2 words\)/);
-  assert.match(html, /Restore all \(4 words\)/);
-  assert.doesNotMatch(html, /Cut first/);
-  assert.doesNotMatch(html, /Cut all/);
-  assert.doesNotMatch(
-    buttonTag(html, "data-transcript-search-restore-all"),
-    /disabled=""/
-  );
+test("search renders kept-word cut controls only", () => {
+  const html = renderSearch({ matches: TWO_MATCHES });
+  assert.match(html, /Cut first \(2 words\)/);
+  assert.match(html, /Cut all \(4 words\)/);
+  assert.doesNotMatch(html, /Restore/);
+  assert.doesNotMatch(html, /data-transcript-search-restore/);
 });
 
 test("note input is present with an accessible label", () => {

@@ -18,6 +18,8 @@ export interface GitHubStarsProps {
   locales?: Intl.LocalesArgument;
   /** GitHub repository in `owner/repo` format. */
   repo: string;
+  /** Whether to show the formatted star count beside the icon. */
+  showCount?: boolean;
   /** Number of stars to display. */
   stargazersCount: number;
 }
@@ -32,6 +34,7 @@ export function GitHubStars({
   className,
   iconClassName,
   locales = "en-US",
+  showCount = true,
 }: GitHubStarsProps) {
   return (
     <Tooltip>
@@ -40,7 +43,8 @@ export function GitHubStars({
           <a
             className={cn(
               buttonVariants({ variant: "ghost" }),
-              "h-8 w-full min-w-0 justify-start gap-2 rounded-md px-2 text-sidebar-foreground text-sm hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+              "h-8 min-w-0 justify-start gap-2 rounded-md px-2 text-sidebar-foreground text-sm hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+              showCount ? "w-full" : "w-8",
               className
             )}
             href={`https://github.com/${repo}`}
@@ -60,17 +64,19 @@ export function GitHubStars({
               </svg>
             </span>
 
-            <span
-              className="text-[0.8125rem]/none text-muted-foreground tabular-nums"
-              style={numberStyle}
-            >
-              {new Intl.NumberFormat(locales, {
-                compactDisplay: "short",
-                notation: "compact",
-              })
-                .format(stargazersCount)
-                .toLowerCase()}
-            </span>
+            {showCount ? (
+              <span
+                className="text-[0.8125rem]/none text-muted-foreground tabular-nums"
+                style={numberStyle}
+              >
+                {new Intl.NumberFormat(locales, {
+                  compactDisplay: "short",
+                  notation: "compact",
+                })
+                  .format(stargazersCount)
+                  .toLowerCase()}
+              </span>
+            ) : null}
           </a>
         }
       />

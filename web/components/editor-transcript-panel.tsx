@@ -7,6 +7,7 @@ import {
   type ReactNode,
   type RefObject,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -55,7 +56,6 @@ interface EditorTranscriptPanelProps {
   onSelectRange: (range: readonly [number, number] | null) => void;
   onTextEdit: (text: string) => void;
   onViewInHistory?: (revisionAfter: number) => void;
-  search?: ReactNode;
   selRange: readonly [number, number] | null;
   /** Advanced: hover attribution and View in history on words. */
   showProvenance?: boolean;
@@ -74,15 +74,14 @@ export function EditorTranscriptPanel({
   onTextEdit,
   onViewInHistory,
   showProvenance = false,
-  search,
   selRange,
   words,
 }: EditorTranscriptPanelProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const [editorMounted, setEditorMounted] = useState(false);
-  const cutCount = words.filter((word) => word.deleted).length;
   const paragraphs = transcriptParagraphs(words);
+  const minuteMarkers = useMemo(() => transcriptMinuteMarkers(words), [words]);
   const selection = selectedWordStats(words, selRange);
   const matchedWordIndices = rangeIndexSet(matchRanges);
   const activeMatchIndices = rangeIndexSet(
@@ -205,26 +204,6 @@ export function EditorTranscriptPanel({
     <TooltipProvider>
       <ScrollArea className="h-full min-h-0" ref={scrollAreaRef}>
         <div className="flex min-h-full flex-col px-4 pt-4 pb-12 sm:px-6">
-          <header className="mx-auto mb-3 w-full max-w-[82ch]">
-            <p className="font-[450] text-[12px] text-muted-foreground/85 leading-normal">
-              Edit the script to edit the video. Select words and press{" "}
-              <kbd className="rounded border bg-muted/35 px-1 font-[450] font-sans text-[12px] text-muted-foreground leading-normal">
-                Delete
-              </kbd>{" "}
-              to cut.
-            </p>
-            {cutCount > 0 ? (
-              <p className="mt-1 font-[450] text-[12px] text-muted-foreground/75 tabular-nums leading-normal">
-                {cutCount} {cutCount === 1 ? "word" : "words"} cut from the
-                video
-              </p>
-            ) : null}
-          </header>
-
-          {search ? (
-            <div className="mx-auto mb-3 w-full max-w-[82ch]">{search}</div>
-          ) : null}
-
           {selection.total > 0 ? (
             <TranscriptSelectionToolbar
               copySelection={copySelection}
@@ -253,7 +232,7 @@ export function EditorTranscriptPanel({
             <div
               aria-label="Transcript editor"
               aria-multiline="true"
-              className="mx-auto w-full max-w-[82ch] rounded-md text-left font-[450] text-[15px] text-foreground/90 leading-6 outline-none selection:bg-primary/15 focus-visible:ring-2 focus-visible:ring-ring/35"
+              className="mx-auto w-full max-w-2xl rounded-md text-left font-[450] text-[15px] text-foreground/90 leading-6 outline-none selection:bg-primary/15 focus-visible:ring-0"
               contentEditable={editorMounted ? true : undefined}
               onBlur={commitEditedText}
               onKeyDown={onEditorKeyDown}
@@ -298,21 +277,139 @@ export function EditorTranscriptPanel({
             </div>
           )}
         </div>
-        <TranscriptScrollFade scrollAreaRef={scrollAreaRef} />
+        <TranscriptMinuteRail
+          markers={minuteMarkers}
+          scrollAreaRef={scrollAreaRef}
+        />
+        <TranscriptScrollFades scrollAreaRef={scrollAreaRef} />
       </ScrollArea>
     </TooltipProvider>
   );
 }
 
+interface TranscriptMinuteMarker {
+  index: number;
+  label: string;
+  minute: number;
+}
+
+interface VisibleTranscriptMinuteMarker extends TranscriptMinuteMarker {
+  top: number;
+}
+
+const TRANSCRIPT_SAMPLE_RATE = 48_000;
+const TRANSCRIPT_MINUTE_RAIL_INSET_PX = 16;
+
+function TranscriptMinuteRail({
+  markers,
+  scrollAreaRef,
+}: {
+  markers: TranscriptMinuteMarker[];
+  scrollAreaRef: RefObject<HTMLDivElement | null>;
+}) {
+  const [visibleMarkers, setVisibleMarkers] = useState<
+    VisibleTranscriptMinuteMarker[]
+  >([]);
+
+  useEffect(() => {
+    const viewport = scrollAreaRef.current?.querySelector<HTMLElement>(
+      "[data-slot='scroll-area-viewport']"
+    );
+    if (!(viewport && markers.length > 0)) {
+      setVisibleMarkers([]);
+      return;
+    }
+
+    const update = () => {
+      const viewportRect = viewport.getBoundingClientRect();
+      const viewportTop = viewportRect.top + TRANSCRIPT_MINUTE_RAIL_INSET_PX;
+      const viewportBottom =
+        viewportRect.bottom - TRANSCRIPT_MINUTE_RAIL_INSET_PX;
+      const next = markers.flatMap((marker) => {
+        const word = viewport.querySelector<HTMLElement>(
+          `[data-word-index="${marker.index}"]`
+        );
+        if (!word) {
+          return [];
+        }
+        const wordRect = word.getBoundingClientRect();
+        const top = wordRect.top - viewportRect.top;
+        if (wordRect.top < viewportTop || wordRect.top > viewportBottom) {
+          return [];
+        }
+        return [{ ...marker, top }];
+      });
+      setVisibleMarkers(next);
+    };
+
+    update();
+    viewport.addEventListener("scroll", update, { passive: true });
+
+    const resizeObserver = new ResizeObserver(update);
+    resizeObserver.observe(viewport);
+    if (viewport.firstElementChild) {
+      resizeObserver.observe(viewport.firstElementChild);
+    }
+
+    return () => {
+      viewport.removeEventListener("scroll", update);
+      resizeObserver.disconnect();
+    };
+  }, [markers, scrollAreaRef]);
+
+  if (markers.length === 0 || visibleMarkers.length === 0) {
+    return null;
+  }
+
+  const scrollToMarker = (marker: TranscriptMinuteMarker) => {
+    const viewport = scrollAreaRef.current?.querySelector<HTMLElement>(
+      "[data-slot='scroll-area-viewport']"
+    );
+    const word = viewport?.querySelector<HTMLElement>(
+      `[data-word-index="${marker.index}"]`
+    );
+    word?.scrollIntoView({ block: "start", behavior: "smooth" });
+  };
+
+  return (
+    <nav
+      aria-label="Transcript minute markers"
+      className="pointer-events-none absolute inset-y-4 right-3 z-20 w-12"
+    >
+      {visibleMarkers.map((marker) => (
+        <button
+          aria-label={`Jump to transcript at ${marker.minute} minute${marker.minute === 1 ? "" : "s"}`}
+          className="group pointer-events-auto absolute right-0 flex h-5 w-8 -translate-y-1/2 items-center justify-end gap-1 text-muted-foreground/60 transition-colors hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-0"
+          key={marker.minute}
+          onClick={() => scrollToMarker(marker)}
+          style={{ top: marker.top }}
+          type="button"
+        >
+          <span className="font-medium text-[10px] leading-none opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+            {marker.minute}m
+          </span>
+          <span className="h-px w-3 rounded-full bg-current transition-all group-hover:w-4 group-focus-visible:w-4" />
+        </button>
+      ))}
+    </nav>
+  );
+}
+
 const TRANSCRIPT_FADE_HEIGHT_PX = 64;
+const TRANSCRIPT_TOP_THRESHOLD_PX = 8;
 const TRANSCRIPT_BOTTOM_THRESHOLD_PX = TRANSCRIPT_FADE_HEIGHT_PX * 0.5;
 
-const transcriptFadeGradientStyle = {
+const transcriptBottomFadeGradientStyle = {
   background:
     "linear-gradient(to top, var(--background) 0%, color-mix(in srgb, var(--background) 72%, transparent) 45%, transparent 100%)",
 } satisfies CSSProperties;
 
-const transcriptFadeBlurStyle = {
+const transcriptTopFadeGradientStyle = {
+  background:
+    "linear-gradient(to bottom, var(--background) 0%, color-mix(in srgb, var(--background) 72%, transparent) 45%, transparent 100%)",
+} satisfies CSSProperties;
+
+const transcriptBottomFadeBlurStyle = {
   backdropFilter: "blur(4px)",
   maskImage:
     "linear-gradient(to top, rgb(0 0 0 / 1) 0%, rgb(0 0 0 / 0.55) 40%, transparent 100%)",
@@ -321,12 +418,24 @@ const transcriptFadeBlurStyle = {
     "linear-gradient(to top, rgb(0 0 0 / 1) 0%, rgb(0 0 0 / 0.55) 40%, transparent 100%)",
 } satisfies CSSProperties;
 
-function TranscriptScrollFade({
+const transcriptTopFadeBlurStyle = {
+  backdropFilter: "blur(4px)",
+  maskImage:
+    "linear-gradient(to bottom, rgb(0 0 0 / 1) 0%, rgb(0 0 0 / 0.55) 40%, transparent 100%)",
+  WebkitBackdropFilter: "blur(4px)",
+  WebkitMaskImage:
+    "linear-gradient(to bottom, rgb(0 0 0 / 1) 0%, rgb(0 0 0 / 0.55) 40%, transparent 100%)",
+} satisfies CSSProperties;
+
+function TranscriptScrollFades({
   scrollAreaRef,
 }: {
   scrollAreaRef: RefObject<HTMLDivElement | null>;
 }) {
-  const [active, setActive] = useState(false);
+  const [activeEdges, setActiveEdges] = useState({
+    bottom: false,
+    top: false,
+  });
 
   useEffect(() => {
     const viewport = scrollAreaRef.current?.querySelector<HTMLElement>(
@@ -340,9 +449,18 @@ function TranscriptScrollFade({
       const canScroll = viewport.scrollHeight > viewport.clientHeight + 1;
       const remainingScroll =
         viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
+      const atTop = viewport.scrollTop <= TRANSCRIPT_TOP_THRESHOLD_PX;
       const atBottom = remainingScroll <= TRANSCRIPT_BOTTOM_THRESHOLD_PX;
-      const nextActive = canScroll && !atBottom;
-      setActive((current) => (current === nextActive ? current : nextActive));
+      const nextActiveEdges = {
+        bottom: canScroll && !atBottom,
+        top: canScroll && !atTop,
+      };
+      setActiveEdges((current) =>
+        current.bottom === nextActiveEdges.bottom &&
+        current.top === nextActiveEdges.top
+          ? current
+          : nextActiveEdges
+      );
     };
 
     update();
@@ -361,19 +479,50 @@ function TranscriptScrollFade({
   }, [scrollAreaRef]);
 
   return (
+    <>
+      <TranscriptScrollFadeEdge
+        active={activeEdges.top}
+        blurStyle={transcriptTopFadeBlurStyle}
+        edge="top"
+        gradientStyle={transcriptTopFadeGradientStyle}
+      />
+      <TranscriptScrollFadeEdge
+        active={activeEdges.bottom}
+        blurStyle={transcriptBottomFadeBlurStyle}
+        edge="bottom"
+        gradientStyle={transcriptBottomFadeGradientStyle}
+      />
+    </>
+  );
+}
+
+function TranscriptScrollFadeEdge({
+  active,
+  blurStyle,
+  edge,
+  gradientStyle,
+}: {
+  active: boolean;
+  blurStyle: CSSProperties;
+  edge: "bottom" | "top";
+  gradientStyle: CSSProperties;
+}) {
+  return (
     <div
       aria-hidden
       className={cn(
-        "pointer-events-none absolute right-2.5 bottom-0 left-0 z-10 h-16 opacity-0 transition-opacity duration-200 ease-out motion-reduce:transition-none",
+        "pointer-events-none absolute right-2.5 left-0 z-10 h-16 opacity-0 transition-opacity duration-200 ease-out motion-reduce:transition-none",
+        edge === "top" ? "top-0" : "bottom-0",
         active && "opacity-100 duration-0"
       )}
       data-active={active ? "true" : "false"}
+      data-edge={edge}
       data-slot="transcript-scroll-fade"
     >
-      <div className="absolute inset-0" style={transcriptFadeGradientStyle} />
+      <div className="absolute inset-0" style={gradientStyle} />
       <div
         className="absolute inset-0 motion-reduce:hidden"
-        style={transcriptFadeBlurStyle}
+        style={blurStyle}
       />
     </div>
   );
@@ -395,7 +544,7 @@ function TranscriptSelectionToolbar({
   return (
     <TooltipProvider>
       <div
-        className="mx-auto mb-3 flex w-full max-w-[80ch] items-center gap-1.5 rounded-md border bg-background/95 p-1 shadow-sm"
+        className="mx-auto mb-3 flex w-full max-w-2xl items-center gap-1.5 rounded-md border bg-background/95 p-1 shadow-sm"
         data-transcript-selection-toolbar
       >
         <Badge className="shrink-0" variant="secondary">
@@ -442,7 +591,7 @@ function TranscriptSelectionTool({
   shortcut,
 }: {
   disabled?: boolean;
-  icon: React.ReactNode;
+  icon: ReactNode;
   label: string;
   onClick: () => void;
   shortcut?: string;
@@ -666,4 +815,32 @@ function transcriptParagraphs(words: TranscriptWord[]) {
 
 function shouldEndParagraph(paragraphLength: number, sentenceCount: number) {
   return sentenceCount >= 3 || paragraphLength >= 90;
+}
+
+function transcriptMinuteMarkers(
+  words: TranscriptWord[]
+): TranscriptMinuteMarker[] {
+  const lastSample = words.at(-1)?.endSample ?? 0;
+  const lastMinute = Math.floor(lastSample / (60 * TRANSCRIPT_SAMPLE_RATE));
+  const markers: TranscriptMinuteMarker[] = [];
+  let wordIndex = 0;
+
+  for (let minute = 0; minute <= lastMinute; minute++) {
+    const targetSample = minute * 60 * TRANSCRIPT_SAMPLE_RATE;
+    while (
+      wordIndex < words.length - 1 &&
+      words[wordIndex].startSample < targetSample
+    ) {
+      wordIndex += 1;
+    }
+    if (words[wordIndex]) {
+      markers.push({
+        index: wordIndex,
+        label: `${minute}:00`,
+        minute,
+      });
+    }
+  }
+
+  return markers;
 }

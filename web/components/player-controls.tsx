@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
 export const PLAYER_SPEEDS = [0.5, 1, 1.25, 1.5, 2] as const;
 
 const TRANSPORT_NUM =
-  "shrink-0 font-black text-xs tabular-nums leading-none tracking-tight";
+  "shrink-0 font-medium text-[13px] tabular-nums leading-none";
 
 export function fmtClock(sec: number): string {
   if (!Number.isFinite(sec) || sec < 0) {
@@ -197,7 +197,7 @@ export function PlayerControls({
   return (
     <div
       className={cn(
-        "flex flex-wrap items-center gap-2 bg-gradient-to-t from-black/65 to-transparent px-3 pt-10 pb-3 sm:flex-nowrap sm:gap-2.5 sm:px-4 sm:pt-12",
+        "flex flex-wrap items-center gap-1.5 bg-gradient-to-t from-black/70 via-black/28 to-transparent px-3 pt-10 pb-3 text-white/75 sm:flex-nowrap sm:gap-2 sm:px-4 sm:pt-12",
         className
       )}
       data-preview-chrome
@@ -216,7 +216,7 @@ export function PlayerControls({
           aria-label={musicMuted ? "Unmute music" : "Mute music"}
           aria-pressed={musicMuted}
           className={cn(
-            "size-11 shrink-0 rounded-full text-white/75 fine-hover:hover:bg-white/10 fine-hover:hover:text-white active:scale-[0.97] sm:size-7",
+            "size-10 shrink-0 rounded-full text-white/70 fine-hover:hover:bg-white/10 fine-hover:hover:text-white active:scale-[0.97] sm:size-8 [&_svg]:size-4",
             musicMuted && "text-white/40"
           )}
           data-music-mute
@@ -229,10 +229,10 @@ export function PlayerControls({
         </Button>
       )}
 
-      <span className={cn(TRANSPORT_NUM, "text-white")}>
+      <span className={cn(TRANSPORT_NUM, "min-w-9 text-white/92")}>
         {fmtClock(current)}
       </span>
-      <span className="shrink-0 text-white/30 text-xs leading-none">•</span>
+      <span className="shrink-0 text-white/24 text-xs leading-none">•</span>
 
       {/* Hairline scrubber with dot handle + hover preview */}
       <div
@@ -240,7 +240,7 @@ export function PlayerControls({
         aria-valuemax={Math.round(duration)}
         aria-valuemin={0}
         aria-valuenow={Math.round(current)}
-        className="group/scrub relative order-first flex min-h-11 min-w-full basis-full cursor-pointer items-center py-5 sm:order-none sm:min-h-0 sm:min-w-16 sm:basis-auto sm:py-2"
+        className="group/scrub relative order-first flex min-h-11 min-w-full basis-full cursor-pointer items-center py-5 sm:order-none sm:min-h-0 sm:min-w-20 sm:flex-1 sm:basis-0 sm:py-2"
         onPointerDown={onScrubDown}
         onPointerEnter={(e) => updateHoverFromPointer(e.clientX)}
         onPointerLeave={onScrubLeave}
@@ -253,11 +253,11 @@ export function PlayerControls({
         {hoverFrac !== null && hoverSec !== null && (
           <>
             <div
-              className="pointer-events-none absolute -top-1.5 -bottom-1.5 z-10 w-px bg-white/50"
+              className="pointer-events-none absolute -top-1.5 -bottom-1.5 z-10 w-px bg-white/45"
               style={{ left: `${hoverFrac * 100}%` }}
             />
             <div
-              className="pointer-events-none absolute bottom-full z-10 mb-3.5 -translate-x-1/2 whitespace-nowrap text-[0.6875rem] text-white/75 tabular-nums leading-none tracking-tight"
+              className="pointer-events-none absolute bottom-full z-10 mb-3 -translate-x-1/2 whitespace-nowrap font-medium text-[11px] text-white/75 tabular-nums leading-none"
               style={{
                 left: `clamp(2rem, ${hoverFrac * 100}%, calc(100% - 2rem))`,
               }}
@@ -270,9 +270,9 @@ export function PlayerControls({
             </div>
           </>
         )}
-        <div className="relative h-[3px] w-full rounded-full bg-white/20 transition-[height] group-hover/scrub:h-[5px]">
+        <div className="relative h-px w-full rounded-full bg-white/24 transition-[height,background-color] group-hover/scrub:h-[3px] group-hover/scrub:bg-white/28">
           <div
-            className="absolute inset-y-0 left-0 rounded-full bg-white/25"
+            className="absolute inset-y-0 left-0 rounded-full bg-white/20"
             style={{ width: `${bufPct}%` }}
           />
           <div
@@ -291,7 +291,7 @@ export function PlayerControls({
         </div>
       </div>
 
-      <span className={cn(TRANSPORT_NUM, "text-white/70")}>
+      <span className={cn(TRANSPORT_NUM, "min-w-10 text-white/62")}>
         -{fmtClock(remaining)}
       </span>
 
@@ -299,7 +299,7 @@ export function PlayerControls({
         aria-label="Playback speed"
         className={cn(
           TRANSPORT_NUM,
-          "h-11 min-w-11 rounded-full px-2 py-0 text-white/90 fine-hover:hover:bg-white/10 fine-hover:hover:text-white active:scale-[0.97] sm:h-auto sm:min-w-0 sm:rounded-md sm:px-1 sm:py-0.5"
+          "h-10 min-w-10 rounded-full px-2 py-0 text-white/82 fine-hover:hover:bg-white/10 fine-hover:hover:text-white active:scale-[0.97] sm:h-8 sm:min-w-8 sm:rounded-full sm:px-1.5 sm:py-0 [&_svg]:size-4"
         )}
         onClick={onCycleSpeed}
         type="button"
@@ -356,8 +356,8 @@ export function CtrlButton({
       aria-label={label}
       aria-pressed={active}
       className={cn(
-        "size-11 shrink-0 rounded-full text-white/75 fine-hover:hover:bg-white/10 fine-hover:hover:text-white active:scale-[0.97] sm:size-7",
-        active && "text-white ring-1 ring-white/40 ring-inset"
+        "size-10 shrink-0 rounded-full text-white/70 fine-hover:hover:bg-white/10 fine-hover:hover:text-white active:scale-[0.97] sm:size-8 [&_svg]:size-4",
+        active && "bg-white/10 text-white"
       )}
       onClick={onClick}
       size="icon-sm"

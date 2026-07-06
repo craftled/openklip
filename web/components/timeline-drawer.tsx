@@ -1,6 +1,6 @@
 "use client";
 
-import type { ComponentProps } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import { useState } from "react";
 import { EditTimeline } from "@/components/edit-timeline";
 import { Button } from "@/components/ui/button";
@@ -15,14 +15,18 @@ import { cn } from "@/lib/utils";
 
 interface TimelineDrawerProps extends ComponentProps<typeof EditTimeline> {
   fmtTime: (sec: number) => string;
+  triggerChildren?: ReactNode;
   triggerClassName?: string;
+  triggerVariant?: ComponentProps<typeof Button>["variant"];
 }
 
 export function TimelineDrawer({
   curSec,
   durationSec,
   fmtTime,
+  triggerChildren = "Timeline",
   triggerClassName,
+  triggerVariant = "outline",
   ...timeline
 }: TimelineDrawerProps) {
   const [open, setOpen] = useState(false);
@@ -34,9 +38,9 @@ export function TimelineDrawer({
           <Button
             className={cn("justify-start", triggerClassName)}
             size="sm"
-            variant="outline"
+            variant={triggerVariant}
           >
-            Timeline
+            {triggerChildren}
           </Button>
         }
       />

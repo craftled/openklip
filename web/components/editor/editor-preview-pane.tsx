@@ -3,7 +3,7 @@
 import type { ExportAspect, ExportCrop } from "@engine/edl";
 import { cropObjectPosition } from "@engine/export-aspect";
 import type { SafeAreaPlatform } from "@engine/safe-areas";
-import type { MouseEvent, RefObject } from "react";
+import type { ComponentProps, MouseEvent, RefObject } from "react";
 import {
   CutTransitionSweep,
   type CutTransitionSweepHandle,
@@ -18,6 +18,8 @@ import { PlayerControls } from "@/components/player-controls";
 import { PreviewOverlays } from "@/components/preview-overlays";
 import { PreviewTransitionNotice } from "@/components/preview-transition-notice";
 import { SafeAreaGuides } from "@/components/safe-area-guides";
+import { TimelineDrawer } from "@/components/timeline-drawer";
+import { Search, Spline } from "@/lib/icon";
 import { ORIENTATION_RATIO, type Orientation } from "@/lib/preview-layout";
 import { cn } from "@/lib/utils";
 import type { CaptionGroup } from "../../../src/captions";
@@ -48,6 +50,7 @@ export interface EditorPreviewPaneProps {
   musicRef: RefObject<HTMLAudioElement | null>;
   onCycleSpeed: () => void;
   onExport: (options: ExportDialogOptions) => void | Promise<void>;
+  onFocusTranscriptSearch: () => void;
   onFullscreen: () => void;
   onOpenChat?: () => void;
   onOrientationChange: (orientation: Orientation) => void;
@@ -75,6 +78,7 @@ export interface EditorPreviewPaneProps {
   sourceHeight: number;
   sourceWidth: number;
   sweepRef: RefObject<CutTransitionSweepHandle | null>;
+  timeline: ComponentProps<typeof TimelineDrawer>;
   titles: {
     endSample: number;
     id: string;
@@ -112,6 +116,7 @@ export function EditorPreviewPane({
   musicRef,
   onCycleSpeed,
   onExport,
+  onFocusTranscriptSearch,
   onFullscreen,
   onOpenChat,
   onOrientationChange,
@@ -139,13 +144,14 @@ export function EditorPreviewPane({
   sourceHeight,
   sourceWidth,
   sweepRef,
+  timeline,
   titles,
   videoRef,
   vignetteOn,
   zoomScale,
 }: EditorPreviewPaneProps) {
   return (
-    <div className="shrink-0 border-border border-b px-5 pt-5 pb-6">
+    <div className="shrink-0 px-5 pt-5 pb-6">
       <div className="mx-auto w-full max-w-2xl space-y-1">
         <EditorPreviewHeader
           currentSec={outPos}
@@ -259,7 +265,7 @@ export function EditorPreviewPane({
           ) : null}
           <PlayerControls
             captionsOn={captionsOn}
-            className="absolute inset-x-0 bottom-0 z-30 px-3 pb-2 opacity-0 transition-opacity duration-200 ease-out focus-within:opacity-100 group-hover/preview:opacity-100"
+            className="absolute inset-x-0 bottom-0 z-30 px-3 pb-3 opacity-0 transition-opacity duration-200 ease-out focus-within:opacity-100 group-hover/preview:opacity-100"
             current={outPos}
             duration={keptDurationSec}
             fullscreenLabel="Open cinema player"
@@ -278,6 +284,27 @@ export function EditorPreviewPane({
             pipOn={previewPip}
             playing={playing}
             rate={previewRate}
+          />
+        </div>
+        <div className="flex items-center gap-1.5 px-0.5 pt-1 text-[10px] text-muted-foreground">
+          <button
+            className="inline-flex shrink-0 items-center gap-1 rounded-full bg-muted px-1 py-px text-[10px] text-muted-foreground leading-none transition-colors hover:bg-muted/80 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            onClick={onFocusTranscriptSearch}
+            type="button"
+          >
+            <Search className="size-2.5" />
+            <span>Search transcript</span>
+          </button>
+          <TimelineDrawer
+            {...timeline}
+            triggerChildren={
+              <>
+                <Spline className="size-2.5" />
+                <span>Timeline</span>
+              </>
+            }
+            triggerClassName="h-auto min-w-0 gap-1 rounded-full bg-muted px-1 py-px font-normal text-[10px] text-muted-foreground leading-none shadow-none hover:bg-muted/80 hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring sm:h-auto"
+            triggerVariant="ghost"
           />
         </div>
       </div>

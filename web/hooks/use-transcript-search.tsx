@@ -4,11 +4,15 @@ import type { Project as EngineProject } from "@engine/edl";
 import type { Dispatch, SetStateAction } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { TranscriptSearch } from "@/components/transcript-search";
-import { useModShortcut } from "@/hooks/use-mod-shortcut";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { isModKeyOnly, isTypingTarget } from "@/lib/keyboard-shortcuts";
 import {
   type PhraseSearchMatch,
-  type PhraseSearchMode,
   phraseSearchMatches,
 } from "@/lib/phrase-search";
 import { reanchoredWordUpdate } from "@/lib/reanchored-word-update";
@@ -41,14 +45,13 @@ export function useTranscriptSearch({
   words,
 }: UseTranscriptSearchParams) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchMode, setSearchMode] = useState<PhraseSearchMode>("kept");
   const [searchNote, setSearchNote] = useState("");
+  const [searchVisible, setSearchVisible] = useState(false);
   const [activeMatchIndex, setActiveMatchIndex] = useState<number | null>(null);
   const transcriptSearchInputRef = useRef<HTMLInputElement>(null);
-  const searchShortcutLabel = useModShortcut("f");
 
   const searchMatches = phraseSearchMatches({ words }, searchQuery, {
-    mode: searchMode,
+    mode: "kept",
   });
   const activeSearchIndex =
     activeMatchIndex != null && activeMatchIndex < searchMatches.length
@@ -63,14 +66,18 @@ export function useTranscriptSearch({
     setActiveMatchIndex(null);
   }, []);
 
-  const changeSearchMode = useCallback((mode: PhraseSearchMode) => {
-    setSearchMode(mode);
-    setActiveMatchIndex(null);
-  }, []);
-
   const clearTranscriptSearch = useCallback(() => {
     setSearchQuery("");
     setActiveMatchIndex(null);
+    setSearchVisible(false);
+  }, []);
+
+  const focusTranscriptSearch = useCallback(() => {
+    setSearchVisible(true);
+    window.requestAnimationFrame(() => {
+      transcriptSearchInputRef.current?.focus();
+      transcriptSearchInputRef.current?.select();
+    });
   }, []);
 
   const seekSearchMatch = useCallback(
@@ -125,22 +132,6 @@ export function useTranscriptSearch({
     [enqueueSave, searchMatches, searchNote, searchQuery, setProject, slug]
   );
 
-  const restoreSearchMatches = useCallback(
-    (all: boolean) => {
-      const targets = all ? searchMatches : searchMatches.slice(0, 1);
-      const ids = targets.flatMap((m) => m.ids);
-      if (ids.length === 0) {
-        return;
-      }
-      setProject((prev) =>
-        reanchoredWordUpdate(prev as EngineProject, new Set(ids), false)
-      );
-      setActiveMatchIndex(null);
-      enqueueSave(() => runGuiAction(slug, "cut", { ids, deleted: false }));
-    },
-    [enqueueSave, searchMatches, setProject, slug]
-  );
-
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (!isModKeyOnly(event) || event.key.toLowerCase() !== "f") {
@@ -150,38 +141,43 @@ export function useTranscriptSearch({
         return;
       }
       event.preventDefault();
-      transcriptSearchInputRef.current?.focus();
-      transcriptSearchInputRef.current?.select();
+      focusTranscriptSearch();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [focusTranscriptSearch]);
 
-  const searchField = (
-    <TranscriptSearch
-      activeMatchIndex={activeSearchIndex}
-      matches={searchMatches}
-      mode={searchMode}
-      note={searchNote}
-      onCutMatches={cutSearchMatches}
-      onModeChange={changeSearchMode}
-      onNoteChange={setSearchNote}
-      onQueryChange={changeSearchQuery}
-      onRestoreMatches={restoreSearchMatches}
-      onSearchClear={clearTranscriptSearch}
-      onSeekMatch={seekSearchMatch}
-      onSeekNextMatch={seekNextSearchMatch}
-      onSelectMatch={selectSearchMatch}
-      query={searchQuery}
-      searchInputRef={transcriptSearchInputRef}
-      shortcutLabel={searchShortcutLabel}
-    />
+  const searchDialog = (
+    <Dialog onOpenChange={setSearchVisible} open={searchVisible}>
+      <DialogContent className="gap-3 p-3 sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="font-medium text-sm">
+            Search transcript
+          </DialogTitle>
+        </DialogHeader>
+        <TranscriptSearch
+          activeMatchIndex={activeSearchIndex}
+          matches={searchMatches}
+          note={searchNote}
+          onCutMatches={cutSearchMatches}
+          onNoteChange={setSearchNote}
+          onQueryChange={changeSearchQuery}
+          onSearchClear={clearTranscriptSearch}
+          onSeekMatch={seekSearchMatch}
+          onSeekNextMatch={seekNextSearchMatch}
+          onSelectMatch={selectSearchMatch}
+          query={searchQuery}
+          searchInputRef={transcriptSearchInputRef}
+        />
+      </DialogContent>
+    </Dialog>
   );
 
   return {
     activeSearchIndex,
     activeSearchRange,
-    searchField,
+    focusTranscriptSearch,
+    searchDialog,
     searchMatchRanges,
     searchMatches,
   };

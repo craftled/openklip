@@ -40,6 +40,7 @@ import { useEditorChrome } from "@/hooks/use-editor-chrome";
 import { useEditorConfigPanel } from "@/hooks/use-editor-config-panel";
 import { useEditorExport } from "@/hooks/use-editor-export";
 import { useEditorSelection } from "@/hooks/use-editor-selection";
+import { useEditorTimeline } from "@/hooks/use-editor-timeline";
 import { useLookControls } from "@/hooks/use-look-controls";
 import { useOverlayEditors } from "@/hooks/use-overlay-editors";
 import { usePreviewPlayback } from "@/hooks/use-preview-playback";
@@ -324,16 +325,20 @@ export function App({
     ]
   );
 
-  const { activeSearchRange, searchField, searchMatchRanges } =
-    useTranscriptSearch({
-      enqueueSave,
-      onSeek,
-      selectTranscriptRange,
-      setProject:
-        setProject as unknown as UseTranscriptSearchParams["setProject"],
-      slug: project.slug,
-      words: project.words,
-    });
+  const {
+    activeSearchRange,
+    focusTranscriptSearch,
+    searchDialog,
+    searchMatchRanges,
+  } = useTranscriptSearch({
+    enqueueSave,
+    onSeek,
+    selectTranscriptRange,
+    setProject:
+      setProject as unknown as UseTranscriptSearchParams["setProject"],
+    slug: project.slug,
+    words: project.words,
+  });
 
   const {
     addBroll,
@@ -537,6 +542,67 @@ export function App({
       selected,
       selRange,
       sr,
+    ]
+  );
+
+  const {
+    timelineBroll,
+    timelineGraphics,
+    timelineLibraryStills,
+    timelineMusic,
+    timelinePlacedMusic,
+    timelinePlacedStills,
+    timelineTitles,
+    timelineWords,
+    timelineZooms,
+  } = useEditorTimeline({
+    assetName,
+    assets: project.assets,
+    broll: project.broll ?? [],
+    graphics: project.graphics ?? [],
+    music: project.music ?? [],
+    sampleRate: sr,
+    stills: project.stills ?? [],
+    titles: project.titles ?? [],
+    words: project.words,
+    zooms: project.zooms ?? [],
+  });
+
+  const previewTimeline = useMemo(
+    () => ({
+      broll: timelineBroll,
+      curSec: timelineCallbacks.curSec,
+      durationSamples: timelineCallbacks.durationSamples,
+      durationSec: timelineCallbacks.durationSec,
+      fmtTime: formatEditorTime,
+      graphics: timelineGraphics,
+      libraryMusic: timelineMusic,
+      libraryStills: timelineLibraryStills,
+      music: timelinePlacedMusic,
+      onClipTiming: timelineCallbacks.onClipTiming,
+      onSeek: timelineCallbacks.onSeek,
+      onSelect: timelineCallbacks.onSelect,
+      onWordClick: timelineCallbacks.onWordClick,
+      ranges: timelineCallbacks.ranges,
+      sampleRate: timelineCallbacks.sampleRate,
+      selected: timelineCallbacks.selected,
+      selRange: timelineCallbacks.selRange,
+      stills: timelinePlacedStills,
+      titles: timelineTitles,
+      wordSpans: timelineWords,
+      zooms: timelineZooms,
+    }),
+    [
+      timelineBroll,
+      timelineCallbacks,
+      timelineGraphics,
+      timelineLibraryStills,
+      timelineMusic,
+      timelinePlacedMusic,
+      timelinePlacedStills,
+      timelineTitles,
+      timelineWords,
+      timelineZooms,
     ]
   );
 
@@ -780,6 +846,7 @@ export function App({
                   musicRef,
                   onCycleSpeed: cyclePreviewRate,
                   onExport,
+                  onFocusTranscriptSearch: focusTranscriptSearch,
                   onFullscreen: () => setCinema(true),
                   onOpenChat: () => setMobileRightPanel("chat"),
                   onOrientationChange: changeOrientation,
@@ -810,6 +877,7 @@ export function App({
                   sourceHeight: project.height,
                   sourceWidth: project.width,
                   sweepRef,
+                  timeline: previewTimeline,
                   titles: project.titles ?? [],
                   videoRef,
                   vignetteOn,
@@ -836,12 +904,12 @@ export function App({
                   onViewInHistory: provenanceDisplay
                     ? focusWordInHistory
                     : undefined,
-                  search: searchField,
                   selRange,
                   showProvenance: provenanceDisplay,
                   words: project.words,
                 }}
               />
+              {searchDialog}
 
               <EditorRightRail
                 hidden={settingsOpen}
