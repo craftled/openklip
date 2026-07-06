@@ -11,7 +11,7 @@ export const MAP_MOTION_MARKERS_CIRCLE_LAYER_ID =
 export const MAP_MOTION_MARKERS_LABEL_LAYER_ID = "ok-map-motion-markers-label";
 
 const MAP_IDLE_TIMEOUT_MS = 30_000;
-const MAP_LOAD_TIMEOUT_MS = 60_000;
+export const MAP_LOAD_TIMEOUT_MS = 60_000;
 
 export const MAP_MOTION_DEFAULT_STYLES = {
   dark: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",

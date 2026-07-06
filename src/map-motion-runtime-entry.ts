@@ -10,18 +10,19 @@ import {
   applyMapMotionFrame,
   disposeMapMotion,
   initMapMotionLayers,
+  MAP_LOAD_TIMEOUT_MS,
   MAP_MOTION_DEFAULT_STYLES,
   type MapMotionMap,
   waitMapIdle,
 } from "../web/lib/map-motion-runtime.ts";
 import type { MapMotionSpec } from "./map-motion.ts";
 
-type HeadlessMapMotion = {
+interface HeadlessMapMotion {
   applyFrame: (frame: number, durFrames: number) => void;
   dispose: () => void;
   map: MapMotionMap;
   waitIdle: () => Promise<void>;
-};
+}
 
 let activeMapMotion: HeadlessMapMotion | null = null;
 
@@ -76,8 +77,12 @@ async function ensureMapMotionReady(): Promise<HeadlessMapMotion> {
   const mapInstance = instance.map as unknown as maplibregl.Map;
   await new Promise<void>((resolve, reject) => {
     const timer = setTimeout(() => {
-      reject(new Error("map-motion map load timed out after 60s"));
-    }, 60_000);
+      reject(
+        new Error(
+          `map-motion map load timed out after ${MAP_LOAD_TIMEOUT_MS / 1000}s`
+        )
+      );
+    }, MAP_LOAD_TIMEOUT_MS);
     const finish = (error?: Error) => {
       clearTimeout(timer);
       if (error) {

@@ -75,7 +75,7 @@ Agent sidebar chats use `working/chats.json`, not `localStorage` (color scheme a
 
 ## What works today
 
-Verified against the current codebase (`VERSION` / `package.json` `0.41.0.4`, 1867 tests: 1864 pass, 3 skip without `OPENKLIP_INTEGRATION=1`):
+Verified against the current codebase (`VERSION` / `package.json` `0.41.1.0`, 1888 tests: 1885 pass, 3 skip without `OPENKLIP_INTEGRATION=1`):
 
 - **Ingest**: video → local transcript + preview proxy + `project.json` (`openklip ingest`; refuses re-ingest unless `--force`)
 - **Transcript editing**: click words to toggle `deleted`; `openklip cut` / `cut --text` / `restore` on CLI
@@ -101,11 +101,14 @@ Verified against the current codebase (`VERSION` / `package.json` `0.41.0.4`, 18
 - **Ducking, loudness, voice highpass, and de-essing**: export-only audio quality pass sidechain-ducks the music bed under speech, applies single-pass loudness normalization toward a target LUFS, can highpass the voice track, and can de-ess it (ffmpeg's `deesser` filter, intensity 0-1); `openklip audio <slug>` and the Config panel Audio section (preview audio stays unprocessed)
 - **Blank canvas projects**: create motion-from-scratch without camera footage (`openklip ingest --blank`, MCP `blank_ingest`, GUI New project → Blank canvas)
 - **Rich graphics templates**: HTML/CSS graphic templates (`kind: "rich"`) render through headless Chrome (`chrome-headless-shell` via `puppeteer-core`), driven by the same `web/lib/graphic-runtime.ts` as the live preview, so export matches preview frame-for-frame. Frames capture with a transparent background to a ProRes 4444 alpha MOV (`src/headless-render.ts`), then composite as a timed ffmpeg overlay. Chrome is an optional, one-time download (`bunx puppeteer browsers install chrome-headless-shell`); the default text path needs no browser. Includes an 8-template motion text pack (`graphics/motion-*`), five `transition-*` cut-seam templates, 29 bundled `shader-*` templates (`@paper-design/shaders`), and project-local overrides under `projects/<slug>/graphics/`; `graphics/AUTHORING.md` documents the folder-drop contract for agents adding new templates with no code registration
-- **Motion graphics workflow**: list/show templates (`openklip graphic list`, MCP `graphic_list` / `graphic_show`); phrase placement with per-word stagger; beat-snapped spans (`--beats`, `--bpm`, `--music-asset`); BPM detect and audio loudness measure; `graphic-add-cuts` places transitions at kept-range cut seams (CLI/MCP/GUI **Place at cut seams**); Config → **Graphics** picker with pack grouping, image assets for shaders, beat mode, and project-local template upload (`manifest.json` + `composition.html`)
+- **Motion graphics workflow**: list/show templates (`openklip graphic list`, MCP `graphic_list` / `graphic_show`); phrase placement with per-word stagger; beat-snapped spans (`--beats`, `--bpm`, `--music-asset`); BPM detect and audio loudness measure; `graphic-add-cuts` places transitions at kept-range cut seams (CLI/MCP/GUI **Place at cut seams**); Config → **Graphics** picker with pack grouping, hover previews, image assets for shaders, beat mode, and project-local template upload (`manifest.json` + `composition.html`)
 - **Agent motion playbooks**: `templates/motion-canvas`, `motion-graphics`, `motion-shorts`; installable copies under `skills/` (`npx skills add`, see `skills/README.md`)
 - **Graphic keyframe animation**: graphic overlays carry an optional declarative `keyframes` array (opacity, scale, x/y position; seven easings — `linear`, `easeIn`, `easeOut`, `easeInOut`, `spring`, `backOut`, `anticipate`) evaluated frame-pure by the shared graphic runtime, so preview and export render identically. Edit via timeline diamond markers and a Keyframes inspector section, `graphic-set` (with `--keyframes-file`/`--clear-keyframes` on the CLI), or MCP; undo/history cover keyframe edits automatically
 - **Fullscreen overlays**: the cinema player renders the graphics/titles/captions overlay stack (`web/components/preview-overlays.tsx`), shared with the inline preview and synced to playback
 - **Product announcement graphics**: a catalog-constrained `product-announcement` json-render graphic type; agents author a validated JSON spec via `openklip json-graphic-add` / `json-graphic-set` (CLI / GUI / MCP), the editor previews the exact same React render, and it exports through the normal timeline. Specs are hard-validated before preview or export; invalid specs show an editor preview card and **export fails before ffmpeg** with a clear error (preview degrades gracefully; export does not silently skip)
+- **Map motion graphics** (v0.41.1.0): a second json-render catalog (`map-motion`) for animated route reveals, arcs, globe flyovers, and markers via MapLibre GL (`openklip json-graphic-add <slug> map-motion`, MCP parity, `templates/map-motion/skill.md`); preview and headless export share `web/lib/map-motion-runtime.ts`
+- **B-roll suggest** (v0.41.1.0): `openklip broll-suggest <slug> --phrase "..."` or `--text "..."` and MCP `broll_suggest` rank registered assets using existing asset cards (`summary`, `tags`, `bestFor`); respects `mustUse` / `avoid`
+- **Graphic template previews** (v0.41.1.0): hover and button previews in the Config → Graphics picker (`web/components/graphic-template-preview.tsx`), including live WebGL shader previews when params allow
 - **Config shell + responsive panels**: right-side Config panel with a color temperature pad plus captions/timing controls; Chat and Config stay reachable below the desktop sidebar breakpoint via overlay buttons
 - **Written rationale**: `--note "<why>"` on any `cut` or overlay records why a pick was made; metadata only, never reaches ffmpeg, surfaces in `overlays` / transcript / MCP (`--note ""` clears it)
 - **Phrase-anchored cues**: phrase-placed overlays remember the spoken phrase and re-resolve onto the current kept words after a re-cut (`openklip reanchor`); a deleted phrase flags `stale` and keeps the last good span
@@ -119,7 +122,7 @@ Verified against the current codebase (`VERSION` / `package.json` `0.41.0.4`, 18
 - **Browser editor**: open `http://localhost:<port>/<slug>` or `/?slug=<slug>` after `openklip serve`; script-first transcript editing (select words, Delete to cut)
 - **Workspace**: macOS folder picker on empty landing; inline project create; projects root persisted in `.openklip/projects-root`
 - **CLI**: full edit surface; `openklip actions --json` mutations manifest; `openklip tools --json` full agent tool list; `openklip brief <slug> --audit` ship-readiness check against `brief.md`
-- **MCP server**: `openklip mcp` (stdio) exposes 84 tools across query, mutation, task progress, revert, and export surfaces; `.cursor/mcp.json` wired for Cursor
+- **MCP server**: `openklip mcp` (stdio) exposes 89 tools across query, mutation, task progress, revert, and export surfaces; `.cursor/mcp.json` wired for Cursor
 - **Edit templates**: `templates/<id>/skill.md` playbooks; `openklip template set`; brand presets at ingest (`openklip brand`)
 - **Agent selector**: drive filler cuts via Claude Code, Codex, Cursor, or Grok subscription CLIs
 - **Design system**: default shadcn/ui tokens with Base UI primitives (`app/globals.css`, `components.json`); light/dark via `.dark` class; icons via `web/lib/icon.tsx`
@@ -184,7 +187,7 @@ In Cursor, enable the bundled MCP server (`.cursor/mcp.json`) and call the same 
 
 | Agent / surface | Mutate `project.json` in chat | Typical workflow |
 | --- | --- | --- |
-| **Cursor** (MCP enabled) | Yes, via 88 MCP tools | Chat edits call `cut`, `broll-add`, `export`, etc. directly |
+| **Cursor** (MCP enabled) | Yes, via 89 MCP tools | Chat edits call `cut`, `broll-add`, `export`, etc. directly |
 | **Claude Code / Desktop** (MCP enabled) | Yes, via MCP | Same tool surface as Cursor |
 | **Codex** | CLI hints in chat | Run `openklip` commands the model suggests |
 | **Grok / other CLIs** | CLI hints in chat | Agent selector shells out for filler cuts; mutations via terminal |
