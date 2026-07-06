@@ -23,11 +23,13 @@ const skipReason = integrationSkipReason();
 
 async function openTimelineDrawer(page: import("puppeteer-core").Page) {
   await page.waitForFunction(
-    () => Boolean(document.querySelector('[aria-label="Toggle config"]')),
+    () => Boolean(document.querySelector('[data-sidebar-segment="config"]')),
     { timeout: 30_000 }
   );
   await page.evaluate(() => {
-    document.querySelector('[aria-label="Toggle config"]')?.click();
+    document
+      .querySelector('[data-sidebar-segment="config"]')
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
   });
   await page.waitForSelector("[data-config-tab-bar]", { timeout: 30_000 });
   await page.evaluate(() => {
@@ -98,7 +100,9 @@ test("editor selects json-render graphic on timeline and shows inspector", {
     await page.evaluate(() => {
       const configOpen = document.querySelector("[data-config-panel]");
       if (!configOpen) {
-        document.querySelector('[aria-label="Toggle config"]')?.click();
+        document
+          .querySelector('[data-sidebar-segment="config"]')
+          ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
       }
       const editTab = [...document.querySelectorAll("button")].find(
         (button) => button.textContent?.trim() === "Edit"

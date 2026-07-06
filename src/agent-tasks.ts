@@ -21,6 +21,7 @@ import {
   type AgentTaskStep,
   type AgentTaskStepStatus,
   type AgentTasksFile,
+  type AgentTaskToolCall,
   isAgentTask,
 } from "./agent-task-types.ts";
 import { projectPaths } from "./paths.ts";
@@ -71,6 +72,7 @@ const SUMMARY_MAX_CHARS = 2000;
 const QUESTION_MAX_CHARS = 1000;
 const REMAINING_MAX_ITEMS = 20;
 const REMAINING_ITEM_MAX_CHARS = 300;
+const TOOL_CALL_SUMMARY_MAX_CHARS = 2000;
 
 function truncate(text: string, maxChars: number): string {
   return text.length > maxChars ? text.slice(0, maxChars) : text;
@@ -347,6 +349,12 @@ function capSteps(steps: AgentTaskStep[]): AgentTaskStep[] {
   return kept;
 }
 
+const TOOL_CALLS_CAP = 50;
+
+function capToolCalls(calls: AgentTaskToolCall[]): AgentTaskToolCall[] {
+  return calls.length <= TOOL_CALLS_CAP ? calls : calls.slice(-TOOL_CALLS_CAP);
+}
+
 export function createAgentTask(
   slug: string,
   input: {
@@ -384,12 +392,56 @@ export function createAgentTask(
         : {}),
       status: "running",
       steps: [],
+      toolCalls: [],
       startedAt: now,
       updatedAt: now,
     };
     data.tasks = [task, ...data.tasks];
     await saveAgentTasks(slug, data);
     return task;
+  });
+}
+
+export function appendAgentTaskToolCall(
+  slug: string,
+  taskId: string,
+  input: {
+    toolName: string;
+    ok: boolean;
+    input?: string;
+    output?: string;
+  }
+): Promise<AgentTask | undefined> {
+  return withTasksStoreLock(slug, async () => {
+    const data = await loadAgentTasks(slug);
+    const idx = data.tasks.findIndex((t) => t.id === taskId);
+    if (idx === -1) {
+      return;
+    }
+    const task = data.tasks[idx];
+    if (!task || isTerminal(task.status)) {
+      return;
+    }
+    const call: AgentTaskToolCall = {
+      id: nextTaskId("tc"),
+      at: Date.now(),
+      toolName: truncate(input.toolName, STEP_TITLE_MAX_CHARS),
+      ok: input.ok,
+      ...(input.input === undefined
+        ? {}
+        : { input: truncate(input.input, TOOL_CALL_SUMMARY_MAX_CHARS) }),
+      ...(input.output === undefined
+        ? {}
+        : { output: truncate(input.output, TOOL_CALL_SUMMARY_MAX_CHARS) }),
+    };
+    const next: AgentTask = {
+      ...task,
+      toolCalls: capToolCalls([...(task.toolCalls ?? []), call]),
+      updatedAt: call.at,
+    };
+    data.tasks[idx] = next;
+    await saveAgentTasks(slug, data);
+    return next;
   });
 }
 

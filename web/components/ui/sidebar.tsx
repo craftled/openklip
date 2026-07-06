@@ -26,7 +26,7 @@ import { cn } from "@/lib/utils";
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state";
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
-const SIDEBAR_WIDTH = "16rem";
+const SIDEBAR_WIDTH = "20rem";
 const SIDEBAR_WIDTH_MOBILE = "18rem";
 const SIDEBAR_WIDTH_ICON = "3rem";
 const SIDEBAR_KEYBOARD_SHORTCUT = "b";
@@ -169,7 +169,8 @@ function Sidebar({
   variant?: "sidebar" | "floating" | "inset";
   collapsible?: "offcanvas" | "icon" | "none";
 }) {
-  const { isMobile, state, openMobile, setOpenMobile } = useSidebar();
+  const { isMobile, state, openMobile, setOpenMobile, toggleSidebar } =
+    useSidebar();
 
   if (collapsible === "none") {
     return (
@@ -254,6 +255,21 @@ function Sidebar({
           {children}
         </div>
       </div>
+      {collapsible === "offcanvas" && state === "collapsed" ? (
+        <Button
+          aria-label="Expand sidebar"
+          className={cn(
+            "fixed top-2 z-20 hidden size-8 items-center justify-center rounded-md bg-sidebar text-sidebar-foreground shadow-sm ring-1 ring-sidebar-border md:flex",
+            side === "left" ? "left-2" : "right-2"
+          )}
+          onClick={toggleSidebar}
+          size="icon-sm"
+          type="button"
+          variant="ghost"
+        >
+          {side === "right" ? <PanelRight /> : <PanelLeft />}
+        </Button>
+      ) : null}
     </div>
   );
 }

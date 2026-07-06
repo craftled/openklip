@@ -23,11 +23,13 @@ const skipReason = integrationSkipReason();
 
 async function ensureHistoryPanelReady(page: import("puppeteer-core").Page) {
   await page.waitForFunction(
-    () => Boolean(document.querySelector('[aria-label="Toggle config"]')),
+    () => Boolean(document.querySelector('[data-sidebar-segment="config"]')),
     { timeout: 30_000 }
   );
   await page.evaluate(() => {
-    document.querySelector('[aria-label="Toggle config"]')?.click();
+    document
+      .querySelector('[data-sidebar-segment="config"]')
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
   });
   await page.waitForSelector("[data-config-tab-bar]", { timeout: 30_000 });
   await page.evaluate(() => {

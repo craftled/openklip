@@ -9,10 +9,7 @@ import { ExportSettingsSchema } from "@engine/edl";
 import { exportAspectToOrientation } from "@engine/export-aspect";
 import type { SafeAreaPlatform } from "@engine/safe-areas";
 import { useCallback, useEffect, useState } from "react";
-import {
-  CHAT_WIDTH_DEFAULT,
-  readStoredChatWidth,
-} from "@/components/chat-resize-handle";
+import type { SidebarSegmentView } from "@/components/sidebar-segmented-picker";
 import {
   type AgentModelId,
   DEFAULT_AGENT_MODEL,
@@ -26,7 +23,6 @@ import {
   readProvenanceDisplayEnabled,
   subscribeProvenanceDisplay,
 } from "@/lib/provenance-preferences";
-import { visibleChatWidth } from "@/lib/right-rail-layout";
 import {
   getSafeAreaGuidePlatform,
   setSafeAreaGuidePlatform,
@@ -72,23 +68,16 @@ export function useEditorChrome({
     useState<SettingsSectionId>("appearance");
   const [defaultAgent, setDefaultAgent] =
     useState<AgentModelId>(DEFAULT_AGENT_MODEL);
-  const [configOpen, setConfigOpen] = useState(false);
+  const [sidebarView, setSidebarView] = useState<SidebarSegmentView>("chats");
   const [configTab, setConfigTab] = useState<ConfigTabId>("look");
-  const [mobileRightPanel, setMobileRightPanel] = useState<
-    "chat" | "config" | null
-  >(null);
+  const [mobileRightPanel, setMobileRightPanel] = useState<"chat" | null>(null);
   const [historyFocusRevision, setHistoryFocusRevision] = useState<
     number | null
   >(null);
-  const [chatWidth, setChatWidth] = useState(CHAT_WIDTH_DEFAULT);
   const [cinema, setCinema] = useState(false);
   const [safeAreaGuide, setSafeAreaGuide] = useState<SafeAreaPlatform>("off");
   const [colorScheme, setColorSchemeState] = useState<ColorScheme>("light");
   const [provenanceDisplay, setProvenanceDisplay] = useState(false);
-
-  useEffect(() => {
-    setChatWidth(readStoredChatWidth());
-  }, []);
 
   useEffect(() => {
     setSafeAreaGuide(getSafeAreaGuidePlatform());
@@ -112,8 +101,7 @@ export function useEditorChrome({
   }, []);
 
   const focusWordInHistory = useCallback((revisionAfter: number) => {
-    setConfigOpen(true);
-    setMobileRightPanel("config");
+    setSidebarView("config");
     setConfigTab("history");
     setHistoryFocusRevision(revisionAfter);
   }, []);
@@ -175,19 +163,12 @@ export function useEditorChrome({
   }, [colorScheme]);
 
   const onCloseConfig = useCallback(() => {
-    if (mobileRightPanel === "config") {
-      setMobileRightPanel(null);
-      return;
-    }
-    setConfigOpen(false);
-  }, [mobileRightPanel]);
-
-  const resolvedChatWidth = visibleChatWidth(chatWidth, configOpen);
+    setSidebarView("chats");
+  }, []);
 
   return {
     cinema,
     colorScheme,
-    configOpen,
     configTab,
     defaultAgent,
     focusWordInHistory,
@@ -197,19 +178,17 @@ export function useEditorChrome({
     onHistoryReverted,
     onSafeAreaGuideChange,
     provenanceDisplay,
-    resolvedChatWidth,
     safeAreaGuide,
-    chatWidth,
     setCinema,
-    setConfigOpen,
     setConfigTab,
     setHistoryFocusRevision,
     setMobileRightPanel,
-    setChatWidth,
     setSettingsOpen,
     setSettingsSection,
+    setSidebarView,
     settingsOpen,
     settingsSection,
+    sidebarView,
     toggleColorScheme,
   };
 }

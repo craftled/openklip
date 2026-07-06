@@ -141,7 +141,6 @@ export function App({
   const {
     cinema,
     colorScheme,
-    configOpen,
     configTab,
     defaultAgent,
     focusWordInHistory,
@@ -151,19 +150,17 @@ export function App({
     onHistoryReverted,
     onSafeAreaGuideChange,
     provenanceDisplay,
-    resolvedChatWidth,
     safeAreaGuide,
-    chatWidth,
     setCinema,
-    setConfigOpen,
     setConfigTab,
     setHistoryFocusRevision,
     setMobileRightPanel,
-    setChatWidth,
     setSettingsOpen,
     setSettingsSection,
+    setSidebarView,
     settingsOpen,
     settingsSection,
+    sidebarView,
     toggleColorScheme,
   } = useEditorChrome({
     setCaptionsOn,
@@ -461,8 +458,7 @@ export function App({
       return;
     }
     setConfigTab("edit");
-    setConfigOpen(true);
-    setMobileRightPanel("config");
+    setSidebarView("config");
   }, [hasOverlayInspector, selRange, selected?.id, selected?.kind]);
 
   const onTimelineSelect = useCallback(
@@ -605,7 +601,6 @@ export function App({
       onMotionSpeed: changeMotionSpeed,
       onPadMs: setPad,
     },
-    mobileRightPanel,
     motionSpeed,
     musicAssets,
     musicBpmByAsset,
@@ -680,7 +675,7 @@ export function App({
         keyboardShortcut={false}
         style={
           {
-            "--sidebar-width": "16rem",
+            "--sidebar-width": "20rem",
             "--sidebar-width-icon": "3.25rem",
           } as CSSProperties
         }
@@ -727,16 +722,21 @@ export function App({
         <AgentSidebar
           activeSlug={project.slug}
           assets={project.assets.map(withAssetKind)}
+          colorScheme={colorScheme}
+          configPanel={configPanel}
           mediaVersion={project.mediaVersion}
           onAssetsUpdated={applyAssetUpdate}
           onCloseSettings={() => setSettingsOpen(false)}
           onOpenSettings={() => setSettingsOpen(true)}
           onSelectSettingsSection={setSettingsSection}
+          onSidebarViewChange={setSidebarView}
+          onToggleColorScheme={toggleColorScheme}
           projectHover={projectHover}
           projects={projects}
           sampleRate={project.sampleRate}
           settingsOpen={settingsOpen}
           settingsSection={settingsSection}
+          sidebarView={sidebarView}
         />
 
         <SidebarContextBridge>
@@ -746,7 +746,7 @@ export function App({
               keyboardShortcut={false}
               style={
                 {
-                  "--sidebar-width": `${resolvedChatWidth}px`,
+                  "--sidebar-width": "20rem",
                   "--sidebar-width-icon": "3.25rem",
                 } as CSSProperties
               }
@@ -754,11 +754,6 @@ export function App({
               <EditorSidebarShortcuts agentSidebar={agentSidebar} />
               {/* CENTER : preview + transcript (or settings) */}
               <EditorColumn
-                agentSidebar={{
-                  isMobile: agentSidebar.isMobile,
-                  open: agentSidebar.open,
-                  toggleSidebar: agentSidebar.toggleSidebar,
-                }}
                 preview={{
                   activeCoverBroll: Boolean(activeCoverBroll),
                   activePipBroll: Boolean(activePipBroll),
@@ -768,16 +763,26 @@ export function App({
                   captionStyleId: project.captions?.style,
                   captionsOn,
                   curSample,
+                  cutCount: ranges.length,
+                  exportAspect: exportSettings.aspect,
+                  exportDefaultResolution: export1080 ? "1080" : "4k",
+                  exportDisabled,
+                  exportLabel,
                   exportSettingsCrop: exportSettings.crop,
                   exporting,
+                  fmtTime: formatEditorTime,
                   graphics: project.graphics ?? [],
                   keptDurationSec: keptDuration,
                   mediaVersion: project.mediaVersion ?? 0,
+                  mobileChatOpen: mobileRightPanel === "chat",
                   musicBedCount: project.music?.length ?? 0,
                   musicMuted,
                   musicRef,
                   onCycleSpeed: cyclePreviewRate,
+                  onExport,
                   onFullscreen: () => setCinema(true),
+                  onOpenChat: () => setMobileRightPanel("chat"),
+                  onOrientationChange: changeOrientation,
                   onPlayToggle: onPlay,
                   onPreviewClick,
                   onSeekFraction: (frac) =>
@@ -788,6 +793,7 @@ export function App({
                   onToggleMusicMute: toggleMusicMute,
                   onToggleMute: togglePreviewMute,
                   onTogglePip: togglePreviewPip,
+                  onSafeAreaGuideChange,
                   orientation,
                   outPos,
                   pendingSaves,
@@ -800,6 +806,9 @@ export function App({
                   sampleRate: sr,
                   safeAreaGuide,
                   slug: project.slug,
+                  sourceFps: project.fps,
+                  sourceHeight: project.height,
+                  sourceWidth: project.width,
                   sweepRef,
                   titles: project.titles ?? [],
                   videoRef,
@@ -814,33 +823,6 @@ export function App({
                   onExport1080Change: setExport1080,
                 }}
                 settingsOpen={settingsOpen}
-                toolbar={{
-                  colorScheme,
-                  configOpen,
-                  cutCount: ranges.length,
-                  exportAspect: exportSettings.aspect,
-                  exportDefaultResolution: export1080 ? "1080" : "4k",
-                  exportDisabled,
-                  exportLabel,
-                  exporting,
-                  fmtTime: formatEditorTime,
-                  fullDurationSec: fullDur,
-                  keptDurationSec: keptDuration,
-                  mobileRightPanel,
-                  onExport,
-                  onOpenChat: () => setMobileRightPanel("chat"),
-                  onOpenConfig: () => setMobileRightPanel("config"),
-                  onOrientationChange: changeOrientation,
-                  onSafeAreaGuideChange,
-                  onToggleColorScheme: toggleColorScheme,
-                  onToggleConfig: () => setConfigOpen((open) => !open),
-                  orientation,
-                  pendingSaves,
-                  safeAreaGuide,
-                  sourceFps: project.fps,
-                  sourceHeight: project.height,
-                  sourceWidth: project.width,
-                }}
                 transcript={{
                   activeMatchRange: activeSearchRange,
                   curSample,
@@ -862,13 +844,9 @@ export function App({
               />
 
               <EditorRightRail
-                chatWidth={chatWidth}
-                configOpen={configOpen}
-                configPanel={configPanel}
                 hidden={settingsOpen}
                 mobilePanel={mobileRightPanel}
                 onAssetsUpdated={applyAssetUpdate}
-                onChatWidthChange={setChatWidth}
                 onCloseMobilePanel={() => setMobileRightPanel(null)}
                 slug={project.slug}
               />

@@ -3,19 +3,22 @@
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
 
-export type SidebarSegmentView = "chats" | "assets";
+export type SidebarSegmentView = "chats" | "assets" | "config";
 
 const VIEW_LABELS: Record<SidebarSegmentView, string> = {
   chats: "Chats",
   assets: "Assets",
+  config: "Config",
 };
 
 export function SidebarSegmentedPicker({
   activeView,
+  className,
   onSelectView,
   views = ["chats", "assets"],
 }: {
   activeView: SidebarSegmentView;
+  className?: string;
   onSelectView: (view: SidebarSegmentView) => void;
   views?: ReadonlyArray<SidebarSegmentView>;
 }) {
@@ -24,7 +27,7 @@ export function SidebarSegmentedPicker({
   }
 
   return (
-    <div className="w-full px-2 pt-0 pb-1.5">
+    <div className={cn("w-full", className)}>
       <ToggleGroup
         aria-label="Sidebar view"
         className={cn(
@@ -46,6 +49,7 @@ export function SidebarSegmentedPicker({
         {views.map((view) => (
           <ToggleGroupItem
             className="h-7! w-full first:rounded-r-none! first:rounded-l-md! last:rounded-r-md! last:rounded-l-none!"
+            data-sidebar-segment={view}
             key={view}
             value={view}
           >

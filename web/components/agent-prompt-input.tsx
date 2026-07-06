@@ -229,7 +229,7 @@ function AgentPromptInputInner({
       <div ref={promptRootRef}>
         <PromptInput
           accept="video/*,audio/*,image/*"
-          className="min-w-0 rounded-lg"
+          className="min-w-0 rounded-md"
           inputGroupClassName="items-stretch overflow-visible"
           multiple
           onSubmit={onSubmit}

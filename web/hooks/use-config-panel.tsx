@@ -59,10 +59,10 @@ export interface UseConfigPanelTimelineCallbacks {
 export interface UseConfigPanelParams {
   activeTab: ConfigTabId;
   edit: ConfigEditTabProps;
+  embedded?: boolean;
   history: ConfigHistoryTabProps;
   inspector: ConfigInspectorSummaryInput;
   look: LookTabPanelProps;
-  mobileRightPanel: "chat" | "config" | null;
   onCloseConfig: () => void;
   onTabChange: (tab: ConfigTabId) => void;
   playback: UseConfigPanelPlayback;
@@ -74,10 +74,10 @@ export interface UseConfigPanelParams {
 export function useConfigPanel({
   activeTab,
   edit,
+  embedded = false,
   history,
   inspector,
   look,
-  mobileRightPanel,
   onCloseConfig,
   onTabChange,
   playback,
@@ -102,8 +102,7 @@ export function useConfigPanel({
     [inspector]
   );
 
-  const closeLabel =
-    mobileRightPanel === "config" ? "Close config" : "Hide config";
+  const closeLabel = embedded ? "Back to chats" : "Hide config";
 
   const handleClose = useCallback(() => {
     onCloseConfig();
@@ -162,6 +161,7 @@ export function useConfigPanel({
     activeTab,
     closeLabel,
     edit,
+    embedded,
     history,
     inspectorSummary,
     look,

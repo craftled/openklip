@@ -3,7 +3,6 @@
 import MapLibreGL, { type MarkerOptions, type PopupOptions } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type * as GeoJSON from "geojson";
-import { Loader2, Locate, Maximize, Minus, Plus, X } from "lucide-react";
 import {
   createContext,
   type ReactNode,
@@ -18,6 +17,7 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
+import { Loader2Icon, Locate, Maximize, Minus, Plus, X } from "@/lib/icon";
 
 import { cn } from "@/lib/utils";
 
@@ -967,7 +967,7 @@ function MapControls({
             onClick={handleLocate}
           >
             {waitingForLocation ? (
-              <Loader2 className="size-4 animate-spin" />
+              <Loader2Icon className="size-4 animate-spin" />
             ) : (
               <Locate className="size-4" />
             )}
