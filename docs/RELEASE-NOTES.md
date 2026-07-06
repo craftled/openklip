@@ -8,13 +8,13 @@ Publishing status checked on 2026-07-06: GitHub releases published through `v0.4
 
 ## v0.41.1.1
 
-**Viral launch playbook, Settings Features panel, and b-roll suggest benchmark.**
+**Viral launch playbook, capability registry, and b-roll suggest benchmark.**
 
 ### Highlights
 - **Viral launch**: `templates/viral-launch/skill.md` for hook-first social launch edits (`--platform x` / `shorts`).
-- **Settings Features**: read-only capability list in Settings → Features.
+- **Capability registry**: `src/features.ts` (51 capabilities); Settings → Features; `openklip features`; MCP `features_list`; README parity test.
 - **B-roll benchmark**: `fixtures/broll-suggest/` labeled spans + `tests/broll-suggest-benchmark.test.ts` (10/10 on `edgaras-raw` when present).
-- **Tests**: 1901 tests (1898 pass, 3 skip); 89 MCP tools.
+- **Tests**: 1906 tests (1903 pass, 3 skip); 90 MCP tools.
 
 ### Known gaps
 

@@ -4,7 +4,7 @@
 
 ### Added
 - **Viral launch playbook**: `templates/viral-launch/skill.md` edit template for scroll-stopping social launch videos (hook-first cuts, plain problem setup, early motion, `--platform x` / `shorts` export); auto-listed via `openklip template list` and MCP `load_skill`.
-- **Settings Features panel**: read-only list of shipped capabilities in Settings → Features (`web/lib/openklip-features.ts`, `web/components/settings/settings-features-panel.tsx`).
+- **Capability registry**: `src/features.ts` is the SSOT for 51 shipped product capabilities (validated links to tools/actions/templates; README title parity test in `tests/features.test.ts`); exposed via Settings → Features (`web/components/settings/settings-features-panel.tsx`), `openklip features`, MCP `features_list`, and `GET /api/features`.
 - **B-roll suggest benchmark**: labeled `fixtures/broll-suggest/edgaras-spans.json` plus `tests/broll-suggest-benchmark.test.ts` (deterministic fixture + optional live `edgaras-raw` gate).
 
 ## 0.41.1.0 - 2026-07-06
