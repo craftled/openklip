@@ -1,0 +1,73 @@
+{
+  "slug": "edgaras-raw",
+  "description": "B-roll asset cards from openklip analyze edgaras-raw (2026-07-06). Used for deterministic ranker benchmarks.",
+  "assets": [
+    {
+      "id": "dji-20260620105710-0037-d",
+      "kind": "broll",
+      "name": "DJI_20260620105710_0037_D.MP4",
+      "card": {
+        "summary": "A bald man in a dark jacket talks to another person by an open car door outside a beige building with barred windows and an air-conditioning unit.",
+        "tags": [
+          "outdoor",
+          "building",
+          "car door",
+          "conversation",
+          "two men",
+          "daytime",
+          "residential"
+        ],
+        "bestFor": ["b-roll cover", "location-setup", "intro"],
+        "analyzedAt": "2026-07-06T11:55:50.434Z",
+        "agent": "Claude"
+      }
+    },
+    {
+      "id": "dji-20260620222505-0078-d",
+      "kind": "broll",
+      "name": "DJI_20260620222505_0078_D.MP4",
+      "card": {
+        "summary": "A man in a white cap and tank top sits across a wooden table at night while another person's hand rests near glasses and a green board game on the table indoors.",
+        "tags": [
+          "indoor",
+          "night",
+          "table",
+          "friends",
+          "casual",
+          "hangout",
+          "drinks",
+          "home"
+        ],
+        "bestFor": ["b-roll cover", "location-setup", "intro"],
+        "analyzedAt": "2026-07-06T11:55:50.599Z",
+        "agent": "Claude"
+      }
+    },
+    {
+      "id": "dji-20260620171613-0060-d",
+      "kind": "broll",
+      "name": "DJI_20260620171613_0060_D.MP4",
+      "card": {
+        "summary": "A young man in a white tank top sits at a poolside table with a laptop and drink, gesturing as he talks in a sunny backyard patio with cacti and a swimming pool.",
+        "tags": [
+          "poolside",
+          "backyard",
+          "laptop",
+          "man talking",
+          "summer",
+          "patio",
+          "outdoor",
+          "casual"
+        ],
+        "bestFor": [
+          "b-roll cover",
+          "location-setup",
+          "intro",
+          "transition"
+        ],
+        "analyzedAt": "2026-07-06T11:55:48.636Z",
+        "agent": "Claude"
+      }
+    }
+  ]
+}

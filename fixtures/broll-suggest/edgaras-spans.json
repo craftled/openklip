@@ -1,0 +1,76 @@
+{
+  "slug": "edgaras-raw",
+  "description": "Labeled b-roll suggest cases for edgaras-raw. Text cases use --text; phrase cases require the phrase in the kept transcript.",
+  "cases": [
+    {
+      "id": "car-door-outdoor",
+      "mode": "text",
+      "query": "car door outdoor conversation",
+      "expectedTop1": "dji-20260620105710-0037-d",
+      "minTop1Score": 8
+    },
+    {
+      "id": "poolside-patio",
+      "mode": "text",
+      "query": "poolside patio laptop summer",
+      "expectedTop1": "dji-20260620171613-0060-d",
+      "minTop1Score": 10
+    },
+    {
+      "id": "board-game-night",
+      "mode": "text",
+      "query": "board game night table indoor",
+      "expectedTop1": "dji-20260620222505-0078-d",
+      "minTop1Score": 6
+    },
+    {
+      "id": "poolside-only",
+      "mode": "text",
+      "query": "poolside",
+      "expectedTop1": "dji-20260620171613-0060-d",
+      "minTop1Score": 5
+    },
+    {
+      "id": "car-door-tags",
+      "mode": "text",
+      "query": "car door",
+      "expectedTop1": "dji-20260620105710-0037-d",
+      "minTop1Score": 8
+    },
+    {
+      "id": "laptop-pool",
+      "mode": "text",
+      "query": "laptop pool backyard",
+      "expectedTop1": "dji-20260620171613-0060-d",
+      "minTop1Score": 8
+    },
+    {
+      "id": "hangout-indoor",
+      "mode": "text",
+      "query": "hangout drinks home night",
+      "expectedTop1": "dji-20260620222505-0078-d",
+      "minTop1Score": 8
+    },
+    {
+      "id": "design-feedback-phrase",
+      "mode": "phrase",
+      "query": "design feedback",
+      "expectedTop1": null,
+      "note": "Spoken topic has no visual card overlap; expect empty suggestions."
+    },
+    {
+      "id": "canvas-design-phrase",
+      "mode": "phrase",
+      "query": "canvas design",
+      "expectedTop1": null,
+      "note": "UI talk; no matching b-roll tags."
+    },
+    {
+      "id": "intro-tie",
+      "mode": "text",
+      "query": "intro",
+      "expectedTop1": "dji-20260620105710-0037-d",
+      "note": "Tied bestFor intro scores; tie-break is asset id ascending."
+    }
+  ]
+}
