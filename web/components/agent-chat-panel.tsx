@@ -3,38 +3,23 @@
 import { useMemo, useRef, useState } from "react";
 import { useAgentChat } from "@/components/agent-chat-context";
 import { AgentPromptInput } from "@/components/agent-prompt-input";
-import { ChatMarkdown } from "@/components/chat-markdown";
-import { HelloLoading } from "@/components/hello-loading";
-import { TaskProgressPanel } from "@/components/task-progress-panel";
-import { Bubble, BubbleContent } from "@/components/ui/bubble";
+import { ChatTimeline } from "@/components/chat-timeline";
 import { Button } from "@/components/ui/button";
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyTitle,
-} from "@/components/ui/empty";
-import {
-  Message,
-  MessageAvatar,
-  MessageContent,
-} from "@/components/ui/message";
 import {
   MessageScroller,
   MessageScrollerButton,
   MessageScrollerContent,
-  MessageScrollerItem,
   MessageScrollerProvider,
   MessageScrollerViewport,
   useMessageScroller,
   useMessageScrollerVisibility,
 } from "@/components/ui/message-scroller";
-import { SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarHeader, SidebarTrigger } from "@/components/ui/sidebar";
 import { AgentProviderIcon } from "@/lib/agent-icons";
 import { getAgentModelLabel } from "@/lib/agent-preferences";
 import type { ThreadMessage } from "@/lib/agent-threads";
 import type { AssetBinUpdate } from "@/lib/asset-bin-update";
-import { APP_ICON_CLASS, XIcon } from "@/lib/icon";
+import { XIcon } from "@/lib/icon";
 import { cn } from "@/lib/utils";
 
 const TRAIL_PREVIEW_LENGTH = 180;
@@ -314,128 +299,74 @@ export function AgentChatPanel({
   const isRunning = runningThreadId !== null;
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-      <div className="mx-auto flex min-h-0 w-full min-w-0 max-w-2xl flex-1 flex-col">
-        <div className="flex min-w-0 shrink-0 items-center justify-between gap-2 border-border border-b px-6 py-3">
-          <span className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
-            Chat
-          </span>
-          <div className="flex min-w-0 flex-1 items-center justify-end gap-2 overflow-hidden">
-            <span
-              className="flex min-w-0 items-center gap-1.5 text-muted-foreground text-xs"
-              title={getAgentModelLabel(agent)}
+    <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden bg-sidebar text-sidebar-foreground">
+      <SidebarHeader className="gap-1 border-sidebar-border/60 border-b px-2 pt-1 pb-1.5">
+        <div className="flex h-6 w-full items-center gap-1.5 pr-0.5 pl-2">
+          <h2 className="min-w-0 flex-1 truncate font-medium text-[11px] text-sidebar-foreground leading-none">
+            {activeThread?.title ?? "Chat"}
+          </h2>
+          {onClose ? (
+            <Button
+              aria-label="Close chat"
+              className="size-7 shrink-0 text-muted-foreground/75 hover:text-foreground"
+              onClick={onClose}
+              size="icon-xs"
+              title="Close chat"
+              variant="ghost"
             >
-              <AgentProviderIcon className={APP_ICON_CLASS} value={agent} />
-              <span className="truncate">{getAgentModelLabel(agent)}</span>
-            </span>
-            {activeThread && (
-              <span className="min-w-0 truncate text-muted-foreground text-xs">
-                {activeThread.title}
-              </span>
-            )}
-            {onClose ? (
-              <Button
-                aria-label="Close chat"
-                className="size-8 text-muted-foreground"
-                onClick={onClose}
-                size="icon-sm"
-                title="Close chat"
-                variant="ghost"
-              >
-                <XIcon />
-              </Button>
-            ) : null}
-            {showSidebarTrigger ? (
-              <SidebarTrigger aria-label="Toggle chat" side="right" />
-            ) : null}
-          </div>
+              <XIcon className="size-3.5" />
+            </Button>
+          ) : null}
+          {showSidebarTrigger ? (
+            <SidebarTrigger aria-label="Toggle chat sidebar" side="right" />
+          ) : null}
         </div>
+        <div className="px-2">
+          <span
+            className="inline-flex max-w-full items-center gap-1 rounded-full bg-muted px-1.5 py-px text-[10px] text-muted-foreground leading-none"
+            title={getAgentModelLabel(agent)}
+          >
+            <AgentProviderIcon className="size-3 shrink-0" value={agent} />
+            <span className="truncate">{getAgentModelLabel(agent)}</span>
+          </span>
+        </div>
+      </SidebarHeader>
 
-        <MessageScrollerProvider
-          autoScroll
-          defaultScrollPosition="last-anchor"
-          key={activeThread?.id ?? "empty-chat"}
-          scrollPreviousItemPeek={56}
-        >
-          <MessageScroller className="min-h-0 min-w-0 flex-1">
-            <AgentChatTrail
-              agentLabel={getAgentModelLabel(agent)}
-              messages={activeThread?.messages ?? []}
-            />
-            <MessageScrollerViewport>
-              <MessageScrollerContent className="min-w-0 gap-3 px-6 py-4 text-left">
-                {chatsLoading ? (
-                  <MessageScrollerItem className="flex flex-1 items-center justify-center py-12">
-                    <HelloLoading context="chats" size="compact" />
-                  </MessageScrollerItem>
-                ) : (
-                  <>
-                    {!activeThread?.messages.length && (
-                      <MessageScrollerItem className="flex flex-1 items-center">
-                        <Empty>
-                          <EmptyHeader>
-                            <EmptyTitle>Start a chat</EmptyTitle>
-                            <EmptyDescription>
-                              Type / for edit skills, or ask about cuts, filler,
-                              and overlays.
-                            </EmptyDescription>
-                          </EmptyHeader>
-                        </Empty>
-                      </MessageScrollerItem>
-                    )}
-                    {activeThread?.messages.map((m) => {
-                      const isUser = m.role === "user";
-
-                      return (
-                        <MessageScrollerItem
-                          key={m.id}
-                          messageId={m.id}
-                          scrollAnchor={isUser}
-                        >
-                          <Message align={isUser ? "end" : "start"}>
-                            <MessageAvatar>
-                              <span className="text-muted-foreground text-xs">
-                                {isUser ? "Y" : "A"}
-                              </span>
-                            </MessageAvatar>
-                            <MessageContent>
-                              <Bubble align={isUser ? "end" : "start"}>
-                                <BubbleContent
-                                  className={
-                                    isUser ? "whitespace-pre-wrap" : ""
-                                  }
-                                >
-                                  {isUser ? (
-                                    m.content
-                                  ) : (
-                                    <ChatMarkdown>{m.content}</ChatMarkdown>
-                                  )}
-                                </BubbleContent>
-                              </Bubble>
-                            </MessageContent>
-                          </Message>
-                        </MessageScrollerItem>
-                      );
-                    })}
-                  </>
-                )}
-              </MessageScrollerContent>
-            </MessageScrollerViewport>
-            <MessageScrollerButton />
-          </MessageScroller>
-        </MessageScrollerProvider>
-
-        <div className="flex min-w-0 shrink-0 flex-col gap-3 border-border border-t px-6 py-4">
-          <TaskProgressPanel running={isRunning} slug={slug} />
-          <AgentPromptInput
-            activeSlug={activeSlug}
-            chatsLoading={chatsLoading}
-            isRunning={isRunning}
-            onAssetsUpdated={onAssetsUpdated}
-            onSubmitMessage={sendMessage}
-            slug={slug}
+      <MessageScrollerProvider
+        autoScroll
+        defaultScrollPosition="last-anchor"
+        key={activeThread?.id ?? "empty-chat"}
+        scrollPreviousItemPeek={56}
+      >
+        <MessageScroller className="min-h-0 min-w-0 flex-1">
+          <AgentChatTrail
+            agentLabel={getAgentModelLabel(agent)}
+            messages={activeThread?.messages ?? []}
           />
-        </div>
+          <MessageScrollerViewport>
+            <MessageScrollerContent className="min-w-0 justify-end gap-2 px-2 py-2 text-left">
+              <ChatTimeline
+                agentLabel={getAgentModelLabel(agent)}
+                chatsLoading={chatsLoading}
+                running={isRunning}
+                slug={slug}
+                thread={activeThread}
+              />
+            </MessageScrollerContent>
+          </MessageScrollerViewport>
+          <MessageScrollerButton />
+        </MessageScroller>
+      </MessageScrollerProvider>
+
+      <div className="flex min-w-0 shrink-0 flex-col gap-2 border-sidebar-border/60 border-t px-2 py-2">
+        <AgentPromptInput
+          activeSlug={activeSlug}
+          chatsLoading={chatsLoading}
+          isRunning={isRunning}
+          onAssetsUpdated={onAssetsUpdated}
+          onSubmitMessage={sendMessage}
+          slug={slug}
+        />
       </div>
     </div>
   );

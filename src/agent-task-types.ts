@@ -20,6 +20,15 @@ export interface AgentTaskStep {
   title: string;
 }
 
+export interface AgentTaskToolCall {
+  at: number;
+  id: string;
+  input?: string;
+  ok: boolean;
+  output?: string;
+  toolName: string;
+}
+
 export interface AgentTask {
   /** Who created this task: same Actor union as ActionLogEntry. Optional so
    * tasks created before this field existed still pass the shape guard;
@@ -46,6 +55,8 @@ export interface AgentTask {
   steps: AgentTaskStep[];
   /** The agent's own completion summary. */
   summary?: string;
+  /** Best-effort tool call trace (collapsed in the UI). */
+  toolCalls?: AgentTaskToolCall[];
   updatedAt: number;
 }
 
@@ -158,6 +169,28 @@ export function isAgentTask(value: unknown): value is AgentTask {
     return false;
   }
   if (row.completedAt !== undefined && typeof row.completedAt !== "number") {
+    return false;
+  }
+  if (
+    row.toolCalls !== undefined &&
+    !(
+      Array.isArray(row.toolCalls) &&
+      row.toolCalls.every((call) => {
+        if (!call || typeof call !== "object") {
+          return false;
+        }
+        const c = call as Record<string, unknown>;
+        return (
+          typeof c.id === "string" &&
+          typeof c.at === "number" &&
+          typeof c.toolName === "string" &&
+          typeof c.ok === "boolean" &&
+          (c.input === undefined || typeof c.input === "string") &&
+          (c.output === undefined || typeof c.output === "string")
+        );
+      })
+    )
+  ) {
     return false;
   }
   return true;

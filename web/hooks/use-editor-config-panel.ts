@@ -96,7 +96,6 @@ export interface UseEditorConfigPanelParams {
     | "onPadMs"
   >;
   loop: { inSec: number; outSec: number } | null;
-  mobileRightPanel: "chat" | "config" | null;
   motionSpeed: number;
   musicAssets: ConfigProjectTabProps["musicAssets"];
   musicBpmByAsset: ConfigProjectTabProps["bpmByAssetId"];
@@ -186,7 +185,6 @@ export function useEditorConfigPanel(
     keptDuration,
     loop,
     lookActions,
-    mobileRightPanel,
     motionSpeed,
     musicAssets,
     musicBpmByAsset,
@@ -239,7 +237,7 @@ export function useEditorConfigPanel(
 
   return useConfigPanel({
     activeTab,
-    mobileRightPanel,
+    embedded: true,
     onCloseConfig,
     onTabChange,
     edit: {

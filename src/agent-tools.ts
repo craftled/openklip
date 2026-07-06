@@ -2,10 +2,16 @@
 // commands in one manifest. CLI (`openklip tools`), MCP (stdio server), and docs
 // all read from here so surfaces stay in sync with the GUI's project.json edits.
 import { z } from "zod";
-import { type Actor, actorFromEnv, readActionLog } from "./action-log.ts";
+import {
+  type Actor,
+  actorFromEnv,
+  readActionLog,
+  summarizeForLog,
+} from "./action-log.ts";
 import {
   type AgentTaskOutcome,
   type AgentTaskStatus,
+  appendAgentTaskToolCall,
   completeAgentTask,
   listAgentTasks,
   setAgentTaskStep,
@@ -1480,9 +1486,28 @@ export async function callAgentTool(
     rawInput,
     toolName: name,
   });
+  const taskId = toolTaskId();
+  const projectSlug = rawInputSlug(rawInput) ?? scopedProjectSlug();
   try {
-    return await tool.run(rawInput);
+    const result = await tool.run(rawInput);
+    if (taskId && projectSlug) {
+      await appendAgentTaskToolCall(projectSlug, taskId, {
+        toolName: name,
+        ok: true,
+        input: summarizeForLog(rawInput),
+        output: summarizeForLog(result),
+      }).catch(() => undefined);
+    }
+    return result;
   } catch (err) {
+    if (taskId && projectSlug) {
+      await appendAgentTaskToolCall(projectSlug, taskId, {
+        toolName: name,
+        ok: false,
+        input: summarizeForLog(rawInput),
+        output: summarizeForLog((err as Error).message),
+      }).catch(() => undefined);
+    }
     if (err instanceof z.ZodError) {
       const detail = err.issues
         .map((i) => {

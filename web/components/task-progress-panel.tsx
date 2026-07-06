@@ -22,20 +22,34 @@ export type {
 } from "@engine/agent-task-types";
 
 const BADGE_BASE =
-  "inline-flex shrink-0 items-center rounded-sm px-1.5 py-0.5 font-medium text-xs uppercase tracking-wide";
+  "inline-flex shrink-0 items-center rounded-full px-1 py-px font-normal text-[10px] leading-none";
 
 const TASK_STATUS_BADGES: Record<AgentTaskStatus, string> = {
   pending: "bg-muted text-muted-foreground",
   running: "bg-primary/10 text-primary",
   blocked: "bg-accent text-accent-foreground",
   failed: "bg-destructive/10 text-destructive",
-  completed: "bg-secondary text-secondary-foreground",
-  cancelled: "bg-muted text-muted-foreground",
+  completed: "bg-muted text-muted-foreground",
+  cancelled: "bg-muted text-muted-foreground/70",
+};
+
+const TASK_STATUS_LABELS: Record<AgentTaskStatus, string> = {
+  pending: "Pending",
+  running: "Running",
+  blocked: "Blocked",
+  failed: "Failed",
+  completed: "Done",
+  cancelled: "Cancelled",
 };
 
 /** Badge classes for a task status. */
 export function taskStatusBadgeClass(status: AgentTaskStatus): string {
   return `${BADGE_BASE} ${TASK_STATUS_BADGES[status]}`;
+}
+
+/** Human label for a task status badge. */
+export function taskStatusLabel(status: AgentTaskStatus): string {
+  return TASK_STATUS_LABELS[status];
 }
 
 /** Newest task first by updatedAt. */
@@ -150,16 +164,18 @@ function TaskRow({
   const visibleSteps = task.steps.slice(-MAX_VISIBLE_STEPS);
   return (
     <li
-      className="flex flex-col gap-1.5 border-border/60 border-b pb-2 last:border-b-0 last:pb-0"
+      className="flex flex-col gap-1 border-sidebar-border/50 border-b pb-1.5 last:border-b-0 last:pb-0"
       data-task-row={task.id}
     >
       <div className="flex items-start gap-1.5">
-        <p className="line-clamp-2 min-w-0 flex-1 text-foreground text-xs">
+        <p className="line-clamp-2 min-w-0 flex-1 text-[11px] text-foreground/90 leading-snug">
           {task.request}
         </p>
-        <span className={taskStatusBadgeClass(task.status)}>{task.status}</span>
+        <span className={taskStatusBadgeClass(task.status)}>
+          {taskStatusLabel(task.status)}
+        </span>
       </div>
-      <div className="text-muted-foreground text-xs tabular-nums">
+      <div className="text-[10px] text-muted-foreground tabular-nums">
         {formatTaskRelativeTime(task, now)}
       </div>
       {visibleSteps.length > 0 ? (
@@ -224,8 +240,8 @@ export function TaskList({
   }
 
   return (
-    <div className="flex flex-col gap-2">
-      <ul className="flex list-none flex-col gap-2 p-0">
+    <div className="flex flex-col gap-1.5">
+      <ul className="flex list-none flex-col gap-1.5 p-0">
         {visible.map((task) => (
           <TaskRow key={task.id} now={now} onCancel={onCancel} task={task} />
         ))}

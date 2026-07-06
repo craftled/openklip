@@ -44,15 +44,23 @@ function minimalPreviewProps(): EditorColumnProps["preview"] {
     captionStyleId: "boxed",
     captionsOn: true,
     curSample: 0,
+    cutCount: 2,
+    exportAspect: "16:9",
+    exportDefaultResolution: "1080",
+    exportDisabled: false,
+    exportLabel: "Export",
     exportSettingsCrop: { focusX: 0.5, focusY: 0.5, scale: 1 },
     exporting: false,
+    fmtTime: (sec: number) => sec.toFixed(1),
     graphics: [],
     keptDurationSec: 10,
     mediaVersion: 0,
     musicBedCount: 0,
     musicMuted: false,
     onCycleSpeed: () => undefined,
+    onExport: async () => undefined,
     onFullscreen: () => undefined,
+    onOrientationChange: () => undefined,
     onPlayToggle: async () => undefined,
     onPreviewClick: () => undefined,
     onSeekFraction: () => undefined,
@@ -60,6 +68,7 @@ function minimalPreviewProps(): EditorColumnProps["preview"] {
     onToggleMusicMute: undefined,
     onToggleMute: () => undefined,
     onTogglePip: () => undefined,
+    onSafeAreaGuideChange: () => undefined,
     orientation: "landscape",
     outPos: 0,
     pendingSaves: 0,
@@ -71,6 +80,9 @@ function minimalPreviewProps(): EditorColumnProps["preview"] {
     sampleRate: 48_000,
     safeAreaGuide: "off",
     slug: "demo",
+    sourceFps: 30,
+    sourceHeight: 1080,
+    sourceWidth: 1920,
     sweepRef: createRef<CutTransitionSweepHandle>(),
     titles: [],
     videoRef: createRef<HTMLVideoElement>(),
@@ -80,45 +92,10 @@ function minimalPreviewProps(): EditorColumnProps["preview"] {
   };
 }
 
-function minimalToolbarProps(): EditorColumnProps["toolbar"] {
-  return {
-    colorScheme: "light",
-    configOpen: false,
-    cutCount: 2,
-    exportAspect: "16:9",
-    exportDefaultResolution: "1080",
-    exportDisabled: false,
-    exportLabel: "Export",
-    exporting: false,
-    fmtTime: (sec: number) => sec.toFixed(1),
-    fullDurationSec: 60,
-    keptDurationSec: 45,
-    mobileRightPanel: null,
-    onExport: async () => undefined,
-    onOpenChat: () => undefined,
-    onOpenConfig: () => undefined,
-    onOrientationChange: () => undefined,
-    onSafeAreaGuideChange: () => undefined,
-    onToggleColorScheme: () => undefined,
-    onToggleConfig: () => undefined,
-    orientation: "landscape",
-    pendingSaves: 0,
-    safeAreaGuide: "off",
-    sourceFps: 30,
-    sourceHeight: 1080,
-    sourceWidth: 1920,
-  };
-}
-
 function minimalProps(
   overrides: Partial<EditorColumnProps> = {}
 ): EditorColumnProps {
   return {
-    agentSidebar: {
-      isMobile: false,
-      open: false,
-      toggleSidebar: () => undefined,
-    },
     preview: minimalPreviewProps(),
     settings: {
       activeSection: "appearance",
@@ -128,7 +105,6 @@ function minimalProps(
       onExport1080Change: () => undefined,
     },
     settingsOpen: false,
-    toolbar: minimalToolbarProps(),
     transcript: minimalTranscriptProps(),
     ...overrides,
   };
@@ -137,8 +113,9 @@ function minimalProps(
 test("EditorColumn renders editor workspace with data-editor-column", () => {
   const html = renderToStaticMarkup(<EditorColumn {...minimalProps()} />);
   assert.match(html, /data-editor-column/);
-  assert.match(html, /Editor/);
+  assert.match(html, /demo/);
   assert.match(html, /2 cuts/);
+  assert.match(html, /16:9/);
   assert.match(html, /group\/preview/);
   assert.match(html, /hello/);
 });
@@ -149,19 +126,4 @@ test("EditorColumn renders settings view when settingsOpen", () => {
   );
   assert.doesNotMatch(html, /data-editor-column/);
   assert.match(html, /Appearance/);
-});
-
-test("EditorColumn hides agent sidebar trigger when chat sidebar is open", () => {
-  const html = renderToStaticMarkup(
-    <EditorColumn
-      {...minimalProps({
-        agentSidebar: {
-          isMobile: false,
-          open: true,
-          toggleSidebar: () => undefined,
-        },
-      })}
-    />
-  );
-  assert.doesNotMatch(html, /Toggle agent sidebar/);
 });

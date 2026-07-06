@@ -1,154 +1,172 @@
 import {
+  IconAlertOctagonFilled,
+  IconAlertTriangleFilled,
   IconAperture,
-  IconArchive,
-  IconClock,
-  IconCopy,
+  IconArchiveFilled,
+  IconBoxMultipleFilled,
+  IconCaretUpDownFilled,
+  IconCheckFilled,
+  IconChevronDownFilled,
+  IconChevronRightFilled,
+  IconCircleArrowDownFilled,
+  IconCircleCheckFilled,
+  IconCircleChevronUpFilled,
+  IconClockFilled,
+  IconCopyFilled,
   IconCornerDownLeft,
-  IconDeviceDesktop,
-  IconDots,
-  IconDownload,
-  IconFileText,
-  IconFolder,
-  IconFolderOpen,
-  IconGripVertical,
-  IconLayoutGrid,
-  IconLayoutSidebarLeftCollapse,
-  IconLayoutSidebarRightCollapse,
-  IconLink,
+  IconCurrentLocationFilled,
+  IconDeviceDesktopFilled,
+  IconDotsFilled,
+  IconDotsVerticalFilled,
+  IconDownloadFilled,
+  IconFileMusicFilled,
+  IconFileScissorsFilled,
+  IconFileTextFilled,
+  IconFileTypographyFilled,
+  IconFileUploadFilled,
+  IconFolderFilled,
+  IconFolderOpenFilled,
+  IconInfoCircleFilled,
+  IconLayoutGridFilled,
+  IconLayoutSidebarFilled,
+  IconLayoutSidebarLeftCollapseFilled,
+  IconLayoutSidebarRightCollapseFilled,
+  IconLinkFilled,
   IconLoader2,
   IconMaximize,
-  IconMessageCircle,
-  IconMessagePlus,
+  IconMessage2Filled,
+  IconMessageChatbotFilled,
+  IconMessageCircleFilled,
   IconMinimize,
-  IconMoon,
-  IconMovie,
-  IconMusic,
+  IconMinus,
+  IconMoonFilled,
   IconMusicOff,
-  IconPackage,
-  IconPalette,
-  IconPencil,
-  IconPhoto,
-  IconPictureInPicture,
-  IconPlayerPause,
-  IconPlayerPlay,
-  IconPlayerStop,
+  IconPaletteFilled,
+  IconPencilFilled,
+  IconPhotoFilled,
+  IconPictureInPictureFilled,
+  IconPlayerPauseFilled,
+  IconPlayerPlayFilled,
+  IconPlayerStopFilled,
   IconPlugConnected,
-  IconPlus,
+  IconPlusFilled,
   IconRefresh,
-  IconRobot,
-  IconScan,
-  IconScanEye,
-  IconScissors,
-  IconSettings,
-  IconSparkles,
+  IconSearchFilled,
+  IconSettingsFilled,
+  IconSparklesFilled,
   IconSubtitles,
-  IconSun,
-  IconTextSize,
-  IconTrash,
-  IconUpload,
+  IconSunFilled,
+  IconTrashFilled,
   IconVectorSpline,
-  IconVideo,
+  IconVideoFilled,
   IconVolume,
   IconVolumeOff,
-  IconZoomIn,
-  IconAlertOctagon as TablerIconAlertOctagon,
-  IconAlertTriangle as TablerIconAlertTriangle,
-  IconArrowDown as TablerIconArrowDown,
-  IconCheck as TablerIconCheck,
-  IconChevronDown as TablerIconChevronDown,
-  IconChevronRight as TablerIconChevronRight,
-  IconChevronUp as TablerIconChevronUp,
-  IconCircleCheck as TablerIconCircleCheck,
-  IconInfoCircle as TablerIconInfoCircle,
-  IconLayoutSidebar as TablerIconLayoutSidebar,
+  IconXFilled,
+  IconZoomInFilled,
+  IconZoomScanFilled,
   IconLoader as TablerIconLoader,
-  IconSearch as TablerIconSearch,
-  IconSelector as TablerIconSelector,
-  IconX as TablerIconX,
 } from "@tabler/icons-react";
+import type { ComponentPropsWithoutRef, ComponentType } from "react";
+import { cn } from "@/lib/utils";
 
-export const APP_ICON_CLASS = "size-4 shrink-0 opacity-70";
+type SvgIcon = ComponentType<ComponentPropsWithoutRef<"svg">>;
 
-export const IconAlertOctagon = TablerIconAlertOctagon;
-export const IconAlertTriangle = TablerIconAlertTriangle;
-export const IconArrowDown = TablerIconArrowDown;
-export const IconCheck = TablerIconCheck;
-export const IconChevronDown = TablerIconChevronDown;
-export const IconChevronRight = TablerIconChevronRight;
-export const IconChevronUp = TablerIconChevronUp;
-export const IconCircleCheck = TablerIconCircleCheck;
-export const IconInfoCircle = TablerIconInfoCircle;
-export const IconLayoutSidebar = TablerIconLayoutSidebar;
+const MUTED_ICON_CLASS = "opacity-55";
+
+const muteIcon = (Icon: SvgIcon): SvgIcon => {
+  const MutedIcon = ({
+    className,
+    ...props
+  }: ComponentPropsWithoutRef<"svg">) => (
+    <Icon {...props} className={cn(MUTED_ICON_CLASS, className)} />
+  );
+  return MutedIcon;
+};
+
+export const APP_ICON_CLASS = `size-4 shrink-0 ${MUTED_ICON_CLASS}`;
+
+export const IconAlertOctagon = muteIcon(IconAlertOctagonFilled);
+export const IconAlertTriangle = muteIcon(IconAlertTriangleFilled);
+export const IconArrowDown = muteIcon(IconCircleArrowDownFilled);
+export const IconCheck = muteIcon(IconCheckFilled);
+export const IconChevronDown = muteIcon(IconChevronDownFilled);
+export const IconChevronRight = muteIcon(IconChevronRightFilled);
+export const IconChevronUp = muteIcon(IconCircleChevronUpFilled);
+export const IconCircleCheck = muteIcon(IconCircleCheckFilled);
+export const IconInfoCircle = muteIcon(IconInfoCircleFilled);
+export const IconLayoutSidebar = muteIcon(IconLayoutSidebarFilled);
 export const IconLoader = TablerIconLoader;
-export const IconSearch = TablerIconSearch;
-export const IconSelector = TablerIconSelector;
-export const IconX = TablerIconX;
+export const IconSearch = muteIcon(IconSearchFilled);
+export const IconSelector = muteIcon(IconCaretUpDownFilled);
+export const IconX = muteIcon(IconXFilled);
 
-export const Aperture = IconAperture;
-export const Archive = IconArchive;
-export const ArrowDownIcon = IconArrowDown;
-export const Bot = IconRobot;
-export const Box = IconPackage;
-export const Captions = IconSubtitles;
-export const Check = IconCheck;
-export const CheckIcon = IconCheck;
-export const ChevronDownIcon = IconChevronDown;
-export const ChevronRight = IconChevronRight;
-export const ChevronRightIcon = IconChevronRight;
-export const ChevronUpIcon = IconChevronUp;
-export const ChevronsUpDown = IconSelector;
-export const Clock3 = IconClock;
-export const Copy = IconCopy;
-export const CornerDownLeftIcon = IconCornerDownLeft;
-export const Download = IconDownload;
-export const DownloadIcon = IconDownload;
-export const FileTextIcon = IconFileText;
-export const Film = IconMovie;
-export const FolderClosed = IconFolder;
-export const FolderOpen = IconFolderOpen;
-export const GripVertical = IconGripVertical;
-export const ImageIcon = IconPhoto;
-export const LayoutTemplate = IconLayoutGrid;
-export const Link2 = IconLink;
+export const Aperture = muteIcon(IconAperture);
+export const Archive = muteIcon(IconArchiveFilled);
+export const ArrowDownIcon = muteIcon(IconCircleArrowDownFilled);
+export const Bot = muteIcon(IconMessageChatbotFilled);
+export const Box = muteIcon(IconBoxMultipleFilled);
+export const Captions = muteIcon(IconSubtitles);
+export const Check = muteIcon(IconCheckFilled);
+export const CheckIcon = muteIcon(IconCheckFilled);
+export const ChevronDownIcon = muteIcon(IconChevronDownFilled);
+export const ChevronRight = muteIcon(IconChevronRightFilled);
+export const ChevronRightIcon = muteIcon(IconChevronRightFilled);
+export const ChevronUpIcon = muteIcon(IconCircleChevronUpFilled);
+export const ChevronsUpDown = muteIcon(IconCaretUpDownFilled);
+export const Clock3 = muteIcon(IconClockFilled);
+export const Copy = muteIcon(IconCopyFilled);
+export const CornerDownLeftIcon = muteIcon(IconCornerDownLeft);
+export const Download = muteIcon(IconDownloadFilled);
+export const DownloadIcon = muteIcon(IconDownloadFilled);
+export const FileTextIcon = muteIcon(IconFileTextFilled);
+export const Film = muteIcon(IconVideoFilled);
+export const FolderClosed = muteIcon(IconFolderFilled);
+export const FolderOpen = muteIcon(IconFolderOpenFilled);
+export const GripVertical = muteIcon(IconDotsVerticalFilled);
+export const ImageIcon = muteIcon(IconPhotoFilled);
+export const LayoutTemplate = muteIcon(IconLayoutGridFilled);
+export const Link2 = muteIcon(IconLinkFilled);
 export const Loader2Icon = IconLoader2;
-export const Maximize = IconMaximize;
-export const MessageSquare = IconMessageCircle;
-export const MessageSquarePlus = IconMessagePlus;
-export const Minimize = IconMinimize;
-export const Monitor = IconDeviceDesktop;
-export const Moon = IconMoon;
-export const MoreHorizontal = IconDots;
-export const Music = IconMusic;
-export const MusicOff = IconMusicOff;
-export const NewChatIcon = IconMessagePlus;
-export const Palette = IconPalette;
-export const PanelLeft = IconLayoutSidebarLeftCollapse;
-export const PanelRight = IconLayoutSidebarRightCollapse;
-export const Pause = IconPlayerPause;
-export const Pencil = IconPencil;
-export const PictureInPicture2 = IconPictureInPicture;
-export const Play = IconPlayerPlay;
-export const PlugConnected = IconPlugConnected;
-export const Plus = IconPlus;
-export const PlusIcon = IconPlus;
-export const RotateCcw = IconRefresh;
-export const Scan = IconScan;
-export const ScanSearch = IconScanEye;
-export const Scissors = IconScissors;
-export const Search = IconSearch;
-export const SearchIcon = IconSearch;
-export const Settings2 = IconSettings;
-export const SettingsIcon = IconSettings;
-export const Sparkles = IconSparkles;
-export const Spline = IconVectorSpline;
-export const SquareIcon = IconPlayerStop;
-export const Sun = IconSun;
-export const Trash2 = IconTrash;
-export const Type = IconTextSize;
-export const Upload = IconUpload;
-export const Video = IconVideo;
-export const Volume2 = IconVolume;
-export const VolumeX = IconVolumeOff;
-export const X = IconX;
-export const XIcon = IconX;
-export const ZoomIn = IconZoomIn;
+export const Locate = muteIcon(IconCurrentLocationFilled);
+export const Maximize = muteIcon(IconMaximize);
+export const MessageSquare = muteIcon(IconMessageCircleFilled);
+export const MessageSquarePlus = muteIcon(IconMessage2Filled);
+export const Minimize = muteIcon(IconMinimize);
+export const Minus = muteIcon(IconMinus);
+export const Monitor = muteIcon(IconDeviceDesktopFilled);
+export const Moon = muteIcon(IconMoonFilled);
+export const MoreHorizontal = muteIcon(IconDotsFilled);
+export const Music = muteIcon(IconFileMusicFilled);
+export const MusicOff = muteIcon(IconMusicOff);
+export const NewChatIcon = muteIcon(IconMessage2Filled);
+export const Palette = muteIcon(IconPaletteFilled);
+export const PanelLeft = muteIcon(IconLayoutSidebarLeftCollapseFilled);
+export const PanelRight = muteIcon(IconLayoutSidebarRightCollapseFilled);
+export const Pause = muteIcon(IconPlayerPauseFilled);
+export const Pencil = muteIcon(IconPencilFilled);
+export const PictureInPicture2 = muteIcon(IconPictureInPictureFilled);
+export const Play = muteIcon(IconPlayerPlayFilled);
+export const PlugConnected = muteIcon(IconPlugConnected);
+export const Plus = muteIcon(IconPlusFilled);
+export const PlusIcon = muteIcon(IconPlusFilled);
+export const RotateCcw = muteIcon(IconRefresh);
+export const Scan = muteIcon(IconZoomScanFilled);
+export const ScanSearch = muteIcon(IconZoomScanFilled);
+export const Scissors = muteIcon(IconFileScissorsFilled);
+export const Search = muteIcon(IconSearchFilled);
+export const SearchIcon = muteIcon(IconSearchFilled);
+export const Settings2 = muteIcon(IconSettingsFilled);
+export const SettingsIcon = muteIcon(IconSettingsFilled);
+export const Sparkles = muteIcon(IconSparklesFilled);
+export const Spline = muteIcon(IconVectorSpline);
+export const SquareIcon = muteIcon(IconPlayerStopFilled);
+export const Sun = muteIcon(IconSunFilled);
+export const Trash2 = muteIcon(IconTrashFilled);
+export const Type = muteIcon(IconFileTypographyFilled);
+export const Upload = muteIcon(IconFileUploadFilled);
+export const Video = muteIcon(IconVideoFilled);
+export const Volume2 = muteIcon(IconVolume);
+export const VolumeX = muteIcon(IconVolumeOff);
+export const X = muteIcon(IconXFilled);
+export const XIcon = muteIcon(IconXFilled);
+export const ZoomIn = muteIcon(IconZoomInFilled);

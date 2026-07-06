@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAgentChat } from "@/components/agent-chat-context";
 import { AnalyzeAssetsButton } from "@/components/analyze-assets-button";
@@ -39,7 +40,14 @@ import { useInboxWatch } from "@/hooks/use-inbox-watch";
 import { useModShortcut } from "@/hooks/use-mod-shortcut";
 
 import { chatListEmptyLabel, filterThreadsByQuery } from "@/lib/chat-list";
-import { NewChatIcon, PanelLeft, Search, SettingsIcon } from "@/lib/icon";
+import {
+  Moon,
+  NewChatIcon,
+  PanelLeft,
+  Search,
+  SettingsIcon,
+  Sun,
+} from "@/lib/icon";
 import type { ProjectHoverContext } from "@/lib/project-context";
 import {
   createProjectFromVideo,
@@ -55,42 +63,59 @@ import {
   SIDEBAR_MENU_HEADER_CLASS,
   SIDEBAR_ROW_LABEL_TEXT_CLASS,
 } from "@/lib/sidebar-row-styles";
+import type { ColorScheme } from "@/lib/theme-preferences";
 import { cn } from "@/lib/utils";
 
 interface AgentSidebarProps {
   activeSlug: string;
   assets: BinAsset[];
+  colorScheme: ColorScheme;
+  configPanel: ReactNode;
   mediaVersion?: number;
   onAssetsUpdated: (update: AssetBinUpdate) => void;
   onCloseSettings: () => void;
   onOpenSettings: () => void;
   onSelectSettingsSection: (section: SettingsSectionId) => void;
+  onSidebarViewChange: (view: SidebarSegmentView) => void;
+  onToggleColorScheme: () => void;
   projectHover: ProjectHoverContext;
   projects: ProjectListing[];
   sampleRate: number;
   settingsOpen: boolean;
   settingsSection: SettingsSectionId;
+  sidebarView: SidebarSegmentView;
 }
 
 export function AgentSidebar({
   activeSlug,
   assets,
+  colorScheme,
+  configPanel,
   mediaVersion,
   onAssetsUpdated,
   onCloseSettings,
   onOpenSettings,
   onSelectSettingsSection,
+  onSidebarViewChange,
+  onToggleColorScheme,
   projectHover,
   projects,
   sampleRate,
   settingsOpen,
   settingsSection,
+  sidebarView,
 }: AgentSidebarProps) {
   const router = useRouter();
+  const { isMobile, setOpenMobile } = useSidebar();
   const [search, setSearch] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchShortcut = useModShortcut("k");
-  const [sidebarView, setSidebarView] = useState<SidebarSegmentView>("chats");
+
+  useEffect(() => {
+    if (sidebarView === "config" && isMobile) {
+      setOpenMobile(true);
+    }
+  }, [isMobile, setOpenMobile, sidebarView]);
 
   const {
     activeThreadId,
@@ -203,7 +228,7 @@ export function AgentSidebar({
         </SidebarContent>
       ) : (
         <>
-          <SidebarHeader className="gap-0.5 border-sidebar-border/60 border-b px-2 pt-1 pb-1">
+          <SidebarHeader className="gap-1 border-sidebar-border/60 border-b px-2 pt-1 pb-1.5">
             <div className="flex h-6 w-full items-center gap-1.5 pr-0.5 pl-2">
               <div
                 aria-hidden="true"
@@ -233,135 +258,161 @@ export function AgentSidebar({
                 projects={projects}
               />
             </div>
-          </SidebarHeader>
-
-          <SidebarContent className="gap-0">
-            <div className="px-2 pt-1.5 pb-1">
-              <div className="relative">
-                <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-                <SidebarInput
-                  aria-label="Search chats"
-                  className="h-7! rounded-md border-input bg-transparent pr-14 pl-9 text-[0.8rem]! shadow-none placeholder:text-muted-foreground/74 focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search"
-                  ref={searchInputRef}
-                  value={search}
-                />
-                <span className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 rounded-full bg-muted/90 px-2 py-0.5 font-medium text-muted-foreground text-xs leading-none">
-                  {searchShortcut}
-                </span>
-              </div>
-            </div>
-            <SidebarGroup className="px-2 pt-0 pb-1">
-              <SidebarMenu className="gap-1">
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    className={SIDEBAR_MENU_HEADER_CLASS}
-                    onClick={onNewChat}
-                    size="sm"
-                  >
-                    <NewChatIcon className={SIDEBAR_LEADING_GLYPH_CLASS} />
-                    <span className="truncate">New chat</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </SidebarMenu>
-            </SidebarGroup>
-
             <SidebarSegmentedPicker
               activeView={sidebarView}
-              onSelectView={setSidebarView}
+              className="pt-0.5"
+              onSelectView={onSidebarViewChange}
+              views={["chats", "assets", "config"]}
             />
+          </SidebarHeader>
 
+          <SidebarContent className="min-h-0 flex-1 gap-0">
             {sidebarView === "chats" ? (
-              <CollapsibleSidebarSection defaultOpen title="Chats">
-                <SidebarMenu className="gap-0.5">
-                  {chatEmptyLabel && (
-                    <p className="px-2 py-1 text-muted-foreground/58 text-xs">
-                      {chatEmptyLabel}
-                    </p>
-                  )}
-                  {filteredChats.map((t) => (
-                    <ChatListItem
-                      inProgress={runningThreadId === t.id}
-                      isActive={t.id === activeThreadId}
-                      key={t.id}
-                      onArchive={() => void onArchiveThread(t.id)}
-                      onDelete={() => void onDeleteThread(t.id)}
-                      onRename={(title) => void onRenameThread(t.id, title)}
-                      onSelect={() => void selectThread(t.id)}
-                      project={projectHover}
-                      thread={t}
-                      timeLabel={
-                        <RelativeTimeLabel
-                          format={relativeTimeShort}
-                          ms={t.updatedAt}
-                        />
-                      }
+              <>
+                <div className="px-2 pt-1.5 pb-1">
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <SidebarInput
+                      aria-label="Search chats"
+                      className="h-7! rounded-md border-input bg-transparent pr-14 pl-9 text-[0.8rem]! shadow-none placeholder:text-muted-foreground/74 focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder="Search"
+                      ref={searchInputRef}
+                      value={search}
                     />
-                  ))}
-                </SidebarMenu>
-                {filteredArchivedChats.length > 0 && (
-                  <>
-                    <p className="mt-2 mb-1 px-2 text-muted-foreground/58 text-xs">
-                      Archived
-                    </p>
-                    <SidebarMenu className="gap-0.5">
-                      {filteredArchivedChats.map((t) => (
-                        <ChatListItem
-                          archived
-                          isActive={t.id === activeThreadId}
-                          key={t.id}
-                          onArchive={() => void onArchiveThread(t.id)}
-                          onDelete={() => void onDeleteThread(t.id)}
-                          onRename={(title) => void onRenameThread(t.id, title)}
-                          onSelect={() => void selectThread(t.id)}
-                          onUnarchive={() => void onUnarchiveThread(t.id)}
-                          project={projectHover}
-                          thread={t}
-                          timeLabel={
-                            <RelativeTimeLabel
-                              format={relativeTimeShort}
-                              ms={t.updatedAt}
-                            />
-                          }
-                        />
-                      ))}
-                    </SidebarMenu>
-                  </>
-                )}
-              </CollapsibleSidebarSection>
-            ) : (
-              <CollapsibleSidebarSection
-                action={
-                  <ProjectInlineFolderAction
-                    className="opacity-100"
-                    revealGroup="assets"
-                    slug={activeSlug}
-                    target="assets"
-                  />
-                }
-                defaultOpen
-                showFolderIcon
-                title="Assets"
-              >
-                <div className="px-0.5">
-                  <AssetBin
-                    assets={assets}
-                    mediaVersion={mediaVersion}
-                    onAssetsUpdated={onAssetsUpdated}
-                    sampleRate={sampleRate}
-                    slug={activeSlug}
-                  />
-                  <div className="px-1 pt-1.5">
-                    <AnalyzeAssetsButton />
+                    <span className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 rounded-full bg-muted/90 px-2 py-0.5 font-medium text-muted-foreground text-xs leading-none">
+                      {searchShortcut}
+                    </span>
                   </div>
                 </div>
-              </CollapsibleSidebarSection>
+                <SidebarGroup className="px-2 pt-0 pb-1">
+                  <SidebarMenu className="gap-1">
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        className={SIDEBAR_MENU_HEADER_CLASS}
+                        onClick={onNewChat}
+                        size="sm"
+                      >
+                        <NewChatIcon className={SIDEBAR_LEADING_GLYPH_CLASS} />
+                        <span className="truncate">New chat</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  </SidebarMenu>
+                </SidebarGroup>
+                <CollapsibleSidebarSection defaultOpen title="Chats">
+                  <SidebarMenu className="gap-0.5">
+                    {chatEmptyLabel && (
+                      <p className="px-2 py-1 text-muted-foreground/58 text-xs">
+                        {chatEmptyLabel}
+                      </p>
+                    )}
+                    {filteredChats.map((t) => (
+                      <ChatListItem
+                        inProgress={runningThreadId === t.id}
+                        isActive={t.id === activeThreadId}
+                        key={t.id}
+                        onArchive={() => void onArchiveThread(t.id)}
+                        onDelete={() => void onDeleteThread(t.id)}
+                        onRename={(title) => void onRenameThread(t.id, title)}
+                        onSelect={() => void selectThread(t.id)}
+                        project={projectHover}
+                        thread={t}
+                        timeLabel={
+                          <RelativeTimeLabel
+                            format={relativeTimeShort}
+                            ms={t.updatedAt}
+                          />
+                        }
+                      />
+                    ))}
+                  </SidebarMenu>
+                  {filteredArchivedChats.length > 0 && (
+                    <>
+                      <p className="mt-2 mb-1 px-2 text-muted-foreground/58 text-xs">
+                        Archived
+                      </p>
+                      <SidebarMenu className="gap-0.5">
+                        {filteredArchivedChats.map((t) => (
+                          <ChatListItem
+                            archived
+                            isActive={t.id === activeThreadId}
+                            key={t.id}
+                            onArchive={() => void onArchiveThread(t.id)}
+                            onDelete={() => void onDeleteThread(t.id)}
+                            onRename={(title) =>
+                              void onRenameThread(t.id, title)
+                            }
+                            onSelect={() => void selectThread(t.id)}
+                            onUnarchive={() => void onUnarchiveThread(t.id)}
+                            project={projectHover}
+                            thread={t}
+                            timeLabel={
+                              <RelativeTimeLabel
+                                format={relativeTimeShort}
+                                ms={t.updatedAt}
+                              />
+                            }
+                          />
+                        ))}
+                      </SidebarMenu>
+                    </>
+                  )}
+                </CollapsibleSidebarSection>
+              </>
+            ) : sidebarView === "assets" ? (
+              <div className="min-h-0 flex-1 px-1 pt-1.5 pb-1">
+                <CollapsibleSidebarSection
+                  action={
+                    <ProjectInlineFolderAction
+                      className="opacity-100"
+                      revealGroup="assets"
+                      slug={activeSlug}
+                      target="assets"
+                    />
+                  }
+                  defaultOpen
+                  showFolderIcon
+                  title="Assets"
+                >
+                  <div className="px-0.5">
+                    <AssetBin
+                      assets={assets}
+                      mediaVersion={mediaVersion}
+                      onAssetsUpdated={onAssetsUpdated}
+                      sampleRate={sampleRate}
+                      slug={activeSlug}
+                    />
+                    <div className="px-1 pt-1.5">
+                      <AnalyzeAssetsButton />
+                    </div>
+                  </div>
+                </CollapsibleSidebarSection>
+              </div>
+            ) : (
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-1 pt-1.5 pb-1">
+                {configPanel}
+              </div>
             )}
           </SidebarContent>
 
           <SidebarFooter className="border-sidebar-border/60 border-t px-2 py-2">
             <SidebarMenu className="gap-1">
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  className={SIDEBAR_MENU_HEADER_CLASS}
+                  onClick={onToggleColorScheme}
+                  size="sm"
+                >
+                  {colorScheme === "dark" ? (
+                    <Sun className={SIDEBAR_LEADING_GLYPH_CLASS} />
+                  ) : (
+                    <Moon className={SIDEBAR_LEADING_GLYPH_CLASS} />
+                  )}
+                  <span className={SIDEBAR_ROW_LABEL_TEXT_CLASS}>
+                    {colorScheme === "dark" ? "Light mode" : "Dark mode"}
+                  </span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton
                   className={SIDEBAR_MENU_HEADER_CLASS}

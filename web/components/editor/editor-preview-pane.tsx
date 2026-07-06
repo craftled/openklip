@@ -1,6 +1,6 @@
 "use client";
 
-import type { ExportCrop } from "@engine/edl";
+import type { ExportAspect, ExportCrop } from "@engine/edl";
 import { cropObjectPosition } from "@engine/export-aspect";
 import type { SafeAreaPlatform } from "@engine/safe-areas";
 import type { MouseEvent, RefObject } from "react";
@@ -8,6 +8,11 @@ import {
   CutTransitionSweep,
   type CutTransitionSweepHandle,
 } from "@/components/cut-transition-sweep";
+import { EditorPreviewHeader } from "@/components/editor/editor-preview-header";
+import type {
+  ExportDialogOptions,
+  ExportResolution,
+} from "@/components/export-dialog";
 import type { GraphicItem } from "@/components/graphic-overlay";
 import { PlayerControls } from "@/components/player-controls";
 import { PreviewOverlays } from "@/components/preview-overlays";
@@ -26,18 +31,29 @@ export interface EditorPreviewPaneProps {
   captionStyleId?: string;
   captionsOn: boolean;
   curSample: number;
+  cutCount: number;
+  exportAspect: ExportAspect;
+  exportDefaultResolution: ExportResolution;
+  exportDisabled: boolean;
   exporting: boolean;
+  exportLabel: string;
   exportSettingsCrop: ExportCrop;
+  fmtTime: (sec: number) => string;
   graphics: GraphicItem[];
   keptDurationSec: number;
   mediaVersion: number;
+  mobileChatOpen?: boolean;
   musicBedCount: number;
   musicMuted: boolean;
   musicRef: RefObject<HTMLAudioElement | null>;
   onCycleSpeed: () => void;
+  onExport: (options: ExportDialogOptions) => void | Promise<void>;
   onFullscreen: () => void;
+  onOpenChat?: () => void;
+  onOrientationChange: (orientation: Orientation) => void;
   onPlayToggle: () => void | Promise<void>;
   onPreviewClick: (event: MouseEvent<HTMLDivElement>) => void;
+  onSafeAreaGuideChange: (platform: SafeAreaPlatform) => void;
   onSeekFraction: (fraction: number) => void;
   onToggleCaptions: () => void;
   onToggleMusicMute?: () => void;
@@ -55,6 +71,9 @@ export interface EditorPreviewPaneProps {
   safeAreaGuide: SafeAreaPlatform;
   sampleRate: number;
   slug: string;
+  sourceFps: number;
+  sourceHeight: number;
+  sourceWidth: number;
   sweepRef: RefObject<CutTransitionSweepHandle | null>;
   titles: {
     endSample: number;
@@ -76,16 +95,26 @@ export function EditorPreviewPane({
   captionStyleId,
   captionsOn,
   curSample,
+  cutCount,
+  exportAspect,
+  exportDefaultResolution,
+  exportDisabled,
+  exportLabel,
   exportSettingsCrop,
   exporting,
+  fmtTime,
   graphics,
   keptDurationSec,
   mediaVersion,
+  mobileChatOpen,
   musicBedCount,
   musicMuted,
   musicRef,
   onCycleSpeed,
+  onExport,
   onFullscreen,
+  onOpenChat,
+  onOrientationChange,
   onPlayToggle,
   onPreviewClick,
   onSeekFraction,
@@ -93,6 +122,7 @@ export function EditorPreviewPane({
   onToggleMusicMute,
   onToggleMute,
   onTogglePip,
+  onSafeAreaGuideChange,
   orientation,
   outPos,
   pendingSaves,
@@ -105,6 +135,9 @@ export function EditorPreviewPane({
   sampleRate,
   safeAreaGuide,
   slug,
+  sourceFps,
+  sourceHeight,
+  sourceWidth,
   sweepRef,
   titles,
   videoRef,
@@ -112,10 +145,36 @@ export function EditorPreviewPane({
   zoomScale,
 }: EditorPreviewPaneProps) {
   return (
-    <div className="shrink-0 space-y-3 border-border border-b p-4">
-      <div className="mx-auto w-full max-w-2xl">
+    <div className="shrink-0 border-border border-b px-5 pt-5 pb-6">
+      <div className="mx-auto w-full max-w-2xl space-y-1">
+        <EditorPreviewHeader
+          currentSec={outPos}
+          cutCount={cutCount}
+          exportAspect={exportAspect}
+          exportDefaultResolution={exportDefaultResolution}
+          exportDisabled={exportDisabled}
+          exporting={exporting}
+          exportLabel={exportLabel}
+          fmtTime={fmtTime}
+          keptDurationSec={keptDurationSec}
+          mobileChatOpen={mobileChatOpen}
+          onExport={onExport}
+          onOpenChat={onOpenChat}
+          onOrientationChange={onOrientationChange}
+          onSafeAreaGuideChange={onSafeAreaGuideChange}
+          orientation={orientation}
+          pendingSaves={pendingSaves}
+          projectName={slug}
+          safeAreaGuide={safeAreaGuide}
+          sourceFps={sourceFps}
+          sourceHeight={sourceHeight}
+          sourceWidth={sourceWidth}
+        />
         <div
-          className="group/preview relative cursor-pointer overflow-hidden rounded-lg border border-border bg-black"
+          className={cn(
+            "group/preview relative cursor-pointer overflow-hidden bg-black",
+            orientation !== "landscape" && "mx-auto"
+          )}
           onClick={onPreviewClick}
           style={
             orientation === "landscape"

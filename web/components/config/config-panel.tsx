@@ -50,6 +50,7 @@ export interface ConfigPanelProps {
   activeTab: ConfigTabId;
   closeLabel: string;
   edit: ConfigEditTabProps;
+  embedded?: boolean;
   history: ConfigHistoryTabProps;
   inspectorSummary: ConfigInspectorSummary | null;
   look: LookTabPanelProps;
@@ -63,6 +64,7 @@ export function ConfigPanel({
   activeTab,
   closeLabel,
   edit,
+  embedded = false,
   history,
   inspectorSummary,
   look,
@@ -77,21 +79,23 @@ export function ConfigPanel({
       data-config-panel
     >
       <div className="flex w-full flex-col overflow-hidden bg-background">
-        <div className="flex h-10 shrink-0 items-center gap-2 border-border border-b px-3">
-          <div className="min-w-0 flex-1 truncate font-semibold text-[0.98rem] tracking-tight">
-            Config
+        {embedded ? null : (
+          <div className="flex h-10 shrink-0 items-center gap-2 border-border border-b px-3">
+            <div className="min-w-0 flex-1 truncate font-semibold text-[0.98rem] tracking-tight">
+              Config
+            </div>
+            <Button
+              aria-label={closeLabel}
+              className="text-muted-foreground"
+              onClick={onClose}
+              size="icon-sm"
+              title={closeLabel}
+              variant="ghost"
+            >
+              <PanelRight />
+            </Button>
           </div>
-          <Button
-            aria-label={closeLabel}
-            className="text-muted-foreground"
-            onClick={onClose}
-            size="icon-sm"
-            title={closeLabel}
-            variant="ghost"
-          >
-            <PanelRight />
-          </Button>
-        </div>
+        )}
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
           {inspectorSummary ? (
             <ConfigInspectorHeader summary={inspectorSummary} />

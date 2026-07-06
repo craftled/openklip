@@ -5,10 +5,6 @@ import {
   EditorPreviewPane,
   type EditorPreviewPaneProps,
 } from "@/components/editor/editor-preview-pane";
-import {
-  EditorToolbar,
-  type EditorToolbarProps,
-} from "@/components/editor/editor-toolbar";
 import { EditorTranscriptPanel } from "@/components/editor-transcript-panel";
 import { SettingsView } from "@/components/settings/settings-view";
 import { SidebarInset } from "@/components/ui/sidebar";
@@ -30,34 +26,19 @@ export interface EditorColumnSettingsProps {
   onExport1080Change: (value: boolean) => void;
 }
 
-export type EditorColumnToolbarProps = Omit<
-  EditorToolbarProps,
-  "showAgentSidebarTrigger" | "toggleAgentSidebar"
->;
-
 export interface EditorColumnProps {
-  agentSidebar: {
-    isMobile: boolean;
-    open: boolean;
-    toggleSidebar: () => void;
-  };
   preview: EditorPreviewPaneProps;
   settings: EditorColumnSettingsProps;
   settingsOpen: boolean;
-  toolbar: EditorColumnToolbarProps;
   transcript: EditorTranscriptProps;
 }
 
 export function EditorColumn({
-  agentSidebar,
   preview,
   settings,
   settingsOpen,
-  toolbar,
   transcript,
 }: EditorColumnProps) {
-  const showAgentSidebarTrigger = agentSidebar.isMobile || !agentSidebar.open;
-
   return (
     <SidebarInset className="flex min-h-[28rem] min-w-0 flex-col bg-background md:min-h-0">
       {settingsOpen ? (
@@ -70,11 +51,6 @@ export function EditorColumn({
         />
       ) : (
         <div className="flex min-h-0 flex-1 flex-col" data-editor-column>
-          <EditorToolbar
-            {...toolbar}
-            showAgentSidebarTrigger={showAgentSidebarTrigger}
-            toggleAgentSidebar={agentSidebar.toggleSidebar}
-          />
           <div className="flex min-h-0 flex-1 flex-col">
             <EditorPreviewPane {...preview} />
             <div className="flex min-h-0 flex-1 flex-col">
