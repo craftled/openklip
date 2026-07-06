@@ -1,8 +1,8 @@
 "use client";
 
 import type { ActionLogEntry } from "@engine/action-log-entry";
+import dynamic from "next/dynamic";
 import { useCallback, useState } from "react";
-import { TranscriptDiffView } from "@/components/transcript-diff-view";
 import { Button } from "@/components/ui/button";
 import {
   historyEntryShowsTranscriptDiff,
@@ -11,6 +11,19 @@ import {
   resolveHistoryTranscriptDiff,
 } from "@/lib/history-transcript-diff";
 import type { TranscriptDiffWord } from "@/lib/transcript-diff";
+
+const TranscriptDiffView = dynamic(
+  () =>
+    import("@/components/transcript-diff-view").then(
+      (mod) => mod.TranscriptDiffView
+    ),
+  {
+    loading: () => (
+      <p className="text-muted-foreground text-xs">Loading diff view...</p>
+    ),
+    ssr: false,
+  }
+);
 
 export function canShowHistoryTranscriptDiff(
   entry: Pick<ActionLogEntry, "action" | "revisionBefore">,
