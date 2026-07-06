@@ -1,6 +1,6 @@
 "use client";
 
-import type { ComponentProps, ReactNode } from "react";
+import type { ComponentProps } from "react";
 import {
   EditorPreviewPane,
   type EditorPreviewPaneProps,
@@ -11,12 +11,9 @@ import { SidebarInset } from "@/components/ui/sidebar";
 import type { AgentModelId } from "@/lib/agent-preferences";
 import type { SettingsSectionId } from "@/lib/settings-navigation";
 
-export type EditorTranscriptProps = Omit<
-  ComponentProps<typeof EditorTranscriptPanel>,
-  "search"
-> & {
-  search: ReactNode;
-};
+export type EditorTranscriptProps = ComponentProps<
+  typeof EditorTranscriptPanel
+>;
 
 export interface EditorColumnSettingsProps {
   activeSection: SettingsSectionId;
@@ -65,7 +62,6 @@ export function EditorColumn({
                 onSelectRange={transcript.onSelectRange}
                 onTextEdit={transcript.onTextEdit}
                 onViewInHistory={transcript.onViewInHistory}
-                search={transcript.search}
                 selRange={transcript.selRange}
                 showProvenance={transcript.showProvenance}
                 words={transcript.words}

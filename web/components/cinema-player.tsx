@@ -388,6 +388,7 @@ export function CinemaPlayer({
   return (
     <div
       className="fixed inset-0 z-50 flex select-none items-center justify-center bg-black"
+      data-cinema-player
       onPointerMove={showChrome}
       ref={rootRef}
       style={{ cursor: chromeVisible ? "auto" : "none" }}
@@ -477,24 +478,24 @@ export function CinemaPlayer({
       {/* ── Top bar ─────────────────────────────────────────────── */}
       <div
         className={cn(
-          "absolute inset-x-0 top-0 z-30 flex items-center justify-between gap-4 bg-gradient-to-b from-black/55 to-transparent px-5 pt-4 pb-10 transition-opacity duration-200 ease-out",
+          "absolute inset-x-0 top-0 z-30 flex items-center justify-between gap-4 bg-gradient-to-b from-black/58 via-black/20 to-transparent px-5 pt-4 pb-12 transition-opacity duration-200 ease-out",
           chromeVisible ? "opacity-100" : "pointer-events-none opacity-0"
         )}
       >
         <div className="min-w-0 leading-tight">
           {label && (
-            <div className="truncate font-medium text-white/45 text-xs uppercase tracking-wide">
+            <div className="truncate font-medium text-[11px] text-white/45 uppercase tracking-normal">
               {label}
             </div>
           )}
-          <div className="truncate font-medium text-base text-white/90">
+          <div className="truncate font-medium text-[15px] text-white/88 leading-none">
             {projectName}
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
           {onExport && (
             <Button
-              className="h-auto gap-1.5 rounded-full bg-white/10 px-3 py-1.5 font-medium text-sm text-white/90 backdrop-blur-sm fine-hover:hover:bg-white/20 active:scale-[0.97] disabled:cursor-not-allowed"
+              className="h-8 gap-1.5 rounded-full bg-transparent px-2.5 py-0 font-medium text-[13px] text-white/82 fine-hover:hover:bg-white/10 fine-hover:hover:text-white active:scale-[0.97] disabled:cursor-not-allowed [&_svg]:size-4"
               disabled={exportDisabled}
               onClick={onExport}
               type="button"
@@ -506,7 +507,7 @@ export function CinemaPlayer({
           )}
           <Button
             aria-label="Close player"
-            className="size-8 rounded-full text-white/70 fine-hover:hover:bg-white/10 fine-hover:hover:text-white active:scale-[0.97]"
+            className="size-8 rounded-full text-white/62 fine-hover:hover:bg-white/10 fine-hover:hover:text-white active:scale-[0.97] [&_svg]:size-4"
             onClick={onClose}
             size="icon"
             type="button"
@@ -522,7 +523,7 @@ export function CinemaPlayer({
         bufferedFraction={rawDur ? buffered / rawDur : 0}
         captionsOn={caps}
         className={cn(
-          "absolute inset-x-0 bottom-0 z-30 px-5 pb-4 transition-opacity duration-200 ease-out",
+          "absolute inset-x-0 bottom-0 z-30 px-5 pb-5 transition-opacity duration-200 ease-out",
           chromeVisible ? "opacity-100" : "pointer-events-none opacity-0"
         )}
         current={curOutputSec}
