@@ -229,20 +229,25 @@ export function AgentSidebar({
       ) : (
         <>
           <SidebarHeader className="gap-1 border-sidebar-border/60 border-b px-2 pt-1 pb-1.5">
-            <div className="flex h-6 w-full items-center gap-1.5 pr-0.5 pl-2">
+            <div className="flex h-7 w-full items-center gap-2 pr-0.5 pl-2 text-[0.8rem]">
               <div
                 aria-hidden="true"
                 className="flex min-w-0 flex-1 items-center gap-1.5 text-foreground"
               >
                 <span
-                  className="block h-5 w-5 shrink-0 bg-current"
+                  className="block size-4 shrink-0 bg-current"
                   style={{
                     WebkitMask:
                       "url('/openklip.svg') center / contain no-repeat",
                     mask: "url('/openklip.svg') center / contain no-repeat",
                   }}
                 />
-                <span className="truncate font-medium text-[11px] leading-none">
+                <span
+                  className={cn(
+                    "truncate leading-none",
+                    SIDEBAR_ROW_LABEL_TEXT_CLASS
+                  )}
+                >
                   OpenKlip
                 </span>
               </div>

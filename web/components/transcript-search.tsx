@@ -68,7 +68,7 @@ export function TranscriptSearch({
 
   return (
     <div
-      className="flex w-full flex-col gap-2 rounded-md border bg-background/95 p-2 shadow-sm"
+      className="flex w-full flex-col gap-2 rounded-md border bg-background/80 p-1.5 shadow-[0_1px_2px_color-mix(in_oklch,var(--foreground)_6%,transparent)]"
       data-transcript-search
     >
       <div className="flex items-center gap-1.5">
@@ -76,7 +76,7 @@ export function TranscriptSearch({
           <Search className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
             aria-label="Search transcript"
-            className="h-11 pr-12 pl-7 sm:h-8"
+            className="h-10 rounded-md border-transparent bg-muted/30 pr-12 pl-7 font-[450] text-[13px] leading-normal shadow-none transition-colors placeholder:font-[450] hover:bg-muted/45 focus-visible:bg-background sm:h-7"
             onChange={(event) => onQueryChange(event.target.value)}
             onKeyDown={onQueryKeyDown}
             placeholder="Search transcript"
@@ -101,10 +101,18 @@ export function TranscriptSearch({
           value={mode}
           variant="outline"
         >
-          <ToggleGroupItem aria-label="Search kept words" value="kept">
+          <ToggleGroupItem
+            aria-label="Search kept words"
+            className="font-medium text-[13px] leading-normal"
+            value="kept"
+          >
             Kept
           </ToggleGroupItem>
-          <ToggleGroupItem aria-label="Search cut words" value="cut">
+          <ToggleGroupItem
+            aria-label="Search cut words"
+            className="font-medium text-[13px] leading-normal"
+            value="cut"
+          >
             Cut
           </ToggleGroupItem>
         </ToggleGroup>
@@ -117,7 +125,7 @@ export function TranscriptSearch({
               {plural(matches.length, "match", "matches")}
             </Badge>
             {matches.length > 0 ? (
-              <span className="truncate text-muted-foreground text-xs">
+              <span className="truncate font-[450] text-[12px] text-muted-foreground leading-normal">
                 Enter jumps to the next match
               </span>
             ) : null}
@@ -125,7 +133,7 @@ export function TranscriptSearch({
 
           {matches.length === 0 ? (
             <p
-              className="px-1 pb-1 text-muted-foreground text-xs"
+              className="px-1 pb-1 font-[450] text-[12px] text-muted-foreground leading-normal"
               data-transcript-search-empty
             >
               No matches in {mode} words. Matching ignores punctuation and case.
@@ -142,7 +150,7 @@ export function TranscriptSearch({
                 >
                   <button
                     className={cn(
-                      "flex min-w-0 flex-1 items-center gap-2 rounded-sm px-1.5 py-1 text-left text-xs transition-colors hover:bg-muted",
+                      "flex min-w-0 flex-1 items-center gap-2 rounded-sm px-1.5 py-1 text-left font-[450] text-[12px] leading-normal transition-colors hover:bg-muted",
                       index === activeMatchIndex && "bg-accent"
                     )}
                     data-transcript-search-match
@@ -176,7 +184,7 @@ export function TranscriptSearch({
               Cut note
             </label>
             <Input
-              className="h-7 min-w-24 flex-1 text-base md:text-xs"
+              className="h-7 min-w-24 flex-1 font-[450] text-[12px] leading-normal placeholder:font-[450]"
               id="transcript-search-note"
               onChange={(event) => onNoteChange(event.target.value)}
               placeholder="Note (optional)"
@@ -185,6 +193,7 @@ export function TranscriptSearch({
             {mode === "kept" ? (
               <>
                 <Button
+                  className="font-medium text-[13px] leading-normal"
                   data-transcript-search-cut-first
                   disabled={matches.length === 0}
                   onClick={() => onCutMatches(false)}
@@ -196,6 +205,7 @@ export function TranscriptSearch({
                   Cut first ({plural(firstWordCount, "word", "words")})
                 </Button>
                 <Button
+                  className="font-medium text-[13px] leading-normal"
                   data-transcript-search-cut-all
                   disabled={matches.length === 0}
                   onClick={() => onCutMatches(true)}
@@ -210,6 +220,7 @@ export function TranscriptSearch({
             ) : (
               <>
                 <Button
+                  className="font-medium text-[13px] leading-normal"
                   data-transcript-search-restore-first
                   disabled={matches.length === 0}
                   onClick={() => onRestoreMatches(false)}
@@ -221,6 +232,7 @@ export function TranscriptSearch({
                   Restore ({plural(firstWordCount, "word", "words")})
                 </Button>
                 <Button
+                  className="font-medium text-[13px] leading-normal"
                   data-transcript-search-restore-all
                   disabled={matches.length === 0}
                   onClick={() => onRestoreMatches(true)}

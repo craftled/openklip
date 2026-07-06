@@ -29,7 +29,6 @@ import {
   PromptInputTools,
   usePromptInputController,
 } from "@/components/ai-elements/prompt-input";
-import { ProjectFolderButton } from "@/components/project-folder-action";
 import type { TemplateOption } from "@/components/template-select";
 import {
   DropdownMenu,
@@ -229,8 +228,8 @@ function AgentPromptInputInner({
       <div ref={promptRootRef}>
         <PromptInput
           accept="video/*,audio/*,image/*"
-          className="min-w-0 rounded-md"
-          inputGroupClassName="items-stretch overflow-visible"
+          className="min-w-0 rounded-lg"
+          inputGroupClassName="items-stretch overflow-visible border-sidebar-border/70 bg-muted/30 shadow-none focus-within:border-sidebar-border focus-within:ring-0 has-[[data-slot=input-group-control]:focus-visible]:ring-0"
           multiple
           onSubmit={onSubmit}
         >
@@ -250,7 +249,7 @@ function AgentPromptInputInner({
               <PromptInputTextarea
                 aria-controls={slashMenu.menuOpen ? skillsMenuId : undefined}
                 aria-expanded={slashMenu.menuOpen}
-                className="w-full text-left placeholder:text-left"
+                className="w-full text-left font-[450] text-[13px] leading-normal placeholder:text-left placeholder:font-[450]"
                 disabled={isRunning || chatsLoading || uploadingAssets}
                 onKeyDown={slashMenu.handleInputKeyDown}
                 placeholder={`Ask about ${activeSlug}… or type / for skills`}
@@ -277,10 +276,6 @@ function AgentPromptInputInner({
                 }}
                 ref={uploadInputRef}
                 type="file"
-              />
-              <ProjectFolderButton
-                className="min-w-0 max-w-[5.5rem] shrink"
-                slug={slug}
               />
               <DropdownMenu
                 onOpenChange={setSkillsOpen}
@@ -320,7 +315,7 @@ function AgentPromptInputInner({
                 value={agent}
               >
                 <PromptInputSelectTrigger
-                  className="min-w-0 max-w-[8.5rem]"
+                  className="min-w-0 max-w-[8.5rem] font-medium text-[13px] leading-normal"
                   size="sm"
                 >
                   <AgentModelTriggerValue value={agent} />

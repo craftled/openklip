@@ -44,7 +44,7 @@ export function ChatMarkdown({ children }: ChatMarkdownProps) {
           }
           return (
             <pre
-              className="overflow-x-auto rounded-md bg-background/70 p-2 font-mono text-xs"
+              className="overflow-x-auto rounded-md bg-muted/30 p-2 font-mono text-[12px]"
               key={index}
             >
               <code>{block.code}</code>
@@ -140,7 +140,7 @@ function renderInline(tokens: ChatMarkdownInline[]): ReactNode {
     if (token.kind === "code") {
       return (
         <code
-          className="rounded bg-background/70 px-1 py-0.5 font-mono text-[0.9em]"
+          className="rounded bg-muted/35 px-1 py-0.5 font-mono text-[0.9em]"
           key={index}
         >
           {token.text}
