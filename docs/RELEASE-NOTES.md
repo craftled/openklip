@@ -2,7 +2,7 @@
 
 Use these bodies when publishing releases. Each section matches a tag in `CHANGELOG.md` without duplicating the full changelog. **Known gaps:** always link to [TODO.md](../TODO.md#known-limitations); do not duplicate the list here.
 
-Publishing status checked on 2026-07-06: `v0.41.1.0` merged to `main` at `cea7939` (PR #78). GitHub release tag `v0.41.1.0` pending publish (`gh release create`).
+Publishing status checked on 2026-07-06: GitHub releases published through `v0.41.1.0` (`gh release view v0.41.1.0`). `v0.41.1.0` merged to `main` at `cea7939` (PR #78).
 
 ---
 
