@@ -6,7 +6,7 @@ import { useAgentChat } from "@/components/agent-chat-context";
 import { toastPromise } from "@/lib/app-toast";
 import { Check } from "@/lib/icon";
 import { verifyPromiseMessages } from "@/lib/toast-notifications";
-import { verifyProjectCut } from "../../app/agent-actions.ts";
+import { fetchVerifyCut } from "@/lib/verify-client";
 
 // The verify loop, one click: re-transcribe the rendered cut (output/out.mp4)
 // and check it against the EDL. Uses the local Whisper path, so it is not gated
@@ -21,13 +21,7 @@ export function VerifyCutButton({ className }: { className?: string }) {
     }
     setVerifying(true);
     try {
-      const run = (async () => {
-        const res = await verifyProjectCut(activeSlug);
-        if (!res.ok) {
-          throw new Error(res.error);
-        }
-        return res;
-      })();
+      const run = fetchVerifyCut(activeSlug);
       void toastPromise(run, verifyPromiseMessages());
       await run;
     } catch {

@@ -53,6 +53,130 @@ test("compileTimeline lists overlays in paint order (zoom, broll, title)", () =>
   }
 });
 
+test("compileTimeline exposes Composition IR clips, resources, and layers for all edit kinds", () => {
+  const project = makeProject({
+    assets: [
+      {
+        id: "broll-a",
+        kind: "broll",
+        name: "b-roll.mp4",
+        src: "/tmp/b-roll.mp4",
+        proxy: "working/assets/broll-a.mp4",
+        durationSamples: sec(30),
+      },
+      {
+        id: "music-a",
+        kind: "music",
+        name: "bed.mp3",
+        src: "/tmp/bed.mp3",
+        proxy: "working/assets/music-a.aac",
+        durationSamples: sec(30),
+      },
+    ],
+    zooms: [
+      { id: "z1", startSample: 0, endSample: sec(1), scale: 1.2, rampSec: 0.4 },
+    ],
+    broll: [
+      {
+        id: "b1",
+        assetId: "broll-a",
+        startSample: 0,
+        endSample: sec(1),
+        srcInSample: 0,
+      },
+    ],
+    music: [
+      {
+        id: "m1",
+        assetId: "music-a",
+        startSample: 0,
+        endSample: sec(2),
+        srcInSample: 0,
+        gain: 0.5,
+        fadeInSec: 0,
+        fadeOutSec: 0,
+        mode: "loop",
+      },
+    ],
+    graphics: [
+      {
+        id: "g1",
+        template: "motion-typewriter",
+        params: { text: "Go" },
+        startSample: 0,
+        endSample: sec(1),
+        track: "title",
+      },
+      {
+        id: "jg1",
+        type: "json-render",
+        template: "product-announcement",
+        catalog: "product-announcement",
+        spec: {
+          root: "scene",
+          elements: {
+            scene: {
+              type: "AnnouncementScene",
+              props: {
+                accent: "#00aaff",
+                product: "OpenKlip",
+                claim: "Fast edits",
+                mood: "technical",
+              },
+              children: ["hero"],
+              visible: true,
+            },
+            hero: {
+              type: "HeroStatement",
+              props: { eyebrow: "New", headline: "Fast edits" },
+              children: [],
+              visible: true,
+            },
+          },
+        },
+        params: {},
+        startSample: 0,
+        endSample: sec(1),
+        track: "title",
+      },
+    ],
+    titles: [
+      {
+        id: "t1",
+        text: "Hi",
+        startSample: 0,
+        endSample: sec(1),
+        position: "lower",
+      },
+    ],
+  });
+
+  const tl = compileTimeline(project);
+  assert.equal(tl.composition.sourceOfTruth, "project.json");
+  assert.deepEqual(
+    tl.composition.clips.map((clip) => clip.kind),
+    ["caption", "zoom", "broll", "title", "graphic", "json-render", "music"]
+  );
+  assert.deepEqual(
+    tl.composition.layers.map((layer) => layer.kind),
+    ["caption", "zoom", "broll", "title", "music"]
+  );
+  assert.deepEqual(
+    tl.composition.resources.map((resource) => resource.id),
+    ["asset:broll-a", "asset:music-a", "graphic:g1", "json-render:jg1"]
+  );
+  assert.deepEqual(
+    tl.composition.clips.map((clip) => clip.output.startSec),
+    [0, 0, 0, 0, 0, 0, 0]
+  );
+  assert.deepEqual(
+    tl.composition.clips
+      .filter((clip) => clip.layer === "title")
+      .map((clip) => clip.z),
+    [3, 4, 5]
+  );
+});
+
 test("compileTimeline omits caption groups when captions are disabled", () => {
   const tl = compileTimeline(
     makeProject({ captions: { enabled: false, maxWords: 6 } })
