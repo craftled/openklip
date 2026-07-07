@@ -28,7 +28,6 @@ export type {
 
 import {
   AlertDialog,
-  AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
   AlertDialogFooter,
@@ -370,6 +369,7 @@ export function ExportDialog({
       })
     );
   };
+  const handleCancel = () => setOpen(false);
 
   return (
     <AlertDialog onOpenChange={setOpen} open={open}>
@@ -377,7 +377,7 @@ export function ExportDialog({
         disabled={disabled}
         render={children as ReactElement}
       />
-      <AlertDialogContent className="gap-5 sm:max-w-2xl">
+      <AlertDialogContent className="max-h-[calc(100dvh-2rem)] grid-rows-[auto_minmax(0,1fr)_auto] gap-5 overflow-hidden sm:max-w-2xl">
         <AlertDialogHeader className="text-left">
           <AlertDialogTitle>Export video</AlertDialogTitle>
           <AlertDialogDescription>
@@ -386,24 +386,26 @@ export function ExportDialog({
           </AlertDialogDescription>
         </AlertDialogHeader>
 
-        <ExportOptionsForm
-          compression={compression}
-          destination={destination}
-          dims={dims}
-          format={format}
-          frameRate={frameRate}
-          gifMaxWidth={gifMaxWidth}
-          onCompressionChange={setCompression}
-          onDestinationChange={setDestination}
-          onFormatChange={setFormat}
-          onFrameRateChange={setFrameRate}
-          onGifMaxWidthChange={setGifMaxWidth}
-          onPlatformChange={handlePlatformChange}
-          onResolutionChange={setResolution}
-          platform={platform}
-          resolution={resolution}
-          sourceFps={sourceFps}
-        />
+        <div className="-mx-1 min-h-0 overflow-y-auto px-1">
+          <ExportOptionsForm
+            compression={compression}
+            destination={destination}
+            dims={dims}
+            format={format}
+            frameRate={frameRate}
+            gifMaxWidth={gifMaxWidth}
+            onCompressionChange={setCompression}
+            onDestinationChange={setDestination}
+            onFormatChange={setFormat}
+            onFrameRateChange={setFrameRate}
+            onGifMaxWidthChange={setGifMaxWidth}
+            onPlatformChange={handlePlatformChange}
+            onResolutionChange={setResolution}
+            platform={platform}
+            resolution={resolution}
+            sourceFps={sourceFps}
+          />
+        </div>
 
         <AlertDialogFooter className="items-end gap-3 sm:justify-between">
           <p className="text-muted-foreground text-xs sm:max-w-[55%] sm:text-left">
@@ -413,7 +415,9 @@ export function ExportDialog({
             {estimate.note ? ` ${estimate.note}` : ""}
           </p>
           <div className="flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row">
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <Button onClick={handleCancel} type="button" variant="outline">
+              Cancel
+            </Button>
             <Button className={cn("gap-2")} onClick={handleExport}>
               <Download data-icon="inline-start" />
               Export to file…

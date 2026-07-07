@@ -3,7 +3,13 @@
 import type { ExportAspect, ExportCrop } from "@engine/edl";
 import { cropObjectPosition } from "@engine/export-aspect";
 import type { SafeAreaPlatform } from "@engine/safe-areas";
-import type { ComponentProps, MouseEvent, RefObject } from "react";
+import {
+  type ComponentProps,
+  type MouseEvent,
+  type RefObject,
+  useEffect,
+  useState,
+} from "react";
 import {
   CutTransitionSweep,
   type CutTransitionSweepHandle,
@@ -150,6 +156,12 @@ export function EditorPreviewPane({
   vignetteOn,
   zoomScale,
 }: EditorPreviewPaneProps) {
+  const [previewMediaFailed, setPreviewMediaFailed] = useState(false);
+
+  useEffect(() => {
+    setPreviewMediaFailed(false);
+  }, [mediaVersion, slug]);
+
   return (
     <div className="shrink-0 px-5 pt-5 pb-6">
       <div className="mx-auto w-full max-w-2xl space-y-1">
@@ -202,6 +214,8 @@ export function EditorPreviewPane({
                 ? "absolute inset-y-0 left-0 z-0 h-full w-1/2"
                 : "h-full w-full"
             )}
+            onError={() => setPreviewMediaFailed(true)}
+            onLoadedData={() => setPreviewMediaFailed(false)}
             playsInline
             ref={videoRef}
             src={`/media/proxy.mp4?v=${mediaVersion}`}
@@ -256,6 +270,15 @@ export function EditorPreviewPane({
           <PreviewTransitionNotice
             message={previewTransitionNoticeText ?? null}
           />
+          {previewMediaFailed ? (
+            <div
+              className="pointer-events-none absolute inset-0 z-20 grid place-items-center bg-black/70 p-4 text-center font-medium text-white text-xs"
+              role="alert"
+            >
+              Preview media could not be decoded. Rebuild or re-ingest this
+              project.
+            </div>
+          ) : null}
           <CutTransitionSweep ref={sweepRef} />
           {exporting || pendingSaves > 0 ? (
             <div className="pointer-events-none absolute top-2 right-2 z-20 flex items-center gap-1.5 rounded-md bg-black/70 px-2 py-1 font-medium text-white text-xs backdrop-blur">
