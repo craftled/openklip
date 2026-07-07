@@ -1,6 +1,6 @@
 # External Inspiration : Steal List
 
-Discussion doc. Consolidates patterns worth borrowing from [Videofy Minimal](https://github.com/schibsted/videofy_minimal) and [HyperFrames](https://github.com/heygen-com/hyperframes), scoped to OpenKlip's thesis: **local-first, agent-native, edit video by editing text** (`project.json` EDL, native preview, ffmpeg export).
+Discussion doc. Consolidates patterns worth borrowing from [Videofy Minimal](https://github.com/schibsted/videofy_minimal), [HyperFrames](https://github.com/heygen-com/hyperframes), and the Diffusion Studio public repos, scoped to OpenKlip's thesis: **local-first, agent-native, edit video by editing text** (`project.json` EDL, native preview, ffmpeg export).
 
 **Not a roadmap commitment.** Each item has a recommendation tier and open questions for discussion.
 
@@ -12,10 +12,39 @@ Discussion doc. Consolidates patterns worth borrowing from [Videofy Minimal](htt
 |--------|--------------------------|---------|
 | **Videofy Minimal** | Same local-first files-on-disk philosophy; opposite edit model (article → TTS → Remotion segments) | Steal **engineering hygiene** and **CMS UX patterns** |
 | **HyperFrames** | Same talking-head + Whisper + agent angle; explicitly **no NLE editing** (footage plays untouched) | Steal **agent workflow** and **optional post-export packaging**; do **not** replace core stack |
+| **Diffusion Studio repos** | Same browser-NLE ambition; different source-of-truth and render thesis | Steal **verification, frame browsing, render-worker discipline, examples/docs, and motion-asset contracts**; do **not** adopt Core as the engine |
 
-**Do not adopt:** Remotion/Videofy render pipeline, HyperFrames headless-Chrome export as primary path, article fetchers, TTS generation, segment-as-EDL editing.
+**Do not adopt:** Remotion/Videofy render pipeline, HyperFrames headless-Chrome export as primary path, article fetchers, TTS generation, segment-as-EDL editing, `@diffusionstudio/core` as playback/export engine, Diffusion Studio Pro branding/assets/UI copy.
 
 **Keep:** `project.json` as single canonical edit, `CutScheduler` + all-intra proxy, ffmpeg `filter_complex` export, CLI/GUI parity.
+
+Any richer timeline or composition shape inspired by outside systems must remain a derived, never-persisted view. It can help the UI, verifier, or exporter reason about layers and resources, but it must not become a second source of truth beside `project.json`.
+
+## Source Reuse and License Guardrail
+
+OpenKlip may learn from external systems, but source reuse must stay boring and auditable.
+
+**Rule:** only copy or adapt source from MIT-licensed Diffusion repos, and preserve required copyright/license notices. Otherwise use concepts only and implement OpenKlip-native code.
+
+| Diffusion source | License/readme finding | OpenKlip reuse policy |
+| --- | --- | --- |
+| `diffusionstudio/agent` | MIT license file | OK to adapt with notice. |
+| `diffusionstudio/browserkit` | MIT license file | OK to adapt with notice. |
+| `diffusionstudio/examples` | MIT license file | OK to adapt example patterns with notice; do not inherit Core runtime use accidentally. |
+| `diffusionstudio/webcodecs-scroll-sync` | MIT license file | OK to adapt with notice; best source for a WebCodecs frame-browser spike. |
+| `diffusionstudio/lottie` | MIT license file | OK to adapt with notice; best source for a Lottie graphic-template POC. |
+| `diffusionstudio/slug-webgpu` | MIT license file, but package metadata says ISC | Concepts only until the metadata mismatch is deliberately resolved. |
+| `diffusionstudio/core` / `@diffusionstudio/core` | MPL-2.0 repo; README describes watermark/license-key terms for rendered videos | Do not copy, vendor, or depend on it for OpenKlip. Use only generic architecture vocabulary. |
+| `diffusionstudio/core-docs` | No license file found in repo clone | Read and link only. Do not copy docs text/code. |
+| Diffusion Studio Pro site/app | Product/service, not source | Ideas only. Do not copy branding, assets, UI text, or visual design. |
+
+This rule applies to the current Diffusion follow-up work:
+
+- CRAFT-6042, export verification dashboard: build OpenKlip-native.
+- CRAFT-6043, rich/json graphic render concurrency cap: build OpenKlip-native.
+- CRAFT-6044, WebCodecs frame browser: may adapt `webcodecs-scroll-sync` with notice.
+- CRAFT-6045, Composition IR: use concepts only; no Core code or dependency.
+- CRAFT-6046, Lottie graphic-template POC: may adapt `lottie` with notice.
 
 ---
 

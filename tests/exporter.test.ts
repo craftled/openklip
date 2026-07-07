@@ -36,6 +36,7 @@ import {
   chooseAssetInput,
   chooseSourceInput,
   clampGifDimensions,
+  DEFAULT_GRAPHIC_RENDER_CONCURRENCY,
   type ExportCompression,
   encoderArgsFor,
   exportCut,
@@ -45,12 +46,14 @@ import {
   GIF_MAX_WIDTH_OVERRIDE_CEILING_PX,
   GIF_MAX_WIDTH_PX,
   graphicWindowDurationSamples,
+  MAX_GRAPHIC_RENDER_CONCURRENCY,
   type MusicFilterGraph,
   parseExportFpsFlag,
   parseExportLoudnessFlag,
   planBrollForRanges,
   planGraphicWindow,
   planMusicWindows,
+  resolveGraphicRenderConcurrency,
   resolveOutputFps,
   shouldUseSeamedVoice,
   voiceAffixes,
@@ -115,6 +118,30 @@ test("chooseSourceInput gives an actionable error when no video input exists", (
       /No source or proxy/
     );
   });
+});
+
+test("resolveGraphicRenderConcurrency defaults to serial rich renders", () => {
+  assert.equal(
+    resolveGraphicRenderConcurrency(undefined),
+    DEFAULT_GRAPHIC_RENDER_CONCURRENCY
+  );
+});
+
+test("resolveGraphicRenderConcurrency accepts bounded integer overrides", () => {
+  assert.equal(resolveGraphicRenderConcurrency("2"), 2);
+  assert.equal(
+    resolveGraphicRenderConcurrency(String(MAX_GRAPHIC_RENDER_CONCURRENCY)),
+    MAX_GRAPHIC_RENDER_CONCURRENCY
+  );
+});
+
+test("resolveGraphicRenderConcurrency rejects invalid overrides", () => {
+  for (const raw of ["", "0", "-1", "1.5", "abc", "9"]) {
+    assert.throws(
+      () => resolveGraphicRenderConcurrency(raw),
+      /OPENKLIP_GRAPHIC_RENDER_CONCURRENCY/
+    );
+  }
 });
 
 test("assertJsonRenderGraphicsExportable throws before export when spec is invalid", () => {

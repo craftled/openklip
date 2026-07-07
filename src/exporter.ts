@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, rename, unlink } from "node:fs/promises";
 import { dirname, isAbsolute, join } from "node:path";
+import { mapWithConcurrency } from "./async-pool.ts";
 import { loadAudioAnalysis } from "./audio-analysis.ts";
 import {
   type BrollAudioFilterGraph,
@@ -122,6 +123,30 @@ export {
   GIF_MAX_WIDTH_OVERRIDE_CEILING_PX,
   GIF_MAX_WIDTH_PX,
 } from "./gif-export.ts";
+
+export const DEFAULT_GRAPHIC_RENDER_CONCURRENCY = 1;
+export const MAX_GRAPHIC_RENDER_CONCURRENCY = 8;
+
+export function resolveGraphicRenderConcurrency(
+  raw = process.env.OPENKLIP_GRAPHIC_RENDER_CONCURRENCY
+): number {
+  if (raw === undefined) {
+    return DEFAULT_GRAPHIC_RENDER_CONCURRENCY;
+  }
+  const value = raw.trim();
+  const n = Number(value);
+  if (
+    value.length === 0 ||
+    !Number.isInteger(n) ||
+    n < 1 ||
+    n > MAX_GRAPHIC_RENDER_CONCURRENCY
+  ) {
+    throw new Error(
+      `OPENKLIP_GRAPHIC_RENDER_CONCURRENCY must be an integer between 1 and ${MAX_GRAPHIC_RENDER_CONCURRENCY}`
+    );
+  }
+  return n;
+}
 
 export interface ExportOptions {
   /** Output aspect for this export; defaults to project.export then platform. */
@@ -1199,26 +1224,26 @@ export async function exportCut(
   // `1 + plans.length + stillPlans.length + j` math MUST match the flatMap append
   // order in the inputs array. This is the single most likely off-by-one bug, so the
   // index math and the append order live together.
-  const richRendered = await Promise.all(
-    graphicsPlanned
-      .filter((x) => x.manifest.kind === "rich")
-      .map(async (x) => {
-        const asset = await renderGraphicOverlay({
-          manifest: x.manifest,
-          id: x.graphic.id,
-          template: x.graphic.template,
-          slug: project.slug,
-          compositionHtml: x.compositionHtml,
-          params: x.params,
-          keyframes: x.graphic.keyframes,
-          durationSamples: x.durationSamples,
-          fps: outFps,
-          width: outW,
-          height: outH,
-          outDir: p.working,
-        });
-        return { ...x, asset };
-      })
+  const richRendered = await mapWithConcurrency(
+    graphicsPlanned.filter((x) => x.manifest.kind === "rich"),
+    resolveGraphicRenderConcurrency(),
+    async (x) => {
+      const asset = await renderGraphicOverlay({
+        manifest: x.manifest,
+        id: x.graphic.id,
+        template: x.graphic.template,
+        slug: project.slug,
+        compositionHtml: x.compositionHtml,
+        params: x.params,
+        keyframes: x.graphic.keyframes,
+        durationSamples: x.durationSamples,
+        fps: outFps,
+        width: outW,
+        height: outH,
+        outDir: p.working,
+      });
+      return { ...x, asset };
+    }
   );
   const richGraphics = richRendered.map((x, j) => ({
     ...x,
