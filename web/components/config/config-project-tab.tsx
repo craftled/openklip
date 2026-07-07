@@ -16,6 +16,7 @@ import {
 import { BriefEditor } from "@/components/brief-editor";
 import { CleanupPanel } from "@/components/cleanup-panel";
 import { Section } from "@/components/config/config-section";
+import { FrameBrowser } from "@/components/frame-browser";
 import {
   GraphicSectionControls,
   type GraphicSpanMode,
@@ -142,6 +143,9 @@ export function ConfigProjectTab({
     <>
       <Section title="Brief">
         <BriefEditor initialBrief={brief} onSave={onSaveBrief} slug={slug} />
+      </Section>
+      <Section title="Frames">
+        <FrameBrowser slug={slug} />
       </Section>
       <Section title="Cleanup">
         <CleanupPanel

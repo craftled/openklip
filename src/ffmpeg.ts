@@ -1,4 +1,6 @@
+import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
+import { join } from "node:path";
 
 const require = createRequire(import.meta.url);
 
@@ -10,11 +12,26 @@ function optionalRequire<T>(id: string): T | null {
   }
 }
 
+function localBinary(...parts: string[]): string | null {
+  const fp = join(process.cwd(), "node_modules", ...parts);
+  return existsSync(fp) ? fp : null;
+}
+
 export const FFMPEG =
-  optionalRequire<string>("ffmpeg-static") ?? process.env.FFMPEG ?? "ffmpeg";
+  optionalRequire<string>("ffmpeg-static") ??
+  process.env.FFMPEG ??
+  localBinary("ffmpeg-static", "ffmpeg") ??
+  "ffmpeg";
 export const FFPROBE =
   optionalRequire<{ path?: string }>("ffprobe-static")?.path ??
   process.env.FFPROBE ??
+  localBinary(
+    "ffprobe-static",
+    "bin",
+    process.platform,
+    process.arch,
+    "ffprobe"
+  ) ??
   "ffprobe";
 
 export async function run(
