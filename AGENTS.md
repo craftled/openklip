@@ -567,6 +567,7 @@ Durable, non-obvious notes for cloud agents. The startup update script already r
 - `ffmpeg`/`ffprobe` come from the npm deps `ffmpeg-static`/`ffprobe-static` (no system install needed); `openklip doctor` verifies them.
 - The first `openklip ingest` downloads the Whisper model `Xenova/whisper-base.en` from Hugging Face (one-time network fetch), then caches it. Ingesting a clip with no real speech yields a near-empty transcript, and `openklip verify` will report "drift"; that is expected content behavior, not an environment failure.
 
-### Known test flake (not environment-related)
+### Bun module mocks leak across files (mock.restore does not undo mock.module)
 
-- `bun test` reports 6 failing `syncAssetsFromFolder` tests in the full run, but they pass when the file is run in isolation (`bun test tests/asset-scanner.test.ts`). Cause: `tests/project-data.test.ts` calls `mock.module("@engine/asset-scanner", ...)` with a throwing stub, and Bun's global module mock leaks into `tests/asset-scanner.test.ts` when both run together. This is a pre-existing test-isolation bug, independent of node/bun/ffmpeg versions.
+- `mock.restore()` does NOT revert a `mock.module(...)` registration in Bun: the replacement is process-global and persists into later test files. If you stub a module with `mock.module`, reinstall the real exports afterward (capture them at load time and re-register in a `finally`/`afterAll`), or an unrelated file that imports the real module will fail. See the pattern in `tests/project-data.test.ts` (the throwing-`asset-scanner` test) that keeps `tests/asset-scanner.test.ts` green in the full `bun test` run.
+- Because `@engine/*` maps to `./src/*` (`tsconfig.json`), `@engine/foo` and `../src/foo.ts` are the same module for mock-matching purposes.

@@ -1,5 +1,6 @@
 import { describe, expect, mock, test } from "bun:test";
 import { statSync } from "node:fs";
+import * as assetScannerModule from "@engine/asset-scanner";
 import { loadEditorProject } from "../app/lib/project-data.ts";
 import { saveBrief } from "../src/brief.ts";
 import { projectPaths } from "../src/paths.ts";
@@ -9,6 +10,12 @@ import {
   withTempProjectsRoot,
   writeFixtureProject,
 } from "./helpers/projectFixture.ts";
+
+// Capture the real exports at load time so we can reinstall them after the
+// throwing-mock test below. Bun's mock.restore() does not undo mock.module(),
+// so without this the stub leaks into other test files that use the real
+// asset-scanner (e.g. asset-scanner.test.ts).
+const realAssetScannerExports = { ...assetScannerModule };
 
 describe("loadEditorProject", () => {
   test("returns project with mediaVersion from proxy mtime", async () => {
@@ -128,15 +135,20 @@ describe("loadEditorProject", () => {
     await withTempProjectsRoot(async ({ slug }) => {
       writeFixtureProject(slug, makeProject({ slug, assets: [] }));
       mock.module("@engine/asset-scanner", () => ({
+        ...realAssetScannerExports,
         syncAssetsFromFolder: () => {
           throw new Error("ffmpeg proxy build failed");
         },
       }));
 
-      const loaded = await loadEditorProject(slug);
-      expect(loaded.slug).toBe(slug);
-
-      mock.restore();
+      try {
+        const loaded = await loadEditorProject(slug);
+        expect(loaded.slug).toBe(slug);
+      } finally {
+        // mock.restore() does not revert mock.module(), so reinstall the real
+        // module to prevent the throwing stub from leaking across test files.
+        mock.module("@engine/asset-scanner", () => realAssetScannerExports);
+      }
     });
   });
 });
