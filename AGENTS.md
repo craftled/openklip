@@ -540,3 +540,33 @@ Biome's linter will catch most issues automatically. Focus your attention on:
 7. **No em dashes** - Do not use U+2014 in docs, UI copy, or release notes
 
 Run `bun x ultracite fix` before committing to ensure compliance.
+
+---
+
+## Cursor Cloud specific instructions
+
+Durable, non-obvious notes for cloud agents. The startup update script already runs `bun install`. Standard commands live in `package.json` scripts (`dev`, `build`, `start`, `serve`, `test`, `typecheck`, `check`, `ci`) and are documented above; only the caveats below are worth remembering.
+
+### Runtime (node 24 must beat the default node)
+
+- The VM ships an older `node` at `/exec-daemon/node` (v22) that sits ahead of nvm on `PATH`. OpenKlip needs `node >= 24`. A fresh login shell fixes this: `~/.bashrc` prepends the nvm node 24 bin dir so `node --version` reports v24 in new shells.
+- `bun` (>= 1.3.14, matches `packageManager`) is installed at `~/.bun/bin` and is on `PATH` via `~/.bashrc`.
+- If `node --version` ever shows v22 in a reused shell session, prepend node 24 yourself: `export PATH="$(dirname "$(nvm which 24)"):$PATH"`. This matters because the Whisper transcription subprocess is spawned as a bare `node` (`src/ingest.ts`, `src/verify.ts`), so ingest/verify pick up whatever `node` is first on `PATH`.
+
+### Projects root
+
+- On Linux the default projects dir (`~/Movies/OpenKlip`) does not exist. Set `OPENKLIP_PROJECTS_ROOT` to a writable path (e.g. `~/openklip-projects`) for any CLI command or the dev/serve server. See `README.md` "The file model" for resolution order.
+
+### Running the web GUI
+
+- `bun run dev` serves the Next.js editor on port 4399. Start it with `OPENKLIP_PROJECTS_ROOT` exported in its environment. Open a project editor directly at `http://localhost:4399/<slug>`; the `/home` landing page can render only the logo until a project exists, so prefer opening `/<slug>`.
+- Export from the browser writes to `<projectsRoot>/<slug>/output/out.mp4`, the same path the CLI `export` uses (CLI and GUI share `project.json`).
+
+### Media pipeline / first ingest
+
+- `ffmpeg`/`ffprobe` come from the npm deps `ffmpeg-static`/`ffprobe-static` (no system install needed); `openklip doctor` verifies them.
+- The first `openklip ingest` downloads the Whisper model `Xenova/whisper-base.en` from Hugging Face (one-time network fetch), then caches it. Ingesting a clip with no real speech yields a near-empty transcript, and `openklip verify` will report "drift"; that is expected content behavior, not an environment failure.
+
+### Known test flake (not environment-related)
+
+- `bun test` reports 6 failing `syncAssetsFromFolder` tests in the full run, but they pass when the file is run in isolation (`bun test tests/asset-scanner.test.ts`). Cause: `tests/project-data.test.ts` calls `mock.module("@engine/asset-scanner", ...)` with a throwing stub, and Bun's global module mock leaks into `tests/asset-scanner.test.ts` when both run together. This is a pre-existing test-isolation bug, independent of node/bun/ffmpeg versions.
