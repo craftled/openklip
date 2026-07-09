@@ -335,6 +335,45 @@
   html {
     @apply font-sans;
   }
+  button:not(:disabled):not([aria-disabled="true"]),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="tab"]:not([aria-disabled="true"]),
+  [role="menuitem"]:not([aria-disabled="true"]),
+  [role="option"]:not([aria-disabled="true"]),
+  [role="radio"]:not([aria-disabled="true"]),
+  [role="checkbox"]:not([aria-disabled="true"]),
+  [role="switch"]:not([aria-disabled="true"]),
+  [role="link"],
+  label[for],
+  summary,
+  a[href],
+  select:not(:disabled),
+  input[type="button"]:not(:disabled),
+  input[type="submit"]:not(:disabled),
+  input[type="reset"]:not(:disabled),
+  input[type="checkbox"]:not(:disabled),
+  input[type="radio"]:not(:disabled),
+  input[type="file"]:not(:disabled),
+  input[type="range"]:not(:disabled),
+  [data-slot="drawer-trigger"],
+  [data-slot="dialog-trigger"],
+  [data-slot="sheet-trigger"],
+  [data-slot="alert-dialog-trigger"],
+  [data-slot="collapsible-trigger"] {
+    cursor: pointer;
+  }
+  button:disabled,
+  select:disabled,
+  input:disabled,
+  [aria-disabled="true"] {
+    cursor: not-allowed;
+  }
+  input:not([type="button"]):not([type="submit"]):not([type="reset"]):not(
+      [type="checkbox"]
+    ):not([type="radio"]):not([type="file"]):not([type="range"]),
+  textarea {
+    cursor: text;
+  }
   .maplibregl-popup-content {
     @apply bg-transparent! shadow-none! p-0! rounded-none!;
   }

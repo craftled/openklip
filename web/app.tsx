@@ -6,7 +6,12 @@ import type {
   Project as EngineProject,
   Filter,
 } from "@engine/edl";
-import { ExportSettingsSchema, effectiveRanges } from "@engine/edl";
+import {
+  AudioSchema,
+  CutSnapSchema,
+  ExportSettingsSchema,
+  effectiveRanges,
+} from "@engine/edl";
 import {
   exportAspectToOrientation,
   shouldApplyReframe,
@@ -606,6 +611,29 @@ export function App({
     ]
   );
 
+  const previewAudio = useMemo(
+    () => ({
+      applying: pendingSaves > 0,
+      audio: project.audio ?? AudioSchema.parse(undefined),
+      measure: audioMeasure,
+      measuring: audioMeasuring,
+      onMeasure: measureAudioLoudness,
+      onPatchAudio: patchAudio,
+      onPatchSnap: patchSnap,
+      snap: project.cuts?.snap ?? CutSnapSchema.parse(undefined),
+    }),
+    [
+      audioMeasure,
+      audioMeasuring,
+      measureAudioLoudness,
+      patchAudio,
+      patchSnap,
+      pendingSaves,
+      project.audio,
+      project.cuts?.snap,
+    ]
+  );
+
   const configPanel = useEditorConfigPanel({
     activeTab: configTab,
     applyingVision,
@@ -860,6 +888,7 @@ export function App({
                   onToggleMusicMute: toggleMusicMute,
                   onToggleMute: togglePreviewMute,
                   onTogglePip: togglePreviewPip,
+                  onToggleVignette: () => toggleVignette(!vignetteOn),
                   onSafeAreaGuideChange,
                   orientation,
                   outPos,
@@ -877,6 +906,7 @@ export function App({
                   sourceHeight: project.height,
                   sourceWidth: project.width,
                   sweepRef,
+                  audio: previewAudio,
                   timeline: previewTimeline,
                   titles: project.titles ?? [],
                   videoRef,

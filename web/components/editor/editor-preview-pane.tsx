@@ -24,8 +24,9 @@ import { PlayerControls } from "@/components/player-controls";
 import { PreviewOverlays } from "@/components/preview-overlays";
 import { PreviewTransitionNotice } from "@/components/preview-transition-notice";
 import { SafeAreaGuides } from "@/components/safe-area-guides";
+import { AudioDrawer } from "@/components/audio-drawer";
 import { TimelineDrawer } from "@/components/timeline-drawer";
-import { Search, Spline } from "@/lib/icon";
+import { Search, Spline, Volume2, Aperture } from "@/lib/icon";
 import { ORIENTATION_RATIO, type Orientation } from "@/lib/preview-layout";
 import { cn } from "@/lib/utils";
 import type { CaptionGroup } from "../../../src/captions";
@@ -68,6 +69,7 @@ export interface EditorPreviewPaneProps {
   onToggleMusicMute?: () => void;
   onToggleMute: () => void;
   onTogglePip: () => void;
+  onToggleVignette: () => void;
   orientation: Orientation;
   outPos: number;
   pendingSaves: number;
@@ -84,6 +86,7 @@ export interface EditorPreviewPaneProps {
   sourceHeight: number;
   sourceWidth: number;
   sweepRef: RefObject<CutTransitionSweepHandle | null>;
+  audio: ComponentProps<typeof AudioDrawer>;
   timeline: ComponentProps<typeof TimelineDrawer>;
   titles: {
     endSample: number;
@@ -133,6 +136,7 @@ export function EditorPreviewPane({
   onToggleMusicMute,
   onToggleMute,
   onTogglePip,
+  onToggleVignette,
   onSafeAreaGuideChange,
   orientation,
   outPos,
@@ -150,6 +154,7 @@ export function EditorPreviewPane({
   sourceHeight,
   sourceWidth,
   sweepRef,
+  audio,
   timeline,
   titles,
   videoRef,
@@ -311,7 +316,7 @@ export function EditorPreviewPane({
         </div>
         <div className="flex items-center gap-1.5 px-0.5 pt-1 text-[10px] text-muted-foreground">
           <button
-            className="inline-flex shrink-0 items-center gap-1 rounded-full bg-muted px-1 py-px text-[10px] text-muted-foreground leading-none transition-colors hover:bg-muted/80 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-full bg-muted px-1 py-px text-[10px] text-muted-foreground leading-none transition-colors hover:bg-muted/80 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             onClick={onFocusTranscriptSearch}
             type="button"
           >
@@ -326,9 +331,35 @@ export function EditorPreviewPane({
                 <span>Timeline</span>
               </>
             }
-            triggerClassName="h-auto min-w-0 gap-1 rounded-full bg-muted px-1 py-px font-normal text-[10px] text-muted-foreground leading-none shadow-none hover:bg-muted/80 hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring sm:h-auto"
+            triggerClassName="h-auto min-w-0 cursor-pointer gap-1 rounded-full bg-muted px-1 py-px font-normal text-[10px] text-muted-foreground leading-none shadow-none hover:bg-muted/80 hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring sm:h-auto"
             triggerVariant="ghost"
           />
+          <AudioDrawer
+            {...audio}
+            triggerChildren={
+              <>
+                <Volume2 className="size-2.5" />
+                <span>Improve sound</span>
+              </>
+            }
+            triggerClassName="h-auto min-w-0 cursor-pointer gap-1 rounded-full bg-muted px-1 py-px font-normal text-[10px] text-muted-foreground leading-none shadow-none hover:bg-muted/80 hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring sm:h-auto"
+            triggerVariant="ghost"
+          />
+          <button
+            aria-label={vignetteOn ? "Turn vignette off" : "Turn vignette on"}
+            aria-pressed={vignetteOn}
+            className={cn(
+              "inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-full px-1 py-px text-[10px] leading-none transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+              vignetteOn
+                ? "bg-foreground/10 text-foreground"
+                : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+            )}
+            onClick={onToggleVignette}
+            type="button"
+          >
+            <Aperture className="size-2.5" />
+            <span>Vignette</span>
+          </button>
         </div>
       </div>
     </div>
