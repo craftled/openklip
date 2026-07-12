@@ -11,6 +11,13 @@ import { projectPaths } from "./paths.ts";
 import { normalizeText } from "./phrase-match.ts";
 import { embedScriptPath } from "./script-paths.ts";
 
+// frameNameForTime (the inverse of frameTimeSec) lives in its own fs-free
+// module, ./moment-search-frame-name.ts, not here: linting this file's
+// barrel-style re-export of it as noBarrelFile, and more importantly the
+// web Search panel needs to value-import it directly without pulling in
+// this file's node:fs import (see that module's header). Import it from
+// there directly; this file does not re-export it.
+
 // Mirrors MOMENT_MODEL in src/embed.mjs. That script runs under plain Node
 // (never Bun: see its own header comment) and dynamically imports
 // @huggingface/transformers unconditionally at module scope, so this file
@@ -400,6 +407,18 @@ function readIndexFile(indexPath: string): MomentIndexFile | null {
   } catch {
     return null;
   }
+}
+
+// Cheap freshness probe used by the moment-search API route to answer
+// "indexed:false" (missing/stale sidecar) without needing a query embedding
+// at all: the route only has to spawn the warm embed worker once it already
+// knows there is a current index to search. Same check searchScenes does
+// internally before it touches queryVec; kept as its own export rather than
+// having callers reuse searchScenes with a throwaway vector.
+export function isMomentIndexCurrent(slug: string): boolean {
+  const index = readIndexFile(momentIndexPath(slug));
+  const frameNames = listFrameFileNames(projectPaths(slug).frames);
+  return Boolean(index && indexIsCurrent(index, frameNames, MOMENT_MODEL));
 }
 
 export interface SearchScenesOptions {

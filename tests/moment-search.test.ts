@@ -12,6 +12,7 @@ import {
   embedQueryText,
   encodeVectors,
   indexIsCurrent,
+  isMomentIndexCurrent,
   MOMENT_MODEL,
   type MomentIndexFile,
   mergeSceneResults,
@@ -20,6 +21,10 @@ import {
   summaryMatches,
   topKFrames,
 } from "../src/moment-search.ts";
+// Pure, fs-free sibling of moment-search.ts (see its own header): tested
+// here alongside the rest of the moment-search suite even though it is not
+// re-exported from moment-search.ts itself (that would be a barrel export).
+import { frameNameForTime } from "../src/moment-search-frame-name.ts";
 import { projectPaths } from "../src/paths.ts";
 import {
   makeProject,
@@ -113,6 +118,33 @@ test("indexIsCurrent is false when a frame was added", () => {
 test("indexIsCurrent is false when a frame was removed", () => {
   const idx = makeIndex();
   assert.equal(indexIsCurrent(idx, ["0001.jpg"], MOMENT_MODEL), false);
+});
+
+// ── frameNameForTime ─────────────────────────────────────────────────────
+
+test("frameNameForTime maps 0s to the first frame", () => {
+  assert.equal(frameNameForTime(0), "0001.jpg");
+});
+
+test("frameNameForTime floors within a frame's span (still frame 1 before the 3s boundary)", () => {
+  assert.equal(frameNameForTime(2.9), "0001.jpg");
+});
+
+test("frameNameForTime rolls over to the next frame exactly at the step boundary", () => {
+  assert.equal(frameNameForTime(3), "0002.jpg");
+});
+
+test("frameNameForTime clamps negative seconds to the first frame", () => {
+  assert.equal(frameNameForTime(-5), "0001.jpg");
+});
+
+test("frameNameForTime respects a custom stepSec", () => {
+  assert.equal(frameNameForTime(9, 5), "0002.jpg");
+  assert.equal(frameNameForTime(11, 5), "0003.jpg");
+});
+
+test("frameNameForTime does not truncate indices beyond 4 digits", () => {
+  assert.equal(frameNameForTime(3 * 10_000), "10001.jpg");
 });
 
 // ── topKFrames ─────────────────────────────────────────────────────────────
@@ -530,6 +562,36 @@ test("searchScenes blends scene-log summary matches with embedding moments", asy
     assert.equal(result.results.length, 1);
     assert.equal(result.results[0].source, "both");
     assert.equal(result.results[0].summary, "a dog runs across the yard");
+  });
+});
+
+// ── isMomentIndexCurrent ─────────────────────────────────────────────────
+
+test("isMomentIndexCurrent is false when no sidecar index exists", async () => {
+  await withTempProjectsRoot(({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    assert.equal(isMomentIndexCurrent(slug), false);
+  });
+});
+
+test("isMomentIndexCurrent is true for a current sidecar and flips false once frames change", async () => {
+  await withTempProjectsRoot(({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const framesDir = projectPaths(slug).frames;
+    mkdirSync(framesDir, { recursive: true });
+    writeFileSync(join(framesDir, "0001.jpg"), "fake");
+
+    const index = makeIndex({
+      dim: 2,
+      frames: [{ name: "0001.jpg", atSec: 0 }],
+      vectorsB64: encodeVectors(new Float32Array([1, 0])),
+    });
+    writeFileSync(momentIndexPath(slug), JSON.stringify(index));
+
+    assert.equal(isMomentIndexCurrent(slug), true);
+
+    writeFileSync(join(framesDir, "0002.jpg"), "fake-2");
+    assert.equal(isMomentIndexCurrent(slug), false);
   });
 });
 

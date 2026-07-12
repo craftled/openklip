@@ -3,12 +3,13 @@
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
 
-export type SidebarSegmentView = "chats" | "assets" | "config";
+export type SidebarSegmentView = "assets" | "chats" | "config" | "search";
 
 const VIEW_LABELS: Record<SidebarSegmentView, string> = {
   chats: "Chats",
   assets: "Assets",
   config: "Config",
+  search: "Search",
 };
 
 export function SidebarSegmentedPicker({
@@ -32,7 +33,9 @@ export function SidebarSegmentedPicker({
         aria-label="Sidebar view"
         className={cn(
           "grid w-full",
-          views.length === 2 ? "grid-cols-2" : "grid-cols-3"
+          { 2: "grid-cols-2", 3: "grid-cols-3", 4: "grid-cols-4" }[
+            views.length
+          ] ?? "grid-cols-4"
         )}
         onValueChange={(value) => {
           const nextView = Array.isArray(value) ? value[0] : value;

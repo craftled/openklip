@@ -822,6 +822,7 @@ export function App({
           onAssetsUpdated={applyAssetUpdate}
           onCloseSettings={() => setSettingsOpen(false)}
           onOpenSettings={() => setSettingsOpen(true)}
+          onSeek={onSeek}
           onSelectSettingsSection={setSettingsSection}
           onSidebarViewChange={setSidebarView}
           onToggleColorScheme={toggleColorScheme}
@@ -831,6 +832,7 @@ export function App({
           settingsOpen={settingsOpen}
           settingsSection={settingsSection}
           sidebarView={sidebarView}
+          words={project.words}
         />
 
         <SidebarContextBridge>

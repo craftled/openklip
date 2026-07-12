@@ -13,6 +13,7 @@ import {
 import { ChatListItem } from "@/components/chat-list-item";
 import { CollapsibleSidebarSection } from "@/components/collapsible-sidebar";
 import { GitHubStars } from "@/components/github-stars";
+import { MomentSearchPanel } from "@/components/moment-search-panel";
 import { ProjectInlineFolderAction } from "@/components/project-folder-action";
 import { ProjectSwitcher } from "@/components/project-switcher";
 import { RelativeTimeLabel } from "@/components/relative-time-label";
@@ -38,6 +39,8 @@ import {
 } from "@/components/ui/sidebar";
 import { useInboxWatch } from "@/hooks/use-inbox-watch";
 import { useModShortcut } from "@/hooks/use-mod-shortcut";
+import type { TranscriptWord } from "@/hooks/use-moment-search";
+import { useMomentSearchShortcut } from "@/hooks/use-moment-search-shortcut";
 
 import { chatListEmptyLabel, filterThreadsByQuery } from "@/lib/chat-list";
 import {
@@ -75,6 +78,7 @@ interface AgentSidebarProps {
   onAssetsUpdated: (update: AssetBinUpdate) => void;
   onCloseSettings: () => void;
   onOpenSettings: () => void;
+  onSeek: (sourceSec: number) => void;
   onSelectSettingsSection: (section: SettingsSectionId) => void;
   onSidebarViewChange: (view: SidebarSegmentView) => void;
   onToggleColorScheme: () => void;
@@ -84,6 +88,7 @@ interface AgentSidebarProps {
   settingsOpen: boolean;
   settingsSection: SettingsSectionId;
   sidebarView: SidebarSegmentView;
+  words: TranscriptWord[];
 }
 
 export function AgentSidebar({
@@ -95,6 +100,7 @@ export function AgentSidebar({
   onAssetsUpdated,
   onCloseSettings,
   onOpenSettings,
+  onSeek,
   onSelectSettingsSection,
   onSidebarViewChange,
   onToggleColorScheme,
@@ -104,9 +110,10 @@ export function AgentSidebar({
   settingsOpen,
   settingsSection,
   sidebarView,
+  words,
 }: AgentSidebarProps) {
   const router = useRouter();
-  const { isMobile, setOpenMobile } = useSidebar();
+  const { isMobile, setOpen, setOpenMobile } = useSidebar();
   const [search, setSearch] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchShortcut = useModShortcut("k");
@@ -116,6 +123,16 @@ export function AgentSidebar({
       setOpenMobile(true);
     }
   }, [isMobile, setOpenMobile, sidebarView]);
+
+  const openMomentSearch = useCallback(() => {
+    onSidebarViewChange("search");
+    if (isMobile) {
+      setOpenMobile(true);
+    } else {
+      setOpen(true);
+    }
+  }, [isMobile, onSidebarViewChange, setOpen, setOpenMobile]);
+  useMomentSearchShortcut(openMomentSearch);
 
   const {
     activeThreadId,
@@ -267,7 +284,7 @@ export function AgentSidebar({
               activeView={sidebarView}
               className="pt-0.5"
               onSelectView={onSidebarViewChange}
-              views={["chats", "assets", "config"]}
+              views={["chats", "assets", "search", "config"]}
             />
           </SidebarHeader>
 
@@ -392,6 +409,14 @@ export function AgentSidebar({
                     </div>
                   </div>
                 </CollapsibleSidebarSection>
+              </div>
+            ) : sidebarView === "search" ? (
+              <div className="flex min-h-0 flex-1 flex-col overflow-y-auto pt-1.5 pb-1">
+                <MomentSearchPanel
+                  onSeek={onSeek}
+                  slug={activeSlug}
+                  words={words}
+                />
               </div>
             ) : (
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-1 pt-1.5 pb-1">

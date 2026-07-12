@@ -2,30 +2,36 @@
 // ingest frame JPEGs and free-text search queries into one shared CLIP
 // embedding space for local, no-network visual moment search. Kept separate
 // from the Bun server so the ONNX runtime never has to load inside Bun
-// (mirrors src/transcribe.mjs).
+// (mirrors src/transcribe.mjs). `serve` is the same text-query embedding as
+// `query`, kept warm behind a line-delimited stdio protocol so the Next
+// server (src/embed-service.ts) pays the ~2-5s model load once per process
+// instead of once per search.
 import { readdirSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { createInterface } from "node:readline";
 
 const [, , cmd, ...rest] = process.argv;
 
 function usageExit() {
   console.error(
     "usage: node embed.mjs index <framesDir> <outJson> [model]\n" +
-      "       node embed.mjs query <text> [model]"
+      "       node embed.mjs query <text> [model]\n" +
+      "       node embed.mjs serve [model]"
   );
   process.exit(2);
 }
 
-if (cmd !== "index" && cmd !== "query") {
+if (cmd !== "index" && cmd !== "query" && cmd !== "serve") {
   usageExit();
 }
 
 const isIndex = cmd === "index";
+const isServe = cmd === "serve";
 const [arg1, arg2, arg3] = rest;
 if (isIndex && !(arg1 && arg2)) {
   usageExit();
 }
-if (!(isIndex || arg1)) {
+if (!(isIndex || isServe || arg1)) {
   usageExit();
 }
 
@@ -41,7 +47,7 @@ if (!(isIndex || arg1)) {
 // each project into the SAME 512-dim space, which is exactly what "index
 // frames once, query with arbitrary text later" needs.
 const MOMENT_MODEL = "Xenova/clip-vit-base-patch32";
-const model = (isIndex ? arg3 : arg2) || MOMENT_MODEL;
+const model = (isIndex ? arg3 : isServe ? arg1 : arg2) || MOMENT_MODEL;
 
 // Mirrors FRAME_STEP_SEC in src/scene-log.ts (ffmpeg extracts one frame
 // every 3s at ingest: fps=1/3). This script runs under plain Node and
@@ -77,14 +83,21 @@ function frameAtSec(fileName) {
   return Math.max(0, (index1Based - 1) * FRAME_STEP_SEC);
 }
 
-if (!isIndex) {
+// Shared by `query` (one-shot) and `serve` (warm, repeated): tokenize and
+// run the text encoder, L2-normalizing into the same space the vision
+// encoder's frame vectors live in.
+async function embedTextVector(tokenizer, textModel, text) {
+  const inputs = tokenizer([text], { padding: true, truncation: true });
+  const { text_embeds } = await textModel(inputs);
+  return l2Normalize(Float32Array.from(text_embeds.data));
+}
+
+if (cmd === "query") {
   const text = arg1;
   console.error(`[embed] model=${model} query="${text}"`);
   const tokenizer = await AutoTokenizer.from_pretrained(model);
   const textModel = await CLIPTextModelWithProjection.from_pretrained(model);
-  const inputs = tokenizer([text], { padding: true, truncation: true });
-  const { text_embeds } = await textModel(inputs);
-  const vector = l2Normalize(Float32Array.from(text_embeds.data));
+  const vector = await embedTextVector(tokenizer, textModel, text);
   process.stdout.write(
     `${JSON.stringify({
       model,
@@ -92,6 +105,54 @@ if (!isIndex) {
       vector: Array.from(vector),
     })}\n`
   );
+  process.exit(0);
+}
+
+if (isServe) {
+  console.error(`[embed] serve model=${model} : loading text encoder`);
+  const tokenizer = await AutoTokenizer.from_pretrained(model);
+  const textModel = await CLIPTextModelWithProjection.from_pretrained(model);
+  console.error("[embed] serve ready");
+
+  // Line-delimited JSON protocol (mirrors src/embed-service.ts's parser):
+  // stdin  {"id":"...","text":"..."} per line
+  // stdout {"id":"...","model":"...","dim":N,"vector":[...]} per line,
+  //        or {"id":"...","error":"..."} for a request-scoped failure.
+  // All diagnostics go to stderr; stdout carries only protocol lines.
+  const rl = createInterface({
+    input: process.stdin,
+    crlfDelay: Number.POSITIVE_INFINITY,
+  });
+  for await (const rawLine of rl) {
+    const line = rawLine.trim();
+    if (!line) {
+      continue;
+    }
+    let id;
+    try {
+      const req = JSON.parse(line);
+      id = req?.id;
+      if (typeof id !== "string" || typeof req.text !== "string") {
+        throw new Error("request must be a {id, text} JSON object");
+      }
+      const vector = await embedTextVector(tokenizer, textModel, req.text);
+      process.stdout.write(
+        `${JSON.stringify({
+          id,
+          model,
+          dim: vector.length,
+          vector: Array.from(vector),
+        })}\n`
+      );
+    } catch (e) {
+      console.error(`[embed] serve request failed: ${e?.message ?? e}`);
+      if (typeof id === "string") {
+        process.stdout.write(
+          `${JSON.stringify({ id, error: String(e?.message ?? e) })}\n`
+        );
+      }
+    }
+  }
   process.exit(0);
 }
 
