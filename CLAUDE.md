@@ -14,7 +14,7 @@ See `AGENTS.md` for the full OpenKlip edit loop, CLI commands, MCP tools, and gu
 
 ## Current release memory
 
-- Code truth checked on 2026-07-07: `VERSION` and `package.json` are `0.41.1.3`; `bun test` runs 1904 tests (1901 pass, 3 skip without `OPENKLIP_INTEGRATION=1`); `src/agent-tools.ts` exposes 90 MCP tools; `openklip features --json` lists 51 capabilities from `src/features.ts`; `openklip actions --json` lists 44 registry actions.
+- Code truth checked on 2026-07-12: `VERSION` and `package.json` are `0.41.1.3`; `bun test --isolate` runs 2051 tests across 219 files (8 skip without `OPENKLIP_INTEGRATION=1`; 15 fail only on machines where `ffprobe-static`'s darwin/arm64 binary hits `EBADARCH`, unrelated to app code); `src/agent-tools.ts` exposes 91 MCP tools; `openklip features --json` lists 52 capabilities from `src/features.ts`; `openklip actions --json` lists 44 registry actions. Moment search (`moment-search`) is on this branch but unreleased.
 - Release docs: `CHANGELOG.md` is authoritative history, `docs/RELEASE-NOTES.md` holds GitHub release bodies, and `TODO.md#known-limitations` is the single current gaps list.
 - Published GitHub releases through `v0.41.1.1` (`gh release list`). `v0.41.1.3` is prepared as a draft in `docs/RELEASE-NOTES.md` from PR #83 plus local asset/timeline/runtime follow-ups, but is not published until `main` is pushed and a tag/release is created.
 

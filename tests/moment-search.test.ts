@@ -8,6 +8,7 @@ import {
   buildMomentIndex,
   clusterMoments,
   DEFAULT_MOMENT_MIN_SCORE,
+  DEFAULT_PEAK_MARGIN,
   decodeVectors,
   embedQueryText,
   encodeVectors,
@@ -17,6 +18,7 @@ import {
   type MomentIndexFile,
   mergeSceneResults,
   momentIndexPath,
+  prunePeakRelative,
   searchScenes,
   summaryMatches,
   topKFrames,
@@ -694,4 +696,53 @@ test("embed.mjs indexes solid-color frames and ranks the matching color first", 
 
 test("DEFAULT_MOMENT_MIN_SCORE is a sane rank-only threshold", () => {
   assert.ok(DEFAULT_MOMENT_MIN_SCORE > 0 && DEFAULT_MOMENT_MIN_SCORE < 1);
+});
+
+test("prunePeakRelative keeps only hits within the margin of the peak", () => {
+  const hits = [
+    { atSec: 0, score: 0.3, name: "0001.jpg" },
+    { atSec: 3, score: 0.29, name: "0002.jpg" },
+    { atSec: 6, score: 0.26, name: "0003.jpg" },
+    { atSec: 9, score: 0.24, name: "0004.jpg" },
+  ];
+  const kept = prunePeakRelative(hits, 0.02);
+  assert.deepEqual(
+    kept.map((h) => h.name),
+    ["0001.jpg", "0002.jpg"]
+  );
+});
+
+test("prunePeakRelative keeps peak ties and ignores hit order", () => {
+  const hits = [
+    { atSec: 9, score: 0.24, name: "0004.jpg" },
+    { atSec: 0, score: 0.31, name: "0001.jpg" },
+    { atSec: 3, score: 0.31, name: "0002.jpg" },
+  ];
+  const kept = prunePeakRelative(hits, 0.02);
+  assert.deepEqual(
+    kept.map((h) => h.name),
+    ["0001.jpg", "0002.jpg"]
+  );
+});
+
+test("prunePeakRelative on empty input returns empty", () => {
+  assert.deepEqual(prunePeakRelative([], 0.02), []);
+});
+
+test("prunePeakRelative default margin cuts between-scene connective tissue", () => {
+  // Shape from the measured ground-truth probe: a real scene peaking ~0.30
+  // with the rest of the video sitting ~0.24-0.26. Without pruning, every
+  // frame above the 0.26 floor chains into one video-length moment.
+  const hits = [
+    { atSec: 0, score: 0.299, name: "0001.jpg" },
+    { atSec: 3, score: 0.298, name: "0002.jpg" },
+    { atSec: 6, score: 0.26, name: "0003.jpg" },
+    { atSec: 9, score: 0.262, name: "0004.jpg" },
+  ];
+  const kept = prunePeakRelative(hits);
+  assert.deepEqual(
+    kept.map((h) => h.name),
+    ["0001.jpg", "0002.jpg"]
+  );
+  assert.ok(DEFAULT_PEAK_MARGIN > 0 && DEFAULT_PEAK_MARGIN < 0.1);
 });

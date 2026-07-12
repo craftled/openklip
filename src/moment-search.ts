@@ -26,13 +26,23 @@ import { embedScriptPath } from "./script-paths.ts";
 // sync by hand.
 export const MOMENT_MODEL = "Xenova/clip-vit-base-patch32";
 
-// CLIP cosine-similarity scores for real footage land loosely in ~0.18-0.35
-// for a genuine visual match; there is no calibrated "this is definitely a
-// match" cutoff. This is a starting rank-only threshold (tuned during
-// verification against sample footage, see the slice-1 implementation
-// report), not a probability - revisit once real search transcripts exist
-// to check against.
-export const DEFAULT_MOMENT_MIN_SCORE = 0.22;
+// CLIP cosine-similarity scores are not calibrated across queries, but a
+// measured ground-truth probe (four known synthetic scenes: blue / SMPTE
+// bars / mandelbrot / black, plus uniform-color and dark real projects)
+// separated cleanly at this floor: every correct query peaked >= 0.275
+// while every absurd query ("a red car" on a talking-head, "laughing" on
+// black frames) peaked <= 0.249. Frames below the floor never make a
+// moment. Revisit against real search transcripts once they exist.
+export const DEFAULT_MOMENT_MIN_SCORE = 0.26;
+
+// Second, per-query gate: keep only frames scoring within this margin of
+// the query's own best frame. Raw CLIP scores compress into a narrow band
+// (the same probe put non-matching scenes only ~0.04 below the matching
+// one), so without peak-relative pruning every above-floor frame chains
+// through clusterMoments into one video-length moment and localization is
+// lost. 0.02 kept each probe query's true scene intact while cutting the
+// connective tissue between scenes.
+export const DEFAULT_PEAK_MARGIN = 0.02;
 
 // Merge matched frames into one moment while they are at most one "missed"
 // frame apart: 2 * the 3s ingest frame step, plus a small floating-point
@@ -165,6 +175,28 @@ export interface Moment {
   fromSec: number;
   score: number;
   toSec: number;
+}
+
+// Keep only hits scoring within `margin` of the best hit. Applied before
+// clustering: raw CLIP scores sit in a narrow band, so without this the
+// merely-above-floor frames between two real scenes chain everything into
+// one video-length moment (see DEFAULT_PEAK_MARGIN for the measured basis).
+// Empty input stays empty; ties with the peak always survive.
+export function prunePeakRelative(
+  hits: MomentHit[],
+  margin = DEFAULT_PEAK_MARGIN
+): MomentHit[] {
+  if (hits.length === 0) {
+    return hits;
+  }
+  let peak = hits[0].score;
+  for (const h of hits) {
+    if (h.score > peak) {
+      peak = h.score;
+    }
+  }
+  const cutoff = peak - margin;
+  return hits.filter((h) => h.score >= cutoff);
 }
 
 export interface ClusterMomentsOptions {
@@ -456,7 +488,7 @@ export function searchScenes(
     score,
     name: index.frames[frameIdx].name,
   }));
-  const embeddingMoments = clusterMoments(hits, {
+  const embeddingMoments = clusterMoments(prunePeakRelative(hits), {
     minScore: DEFAULT_MOMENT_MIN_SCORE,
     maxMoments: limit,
     frameStepSec: index.frameStepSec,

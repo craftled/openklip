@@ -1,6 +1,9 @@
 # Changelog
 
-## 0.41.1.3 - 2026-07-07
+## Unreleased
+
+### Added
+- **Moment search: text + scene** (`moment-search`): find moments in the source footage by transcript text or visual content and pull them into the edit. Ingest gains a non-fatal "index" phase that embeds the existing 3s sample frames with a local CLIP model (`Xenova/clip-vit-base-patch32` via the already-shipped `@huggingface/transformers`, downloaded on first use like Whisper) into `working/moment-index.json`; old projects backfill lazily on first search or via `openklip index <slug>`. A fourth left-sidebar **Search** tab (Mod+Shift+F) shows Text and Scene results as thumbnail cards with timestamps: click seeks, and dragging a card onto the preview, transcript, or open timeline drawer — or its hover **Keep** button — restores any cut words in that span (logged `cut` action, revertible from History). Text matches include cut words with a `cut` badge; scene matching blends frame embeddings with scene-log summaries, gated by a measured score floor plus peak-relative pruning so wrong-topic queries return nothing instead of noise. Same engine on every surface: `openklip search <slug> "query" [--json]` (cut matches marked `[cut]`) and the MCP `moment_search` tool (auto-builds a missing index on first call).
 
 ### Changed
 - **Editor chrome follow-up**: PR #83 simplified transcript chrome, moved transcript search behind a compact video-adjacent control, added transcript minute markers and a tighter search/timeline control row, and updated editor chrome tests.
