@@ -266,6 +266,10 @@ function wordIdsFromMutation(
     }
     return r?.ids ?? [];
   }
+  if (action === "cleanup-apply") {
+    const r = result as { wordIds?: string[] } | undefined;
+    return r?.wordIds ?? [];
+  }
   if (action === "edit-words") {
     const i = input as { words?: Array<{ id: string }> } | undefined;
     return i?.words?.map((w) => w.id) ?? [];

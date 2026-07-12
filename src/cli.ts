@@ -30,7 +30,10 @@ import {
   suggestBroll,
 } from "./broll-suggest.ts";
 import { isCaptionStyleId, listCaptionStyles } from "./caption-styles.ts";
-import { buildCleanupReport, partitionSafeCandidates } from "./cleanup.ts";
+import {
+  buildCleanupReport,
+  CLEANUP_CATEGORY_DISPLAY_ORDER,
+} from "./cleanup.ts";
 import {
   runOverlays,
   runRanges,
@@ -303,8 +306,9 @@ Review & export
                                        --json            agent-friendly JSON
   openklip ranges <slug> [--json]    kept source-time segments after cuts
   openklip overlays <slug> [--json]  b-roll, music, titles, zooms, stills with ids
-  openklip cleanup <slug> [--json]   filler-word and dead-air candidates (safe/review)
+  openklip cleanup <slug> [--json]   filler-word and dead-air candidates by category (safe/review)
                                        --apply-safe      apply the safe candidates and print what changed
+                                       --apply-enabled   apply enabled categories plus all dead-air at minSec
   openklip dead-air-rm <slug> <id>   remove a registered dead-air span by id
   openklip export-set <slug>           set export aspect and manual reframe crop
                                        --aspect <id>  source|16:9|9:16|1:1
@@ -403,24 +407,6 @@ async function runLoggedAction<T = unknown>(
     { action: name, actor: "cli", input }
   );
   return { project: mutated as Project, result };
-}
-
-interface DeadAirAddSpan {
-  fromSec: number;
-  toSec: number;
-}
-
-const DEAD_AIR_ADD_BATCH_SIZE = 50;
-
-async function addDeadAirSpansInBatches(
-  slug: string,
-  spans: DeadAirAddSpan[]
-): Promise<void> {
-  for (let i = 0; i < spans.length; i += DEAD_AIR_ADD_BATCH_SIZE) {
-    await runLoggedAction(slug, "dead-air-add", {
-      spans: spans.slice(i, i + DEAD_AIR_ADD_BATCH_SIZE),
-    });
-  }
 }
 
 function secRange(startSec: number, endSec: number): string {
@@ -2238,7 +2224,7 @@ try {
     case "cleanup": {
       if (!rest[0]) {
         throw new Error(
-          "usage: openklip cleanup <slug> [--json] [--apply-safe]"
+          "usage: openklip cleanup <slug> [--json] [--apply-safe] [--apply-enabled]"
         );
       }
       const slug = rest[0];
@@ -2258,27 +2244,41 @@ try {
         briefText,
       });
 
-      if (rest.includes("--apply-safe")) {
-        const { fillerIds, deadAirSpans } = partitionSafeCandidates(
-          report.candidates
-        );
-        if (fillerIds.length === 0 && deadAirSpans.length === 0) {
-          console.log("cleanup: no safe candidates to apply");
+      if (rest.includes("--apply-safe") || rest.includes("--apply-enabled")) {
+        const mode = rest.includes("--apply-enabled") ? "enabled" : "safe";
+        const { result: applied } = await runLoggedAction<{
+          deadAirSpanIds: string[];
+          extendedSpanIds: string[];
+          warnings: string[];
+          wordIds: string[];
+        }>(slug, "cleanup-apply", { mode });
+        if (
+          applied.wordIds.length === 0 &&
+          applied.deadAirSpanIds.length === 0 &&
+          applied.extendedSpanIds.length === 0
+        ) {
+          console.log(
+            mode === "safe"
+              ? "cleanup: no safe candidates to apply"
+              : "cleanup: no enabled candidates to apply"
+          );
           break;
         }
-        if (fillerIds.length > 0) {
-          await runLoggedAction(slug, "cut", {
-            ids: fillerIds,
-            deleted: true,
-            note: "cleanup: apply all safe",
-          });
-          console.log(`cleanup: cut ${fillerIds.length} filler word(s)`);
+        if (applied.wordIds.length > 0) {
+          console.log(`cleanup: cut ${applied.wordIds.length} filler word(s)`);
         }
-        if (deadAirSpans.length > 0) {
-          await addDeadAirSpansInBatches(slug, deadAirSpans);
+        if (applied.deadAirSpanIds.length > 0) {
           console.log(
-            `cleanup: registered ${deadAirSpans.length} dead-air span(s)`
+            `cleanup: registered ${applied.deadAirSpanIds.length} dead-air span(s)`
           );
+        }
+        if (applied.extendedSpanIds.length > 0) {
+          console.log(
+            `cleanup: extended ${applied.extendedSpanIds.length} existing dead-air span(s)`
+          );
+        }
+        for (const warning of applied.warnings) {
+          console.log(`  warning: ${warning}`);
         }
         break;
       }
@@ -2288,27 +2288,24 @@ try {
         break;
       }
 
+      const counts = report.categoryCounts;
       console.log(
-        `cleanup: ${report.fillerCount} filler, ${report.deadAirCount} dead-air, ~${report.estSavedSec.toFixed(1)}s total`
+        `cleanup: ${counts.hesitation} hesitation, ${counts.hedging} hedging, ${counts.repeat} repeat, ${counts["dead-air"]} dead-air, ~${report.estSavedSec.toFixed(1)}s total`
       );
       for (const warning of report.warnings) {
         console.log(`  warning: ${warning}`);
       }
-      const filler = report.candidates.filter((c) => c.kind === "filler");
-      const deadAir = report.candidates.filter((c) => c.kind === "dead-air");
-      if (filler.length > 0) {
-        console.log("  filler:");
-        for (const c of filler) {
-          console.log(
-            `    ${c.id}  ${c.risk.padEnd(6)}  ${secRange(c.startSec, c.endSec)}  ~${c.estSavedSec.toFixed(1)}s  ${c.reason}  "${c.text}"`
-          );
+      const categories = CLEANUP_CATEGORY_DISPLAY_ORDER;
+      for (const category of categories) {
+        const group = report.candidates.filter((c) => c.category === category);
+        if (group.length === 0) {
+          continue;
         }
-      }
-      if (deadAir.length > 0) {
-        console.log("  dead-air:");
-        for (const c of deadAir) {
+        console.log(`  ${category}:`);
+        for (const c of group) {
+          const textSuffix = c.kind === "filler" ? `  "${c.text}"` : "";
           console.log(
-            `    ${c.id}  ${c.risk.padEnd(6)}  ${secRange(c.startSec, c.endSec)}  ~${c.estSavedSec.toFixed(1)}s  ${c.reason}`
+            `    ${c.id}  ${c.risk.padEnd(6)}  ${secRange(c.startSec, c.endSec)}  ~${c.estSavedSec.toFixed(1)}s  ${c.reason}${textSuffix}`
           );
         }
       }

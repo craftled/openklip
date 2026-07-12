@@ -1,13 +1,23 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { addDeadAir, cutWords } from "../src/actions.ts";
+import {
+  addDeadAir,
+  applyCleanupFromReport,
+  cutWords,
+  removeDeadAir,
+} from "../src/actions.ts";
 import type { SilenceSpan } from "../src/audio-analysis-core.ts";
 import {
+  buildCleanupReport,
   type CleanupCandidate,
+  categorizeAgentCutIds,
   cleanupReport,
   deadAirCandidates,
   fillerCandidates,
+  partitionApplyCandidates,
   partitionSafeCandidates,
+  repeatedSequenceCandidates,
+  resolveCleanupConfig,
 } from "../src/cleanup.ts";
 import type { Project, Word } from "../src/edl.ts";
 import { SAMPLE_RATE } from "../src/edl.ts";
@@ -384,4 +394,510 @@ test("cleanup apply round-trip: partitionSafeCandidates -> cut + addDeadAir -> a
 
   const after = cleanupReport(project, silences);
   assert.equal(after.candidates.length, 0);
+});
+
+// ── category field ───────────────────────────────────────────────────────
+
+test("fillerCandidates: core filler maps to hesitation category", () => {
+  const words = [word("w0", "um", 0, 0.5), word("w1", "hi", 0.5, 1.0)];
+  const cands = fillerCandidates(makeProject(words));
+  assert.equal(cands[0].category, "hesitation");
+});
+
+test("fillerCandidates: default multi-word phrases map to hedging category", () => {
+  const words = [
+    word("w0", "you", 0, 0.5),
+    word("w1", "know", 0.5, 1.0),
+    word("w2", "then", 1.0, 1.5),
+  ];
+  const cands = fillerCandidates(makeProject(words));
+  assert.equal(cands[0].category, "hedging");
+});
+
+test("fillerCandidates: repeated like/so maps to repeat category", () => {
+  const words = [
+    word("w0", "it's", 0, 0.5),
+    word("w1", "like", 0.5, 1.0),
+    word("w2", "like", 1.0, 1.5),
+    word("w3", "great", 1.5, 2.0),
+  ];
+  const cands = fillerCandidates(makeProject(words));
+  assert.equal(cands[0].category, "repeat");
+});
+
+test("deadAirCandidates: maps to dead-air category", () => {
+  const words = [word("w0", "so", 0, 0.5), word("w1", "yeah", 2.5, 3.0)];
+  const silences: SilenceSpan[] = [{ startSec: 0.5, endSec: 2.5 }];
+  const cands = deadAirCandidates(makeProject(words), silences);
+  assert.equal(cands[0].category, "dead-air");
+});
+
+// ── repeatedSequenceCandidates ───────────────────────────────────────────
+
+test("repeatedSequenceCandidates: do you do you bigram cuts first keeps last", () => {
+  const words = [
+    word("w0", "do", 0, 0.3),
+    word("w1", "you", 0.3, 0.6),
+    word("w2", "do", 0.7, 1.0),
+    word("w3", "you", 1.0, 1.3),
+    word("w4", "want", 1.3, 1.6),
+  ];
+  const kept = words.filter((w) => !w.deleted);
+  const cands = repeatedSequenceCandidates(kept, new Set());
+  assert.equal(cands.length, 1);
+  assert.deepEqual(cands[0].wordIds, ["w0", "w1"]);
+  assert.equal(cands[0].category, "repeat");
+  assert.equal(cands[0].risk, "review");
+  assert.match(cands[0].reason, /repeated "do you"/);
+});
+
+test("repeatedSequenceCandidates: the the unigram cuts first keeps last", () => {
+  const words = [
+    word("w0", "the", 0, 0.3),
+    word("w1", "the", 0.35, 0.6),
+    word("w2", "cat", 0.6, 0.9),
+  ];
+  const cands = repeatedSequenceCandidates(words, new Set());
+  assert.equal(cands.length, 1);
+  assert.deepEqual(cands[0].wordIds, ["w0"]);
+  assert.match(cands[0].reason, /repeated "the"/);
+});
+
+test("repeatedSequenceCandidates: trigram repeat cuts prior occurrences", () => {
+  const words = [
+    word("w0", "I", 0, 0.2),
+    word("w1", "think", 0.2, 0.4),
+    word("w2", "that", 0.4, 0.6),
+    word("w3", "I", 0.65, 0.85),
+    word("w4", "think", 0.85, 1.05),
+    word("w5", "that", 1.05, 1.25),
+    word("w6", "I", 1.3, 1.5),
+    word("w7", "think", 1.5, 1.7),
+    word("w8", "that", 1.7, 1.9),
+    word("w9", "works", 1.9, 2.1),
+  ];
+  const cands = repeatedSequenceCandidates(words, new Set());
+  assert.equal(cands.length, 1);
+  assert.deepEqual(cands[0].wordIds, ["w0", "w1", "w2", "w3", "w4", "w5"]);
+});
+
+test("repeatedSequenceCandidates: prefers longest n-gram over nested unigrams", () => {
+  const words = [
+    word("w0", "do", 0, 0.3),
+    word("w1", "you", 0.3, 0.6),
+    word("w2", "do", 0.7, 1.0),
+    word("w3", "you", 1.0, 1.3),
+  ];
+  const cands = repeatedSequenceCandidates(words, new Set());
+  assert.equal(cands.length, 1);
+  assert.deepEqual(cands[0].wordIds, ["w0", "w1"]);
+});
+
+test("repeatedSequenceCandidates: gap over 0.6s between repetitions is not flagged", () => {
+  const words = [
+    word("w0", "do", 0, 0.3),
+    word("w1", "do", 1.0, 1.3),
+    word("w2", "it", 1.3, 1.6),
+  ];
+  const cands = repeatedSequenceCandidates(words, new Set());
+  assert.equal(cands.length, 0);
+});
+
+test("repeatedSequenceCandidates: skips word ids already covered by core filler", () => {
+  const words = [
+    word("w0", "um", 0, 0.3),
+    word("w1", "um", 0.35, 0.6),
+    word("w2", "hi", 0.6, 0.9),
+  ];
+  const blocked = new Set(["w0", "w1"]);
+  const cands = repeatedSequenceCandidates(words, blocked);
+  assert.equal(cands.length, 0);
+});
+
+test("cleanupReport: includes repeat detector candidates merged with filler", () => {
+  const words = [
+    word("w0", "do", 0, 0.3),
+    word("w1", "you", 0.3, 0.6),
+    word("w2", "do", 0.7, 1.0),
+    word("w3", "you", 1.0, 1.3),
+    word("w4", "want", 1.3, 1.6),
+  ];
+  const report = cleanupReport(makeProject(words), []);
+  const repeatCand = report.candidates.find((c) =>
+    c.reason.includes('repeated "do you"')
+  );
+  assert.ok(repeatCand);
+  assert.equal(repeatCand.category, "repeat");
+});
+
+// ── cleanup config ───────────────────────────────────────────────────────
+
+test("resolveCleanupConfig: defaults when project has no cleanup key", () => {
+  const project = makeProject([]);
+  const config = resolveCleanupConfig(project);
+  assert.equal(config.minSec, 0.7);
+  assert.equal(config.keepPadSec, 0.15);
+  assert.equal(config.categories.hesitation, true);
+  assert.equal(config.categories.hedging, false);
+  assert.equal(config.categories.repeat, false);
+});
+
+test("resolveCleanupConfig: project overrides beat defaults and clamps ranges", () => {
+  const project = makeProject([], {
+    cuts: {
+      snap: { enabled: false, mode: "off", maxShiftMs: 120, crossfadeMs: 24 },
+      deadAir: [],
+      cleanup: {
+        minSec: 10,
+        keepPadSec: 2,
+        categories: { hedging: true, repeat: true },
+      },
+    },
+  });
+  const config = resolveCleanupConfig(project);
+  assert.equal(config.minSec, 5);
+  assert.equal(config.keepPadSec, 1);
+  assert.equal(config.categories.hedging, true);
+  assert.equal(config.categories.repeat, true);
+  assert.equal(config.categories.hesitation, true);
+});
+
+test("buildCleanupReport: includes effective config and per-category counts", () => {
+  const words = [
+    word("w0", "um", 0, 0.5),
+    word("w1", "you", 0.5, 1.0),
+    word("w2", "know", 1.0, 1.5),
+    word("w3", "yeah", 4.0, 4.5),
+  ];
+  const silences: SilenceSpan[] = [{ startSec: 1.5, endSec: 4.0 }];
+  const report = buildCleanupReport({
+    project: makeProject(words),
+    silences,
+  });
+  assert.ok(report.config);
+  assert.equal(report.config.minSec, 0.7);
+  assert.equal(report.categoryCounts.hesitation, 1);
+  assert.equal(report.categoryCounts.hedging, 1);
+  assert.equal(report.categoryCounts["dead-air"], 1);
+});
+
+// ── partitionApplyCandidates / applyCleanupFromReport ────────────────────
+
+test("partitionApplyCandidates: enabled mode applies enabled categories at any risk", () => {
+  const words = [
+    word("w0", "like", 0, 0.5),
+    word("w1", "like", 0.5, 1.0),
+    word("w2", "you", 1.0, 1.5),
+    word("w3", "know", 1.5, 2.0),
+  ];
+  const report = cleanupReport(makeProject(words), []);
+  const config = resolveCleanupConfig(makeProject([]));
+  config.categories.repeat = true;
+  config.categories.hedging = true;
+  const { fillerIds } = partitionApplyCandidates(
+    report.candidates,
+    "enabled",
+    config
+  );
+  assert.deepEqual(fillerIds.sort(), ["w0", "w1", "w2", "w3"]);
+});
+
+test("applyCleanupFromReport: safe mode matches partitionSafeCandidates legacy result", () => {
+  const words = [
+    word("w0", "so", 0, 0.5),
+    word("w1", "um", 0.5, 1.0),
+    word("w2", "like", 1.0, 1.5),
+    word("w3", "like", 1.5, 2.0),
+    word("w4", "hello", 2.0, 2.5),
+    word("w5", "yeah", 4.0, 4.5),
+  ];
+  const silences: SilenceSpan[] = [{ startSec: 2.5, endSec: 4.0 }];
+  const project = makeProject(words);
+  const report = cleanupReport(project, silences);
+  const legacy = partitionSafeCandidates(report.candidates);
+  const applied = applyCleanupFromReport(project, report, "safe");
+  assert.deepEqual(applied.wordIds.sort(), legacy.fillerIds.sort());
+  assert.equal(applied.deadAirSpanIds.length, legacy.deadAirSpans.length);
+});
+
+test("applyCleanupFromReport: enabled mode applies review dead-air and returns restorable ids", () => {
+  const words = [
+    word("w0", "um", 0, 0.5),
+    word("w1", "hello", 0.5, 1.0),
+    word("w2", "yeah", 1.8, 2.3),
+  ];
+  const silences: SilenceSpan[] = [{ startSec: 1.0, endSec: 1.8 }];
+  const project = makeProject(words, {
+    cuts: {
+      snap: { enabled: false, mode: "off", maxShiftMs: 120, crossfadeMs: 24 },
+      deadAir: [],
+      cleanup: { categories: { hesitation: true } },
+    },
+  });
+  const report = buildCleanupReport({ project, silences });
+  const applied = applyCleanupFromReport(project, report, "enabled");
+  assert.deepEqual(applied.wordIds, ["w0"]);
+  assert.equal(applied.deadAirSpanIds.length, 1);
+  assert.equal(applied.extendedSpanIds.length, 0);
+  assert.equal(project.words.find((w) => w.id === "w0")?.deleted, true);
+  assert.equal(project.cuts.deadAir.length, 1);
+  cutWords(project, applied.wordIds, false);
+  for (const id of applied.deadAirSpanIds) {
+    removeDeadAir(project, id);
+  }
+  assert.equal(project.words.find((w) => w.id === "w0")?.deleted, false);
+  assert.equal(project.cuts.deadAir.length, 0);
+});
+
+// ── categorizeAgentCutIds (AI pass classifier) ───────────────────────────
+
+test("categorizeAgentCutIds: core filler id maps to hesitation", () => {
+  const words = [word("w0", "um", 0, 0.5), word("w1", "hello", 0.5, 1.0)];
+  const result = categorizeAgentCutIds(makeProject(words), ["w0"]);
+  assert.deepEqual(result.hesitation, ["w0"]);
+  assert.deepEqual(result.hedging, []);
+  assert.deepEqual(result.repeat, []);
+});
+
+test('categorizeAgentCutIds: lone "like" maps to hedging', () => {
+  const words = [word("w0", "like", 0, 0.5), word("w1", "hello", 0.5, 1.0)];
+  const result = categorizeAgentCutIds(makeProject(words), ["w0"]);
+  assert.deepEqual(result.hesitation, []);
+  assert.deepEqual(result.hedging, ["w0"]);
+  assert.deepEqual(result.repeat, []);
+});
+
+test('categorizeAgentCutIds: word inside "you know" maps to hedging', () => {
+  const words = [
+    word("w0", "well", 0, 0.5),
+    word("w1", "you", 0.5, 1.0),
+    word("w2", "know", 1.0, 1.5),
+    word("w3", "yeah", 1.5, 2.0),
+  ];
+  const result = categorizeAgentCutIds(makeProject(words), ["w1", "w2"]);
+  assert.deepEqual(result.hesitation, []);
+  assert.deepEqual(result.hedging, ["w1", "w2"]);
+  assert.deepEqual(result.repeat, []);
+});
+
+test("categorizeAgentCutIds: content word maps to repeat", () => {
+  const words = [
+    word("w0", "basically", 0, 0.5),
+    word("w1", "we", 0.5, 1.0),
+    word("w2", "start", 1.0, 1.5),
+  ];
+  const result = categorizeAgentCutIds(makeProject(words), ["w0"]);
+  assert.deepEqual(result.hesitation, []);
+  assert.deepEqual(result.hedging, []);
+  assert.deepEqual(result.repeat, ["w0"]);
+});
+
+test("categorizeAgentCutIds: unknown ids are dropped", () => {
+  const words = [word("w0", "um", 0, 0.5)];
+  const result = categorizeAgentCutIds(makeProject(words), ["w99", "w0"]);
+  assert.deepEqual(result.hesitation, ["w0"]);
+  assert.deepEqual(result.hedging, []);
+  assert.deepEqual(result.repeat, []);
+});
+
+test("categorizeAgentCutIds: dedupes ids within buckets", () => {
+  const words = [word("w0", "um", 0, 0.5)];
+  const result = categorizeAgentCutIds(makeProject(words), ["w0", "w0", "w0"]);
+  assert.deepEqual(result.hesitation, ["w0"]);
+  assert.deepEqual(result.hedging, []);
+  assert.deepEqual(result.repeat, []);
+});
+
+test("categorizeAgentCutIds: custom alwaysCut phrase word maps to hedging", () => {
+  const words = [
+    word("w0", "sort", 0, 0.5),
+    word("w1", "of", 0.5, 1.0),
+    word("w2", "great", 1.0, 1.5),
+  ];
+  const project = makeProject(words, {
+    cuts: {
+      snap: { enabled: false, mode: "off", maxShiftMs: 120, crossfadeMs: 24 },
+      deadAir: [],
+      cleanupPhrases: { alwaysCut: ["sort of"], neverCut: [] },
+    },
+  });
+  const result = categorizeAgentCutIds(project, ["w0", "w1"]);
+  assert.deepEqual(result.hesitation, []);
+  assert.deepEqual(result.hedging, ["w0", "w1"]);
+  assert.deepEqual(result.repeat, []);
+});
+
+// ── FIX1: coalescing undo, phrase dedupe, repeat convergence, MAX_NGRAM ──
+
+test("applyCleanupFromReport: adjacent dead-air extends existing span without undo data loss", () => {
+  const project = makeProject(
+    [word("w0", "before", 0, 3.5), word("w1", "after", 5.0, 6.0)],
+    {
+      cuts: {
+        snap: { enabled: false, mode: "off", maxShiftMs: 120, crossfadeMs: 24 },
+        deadAir: [],
+        cleanup: { keepPadSec: 0, minSec: 0.7 },
+      },
+    }
+  );
+  const [existing] = addDeadAir(project, [{ fromSec: 5.0, toSec: 6.0 }]);
+  const existingId = existing.span.id;
+  const report = buildCleanupReport({
+    project,
+    silences: [{ startSec: 3.5, endSec: 5.0 }],
+  });
+  const applied = applyCleanupFromReport(project, report, "safe");
+  assert.deepEqual(applied.deadAirSpanIds, []);
+  assert.deepEqual(applied.extendedSpanIds, [existingId]);
+  for (const id of applied.deadAirSpanIds) {
+    removeDeadAir(project, id);
+  }
+  assert.equal(project.cuts.deadAir.length, 1);
+  assert.equal(project.cuts.deadAir[0].id, existingId);
+  assert.equal(project.cuts.deadAir[0].startSample, sec(3.5));
+  assert.equal(project.cuts.deadAir[0].endSample, sec(6.0));
+});
+
+test("applyCleanupFromReport: fresh dead-air spans stay in deadAirSpanIds for undo", () => {
+  const project = makeProject([
+    word("w0", "hello", 0, 1.0),
+    word("w1", "world", 3.0, 4.0),
+  ]);
+  const report = buildCleanupReport({
+    project,
+    silences: [{ startSec: 1.0, endSec: 3.0 }],
+  });
+  const applied = applyCleanupFromReport(project, report, "enabled");
+  assert.equal(applied.deadAirSpanIds.length, 1);
+  assert.equal(applied.extendedSpanIds.length, 0);
+  const createdId = applied.deadAirSpanIds[0];
+  removeDeadAir(project, createdId);
+  assert.equal(project.cuts.deadAir.length, 0);
+});
+
+test('fillerCandidates: "you know you know" avoids double-claim on the same words', () => {
+  const words = [
+    word("w0", "you", 0, 0.4),
+    word("w1", "know", 0.4, 0.8),
+    word("w2", "you", 0.8, 1.2),
+    word("w3", "know", 1.2, 1.6),
+    word("w4", "this", 1.6, 2.0),
+    word("w5", "is", 2.0, 2.4),
+    word("w6", "important", 2.4, 3.0),
+  ];
+  const project = makeProject(words, {
+    cuts: {
+      snap: { enabled: false, mode: "off", maxShiftMs: 120, crossfadeMs: 24 },
+      deadAir: [],
+      cleanup: {
+        categories: { hedging: true, repeat: true, hesitation: true },
+      },
+    },
+  });
+  const report = buildCleanupReport({ project, silences: [] });
+  const hedging = report.candidates.filter((c) => c.category === "hedging");
+  const repeat = report.candidates.filter((c) => c.category === "repeat");
+  assert.equal(hedging.length, 1);
+  assert.equal(repeat.length, 1);
+  assert.deepEqual(repeat[0].wordIds, ["w0", "w1"]);
+  assert.deepEqual(hedging[0].wordIds, ["w2", "w3"]);
+  assert.equal(report.categoryCounts.hedging, 1);
+  assert.equal(report.categoryCounts.repeat, 1);
+  const config = resolveCleanupConfig(project);
+  config.categories.hedging = true;
+  config.categories.repeat = true;
+  const { fillerIds } = partitionApplyCandidates(
+    report.candidates,
+    "enabled",
+    config
+  );
+  assert.deepEqual(fillerIds, ["w0", "w1", "w2", "w3"]);
+});
+
+test("cleanup-apply enabled mode converges on you-um-you-know fixture in three passes", () => {
+  const project = makeProject(
+    [
+      word("w0", "you", 0, 0.4),
+      word("w1", "um", 0.4, 0.8),
+      word("w2", "you", 0.8, 1.2),
+      word("w3", "know", 1.2, 1.6),
+    ],
+    {
+      cuts: {
+        snap: { enabled: false, mode: "off", maxShiftMs: 120, crossfadeMs: 24 },
+        deadAir: [],
+        cleanup: {
+          categories: { hesitation: true, repeat: true, hedging: false },
+        },
+      },
+    }
+  );
+  const config = resolveCleanupConfig(project);
+  const first = applyCleanupFromReport(
+    project,
+    buildCleanupReport({ project, silences: [] }),
+    "enabled"
+  );
+  assert.deepEqual(first.wordIds, ["w1"]);
+  const second = applyCleanupFromReport(
+    project,
+    buildCleanupReport({ project, silences: [] }),
+    "enabled"
+  );
+  assert.deepEqual(second.wordIds, ["w0"]);
+  const third = applyCleanupFromReport(
+    project,
+    buildCleanupReport({ project, silences: [] }),
+    "enabled"
+  );
+  assert.deepEqual(third.wordIds, []);
+  assert.equal(config.categories.hesitation, true);
+});
+
+test("repeatedSequenceCandidates: 5-gram false start cuts first occurrence keeps last", () => {
+  const words = [
+    word("w0", "I", 0, 0.2),
+    word("w1", "want", 0.2, 0.4),
+    word("w2", "to", 0.4, 0.6),
+    word("w3", "show", 0.6, 0.8),
+    word("w4", "you", 0.8, 1.0),
+    word("w5", "I", 1.05, 1.25),
+    word("w6", "want", 1.25, 1.45),
+    word("w7", "to", 1.45, 1.65),
+    word("w8", "show", 1.65, 1.85),
+    word("w9", "you", 1.85, 2.05),
+    word("w10", "the", 2.05, 2.25),
+    word("w11", "new", 2.25, 2.45),
+    word("w12", "feature", 2.45, 2.7),
+  ];
+  const cands = repeatedSequenceCandidates(words, new Set());
+  assert.equal(cands.length, 1);
+  assert.deepEqual(cands[0].wordIds, ["w0", "w1", "w2", "w3", "w4"]);
+});
+
+test("repeatedSequenceCandidates: 7-gram repeat is not matched at MAX_NGRAM cap", () => {
+  const words = Array.from({ length: 14 }, (_, i) =>
+    word(
+      `w${i}`,
+      i < 7
+        ? ["a", "b", "c", "d", "e", "f", "g"][i]
+        : ["a", "b", "c", "d", "e", "f", "g"][i - 7],
+      i * 0.3,
+      i * 0.3 + 0.25
+    )
+  );
+  const cands = repeatedSequenceCandidates(words, new Set());
+  assert.equal(cands.length, 0);
+});
+
+test("repeatedSequenceCandidates: nested preference still holds at MAX_NGRAM 6", () => {
+  const words = [
+    word("w0", "do", 0, 0.3),
+    word("w1", "you", 0.3, 0.6),
+    word("w2", "do", 0.65, 0.95),
+    word("w3", "you", 0.95, 1.25),
+  ];
+  const cands = repeatedSequenceCandidates(words, new Set());
+  assert.equal(cands.length, 1);
+  assert.deepEqual(cands[0].wordIds, ["w0", "w1"]);
 });

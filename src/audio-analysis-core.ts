@@ -44,6 +44,28 @@ export const DEFAULT_SAMPLE_RATE = 16_000;
 export const DEFAULT_WINDOW_MS = 20;
 export const DEFAULT_THRESHOLD_DB = -38;
 export const DEFAULT_MIN_SILENCE_MS = 300;
+export const DEFAULT_PEAK_BUCKETS = 400;
+const MIN_PEAK_BUCKETS = 1;
+const MAX_PEAK_BUCKETS = 2000;
+
+export class PeakBucketsError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "PeakBucketsError";
+  }
+}
+
+export interface PeakBucket {
+  max: number;
+  min: number;
+}
+
+export interface ComputePeakBucketsOpts {
+  buckets: number;
+  fromSec: number;
+  sampleRate?: number;
+  toSec: number;
+}
 // dBFS assigned to a zero-RMS window (log10(0) is undefined); anything this
 // quiet is silence at any realistic threshold.
 const SILENCE_FLOOR_DB = -100;
@@ -92,6 +114,70 @@ export function analyzeSilences(
     );
   }
   return spans;
+}
+
+// Min/max peak buckets over a PCM span: divide [fromSec, toSec) into equal
+// time slices (clamped to the available samples) and report each bucket's
+// sample extrema. Empty buckets (no samples in range) report {min:0, max:0}.
+export function computePeakBuckets(
+  pcm: Float32Array,
+  opts: ComputePeakBucketsOpts
+): PeakBucket[] {
+  const sampleRate = opts.sampleRate ?? DEFAULT_SAMPLE_RATE;
+  const { fromSec, toSec } = opts;
+
+  if (
+    !(
+      Number.isFinite(fromSec) &&
+      Number.isFinite(toSec) &&
+      Number.isFinite(opts.buckets)
+    ) ||
+    fromSec < 0
+  ) {
+    throw new PeakBucketsError("invalid peak range");
+  }
+  if (toSec <= fromSec) {
+    throw new PeakBucketsError("toSec must be greater than fromSec");
+  }
+
+  const bucketCount = Math.min(
+    MAX_PEAK_BUCKETS,
+    Math.max(MIN_PEAK_BUCKETS, Math.round(opts.buckets))
+  );
+
+  const totalSec = pcm.length / sampleRate;
+  const clampedFrom = Math.max(0, Math.min(fromSec, totalSec));
+  const clampedTo = Math.max(clampedFrom, Math.min(toSec, totalSec));
+  const spanSec = clampedTo - clampedFrom;
+  const bucketSpanSec = spanSec / bucketCount;
+
+  const out: PeakBucket[] = [];
+  for (let i = 0; i < bucketCount; i++) {
+    const bucketStartSec = clampedFrom + i * bucketSpanSec;
+    const bucketEndSec = clampedFrom + (i + 1) * bucketSpanSec;
+    const startSample = Math.floor(bucketStartSec * sampleRate);
+    const endSample = Math.floor(bucketEndSec * sampleRate);
+
+    if (startSample >= endSample || startSample >= pcm.length) {
+      out.push({ min: 0, max: 0 });
+      continue;
+    }
+
+    const end = Math.min(endSample, pcm.length);
+    let min = pcm[startSample] ?? 0;
+    let max = min;
+    for (let s = startSample + 1; s < end; s++) {
+      const v = pcm[s] ?? 0;
+      if (v < min) {
+        min = v;
+      }
+      if (v > max) {
+        max = v;
+      }
+    }
+    out.push({ min, max });
+  }
+  return out;
 }
 
 function windowDb(pcm: Float32Array, start: number, end: number): number {

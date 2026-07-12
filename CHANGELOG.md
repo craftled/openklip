@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- **Categorized cleanup (Cutback parity)**: cleanup candidates now carry a category (hesitation, hedging, repeat, dead-air); new deterministic repeated-n-gram detector catches immediate repeats and false starts up to 6 words (≤0.6s apart, cut-first-keep-last, review risk); category toggles and silence thresholds (minSec/keepPadSec) persist in `project.cuts.cleanup` via the new `cleanup-config` action (null unsets a field); new `cleanup-apply` action (`safe` = legacy apply-all-safe, `enabled` = checked categories at any risk plus all dead-air at the configured threshold) returns created-vs-extended span ids plus warnings and records provenance; CLI `openklip cleanup` gains `--apply-enabled` and category-grouped output.
+- **Cleanup tab GUI**: dedicated Cleanup tab in the Config panel with per-category checkbox cards (live counts and example snippets), Remove-silence card with a real waveform strip (peaks from the new `GET /api/projects/[slug]/peaks` range API), min-gap/keep-padding sliders, silences hydration without enabling snap (`GET /api/projects/[slug]/silences`), one-click bulk apply, and "Undo last cleanup" driven by created-only span ids.
+- **AI false-start pass**: "Find false starts & mistakes (AI)" button runs the subscription-CLI filler pass server-side (`suggestCleanupCuts`) and merges suggestions into the categories as review candidates with agent provenance; disabled with a hint when no agent CLI is configured.
+- **Pending hover highlight**: hovering a cleanup candidate marks its words in the transcript with a dashed pending underline (distinct from applied-cut strikethrough) and scrolls the first hit into view.
+
+### Fixed
+- **Dead-air undo integrity**: `addDeadAir` now distinguishes created from extended spans, so undoing a cleanup can no longer delete a pre-existing dead-air span that a new candidate merely coalesced into.
+- **Hand-edited cleanup config can't brick a project**: out-of-range `cuts.cleanup` values degrade to defaults at load (`.catch`) instead of failing `ProjectSchema.parse`.
+- **Cold-project dead-air apply**: `cleanup-apply` computes audio analysis on demand (async) instead of silently degrading to filler-only when the cache is missing, and threads report warnings through the action result and CLI output.
+- **Report double-counting**: a phrase that is also a detected repeat (e.g. "you know you know") no longer yields overlapping candidates or duplicated word ids in apply results.
+
+
 ## 0.41.1.3 - 2026-07-07
 
 ### Changed

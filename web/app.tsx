@@ -41,6 +41,7 @@ import {
 } from "@/components/graphic-picker-controls";
 import { PreviewOverlays } from "@/components/preview-overlays";
 import { SidebarProvider, useSidebar } from "@/components/ui/sidebar";
+import { useCleanupSilences } from "@/hooks/use-cleanup-tab-data";
 import { useEditorChrome } from "@/hooks/use-editor-chrome";
 import { useEditorConfigPanel } from "@/hooks/use-editor-config-panel";
 import { useEditorExport } from "@/hooks/use-editor-export";
@@ -193,6 +194,19 @@ export function App({
     toggleWord,
   } = useTranscriptEdits({ enqueueSave, setProject, setSelected });
 
+  const [cleanupPendingWordIds, setCleanupPendingWordIds] = useState<
+    ReadonlySet<string>
+  >(() => new Set());
+  const onCleanupPendingHighlightChange = useCallback(
+    (wordIds: readonly string[]) => {
+      setCleanupPendingWordIds(new Set(wordIds));
+    },
+    []
+  );
+  useEffect(() => {
+    setCleanupPendingWordIds(new Set());
+  }, [project.slug]);
+
   const [titleText, setTitleText] = useState("");
   const [titlePos, setTitlePos] = useState<"lower" | "center" | "hero">(
     "lower"
@@ -309,18 +323,26 @@ export function App({
     () => project.assets.filter((a) => a.kind === "music"),
     [project.assets]
   );
+  const cleanupTabActive = sidebarView === "config" && configTab === "cleanup";
+  const { silences: hydratedSilences } = useCleanupSilences({
+    slug: project.slug,
+    enabled: cleanupTabActive,
+    projectSilences: project.silences,
+  });
+  const silencesForCleanup = project.silences ?? hydratedSilences;
+
   const cleanupReportView = useMemo(
     () =>
       buildCleanupCandidates(
         project as unknown as EngineProject,
-        project.silences,
+        silencesForCleanup,
         project.brief
       ),
     [
       project.slug,
       project.words,
       project.cuts,
-      project.silences,
+      silencesForCleanup,
       project.brief,
       project.broll,
       project.titles,
@@ -378,7 +400,9 @@ export function App({
     addGraphicPlacement,
     addMusicPlacement,
     applyAllSafeCleanup,
+    applyAllSilences,
     applyCleanupCandidate,
+    applyEnabledCleanup,
     applyingVision,
     audioMeasure,
     audioMeasuring,
@@ -386,17 +410,21 @@ export function App({
     changeOrientation,
     detectMusicBpm,
     detectingHighlights,
+    lastCleanupUndo,
     measureAudioLoudness,
     onChooseGraphicTemplate,
     onDetectHighlights,
     onRunVisionFocus,
     onSaveBrief,
     patchAudio,
+    patchCleanupThreshold,
     patchExport,
     patchMusicPlacement,
     patchSnap,
     removeDeadAirSpan,
     removeMusicPlacement,
+    toggleCleanupCategory,
+    undoLastCleanup,
   } = useProjectConfigActions({
     cleanupReport: cleanupReportView,
     chosenGraphicTemplate,
@@ -646,6 +674,18 @@ export function App({
     chosenGraphicTemplate,
     chosenMusicAsset,
     chosenStillAsset,
+    cleanupActions: {
+      lastUndo: lastCleanupUndo,
+      onApply: applyCleanupCandidate,
+      onApplyAllSafe: applyAllSafeCleanup,
+      onApplyAllSilences: applyAllSilences,
+      onApplyEnabled: applyEnabledCleanup,
+      onPatchCleanupThreshold: patchCleanupThreshold,
+      onPendingHighlightChange: onCleanupPendingHighlightChange,
+      onRemoveSpan: removeDeadAirSpan,
+      onToggleCategory: toggleCleanupCategory,
+      onUndoLast: undoLastCleanup,
+    },
     cleanupReport: cleanupReportView,
     clearSelection: clearSel,
     color,
@@ -716,8 +756,6 @@ export function App({
     project,
     projectActions: {
       onAddMusic: addMusicPlacement,
-      onApplyAllSafeCleanup: applyAllSafeCleanup,
-      onApplyCleanup: applyCleanupCandidate,
       onChooseMusicAsset: setChosenMusicAsset,
       onDetectBpm: detectMusicBpm,
       onDetectHighlights,
@@ -725,7 +763,6 @@ export function App({
       onPatchAudio: patchAudio,
       onPatchMusic: patchMusicPlacement,
       onPatchSnap: patchSnap,
-      onRemoveDeadAirSpan: removeDeadAirSpan,
       onRemoveMusic: removeMusicPlacement,
       onSaveBrief,
       onSeekHighlight: onSeek,
@@ -923,6 +960,7 @@ export function App({
                 settingsOpen={settingsOpen}
                 transcript={{
                   activeMatchRange: activeSearchRange,
+                  cleanupPendingWordIds,
                   curSample,
                   inBroll,
                   inZoom,

@@ -3,6 +3,10 @@
 import type { Project as EngineProject } from "@engine/edl";
 import type { ComponentProps } from "react";
 import {
+  ConfigCleanupTab,
+  type ConfigCleanupTabProps,
+} from "@/components/config/config-cleanup-tab";
+import {
   ConfigEditTab,
   type ConfigEditTabProps,
 } from "@/components/config/config-edit-tab";
@@ -48,6 +52,7 @@ export interface ConfigHistoryTabProps {
 
 export interface ConfigPanelProps {
   activeTab: ConfigTabId;
+  cleanup: ConfigCleanupTabProps;
   closeLabel: string;
   edit: ConfigEditTabProps;
   embedded?: boolean;
@@ -67,6 +72,7 @@ export function ConfigPanel({
   embedded = false,
   history,
   inspectorSummary,
+  cleanup,
   look,
   onClose,
   onTabChange,
@@ -120,6 +126,7 @@ export function ConfigPanel({
               </>
             ) : null}
             {activeTab === "project" ? <ConfigProjectTab {...project} /> : null}
+            {activeTab === "cleanup" ? <ConfigCleanupTab {...cleanup} /> : null}
             {activeTab === "history" ? (
               <HistoryPanel
                 currentRevision={history.currentRevision}

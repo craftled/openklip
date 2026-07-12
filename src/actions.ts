@@ -4,14 +4,25 @@
 // are the operations an external coding agent drives from the terminal.
 
 import { randomUUID } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { loadAudioAnalysis } from "./audio-analysis.ts";
+import type { SilenceSpan } from "./audio-analysis-core.ts";
 import { suggestCropFromSceneLog } from "./auto-crop.ts";
 import { CAPTION_STYLE_IDS, isCaptionStyleId } from "./caption-styles.ts";
+import {
+  buildCleanupReport,
+  CLEANUP_FILLER_CATEGORIES,
+  type CleanupReport,
+  partitionApplyCandidates,
+} from "./cleanup.ts";
 import { isNeutralColor } from "./color-adjust.ts";
 import {
   type Asset,
   type Audio,
   AudioSchema,
   type Broll,
+  CleanupSettingsSchema,
   type ColorAdjust,
   ColorAdjustSchema,
   type CropMode,
@@ -48,6 +59,7 @@ import {
   type JsonRenderCatalogId,
   JsonRenderCatalogSchema,
 } from "./json-render-catalogs.ts";
+import { projectPaths } from "./paths.ts";
 import { findPhraseRuns } from "./phrase-match.ts";
 import { CAPTION_INSET_PLATFORMS } from "./safe-areas.ts";
 
@@ -1229,6 +1241,148 @@ export function setCutSnap(project: Project, input: Partial<CutSnap>): Project {
   return project;
 }
 
+function tryLoadBriefSync(slug: string): string | undefined {
+  const briefPath = projectPaths(slug).brief;
+  if (!existsSync(briefPath)) {
+    return;
+  }
+  try {
+    return readFileSync(briefPath, "utf8");
+  } catch {
+    return;
+  }
+}
+
+function tryLoadSilencesSync(slug: string): SilenceSpan[] | null {
+  const cachePath = join(projectPaths(slug).working, "audio-analysis.json");
+  if (!existsSync(cachePath)) {
+    return null;
+  }
+  try {
+    const raw = JSON.parse(readFileSync(cachePath, "utf8")) as {
+      silences?: SilenceSpan[];
+    };
+    return Array.isArray(raw.silences) ? raw.silences : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setCleanupConfig(
+  project: Project,
+  input: {
+    hedging?: boolean | null;
+    hesitation?: boolean | null;
+    keepPadSec?: number | null;
+    minSec?: number | null;
+    repeat?: boolean | null;
+  }
+): Project {
+  const current = project.cuts?.cleanup ?? {};
+  const categories = { ...current.categories };
+  for (const key of CLEANUP_FILLER_CATEGORIES) {
+    const value = input[key];
+    if (value === null) {
+      categories[key] = undefined;
+    } else if (value !== undefined) {
+      categories[key] = value;
+    }
+  }
+  const cleanedCategories = Object.fromEntries(
+    Object.entries(categories).filter(
+      (entry): entry is [string, boolean] => entry[1] !== undefined
+    )
+  );
+  const nextCleanup: {
+    categories?: Record<string, boolean>;
+    keepPadSec?: number;
+    minSec?: number;
+  } = {};
+  if (input.minSec === null) {
+    // inherit default on read
+  } else if (input.minSec !== undefined) {
+    nextCleanup.minSec = input.minSec;
+  } else if (current.minSec !== undefined) {
+    nextCleanup.minSec = current.minSec;
+  }
+  if (input.keepPadSec === null) {
+    // inherit default on read
+  } else if (input.keepPadSec !== undefined) {
+    nextCleanup.keepPadSec = input.keepPadSec;
+  } else if (current.keepPadSec !== undefined) {
+    nextCleanup.keepPadSec = current.keepPadSec;
+  }
+  if (Object.keys(cleanedCategories).length > 0) {
+    nextCleanup.categories = cleanedCategories;
+  }
+  const hasCleanup = Object.keys(nextCleanup).length > 0;
+  project.cuts = {
+    ...project.cuts,
+    cleanup: hasCleanup ? CleanupSettingsSchema.parse(nextCleanup) : undefined,
+  };
+  return project;
+}
+
+export interface CleanupApplyResult {
+  deadAirSpanIds: string[];
+  extendedSpanIds: string[];
+  warnings: string[];
+  wordIds: string[];
+}
+
+export function applyCleanupFromReport(
+  project: Project,
+  report: CleanupReport,
+  mode: "safe" | "enabled"
+): CleanupApplyResult {
+  const { fillerIds, deadAirSpans } = partitionApplyCandidates(
+    report.candidates,
+    mode,
+    report.config
+  );
+  if (fillerIds.length > 0) {
+    const note =
+      mode === "safe" ? "cleanup: apply all safe" : "cleanup: apply enabled";
+    cutWords(project, fillerIds, true, note);
+  }
+  // cleanup-apply bypasses dead-air-add's 50-span-per-call cap by calling
+  // addDeadAir directly: one atomic action, bounded by MAX_DEAD_AIR_SPANS total.
+  // The 50-cap is a per-action-call guardrail for agent-composed edits.
+  const touched =
+    deadAirSpans.length > 0 ? addDeadAir(project, deadAirSpans) : [];
+  return {
+    wordIds: fillerIds,
+    deadAirSpanIds: touched
+      .filter((entry) => entry.created)
+      .map((entry) => entry.span.id),
+    extendedSpanIds: touched
+      .filter((entry) => !entry.created)
+      .map((entry) => entry.span.id),
+    warnings: report.warnings,
+  };
+}
+
+export async function applyCleanup(
+  project: Project,
+  input: { briefText?: string; mode: "safe" | "enabled" }
+): Promise<CleanupApplyResult> {
+  let silences = tryLoadSilencesSync(project.slug);
+  if (silences === null) {
+    try {
+      const analysis = await loadAudioAnalysis(project.slug);
+      silences = analysis.silences;
+    } catch {
+      // No ingest audio yet: buildCleanupReport degrades to filler-only.
+    }
+  }
+  const report = buildCleanupReport({
+    project,
+    silences,
+    briefText: input.briefText ?? tryLoadBriefSync(project.slug),
+  });
+  return applyCleanupFromReport(project, report, input.mode);
+}
+
 // Sliver floor for an INCOMING dead-air span before it is ever registered.
 // Distinct from MIN_DEAD_AIR_SLIVER_SEC in audio-analysis-core.ts, which
 // floors a REMAINDER kept after subtracting dead air from a range; the two
@@ -1249,10 +1403,15 @@ const MAX_DEAD_AIR_SPANS = 200;
 // validated (finite, toSec > fromSec), clamped to [0, project duration], and
 // dropped as a sliver under 0.05s after clamping; spans that end up touching
 // or overlapping (within THIS call) are merged before ids are assigned.
+export interface DeadAirTouch {
+  created: boolean;
+  span: DeadAirSpan;
+}
+
 export function addDeadAir(
   project: Project,
   spans: { fromSec: number; toSec: number }[]
-): DeadAirSpan[] {
+): DeadAirTouch[] {
   if (!Array.isArray(spans) || spans.length === 0) {
     throw new Error("dead-air spans must be a non-empty array");
   }
@@ -1298,7 +1457,7 @@ export function addDeadAir(
   const existingIds = new Set(existing.map((d) => d.id));
   const adjacentSamples = Math.round(DEAD_AIR_ADJACENT_SEC * SAMPLE_RATE);
   const nextSpans: DeadAirSpan[] = existing.map((d) => ({ ...d }));
-  const touched: DeadAirSpan[] = [];
+  const touched: DeadAirTouch[] = [];
   let seq = 0;
 
   for (const span of merged) {
@@ -1310,7 +1469,7 @@ export function addDeadAir(
     if (hit) {
       hit.startSample = Math.min(hit.startSample, span.startSample);
       hit.endSample = Math.max(hit.endSample, span.endSample);
-      touched.push(hit);
+      touched.push({ span: hit, created: false });
       continue;
     }
     let id: string;
@@ -1321,7 +1480,7 @@ export function addDeadAir(
     existingIds.add(id);
     const item: DeadAirSpan = { id, ...span };
     nextSpans.push(item);
-    touched.push(item);
+    touched.push({ span: item, created: true });
   }
 
   // 200-span cap: keep the earliest (by source time), silently drop overflow.
@@ -1334,11 +1493,11 @@ export function addDeadAir(
   // as an earlier span in this call (both `touched`); a caller reconciling
   // optimistic ids only needs each affected span once.
   const seenIds = new Set<string>();
-  return touched.filter((t) => {
-    if (!cappedIds.has(t.id) || seenIds.has(t.id)) {
+  return touched.filter((touch) => {
+    if (!cappedIds.has(touch.span.id) || seenIds.has(touch.span.id)) {
       return false;
     }
-    seenIds.add(t.id);
+    seenIds.add(touch.span.id);
     return true;
   });
 }
