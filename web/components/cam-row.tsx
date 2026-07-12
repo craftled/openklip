@@ -57,7 +57,10 @@ export function CamRowView({
       void video.play().catch(() => {
         // preview may fail when the proxy is absent in dev fixtures
       });
-      return;
+      // Stop audio when the row unmounts mid-playback (tab/panel switch).
+      return () => {
+        video.pause();
+      };
     }
     video.pause();
     video.currentTime = 0;
@@ -86,11 +89,9 @@ export function CamRowView({
             }
           }}
           onChange={(e) => {
-            const next = e.target.value;
-            setNameDraft(next);
-            if (next.trim()) {
-              onNameChange(cam.id, next.trim());
-            }
+            // Local draft only while typing; persistence happens on blur to
+            // avoid a server write per keystroke.
+            setNameDraft(e.target.value);
           }}
           value={nameDraft}
         />

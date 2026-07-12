@@ -425,6 +425,12 @@ function applyMaxShotVariety(
 
     trackRecent(span.shot);
 
+    // Locked spans hold exactly what the user pinned, however long.
+    if (span.locked) {
+      result.push(span);
+      continue;
+    }
+
     while (remaining.toSample - remaining.fromSample > maxShotSamples) {
       const breakAt = remaining.fromSample + maxShotSamples;
       result.push({
@@ -481,6 +487,17 @@ function pickVarietyShot(
   }
   const other = speakerIds.find((id) => id !== currentShot);
   return other ?? currentShot;
+}
+
+// Public max-shot clamp for auto-mode plans that were produced elsewhere
+// (LLM output after validatePlan). Splits any unlocked span exceeding
+// maxShotMs with a variety shot, mirroring ruleBasedAutoPlan's behavior.
+export function enforceMaxShotVariety(
+  plan: PlanSpan[],
+  opts: { cams: PlanCam[]; settings?: Partial<CamSwitchSettings> }
+): PlanSpan[] {
+  const settings = resolveSettings(opts.settings);
+  return applyMaxShotVariety(plan, opts.cams, settings);
 }
 
 // ── ruleBasedAutoPlan ─────────────────────────────────────────────────────────
@@ -740,14 +757,19 @@ function snapPlanEdges(
     const span = plan[i];
     let fromSample = span.fromSample;
     let toSample = span.toSample;
+    // A boundary touching a locked span is pinned: locked spans hold their
+    // exact user-chosen samples, so neither their own edges nor a neighbor's
+    // shared edge may snap.
+    const startPinned = span.locked || plan[i - 1]?.locked;
+    const endPinned = span.locked || plan[i + 1]?.locked;
 
-    if (i > 0) {
+    if (i > 0 && !startPinned) {
       const fromSec = samplesToSec(fromSample);
       const snappedSec = snapBoundary(fromSec, silences, maxShiftSec, "start");
       fromSample = secToSamples(snappedSec);
     }
 
-    if (i < plan.length - 1) {
+    if (i < plan.length - 1 && !endPinned) {
       const toSec = samplesToSec(toSample);
       const snappedSec = snapBoundary(toSec, silences, maxShiftSec, "end");
       toSample = secToSamples(snappedSec);
@@ -776,7 +798,8 @@ function snapPlanEdges(
 function overlayLocked(
   plan: PlanSpan[],
   locked: PlanSpan[],
-  minShotSamples: number
+  minShotSamples: number,
+  durationSamples: number
 ): PlanSpan[] {
   if (locked.length === 0) {
     return plan;
@@ -820,7 +843,7 @@ function overlayLocked(
   );
 
   // Absorb short remnants adjacent to locked spans
-  result = enforceMinShot(result, minShotSamples, result.at(-1)?.toSample ?? 0);
+  result = enforceMinShot(result, minShotSamples, durationSamples);
 
   return result;
 }
@@ -935,7 +958,12 @@ export function validatePlan(
   }
 
   if (opts.locked && opts.locked.length > 0) {
-    plan = overlayLocked(plan, opts.locked, minShotSamples);
+    plan = overlayLocked(
+      plan,
+      opts.locked,
+      minShotSamples,
+      opts.durationSamples
+    );
   }
 
   plan = ensureFullCoverage(plan, opts.durationSamples, fallbackShot);

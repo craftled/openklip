@@ -25,6 +25,7 @@ import { type Project, ProjectSchema, SAMPLE_RATE, type Word } from "./edl.ts";
 import { FFMPEG, probe, run } from "./ffmpeg.ts";
 import { buildProxy, extractAudio, transcribeToWords } from "./ingest.ts";
 import { camDir, projectPaths } from "./paths.ts";
+import { mutateProject } from "./projectStore.ts";
 import { defaultTemplateId } from "./templates.ts";
 
 export interface MixCam
@@ -67,29 +68,65 @@ export const MulticamProvenanceSchema = z.object({
 
 export type MulticamProvenance = z.infer<typeof MulticamProvenanceSchema>;
 
-function samplesToSec(samples: number): string {
-  return (samples / SAMPLE_RATE).toFixed(6).replace(/\.?0+$/, "") || "0";
+function fmtSec(sec: number): string {
+  return sec.toFixed(6).replace(/\.?0+$/, "") || "0";
 }
 
-function projectSecToCamLocalSec(projectSec: number, offsetMs: number): number {
-  return Math.max(0, projectSec - offsetMs / 1000);
+interface CamTrimWindow {
+  empty: boolean; // cam has zero footage inside the span
+  end: string; // cam-local trim end (sec)
+  leadSec: number; // missing footage before the window (pad black)
+  start: string; // cam-local trim start (sec)
+  tailSec: number; // missing footage after the window (pad black)
 }
 
-function camLocalTrimRange(
+// A plan span may extend past a cam's footage (late start via offsetMs, or a
+// file that ends early). Trim only what exists and report the gaps so the
+// caller pads them — every rendered segment must be exactly span-length or the
+// concat drifts against the program audio.
+function camTrimWindow(
+  cam: Pick<Cam, "offsetMs" | "durationSamples">,
   fromSample: number,
-  toSample: number,
-  offsetMs: number
-): { start: string; end: string } {
-  const projectStart = fromSample / SAMPLE_RATE;
-  const projectEnd = toSample / SAMPLE_RATE;
+  toSample: number
+): CamTrimWindow {
+  const offSec = cam.offsetMs / 1000;
+  const camDurSec = cam.durationSamples / SAMPLE_RATE;
+  const c0 = fromSample / SAMPLE_RATE - offSec;
+  const c1 = toSample / SAMPLE_RATE - offSec;
+  const availStart = Math.min(Math.max(c0, 0), camDurSec);
+  const availEnd = Math.min(Math.max(c1, 0), camDurSec);
   return {
-    start: samplesToSec(
-      Math.round(projectSecToCamLocalSec(projectStart, offsetMs) * SAMPLE_RATE)
-    ),
-    end: samplesToSec(
-      Math.round(projectSecToCamLocalSec(projectEnd, offsetMs) * SAMPLE_RATE)
-    ),
+    start: fmtSec(availStart),
+    end: fmtSec(availEnd),
+    leadSec: availStart - c0,
+    tailSec: c1 - availEnd,
+    empty: availEnd <= availStart,
   };
+}
+
+function padSuffix(win: CamTrimWindow): string {
+  const parts: string[] = [];
+  if (win.leadSec > 0.0005) {
+    parts.push(`start_duration=${fmtSec(win.leadSec)}:start_mode=add`);
+  }
+  if (win.tailSec > 0.0005) {
+    parts.push(`stop_duration=${fmtSec(win.tailSec)}:stop_mode=add`);
+  }
+  if (parts.length === 0) {
+    return "";
+  }
+  return `,tpad=${parts.join(":")}:color=black`;
+}
+
+function blackSourceChain(
+  size: { width: number; height: number; fps: number },
+  durationSec: number,
+  outLabel: string
+): string {
+  return (
+    `color=black:s=${size.width}x${size.height}:r=${size.fps}:` +
+    `d=${fmtSec(durationSec)},setsar=1${outLabel}`
+  );
 }
 
 function speakerCams(cams: Cam[]): Cam[] {
@@ -137,12 +174,16 @@ function buildCamTrimChain(
   target: { width: number; height: number; fps: number },
   outLabel: string
 ): string {
-  const { start, end } = camLocalTrimRange(fromSample, toSample, cam.offsetMs);
+  const win = camTrimWindow(cam, fromSample, toSample);
+  if (win.empty) {
+    const durationSec = (toSample - fromSample) / SAMPLE_RATE;
+    return blackSourceChain(target, durationSec, outLabel);
+  }
   return (
-    `[${inputIndex}:v]trim=start=${start}:end=${end},setpts=PTS-STARTPTS,` +
+    `[${inputIndex}:v]trim=start=${win.start}:end=${win.end},setpts=PTS-STARTPTS,` +
     `scale=${target.width}:${target.height}:force_original_aspect_ratio=decrease,` +
     `pad=${target.width}:${target.height}:(ow-iw)/2:(oh-ih)/2,setsar=1,` +
-    `fps=${target.fps}${outLabel}`
+    `fps=${target.fps}${padSuffix(win)}${outLabel}`
   );
 }
 
@@ -158,30 +199,30 @@ function buildSyntheticWideChain(
   // spanLabel arrives bracketed ("[seg2]"); cell labels must stay bracket-free
   // inside their own brackets or ffmpeg rejects the filterchain.
   const bare = spanLabel.replace(/[^A-Za-z0-9]/g, "");
-  const durationSec = ((span.toSample - span.fromSample) / SAMPLE_RATE).toFixed(
-    6
-  );
+
+  const spanDurationSec = (span.toSample - span.fromSample) / SAMPLE_RATE;
 
   if (speakers.length === 2) {
     const halfW = Math.floor(target.width / 2);
+    const cellSize = { width: halfW, height: target.height, fps: target.fps };
     const labels: string[] = [];
     speakers.forEach((cam, i) => {
       const idx = inputIndexById.get(cam.id);
       if (idx === undefined) {
         throw new Error(`missing input for cam ${cam.id}`);
       }
-      const trim = camLocalTrimRange(
-        span.fromSample,
-        span.toSample,
-        cam.offsetMs
-      );
       const cell = `w${bare}x${i}`;
-      parts.push(
-        `[${idx}:v]trim=start=${trim.start}:end=${trim.end},setpts=PTS-STARTPTS,` +
-          `scale=${halfW}:${target.height}:force_original_aspect_ratio=decrease,` +
-          `pad=${halfW}:${target.height}:(ow-iw)/2:(oh-ih)/2,setsar=1,` +
-          `fps=${target.fps}[${cell}]`
-      );
+      const win = camTrimWindow(cam, span.fromSample, span.toSample);
+      if (win.empty) {
+        parts.push(blackSourceChain(cellSize, spanDurationSec, `[${cell}]`));
+      } else {
+        parts.push(
+          `[${idx}:v]trim=start=${win.start}:end=${win.end},setpts=PTS-STARTPTS,` +
+            `scale=${halfW}:${target.height}:force_original_aspect_ratio=decrease,` +
+            `pad=${halfW}:${target.height}:(ow-iw)/2:(oh-ih)/2,setsar=1,` +
+            `fps=${target.fps}${padSuffix(win)}[${cell}]`
+        );
+      }
       labels.push(`[${cell}]`);
     });
     parts.push(`${labels.join("")}hstack=inputs=2${spanLabel}`);
@@ -193,6 +234,7 @@ function buildSyntheticWideChain(
   const gridLabels: string[] = [];
   const gridCount = 4;
 
+  const cellSize = { width: halfW, height: halfH, fps: target.fps };
   for (let i = 0; i < gridCount; i++) {
     const cam = speakers[i];
     const cell = `w${bare}x${i}`;
@@ -201,23 +243,20 @@ function buildSyntheticWideChain(
       if (idx === undefined) {
         throw new Error(`missing input for cam ${cam.id}`);
       }
-      const trim = camLocalTrimRange(
-        span.fromSample,
-        span.toSample,
-        cam.offsetMs
-      );
-      parts.push(
-        `[${idx}:v]trim=start=${trim.start}:end=${trim.end},setpts=PTS-STARTPTS,` +
-          `scale=${halfW}:${halfH}:force_original_aspect_ratio=decrease,` +
-          `pad=${halfW}:${halfH}:(ow-iw)/2:(oh-ih)/2,setsar=1,` +
-          `fps=${target.fps}[${cell}]`
-      );
+      const win = camTrimWindow(cam, span.fromSample, span.toSample);
+      if (win.empty) {
+        parts.push(blackSourceChain(cellSize, spanDurationSec, `[${cell}]`));
+      } else {
+        parts.push(
+          `[${idx}:v]trim=start=${win.start}:end=${win.end},setpts=PTS-STARTPTS,` +
+            `scale=${halfW}:${halfH}:force_original_aspect_ratio=decrease,` +
+            `pad=${halfW}:${halfH}:(ow-iw)/2:(oh-ih)/2,setsar=1,` +
+            `fps=${target.fps}${padSuffix(win)}[${cell}]`
+        );
+      }
       gridLabels.push(`[${cell}]`);
     } else {
-      parts.push(
-        `color=black:s=${halfW}x${halfH}:r=${target.fps}:d=${durationSec},` +
-          `setsar=1[${cell}]`
-      );
+      parts.push(blackSourceChain(cellSize, spanDurationSec, `[${cell}]`));
       gridLabels.push(`[${cell}]`);
     }
   }
@@ -409,13 +448,45 @@ function wordsMatchTranscript(existing: Word[], fresh: Word[]): boolean {
   return true;
 }
 
-// Re-mix word preservation: keep existing words (including deletions) only when
-// word count and text sequence match the fresh transcript; otherwise replace.
-function resolveWords(existing: Word[] | undefined, fresh: Word[]): Word[] {
-  if (existing && wordsMatchTranscript(existing, fresh)) {
-    return existing;
-  }
-  return fresh;
+function stampSpeakers(
+  words: Word[],
+  attributions: Array<{ wordId: string; camId: string | null }>
+): Word[] {
+  const attr = new Map(attributions.map((a) => [a.wordId, a.camId] as const));
+  return words.map((w) => {
+    const camId = attr.get(w.id);
+    return camId ? { ...w, speaker: camId } : { ...w, speaker: undefined };
+  });
+}
+
+export interface CamMixProjectPatch {
+  durationSamples: number;
+  fps: number;
+  height: number;
+  multicam: MulticamProvenance;
+  proxy: string;
+  sampleRate: typeof SAMPLE_RATE;
+  source: string;
+  width: number;
+}
+
+// Re-mix contract: refresh only what the mix invalidates (source media,
+// geometry, duration, words, provenance) and preserve every other user edit
+// (cuts live in words, plus b-roll/titles/zooms/music/look/captions/export).
+// Words keep the user's deletions/corrections when the fresh transcript's text
+// sequence is unchanged; otherwise the fresh transcript wins.
+export function applyCamMixToProject(
+  loaded: Project,
+  patch: CamMixProjectPatch,
+  freshWords: Word[],
+  attributions: Array<{ wordId: string; camId: string | null }>
+): Word[] {
+  const base = wordsMatchTranscript(loaded.words, freshWords)
+    ? loaded.words
+    : freshWords;
+  const words = stampSpeakers(base, attributions);
+  Object.assign(loaded, patch, { words });
+  return words;
 }
 
 function resolveSettings(
@@ -567,30 +638,6 @@ export async function camMix(
   const meta = await probe(sourceOut);
   const renderedDurationSamples = Math.round(meta.durationSec * SAMPLE_RATE);
 
-  let existingWords: Word[] | undefined;
-  if (existsSync(paths.project)) {
-    try {
-      const existing = ProjectSchema.parse(
-        JSON.parse(await readFile(paths.project, "utf8"))
-      );
-      existingWords = existing.words;
-    } catch {
-      existingWords = undefined;
-    }
-  }
-
-  const attrByWordId = new Map(
-    attributions.map((a) => [a.wordId, a.camId] as const)
-  );
-  const resolvedWords = resolveWords(existingWords, freshWords);
-  const words = resolvedWords.map((w) => {
-    const camId = attrByWordId.get(w.id);
-    if (!camId) {
-      return w;
-    }
-    return { ...w, speaker: camId };
-  });
-
   const multicam: MulticamProvenance = {
     version: 1,
     mode,
@@ -609,9 +656,7 @@ export async function camMix(
     programAudio: { masterMix: opts?.masterMix ?? null },
   };
 
-  const project: Project = ProjectSchema.parse({
-    version: 1,
-    slug,
+  const patch: CamMixProjectPatch = {
     source: sourceOut,
     proxy: "working/proxy.mp4",
     sampleRate: SAMPLE_RATE,
@@ -619,14 +664,36 @@ export async function camMix(
     width: meta.width,
     height: meta.height,
     durationSamples: renderedDurationSamples,
-    padMs: 50,
-    template: defaultTemplateId(),
-    captions: { enabled: true, maxWords: 6 },
-    words,
     multicam,
-  });
+  };
 
-  await Bun.write(paths.project, JSON.stringify(project, null, 2));
+  let words: Word[];
+  if (existsSync(paths.project)) {
+    // Re-mix of an existing project: apply through mutateProject so the
+    // revision counter, history snapshot, and actions.jsonl entry are kept
+    // (same contract as assembly's wholesale replacement).
+    words = await mutateProject(
+      slug,
+      (loaded) => applyCamMixToProject(loaded, patch, freshWords, attributions),
+      {
+        action: "cam-mix",
+        input: { mode, plannedBy, spans: plan.length },
+      }
+    );
+  } else {
+    // First mix creates the project, mirroring ingest/assembly project birth.
+    words = stampSpeakers(freshWords, attributions);
+    const project: Project = ProjectSchema.parse({
+      version: 1,
+      slug,
+      padMs: 50,
+      template: defaultTemplateId(),
+      captions: { enabled: true, maxWords: 6 },
+      words,
+      ...patch,
+    });
+    await Bun.write(paths.project, JSON.stringify(project, null, 2));
+  }
   await Bun.write(paths.transcript, JSON.stringify({ words }, null, 2));
 
   return {

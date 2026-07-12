@@ -4,9 +4,9 @@ import { existsSync } from "node:fs";
 import { assembleFromSelection, listTakes, loadTake } from "@engine/assembly";
 import { loadBrief, saveBrief as saveBriefFile } from "@engine/brief";
 import { logBriefSet } from "@engine/brief-log";
-import { camMix } from "@engine/cam-mix";
+import type { camMix } from "@engine/cam-mix";
 import type { CamSwitchSettings } from "@engine/cam-plan";
-import { camRemix } from "@engine/cam-remix";
+import { camMixOrRemix } from "@engine/cam-remix";
 import { type CamRole, listCams, setCam } from "@engine/cams";
 import type {
   ColorAdjust,
@@ -615,18 +615,12 @@ export async function camMixAction(
   }>
 > {
   try {
-    // A re-mix of an existing multicam project must carry locked plan spans
-    // forward (camRemix); only the first mix plans entirely from scratch.
-    const existing = await loadProject(slug).catch(() => null);
-    const hasProvenance = Boolean(
-      (existing as (Project & { multicam?: unknown }) | null)?.multicam
-    );
-    const mix = hasProvenance
-      ? await camRemix(slug, { mode: opts.mode, settings: opts.settings })
-      : await camMix(slug, {
-          mode: opts.mode,
-          settings: opts.settings,
-        });
+    // camMixOrRemix carries locked plan spans forward when multicam
+    // provenance exists; only the first mix plans entirely from scratch.
+    const mix = await camMixOrRemix(slug, {
+      mode: opts.mode,
+      settings: opts.settings,
+    });
     const project = await loadProject(slug);
     return { ok: true, data: { mix, project } };
   } catch (e) {

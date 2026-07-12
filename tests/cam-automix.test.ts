@@ -401,3 +401,40 @@ test("autoMixPlan: same ctx and canned reply is deterministic", async () => {
   assert.equal(a.fallback, b.fallback);
   assert.equal(a.plannedBy, b.plannedBy);
 });
+
+// ── Second-opinion review regression (codex lane, pre-PR) ────────────────────
+
+test("autoMixPlan clamps model output to maxShotMs (no unlocked marathon shots)", async () => {
+  const ctx = makeBaseContext();
+  const duration = ctx.durationSamples;
+  const durationSec = duration / SAMPLE_RATE;
+  const result = await autoMixPlan(ctx, {
+    agent: "claude-opus-4-8",
+    runText: () =>
+      Promise.resolve(
+        JSON.stringify({
+          spans: [
+            {
+              fromSec: 0,
+              toSec: durationSec,
+              shot: "cam-a",
+              reason: "one take",
+            },
+          ],
+        })
+      ),
+  });
+  assert.equal(result.fallback, false);
+  const maxShotSamples = Math.round(
+    (DEFAULT_CAM_SWITCH_SETTINGS.maxShotMs / 1000) * SAMPLE_RATE
+  );
+  for (const span of result.plan) {
+    if (!span.locked) {
+      assert.ok(
+        span.toSample - span.fromSample <= maxShotSamples,
+        `span ${span.fromSample}-${span.toSample} (${span.shot}) exceeds maxShotMs`
+      );
+    }
+  }
+  assertFullCoverage(result.plan, duration, ["cam-a", "cam-b", "wide"]);
+});

@@ -6,6 +6,7 @@ import { runAgentText } from "./agent-driver.ts";
 import {
   type CamSwitchSettings,
   DEFAULT_CAM_SWITCH_SETTINGS,
+  enforceMaxShotVariety,
   type PlanCam,
   type PlanSpan,
   ruleBasedAutoPlan,
@@ -303,12 +304,18 @@ export async function autoMixPlan(
       durationSamples: ctx.durationSamples,
       settings: ctx.settings,
     });
-    const plan = validatePlan(raw, {
+    const validated = validatePlan(raw, {
       cams: planCams,
       durationSamples: ctx.durationSamples,
       settings: ctx.settings,
       silences: ctx.silences,
       fallback: rules,
+    });
+    // Auto mode promises a max-shot variety guardrail; the model is asked to
+    // respect it but the clamp must be deterministic.
+    const plan = enforceMaxShotVariety(validated, {
+      cams: planCams,
+      settings: ctx.settings,
     });
     return {
       plan,

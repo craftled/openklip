@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  applyCamMixToProject,
   buildCamMixArgs,
   buildCamMixVideoFilter,
   camMix,
@@ -391,4 +392,192 @@ test("buildCamMixVideoFilter synthetic wide labels contain no nested brackets", 
       `malformed filter label: ${label}`
     );
   }
+});
+
+// ── Second-opinion review regressions (codex lane, pre-PR) ───────────────────
+
+function mkProject(overrides: Record<string, unknown> = {}) {
+  return ProjectSchema.parse({
+    version: 1,
+    slug: "fixture",
+    source: "/tmp/old-source.mp4",
+    proxy: "working/proxy.mp4",
+    sampleRate: 48_000,
+    fps: 30,
+    width: 1280,
+    height: 720,
+    durationSamples: 480_000,
+    padMs: 50,
+    words: [
+      {
+        id: "w0",
+        text: "hello",
+        startSample: 0,
+        endSample: 24_000,
+        deleted: false,
+      },
+      {
+        id: "w1",
+        text: "world",
+        startSample: 24_000,
+        endSample: 48_000,
+        deleted: true,
+      },
+    ],
+    titles: [
+      {
+        id: "t1",
+        kind: "lower-third",
+        text: "Keep me",
+        startSample: 0,
+        endSample: 96_000,
+      },
+    ],
+    ...overrides,
+  });
+}
+
+function mkPatch() {
+  return {
+    source: "/tmp/new-source.mp4",
+    proxy: "working/proxy.mp4",
+    sampleRate: 48_000 as const,
+    fps: 30,
+    width: 1280,
+    height: 720,
+    durationSamples: 480_000,
+    multicam: MulticamProvenanceSchema.parse({
+      version: 1,
+      mode: "follow",
+      settings: {
+        minShotMs: 2000,
+        interjectionMs: 700,
+        leadMs: 250,
+        maxShotMs: 25_000,
+        snapMs: 120,
+        wide: "auto",
+      },
+      plan: [{ fromSample: 0, toSample: 480_000, shot: "cam1" }],
+      cams: [
+        {
+          id: "cam1",
+          name: "A",
+          role: "speaker",
+          offsetMs: 0,
+          source: "/a.mp4",
+        },
+        {
+          id: "cam2",
+          name: "B",
+          role: "speaker",
+          offsetMs: 0,
+          source: "/b.mp4",
+        },
+      ],
+      attributions: [],
+      plannedBy: "follow",
+      plannedAt: "2026-07-12T00:00:00.000Z",
+      programAudio: { masterMix: null },
+    }),
+  };
+}
+
+test("applyCamMixToProject preserves edit state and deletions when words match", () => {
+  const loaded = mkProject();
+  const fresh = [
+    {
+      id: "w0",
+      text: "hello",
+      startSample: 0,
+      endSample: 24_000,
+      deleted: false,
+    },
+    {
+      id: "w1",
+      text: "world",
+      startSample: 24_000,
+      endSample: 48_000,
+      deleted: false,
+    },
+  ];
+  const words = applyCamMixToProject(loaded, mkPatch(), fresh, [
+    { wordId: "w0", camId: "cam1" },
+    { wordId: "w1", camId: "cam2" },
+  ]);
+  assert.equal(loaded.titles.length, 1, "user titles survive re-mix");
+  assert.equal(loaded.titles[0]?.text, "Keep me");
+  assert.equal(
+    words[1]?.deleted,
+    true,
+    "user deletion survives (existing words kept)"
+  );
+  assert.equal(words[0]?.speaker, "cam1", "speaker stamped");
+  assert.equal(words[1]?.speaker, "cam2");
+  assert.equal(loaded.source, "/tmp/new-source.mp4", "source refreshed");
+  assert.ok(loaded.multicam, "provenance attached");
+});
+
+test("applyCamMixToProject adopts fresh words when transcript diverges, keeps other state", () => {
+  const loaded = mkProject();
+  const fresh = [
+    {
+      id: "w0",
+      text: "different",
+      startSample: 0,
+      endSample: 24_000,
+      deleted: false,
+    },
+    {
+      id: "w1",
+      text: "content",
+      startSample: 24_000,
+      endSample: 48_000,
+      deleted: false,
+    },
+  ];
+  const words = applyCamMixToProject(loaded, mkPatch(), fresh, []);
+  assert.equal(words[0]?.text, "different", "fresh transcript adopted");
+  assert.equal(
+    words[1]?.deleted,
+    false,
+    "old deletions not carried onto new words"
+  );
+  assert.equal(loaded.titles.length, 1, "non-word edit state still survives");
+});
+
+test("buildCamMixVideoFilter pads missing footage so segment durations stay exact", () => {
+  const cams = [
+    mkCam({ id: "cam1", role: "speaker" }),
+    // cam2 starts 2s late and its file is only 4s long
+    mkCam({
+      id: "cam2",
+      role: "speaker",
+      offsetMs: 2000,
+      durationSamples: sec(4),
+    }),
+  ];
+  const plan: PlanSpan[] = [
+    // cam2 shown for project 0-4s: first 2s have no cam2 footage (lead pad)
+    { fromSample: 0, toSample: sec(4), shot: "cam2" },
+    // cam2 shown for project 4-8s: cam2 footage ends at project 6s (tail pad)
+    { fromSample: sec(4), toSample: sec(8), shot: "cam2" },
+    { fromSample: sec(8), toSample: sec(12), shot: "cam1" },
+  ];
+  const { filter } = buildCamMixVideoFilter(plan, cams, {
+    width: 1280,
+    height: 720,
+    fps: 30,
+  });
+  assert.ok(
+    /tpad=[^;[]*start_duration=2/.test(filter),
+    `lead gap padded with 2s: ${filter.slice(0, 400)}`
+  );
+  assert.ok(
+    /tpad=[^;[]*stop_duration=2/.test(filter),
+    "tail gap padded with 2s"
+  );
+  assert.ok(
+    !/\[2:v\]|\[seg2\][^;]*tpad/.test(filter.split("[seg2]")[0] ?? ""),
+    "fully covered cam1 span gets no pad"
+  );
 });

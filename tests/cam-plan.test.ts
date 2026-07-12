@@ -660,3 +660,61 @@ test("applyOverrides preserves previously locked spans across a second override"
   );
   assert.equal(first?.locked, true, "and stays locked");
 });
+
+// ── Second-opinion review regressions (grok lane, pre-PR) ────────────────────
+
+test("validatePlan never snaps locked span boundaries onto silence edges", () => {
+  const sec = (n: number) => Math.round(n * 48_000);
+  const cams = [
+    { id: "cam-a", role: "speaker" as const },
+    { id: "cam-b", role: "speaker" as const },
+  ];
+  // Silence edges sit 50ms away from the locked boundaries — inside snapMs=120.
+  const silences = [
+    { startSec: 9.55, endSec: 10.05 },
+    { startSec: 14.95, endSec: 15.45 },
+  ];
+  const plan = [
+    { fromSample: 0, toSample: sec(10), shot: "cam-a" },
+    { fromSample: sec(10), toSample: sec(15), shot: "cam-b", locked: true },
+    { fromSample: sec(15), toSample: sec(30), shot: "cam-a" },
+  ];
+  const out = validatePlan(plan, {
+    cams,
+    durationSamples: sec(30),
+    silences,
+    locked: plan.filter((s) => s.locked),
+  });
+  const lockedOut = out.find((s) => s.locked);
+  assert.ok(lockedOut, "locked span still present");
+  assert.equal(lockedOut?.fromSample, sec(10), "locked start not snapped");
+  assert.equal(lockedOut?.toSample, sec(15), "locked end not snapped");
+  assert.equal(lockedOut?.shot, "cam-b");
+});
+
+test("validatePlan without explicit locked opts still respects locked flags in the plan", () => {
+  const sec = (n: number) => Math.round(n * 48_000);
+  const cams = [
+    { id: "cam-a", role: "speaker" as const },
+    { id: "cam-b", role: "speaker" as const },
+  ];
+  const silences = [{ startSec: 9.55, endSec: 10.05 }];
+  // This mirrors camMix's re-validation of a pre-resolved plan (opts.plan path).
+  const plan = [
+    { fromSample: 0, toSample: sec(10), shot: "cam-a" },
+    { fromSample: sec(10), toSample: sec(15), shot: "cam-b", locked: true },
+    { fromSample: sec(15), toSample: sec(30), shot: "cam-a" },
+  ];
+  const out = validatePlan(plan, { cams, durationSamples: sec(30), silences });
+  const lockedOut = out.find((s) => s.shot === "cam-b");
+  assert.equal(
+    lockedOut?.fromSample,
+    sec(10),
+    "locked start stable without opts.locked"
+  );
+  assert.equal(
+    lockedOut?.toSample,
+    sec(15),
+    "locked end stable without opts.locked"
+  );
+});

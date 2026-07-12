@@ -30,8 +30,8 @@ import { measureMusicBpm } from "./bpm.ts";
 import { loadBrief, saveBrief } from "./brief.ts";
 import { logBriefSet } from "./brief-log.ts";
 import { suggestBroll } from "./broll-suggest.ts";
-import { camMix, planTimelineSummary } from "./cam-mix.ts";
-import { camRemix } from "./cam-remix.ts";
+import { planTimelineSummary } from "./cam-mix.ts";
+import { camMixOrRemix, camRemix } from "./cam-remix.ts";
 import { type CamRole, ingestCam, listCams, setCam } from "./cams.ts";
 import { buildCleanupReport } from "./cleanup.ts";
 import { transitionExportPreview } from "./cut-transition-gate.ts";
@@ -1421,7 +1421,7 @@ const queryTools: AgentToolDef[] = [
         ...(leadMs === undefined ? {} : { leadMs }),
         ...(wide === undefined ? {} : { wide }),
       };
-      const result = await camMix(projectSlug, {
+      const result = await camMixOrRemix(projectSlug, {
         mode,
         agent,
         masterMix,

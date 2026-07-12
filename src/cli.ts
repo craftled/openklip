@@ -29,8 +29,8 @@ import {
   formatBrollSuggestJson,
   suggestBroll,
 } from "./broll-suggest.ts";
-import { camMix, planTimelineSummary } from "./cam-mix.ts";
-import { camRemix } from "./cam-remix.ts";
+import { planTimelineSummary } from "./cam-mix.ts";
+import { camMixOrRemix, camRemix } from "./cam-remix.ts";
 import { type CamRole, ingestCam, listCams, setCam } from "./cams.ts";
 import { isCaptionStyleId, listCaptionStyles } from "./caption-styles.ts";
 import { buildCleanupReport, partitionSafeCandidates } from "./cleanup.ts";
@@ -3098,7 +3098,7 @@ try {
           : { leadMs: flagNumber(rest, "--lead") }),
         ...(wide === undefined ? {} : { wide }),
       };
-      const result = await camMix(slug, {
+      const result = await camMixOrRemix(slug, {
         mode,
         settings: Object.keys(settings).length > 0 ? settings : undefined,
         masterMix,

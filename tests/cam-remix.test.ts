@@ -4,7 +4,11 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { PlanSpan } from "../src/cam-plan.ts";
 import { DEFAULT_CAM_SWITCH_SETTINGS } from "../src/cam-plan.ts";
-import { camRemix, resolveCamRemixPlan } from "../src/cam-remix.ts";
+import {
+  camRemix,
+  hasMulticamProvenance,
+  resolveCamRemixPlan,
+} from "../src/cam-remix.ts";
 import type { Cam } from "../src/cams.ts";
 import { CamSchema } from "../src/cams.ts";
 import { SAMPLE_RATE } from "../src/edl.ts";
@@ -205,5 +209,30 @@ test("resolveCamRemixPlan mode switch re-plans while honoring locked spans", asy
       0,
       "auto re-plan still produces unlocked regions"
     );
+  });
+});
+
+// ── Second-opinion review regressions (grok+codex lanes, pre-PR) ─────────────
+// CLI cam-mix / MCP cam_mix / GUI re-mix must all route through camRemix when
+// multicam provenance exists, or locked spans are silently dropped.
+
+test("hasMulticamProvenance is true only for projects with a multicam block", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    assert.equal(await hasMulticamProvenance(slug), false);
+  });
+  await withTempProjectsRoot(async ({ slug }) => {
+    const plan = [{ fromSample: 0, toSample: sec(30), shot: "cam1" }];
+    writeFixtureProject(
+      slug,
+      makeProject({ slug, multicam: mkMulticam(plan) })
+    );
+    assert.equal(await hasMulticamProvenance(slug), true);
+  });
+});
+
+test("hasMulticamProvenance is false when no project exists", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    assert.equal(await hasMulticamProvenance(slug), false);
   });
 });

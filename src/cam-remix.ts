@@ -172,6 +172,21 @@ export async function resolveCamRemixPlan(
   let plan = [...provenance.plan];
 
   if (opts?.overrides && opts.overrides.length > 0) {
+    // Fail fast on impossible overrides instead of silently dropping them in
+    // the validator (inverted span) or dying at ffmpeg (unknown shot).
+    const validShots = new Set([...cams.map((c) => c.id), "wide"]);
+    for (const o of opts.overrides) {
+      if (!(o.toSec > o.fromSec)) {
+        throw new Error(
+          `bad override span ${o.fromSec}-${o.toSec} (toSec must be greater than fromSec)`
+        );
+      }
+      if (!validShots.has(o.shot)) {
+        throw new Error(
+          `unknown shot "${o.shot}" (use one of: ${[...validShots].join(", ")})`
+        );
+      }
+    }
     const overrideSpans: PlanSpan[] = opts.overrides.map((o) => ({
       fromSample: secToSamples(o.fromSec),
       toSample: secToSamples(o.toSec),
@@ -213,6 +228,7 @@ export async function camRemix(
     mode?: "follow" | "auto";
     settings?: Partial<CamSwitchSettings>;
     agent?: string;
+    masterMix?: string;
   }
 ): Promise<CamMixResult> {
   const resolved = await resolveCamRemixPlan(slug, opts);
@@ -220,7 +236,31 @@ export async function camRemix(
     plan: resolved.plan,
     mode: resolved.mode,
     settings: resolved.settings,
-    masterMix: resolved.masterMix,
+    masterMix: opts?.masterMix ?? resolved.masterMix,
     agent: resolved.agent,
   });
+}
+
+/** True when the project exists and carries a multicam provenance block. */
+export async function hasMulticamProvenance(slug: string): Promise<boolean> {
+  const project = await loadProject(slug).catch(() => null);
+  return Boolean((project as Record<string, unknown> | null)?.multicam);
+}
+
+// Every re-mix surface (CLI cam-mix, MCP cam_mix, GUI re-mix) must preserve
+// locked plan spans. Route through camRemix whenever provenance exists; only
+// the very first mix of a project plans from scratch.
+export async function camMixOrRemix(
+  slug: string,
+  opts?: {
+    mode?: "follow" | "auto";
+    settings?: Partial<CamSwitchSettings>;
+    masterMix?: string;
+    agent?: string;
+  }
+): Promise<CamMixResult> {
+  if (await hasMulticamProvenance(slug)) {
+    return camRemix(slug, opts);
+  }
+  return camMix(slug, opts);
 }
