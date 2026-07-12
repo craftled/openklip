@@ -66,3 +66,11 @@ FIX_FIRST
 1. hand over: branch `claude/feature-availability-check-f784a6` + this report — remove the `OPENKLIP_SLUG` env pin from `.claude/launch.json` (one line), commit, then push and open the PR so remote CI (the only unrun required gate for merge) executes.
 2. `$tstack-qa` acceptance run on real multi-cam footage before tagging/publishing 0.42.0.0 (spec-mandated release gate).
 3. Optional hardening given the 7k-line diff: `$tstack-review` (fresh context / codex second opinion) + `$tstack-devex-qa` over the new cam-* CLI surface.
+
+## Amendment — 2026-07-12 (post fresh review)
+
+Requested actions executed: launch-config fix (5919048), fresh-context review, PR creation.
+
+Second-opinion review (Second Opinion mode, `$tstack-review`): grok composer-2.5-fast and codex gpt-5.5 lanes both returned FIX_FIRST with 5 distinct blocking findings (lock drop on CLI/MCP re-mix; locked-boundary snap drift; re-mix edit-state loss; mutateProject/history bypass; offset/short-cam duration drift; missing LLM max-shot clamp). All fixed red-first in 159e7bb; formatter-only hunks in 5 pre-existing files judged acceptable drift; my same-context read added early override validation + GUI row cleanups. Post-fix: `bun run ci` green (2045 tests/0 fail), integration suites green, and the lock-preservation case verified live on the demo project (locked wide exact through plain cam-mix, revision 1 recorded).
+
+Review verdict after fixes: PASS. Remote CI pending on the PR; real-footage acceptance still gates tag/publish only.
