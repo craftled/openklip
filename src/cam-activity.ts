@@ -14,16 +14,16 @@ import { FFMPEG, run } from "./ffmpeg.ts";
 import { projectPaths } from "./paths.ts";
 
 export interface ActivityCam {
-  id: string;
-  role: "speaker" | "wide";
-  offsetMs: number;
   audioPath: string;
+  id: string;
+  offsetMs: number;
+  role: "speaker" | "wide";
 }
 
 export interface CamActivity {
   camId: string;
-  windowMs: number;
   db: number[];
+  windowMs: number;
 }
 
 export interface SpeakingSpan {
@@ -33,8 +33,8 @@ export interface SpeakingSpan {
 }
 
 export interface SpeakerAttribution {
-  wordId: string;
   camId: string | null;
+  wordId: string;
 }
 
 const SILENCE_FLOOR_DB = -100;
@@ -74,7 +74,9 @@ function activityCachePath(audioPath: string): string {
 }
 
 function resolveAudioPath(slug: string, audioPath: string): string {
-  return audioPath.startsWith("/") ? audioPath : join(projectPaths(slug).dir, audioPath);
+  return audioPath.startsWith("/")
+    ? audioPath
+    : join(projectPaths(slug).dir, audioPath);
 }
 
 async function readPcmFile(audioPath: string): Promise<Float32Array> {
@@ -156,7 +158,10 @@ function projectSecToCamLocalSec(projectSec: number, offsetMs: number): number {
   return projectSec - offsetMs / 1000;
 }
 
-function camLocalSecToProjectSample(camLocalSec: number, offsetMs: number): number {
+function camLocalSecToProjectSample(
+  camLocalSec: number,
+  offsetMs: number
+): number {
   return Math.round((camLocalSec + offsetMs / 1000) * SAMPLE_RATE);
 }
 
@@ -216,14 +221,11 @@ function meanDbOverCamLocalRange(
 }
 
 interface ActiveRun {
-  startWindow: number;
   endWindowExclusive: number;
+  startWindow: number;
 }
 
-function activeRuns(
-  activity: CamActivity,
-  thresholdDb: number
-): ActiveRun[] {
+function activeRuns(activity: CamActivity, thresholdDb: number): ActiveRun[] {
   const runs: ActiveRun[] = [];
   let runStart = -1;
   for (let w = 0; w < activity.db.length; w++) {
@@ -269,19 +271,17 @@ function mergeSpansForCam(
   spans: SpeakingSpan[],
   mergeGapMs: number
 ): SpeakingSpan[] {
-  if (spans.length === 0) {
-    return [];
-  }
   const sorted = [...spans].sort((a, b) => a.fromSample - b.fromSample);
-  const merged: SpeakingSpan[] = [sorted[0]!];
-  for (let i = 1; i < sorted.length; i++) {
-    const prev = merged.at(-1)!;
-    const cur = sorted[i]!;
-    const gapMs = ((cur.fromSample - prev.toSample) / SAMPLE_RATE) * 1000;
-    if (gapMs <= mergeGapMs) {
+  const merged: SpeakingSpan[] = [];
+  for (const cur of sorted) {
+    const prev = merged.at(-1);
+    const gapMs = prev
+      ? ((cur.fromSample - prev.toSample) / SAMPLE_RATE) * 1000
+      : Number.POSITIVE_INFINITY;
+    if (prev && gapMs <= mergeGapMs) {
       prev.toSample = Math.max(prev.toSample, cur.toSample);
     } else {
-      merged.push(cur);
+      merged.push({ ...cur });
     }
   }
   return merged;
@@ -304,7 +304,7 @@ export function speakingSpans(
 
   for (const activity of activities) {
     const cam = camById.get(activity.camId);
-    if (!cam || cam.role !== "speaker") {
+    if (cam?.role !== "speaker") {
       continue;
     }
     const runs = activeRuns(activity, thresholdDb);
@@ -334,12 +334,19 @@ export function attributeWords(
 
     for (const activity of activities) {
       const cam = camById.get(activity.camId);
-      if (!cam || cam.role !== "speaker") {
+      if (cam?.role !== "speaker") {
         continue;
       }
-      const camLocalFrom = projectSecToCamLocalSec(projectFromSec, cam.offsetMs);
+      const camLocalFrom = projectSecToCamLocalSec(
+        projectFromSec,
+        cam.offsetMs
+      );
       const camLocalTo = projectSecToCamLocalSec(projectToSec, cam.offsetMs);
-      const meanDb = meanDbOverCamLocalRange(activity, camLocalFrom, camLocalTo);
+      const meanDb = meanDbOverCamLocalRange(
+        activity,
+        camLocalFrom,
+        camLocalTo
+      );
       if (meanDb >= thresholdDb && meanDb > bestDb) {
         bestDb = meanDb;
         bestCamId = cam.id;
@@ -452,23 +459,11 @@ export async function buildProgramAudio(
       ? resolveAudioPath(slug, opts.masterMix)
       : undefined,
   });
-  await run(mixArgs[0]!, mixArgs.slice(1), "ffmpeg(program-audio)");
+  await run(FFMPEG, mixArgs.slice(1), "ffmpeg(program-audio)");
 
   await run(
     FFMPEG,
-    [
-      "-y",
-      "-i",
-      wav,
-      "-vn",
-      "-ac",
-      "1",
-      "-ar",
-      "16000",
-      "-f",
-      "f32le",
-      pcm16k,
-    ],
+    ["-y", "-i", wav, "-vn", "-ac", "1", "-ar", "16000", "-f", "f32le", pcm16k],
     "ffmpeg(program-audio16k)"
   );
 

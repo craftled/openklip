@@ -8,11 +8,11 @@ import {
   DEFAULT_CAM_SWITCH_SETTINGS,
   type PlanCam,
   type PlanSpan,
-  type SpeakingSpan,
   ruleBasedAutoPlan,
+  type SpeakingSpan,
   validatePlan,
 } from "./cam-plan.ts";
-import { type Word, SAMPLE_RATE } from "./edl.ts";
+import { SAMPLE_RATE, type Word } from "./edl.ts";
 
 const TRANSCRIPT_MAX_CHARS = 6000;
 
@@ -47,9 +47,7 @@ function resolveSettings(
   return { ...DEFAULT_CAM_SWITCH_SETTINGS, ...partial };
 }
 
-function camNameById(
-  cams: AutoMixContext["cams"]
-): Map<string, string> {
+function camNameById(cams: AutoMixContext["cams"]): Map<string, string> {
   return new Map(cams.map((c) => [c.id, c.name]));
 }
 
@@ -128,12 +126,10 @@ function buildSpeakingTimeline(ctx: AutoMixContext): string {
 
 function buildCastList(ctx: AutoMixContext): string {
   const hasWideCam = ctx.cams.some((c) => c.role === "wide");
-  const castLines = ctx.cams.map(
-    (c) => `- ${c.id}: ${c.name} (${c.role})`
-  );
+  const castLines = ctx.cams.map((c) => `- ${c.id}: ${c.name} (${c.role})`);
   const wideNote = hasWideCam
-    ? "A dedicated wide camera is registered; synthetic \"wide\" is also always available as a valid shot."
-    : "No dedicated wide camera is registered, but synthetic \"wide\" is always available as a valid shot.";
+    ? 'A dedicated wide camera is registered; synthetic "wide" is also always available as a valid shot.'
+    : 'No dedicated wide camera is registered, but synthetic "wide" is always available as a valid shot.';
   return `${castLines.join("\n")}\n${wideNote}`;
 }
 
@@ -277,7 +273,7 @@ export async function autoMixPlan(
   const hasInjectedRunText = opts?.runText !== undefined;
   const agent = opts?.agent;
 
-  if (!hasInjectedRunText && !agent) {
+  if (!(hasInjectedRunText || agent)) {
     return {
       plan: rulesPlan,
       plannedBy: "rules",

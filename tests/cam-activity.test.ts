@@ -1,5 +1,12 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, stat, utimes, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  stat,
+  utimes,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -9,14 +16,14 @@ import {
   DEFAULT_WINDOW_MS,
 } from "../src/audio-analysis-core.ts";
 import {
+  type ActivityCam,
   attributeWords,
+  type CamActivity,
   computeActivityFromPcm,
   dbAt,
   loadCamActivity,
   programAudioArgs,
   speakingSpans,
-  type ActivityCam,
-  type CamActivity,
 } from "../src/cam-activity.ts";
 import { SAMPLE_RATE } from "../src/edl.ts";
 import { FFMPEG } from "../src/ffmpeg.ts";
@@ -81,8 +88,8 @@ test("computeActivityFromPcm separates silence from signal", () => {
     signalWindows: [{ startMs: 0, endMs: 200, amplitude: 0.5 }],
   });
   const db = computeActivityFromPcm(pcm);
-  const silentWindow = db[15]!;
-  const signalWindow = db[0]!;
+  const silentWindow = db[15] ?? Number.NaN;
+  const signalWindow = db[0] ?? Number.NaN;
   assert.ok(signalWindow > DEFAULT_THRESHOLD_DB);
   assert.ok(silentWindow < DEFAULT_THRESHOLD_DB);
   assert.ok(signalWindow - silentWindow > 20);
@@ -131,9 +138,9 @@ test("speakingSpans alternates two speaker cams", () => {
   const cam2Spans = spans.filter((s) => s.camId === "cam2");
   assert.equal(cam1Spans.length, 1);
   assert.equal(cam2Spans.length, 1);
-  assert.ok(cam1Spans[0]!.fromSample < cam2Spans[0]!.fromSample);
-  assert.equal(cam1Spans[0]!.fromSample, 0);
-  assert.ok(cam1Spans[0]!.toSample > 0);
+  assert.ok(cam1Spans[0]?.fromSample < cam2Spans[0]?.fromSample);
+  assert.equal(cam1Spans[0]?.fromSample, 0);
+  assert.ok(cam1Spans[0]?.toSample > 0);
 });
 
 test("speakingSpans drops bursts shorter than minSpanMs", () => {
@@ -162,7 +169,7 @@ test("speakingSpans merges short gaps within one cam", () => {
     mergeGapMs: 200,
   });
   assert.equal(spans.length, 1);
-  assert.equal(spans[0]!.camId, "cam1");
+  assert.equal(spans[0]?.camId, "cam1");
 });
 
 test("speakingSpans excludes wide-role cams", () => {
@@ -212,8 +219,8 @@ test("attributeWords assigns words to the active cam burst", () => {
     { id: "w0", startSample: 0, endSample: Math.round(0.5 * SAMPLE_RATE) },
   ];
   const result = attributeWords(words, activities, cams);
-  assert.equal(result[0]!.wordId, "w0");
-  assert.equal(result[0]!.camId, "cam1");
+  assert.equal(result[0]?.wordId, "w0");
+  assert.equal(result[0]?.camId, "cam1");
 });
 
 test("attributeWords returns null during silence", () => {
@@ -228,7 +235,7 @@ test("attributeWords returns null during silence", () => {
     },
   ];
   const result = attributeWords(words, activities, cams);
-  assert.equal(result[0]!.camId, null);
+  assert.equal(result[0]?.camId, null);
 });
 
 test("attributeWords picks higher-energy cam during crosstalk", () => {
@@ -256,7 +263,7 @@ test("attributeWords picks higher-energy cam during crosstalk", () => {
     },
   ];
   const result = attributeWords(words, activities, cams);
-  assert.equal(result[0]!.camId, "cam1");
+  assert.equal(result[0]?.camId, "cam1");
 });
 
 test("attributeWords is offset-aware", () => {
@@ -274,7 +281,7 @@ test("attributeWords is offset-aware", () => {
     },
   ];
   const result = attributeWords(words, activities, cams);
-  assert.equal(result[0]!.camId, "cam1");
+  assert.equal(result[0]?.camId, "cam1");
 });
 
 test("attributeWords converts 48k word samples to 16k PCM windows", () => {
@@ -292,7 +299,7 @@ test("attributeWords converts 48k word samples to 16k PCM windows", () => {
     },
   ];
   const result = attributeWords(words, activities, cams);
-  assert.equal(result[0]!.camId, "cam1");
+  assert.equal(result[0]?.camId, "cam1");
 });
 
 test("programAudioArgs short-circuits when masterMix is provided", () => {
@@ -422,8 +429,18 @@ test("buildProgramAudio renders wav and 16k PCM with integration flag", async ()
 
 test("programAudioArgs trims lead-in for negative offsets instead of clamping", () => {
   const cams = [
-    { id: "cam1", role: "speaker" as const, offsetMs: -1500, audioPath: "/a/cam1.f32" },
-    { id: "cam2", role: "speaker" as const, offsetMs: 250, audioPath: "/a/cam2.f32" },
+    {
+      id: "cam1",
+      role: "speaker" as const,
+      offsetMs: -1500,
+      audioPath: "/a/cam1.f32",
+    },
+    {
+      id: "cam2",
+      role: "speaker" as const,
+      offsetMs: 250,
+      audioPath: "/a/cam2.f32",
+    },
   ];
   const args = programAudioArgs(cams, { out: "/tmp/out.wav" });
   const filter = args[args.indexOf("-filter_complex") + 1] ?? "";
@@ -436,13 +453,26 @@ test("programAudioArgs trims lead-in for negative offsets instead of clamping", 
     "trimmed stream resets PTS"
   );
   assert.ok(filter.includes("adelay=250"), "positive offset still delays");
-  assert.ok(!filter.includes("adelay=0"), "no zero-clamped delay for the negative cam");
+  assert.ok(
+    !filter.includes("adelay=0"),
+    "no zero-clamped delay for the negative cam"
+  );
 });
 
 test("programAudioArgs declares raw f32 input format before .f32 inputs", () => {
   const cams = [
-    { id: "cam1", role: "speaker" as const, offsetMs: 0, audioPath: "/p/cams/cam1/audio16k.f32" },
-    { id: "cam2", role: "speaker" as const, offsetMs: 0, audioPath: "/p/master.wav" },
+    {
+      id: "cam1",
+      role: "speaker" as const,
+      offsetMs: 0,
+      audioPath: "/p/cams/cam1/audio16k.f32",
+    },
+    {
+      id: "cam2",
+      role: "speaker" as const,
+      offsetMs: 0,
+      audioPath: "/p/master.wav",
+    },
   ];
   const args = programAudioArgs(cams, { out: "/tmp/out.wav" });
   const f32Idx = args.indexOf("/p/cams/cam1/audio16k.f32");
@@ -452,6 +482,10 @@ test("programAudioArgs declares raw f32 input format before .f32 inputs", () => 
     "raw PCM input gets format flags"
   );
   const wavIdx = args.indexOf("/p/master.wav");
-  assert.equal(args[wavIdx - 1], "-i", "container input probes normally, no forced format");
+  assert.equal(
+    args[wavIdx - 1],
+    "-i",
+    "container input probes normally, no forced format"
+  );
   assert.notEqual(args[wavIdx - 2], "f32le");
 });

@@ -536,7 +536,16 @@ export async function camMix(
   await mkdir(paths.frames, { recursive: true });
   await run(
     FFMPEG,
-    ["-y", "-i", paths.proxy, "-vf", "fps=1/3", "-q:v", "4", `${paths.frames}/%04d.jpg`],
+    [
+      "-y",
+      "-i",
+      paths.proxy,
+      "-vf",
+      "fps=1/3",
+      "-q:v",
+      "4",
+      `${paths.frames}/%04d.jpg`,
+    ],
     "ffmpeg(frames)"
   ).catch((e: Error) => console.warn(`[cam-mix] frames skipped: ${e.message}`));
   await rm(join(paths.working, "audio-analysis.json"), { force: true });

@@ -643,9 +643,7 @@ test("enforceMinShot survives consecutive sub-minimum spans without corruption",
 
 test("applyOverrides preserves previously locked spans across a second override", () => {
   const sec = (n: number) => Math.round(n * 48_000);
-  const base = [
-    { fromSample: 0, toSample: sec(30), shot: "cam-a" },
-  ];
+  const base = [{ fromSample: 0, toSample: sec(30), shot: "cam-a" }];
   const once = applyOverrides(base, [
     { fromSample: sec(5), toSample: sec(10), shot: "cam-b" },
   ]);
@@ -653,8 +651,12 @@ test("applyOverrides preserves previously locked spans across a second override"
     { fromSample: sec(20), toSample: sec(25), shot: "cam-b" },
   ]);
   const first = twice.find(
-    (s) => s.fromSample === sec(5) && s.toSample === sec(10) && s.shot === "cam-b"
+    (s) =>
+      s.fromSample === sec(5) && s.toSample === sec(10) && s.shot === "cam-b"
   );
-  assert.ok(first, "first override survives the second applyOverrides verbatim");
+  assert.ok(
+    first,
+    "first override survives the second applyOverrides verbatim"
+  );
   assert.equal(first?.locked, true, "and stays locked");
 });

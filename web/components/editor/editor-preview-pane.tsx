@@ -10,6 +10,7 @@ import {
   useEffect,
   useState,
 } from "react";
+import { AudioDrawer } from "@/components/audio-drawer";
 import {
   CutTransitionSweep,
   type CutTransitionSweepHandle,
@@ -24,9 +25,8 @@ import { PlayerControls } from "@/components/player-controls";
 import { PreviewOverlays } from "@/components/preview-overlays";
 import { PreviewTransitionNotice } from "@/components/preview-transition-notice";
 import { SafeAreaGuides } from "@/components/safe-area-guides";
-import { AudioDrawer } from "@/components/audio-drawer";
 import { TimelineDrawer } from "@/components/timeline-drawer";
-import { Search, Spline, Volume2, Aperture } from "@/lib/icon";
+import { Aperture, Search, Spline, Volume2 } from "@/lib/icon";
 import { ORIENTATION_RATIO, type Orientation } from "@/lib/preview-layout";
 import { cn } from "@/lib/utils";
 import type { CaptionGroup } from "../../../src/captions";
@@ -35,6 +35,7 @@ export interface EditorPreviewPaneProps {
   activeCoverBroll: boolean;
   activePipBroll: boolean;
   activeSplitBroll: boolean;
+  audio: ComponentProps<typeof AudioDrawer>;
   brollRef: RefObject<HTMLVideoElement | null>;
   captionGroups: CaptionGroup[];
   captionStyleId?: string;
@@ -86,7 +87,6 @@ export interface EditorPreviewPaneProps {
   sourceHeight: number;
   sourceWidth: number;
   sweepRef: RefObject<CutTransitionSweepHandle | null>;
-  audio: ComponentProps<typeof AudioDrawer>;
   timeline: ComponentProps<typeof TimelineDrawer>;
   titles: {
     endSample: number;

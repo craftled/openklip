@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  type AutoMixContext,
   autoMixPlan,
   buildAutoMixPrompt,
-  type AutoMixContext,
   parseAutoMixReply,
 } from "../src/cam-automix.ts";
 import {
@@ -225,7 +225,10 @@ test("parseAutoMixReply recovers JSON with leading prose", () => {
 });
 
 test("parseAutoMixReply returns [] on garbage", () => {
-  assert.deepEqual(parseAutoMixReply("not json", { durationSamples: sec(10) }), []);
+  assert.deepEqual(
+    parseAutoMixReply("not json", { durationSamples: sec(10) }),
+    []
+  );
   assert.deepEqual(
     parseAutoMixReply('{"spans":[]}', { durationSamples: sec(10) }),
     []
@@ -249,14 +252,16 @@ test("autoMixPlan: valid reply yields agent plan with full coverage", async () =
   let called = false;
   const result = await autoMixPlan(ctx, {
     agent: "claude-opus-4-8",
-    runText: async () => {
+    runText: () => {
       called = true;
-      return JSON.stringify({
-        spans: [
-          { fromSec: 0, toSec: 15, shot: "cam-a", reason: "Alice opens" },
-          { fromSec: 15, toSec: 30, shot: "cam-b", reason: "Bob responds" },
-        ],
-      });
+      return Promise.resolve(
+        JSON.stringify({
+          spans: [
+            { fromSec: 0, toSec: 15, shot: "cam-a", reason: "Alice opens" },
+            { fromSec: 15, toSec: 30, shot: "cam-b", reason: "Bob responds" },
+          ],
+        })
+      );
     },
   });
 
@@ -342,9 +347,7 @@ test("autoMixPlan: runText throw falls back to rules", async () => {
 
   const result = await autoMixPlan(ctx, {
     agent: "claude-opus-4-8",
-    runText: async () => {
-      throw new Error("agent CLI failed");
-    },
+    runText: () => Promise.reject(new Error("agent CLI failed")),
   });
 
   assert.equal(result.fallback, true);

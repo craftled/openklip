@@ -1,6 +1,6 @@
 import { mock, test } from "bun:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Cam } from "../src/cams.ts";
 import { SAMPLE_RATE } from "../src/edl.ts";
@@ -236,4 +236,3 @@ test("loadCam throws for a missing cam id", async () => {
     await assert.rejects(loadCam(slug, "missing"), /cam not found/i);
   });
 });
-
