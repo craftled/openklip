@@ -94,7 +94,7 @@ export function analyzeSilences(
   return spans;
 }
 
-function windowDb(pcm: Float32Array, start: number, end: number): number {
+export function windowDb(pcm: Float32Array, start: number, end: number): number {
   let sumSq = 0;
   for (let i = start; i < end; i++) {
     const s = pcm[i];

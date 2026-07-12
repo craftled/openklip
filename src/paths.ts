@@ -94,6 +94,8 @@ export function projectPaths(slug: string) {
     highlightsDir: join(output, "highlights"),
     /** Multi-take ingest parking lot: takes/<id>/ (F3). */
     takes: join(dir, "takes"),
+    /** Multicam ingest parking lot: cams/<id>/ */
+    cams: join(dir, "cams"),
   };
 }
 
@@ -107,6 +109,17 @@ export function takeDir(slug: string, takeId: string): string {
 /** The take.json record (transcript + probe metadata) inside a take folder. */
 export function takeFile(slug: string, takeId: string): string {
   return join(takeDir(slug, takeId), "take.json");
+}
+
+// One ingested cam's folder under the project's cams/. The cam id is validated
+// before any join so a hostile id cannot traverse out of cams/.
+export function camDir(slug: string, camId: string): string {
+  return join(projectDir(slug), "cams", assertValidSlug(camId));
+}
+
+/** The cam.json record (probe metadata + role/name/offset) inside a cam folder. */
+export function camFile(slug: string, camId: string): string {
+  return join(camDir(slug, camId), "cam.json");
 }
 
 /** Relative path (from project dir) for a user asset original. */
