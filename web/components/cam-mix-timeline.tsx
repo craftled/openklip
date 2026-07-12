@@ -34,6 +34,11 @@ export function CamMixTimeline({
     ...cams.filter((cam) => cam.role === "speaker"),
     ...cams.filter((cam) => cam.role === "wide"),
   ];
+  // Synthetic wide has no cam record but still needs a legend entry when the
+  // plan cuts to it.
+  const hasSyntheticWide =
+    plan.some((span) => span.shot === "wide") &&
+    !cams.some((cam) => cam.role === "wide");
 
   return (
     <div className="flex flex-col gap-1.5" data-cam-mix-timeline>
@@ -73,6 +78,20 @@ export function CamMixTimeline({
             {legendLabelForCam(cam, cams)}
           </li>
         ))}
+        {hasSyntheticWide ? (
+          <li
+            className="flex items-center gap-1 text-muted-foreground text-xs"
+            key="wide"
+          >
+            <span
+              className={cn(
+                "inline-flex size-3 shrink-0 rounded-sm",
+                segmentClassForShot("wide", cams)
+              )}
+            />
+            Wide
+          </li>
+        ) : null}
       </ul>
     </div>
   );

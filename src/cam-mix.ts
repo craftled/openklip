@@ -155,6 +155,9 @@ function buildSyntheticWideChain(
   parts: string[]
 ): void {
   const speakers = speakerCamsForSyntheticWide(cams);
+  // spanLabel arrives bracketed ("[seg2]"); cell labels must stay bracket-free
+  // inside their own brackets or ffmpeg rejects the filterchain.
+  const bare = spanLabel.replace(/[^A-Za-z0-9]/g, "");
   const durationSec = ((span.toSample - span.fromSample) / SAMPLE_RATE).toFixed(
     6
   );
@@ -172,7 +175,7 @@ function buildSyntheticWideChain(
         span.toSample,
         cam.offsetMs
       );
-      const cell = `wseg${spanLabel}${i}`;
+      const cell = `w${bare}x${i}`;
       parts.push(
         `[${idx}:v]trim=start=${trim.start}:end=${trim.end},setpts=PTS-STARTPTS,` +
           `scale=${halfW}:${target.height}:force_original_aspect_ratio=decrease,` +
@@ -192,7 +195,7 @@ function buildSyntheticWideChain(
 
   for (let i = 0; i < gridCount; i++) {
     const cam = speakers[i];
-    const cell = `wseg${spanLabel}${i}`;
+    const cell = `w${bare}x${i}`;
     if (cam) {
       const idx = inputIndexById.get(cam.id);
       if (idx === undefined) {

@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "openklip-web",
+      "runtimeExecutable": "bun",
+      "runtimeArgs": ["--bun", "next", "dev"],
+      "autoPort": true,
+      "env": { "OPENKLIP_SLUG": "cam-demo" }
+    }
+  ]
+}

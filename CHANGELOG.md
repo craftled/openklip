@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.42.0.0 - 2026-07-12
+
+### Added
+- **Contextual cam switch (multicam)**: per-speaker cam ingest up to 8 cams (`openklip cam-add`, roles `speaker`/`wide`, manual `--offset` in ms including negative), automatic speaker ID from per-track RMS energy (no ML or cloud diarization), follow-speaker and LLM auto scene mix modes (`openklip cam-mix --mode follow|auto`) with tunable guardrails (min/max shot, interjection, lead) and a synthetic side-by-side/grid wide shot when no physical wide cam is registered, and locked manual overrides that survive re-mix (`openklip cam-override`). One mix-down ffmpeg pass renders a normal `source.mp4` / `proxy.mp4` so every existing feature (transcript editing, captions, reframe, export) keeps working unchanged. CLI `cam-add` / `cams` / `cam-set` / `cam-mix` / `cam-override`; MCP `cam_add` / `list_cams` / `cam_set` / `cam_mix` / `cam_override` (95 MCP tools total); GUI Config → Project **Cameras** section; `templates/cam-mix/skill.md`. Transcript words gain an optional `speaker` field (the attributed cam id) once a project has been through `cam-mix`.
+
 ## 0.41.1.3 - 2026-07-07
 
 ### Changed

@@ -362,3 +362,33 @@ test("camMix integration renders switched source and project", {
     assert.ok(Array.isArray(transcript.words));
   });
 });
+
+// ── Orchestrator review regression (localhost E2E finding) ───────────────────
+// Synthetic wide cell labels must be bracket-safe: `wseg[seg2]0` (nested
+// brackets) breaks ffmpeg's filterchain parser.
+
+test("buildCamMixVideoFilter synthetic wide labels contain no nested brackets", () => {
+  const cams = [
+    mkCam({ id: "cam1", role: "speaker" }),
+    mkCam({ id: "cam2", role: "speaker" }),
+  ];
+  const plan = [
+    { fromSample: 0, toSample: 480_000, shot: "cam1" },
+    { fromSample: 480_000, toSample: 960_000, shot: "wide" },
+    { fromSample: 960_000, toSample: 1_440_000, shot: "cam2" },
+  ];
+  const { filter } = buildCamMixVideoFilter(plan, cams, {
+    width: 1280,
+    height: 720,
+    fps: 30,
+  });
+  assert.ok(!filter.includes("[wseg["), "no nested-bracket labels");
+  const labels = filter.match(/\[[^\]]*\]/g) ?? [];
+  for (const label of labels) {
+    assert.match(
+      label,
+      /^\[[A-Za-z0-9:_]+\]$/,
+      `malformed filter label: ${label}`
+    );
+  }
+});

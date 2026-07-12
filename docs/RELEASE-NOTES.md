@@ -2,7 +2,25 @@
 
 Use these bodies when publishing releases. Each section matches a tag in `CHANGELOG.md` without duplicating the full changelog. **Known gaps:** always link to [TODO.md](../TODO.md#known-limitations); do not duplicate the list here.
 
-Publishing status checked on 2026-07-07: GitHub releases published through `v0.41.1.1` (`gh release list`). `v0.41.1.3` is prepared here as a draft from PR #83 plus local follow-ups on `main`; publish it only after pushing, tagging, and verifying the synced `main`. `v0.41.1.2` remains an unpublished prepared docs release.
+Publishing status checked on 2026-07-12: GitHub releases published through `v0.41.1.1` (`gh release list`). `v0.41.1.3` is prepared here as a draft from PR #83 plus local follow-ups on `main`; publish it only after pushing, tagging, and verifying the synced `main`. `v0.41.1.2` remains an unpublished prepared docs release. `v0.42.0.0` is prepared here as a draft from the contextual cam switch (multicam) feature work; its spec (`docs/specs/contextual-cam-switch-v1.md`) makes real multi-cam footage acceptance a release gate that has not been run yet, so do not tag or publish until that gate passes and the feature is merged and synced to `main`.
+
+---
+
+## v0.42.0.0
+
+**Contextual cam switch: multicam ingest, speaker-follow and LLM auto scene mixing, mixed down to a normal edit.**
+
+### Highlights
+- **Contextual cam switch (multicam)**: ingest per-speaker cam files (`openklip cam-add`, up to 8 cams, `speaker`/`wide` roles, manual `--offset`), automatic speaker ID from per-track audio energy (no ML or cloud diarization), and mix down to a switched program with follow-speaker or LLM auto scene modes (`openklip cam-mix`), a synthetic wide shot when no physical wide cam exists, and locked manual overrides (`openklip cam-override`) that survive re-mix.
+- **Surfaces**: CLI `cam-add` / `cams` / `cam-set` / `cam-mix` / `cam-override`; MCP `cam_add` / `list_cams` / `cam_set` / `cam_mix` / `cam_override`; GUI Config → Project **Cameras** section; `templates/cam-mix/skill.md`.
+- **Transcript**: words gain an optional `speaker` field (the attributed cam id) once a project has been through `cam-mix`.
+- **Verification**: `bun run typecheck`, `bun run check`, `bun test --isolate` (2032 pass, 5 skip); 95 MCP tools; 52 capabilities; 44 registry actions.
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues. The spec's real multi-cam footage acceptance check has not been run yet; see the publishing status note above.
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#04200---2026-07-12)
 
 ---
 
