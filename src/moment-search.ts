@@ -1,0 +1,543 @@
+// Local visual moment search: embed every ingest frame with a local CLIP
+// model (src/embed.mjs), store a sidecar index next to the frames, and
+// answer text queries by cosine similarity, clustered into moments, blended
+// with fuzzy matches over scene-log summaries (src/scene-log.ts). Everything
+// below except buildMomentIndex/embedQueryText is pure (no fs, no spawn) so
+// it is unit-testable without a project on disk; those two functions are the
+// Bun-side IO boundary that spawns src/embed.mjs under Node.
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import type { Project } from "./edl.ts";
+import { projectPaths } from "./paths.ts";
+import { normalizeText } from "./phrase-match.ts";
+import { embedScriptPath } from "./script-paths.ts";
+
+// Mirrors MOMENT_MODEL in src/embed.mjs. That script runs under plain Node
+// (never Bun: see its own header comment) and dynamically imports
+// @huggingface/transformers unconditionally at module scope, so this file
+// must not import it directly, which means the model name can't be shared
+// as one constant across the process boundary. Keep the two literals in
+// sync by hand.
+export const MOMENT_MODEL = "Xenova/clip-vit-base-patch32";
+
+// CLIP cosine-similarity scores for real footage land loosely in ~0.18-0.35
+// for a genuine visual match; there is no calibrated "this is definitely a
+// match" cutoff. This is a starting rank-only threshold (tuned during
+// verification against sample footage, see the slice-1 implementation
+// report), not a probability - revisit once real search transcripts exist
+// to check against.
+export const DEFAULT_MOMENT_MIN_SCORE = 0.22;
+
+// Merge matched frames into one moment while they are at most one "missed"
+// frame apart: 2 * the 3s ingest frame step, plus a small floating-point
+// margin so an exact 6s gap (two steps) can't fall on the wrong side of the
+// comparison due to atSec arithmetic.
+export const DEFAULT_MOMENT_GAP_SEC = 6.01;
+
+export const DEFAULT_SEARCH_LIMIT = 24;
+
+// ── Sidecar index file format ──────────────────────────────────────────────
+
+export interface MomentIndexFrame {
+  atSec: number;
+  name: string;
+}
+
+// working/moment-index.json. ~600 frames x 512 dims (f32, base64) is about
+// 1.2MB : one JSON sidecar is fine, no need for a separate binary file.
+export interface MomentIndexFile {
+  dim: number;
+  frameStepSec: number;
+  frames: MomentIndexFrame[];
+  model: string;
+  vectorsB64: string;
+  version: 1;
+}
+
+export function momentIndexPath(slug: string): string {
+  return projectPaths(slug).momentIndex;
+}
+
+// ── Vector (de)serialization ───────────────────────────────────────────────
+
+export function encodeVectors(vectors: Float32Array): string {
+  return Buffer.from(
+    vectors.buffer,
+    vectors.byteOffset,
+    vectors.byteLength
+  ).toString("base64");
+}
+
+export function decodeVectors(
+  b64: string,
+  count: number,
+  dim: number
+): Float32Array {
+  const expectedBytes = count * dim * 4;
+  const buf = Buffer.from(b64, "base64");
+  if (buf.byteLength !== expectedBytes) {
+    throw new Error(
+      `moment index vector data size mismatch: expected ${expectedBytes} bytes for ${count}x${dim} f32, got ${buf.byteLength}`
+    );
+  }
+  // Buffer.from(base64) can return a view whose byteOffset into Node's
+  // shared pool is not a multiple of 4; Float32Array requires 4-byte
+  // alignment, so copy into a fresh, aligned buffer rather than viewing
+  // buf.buffer directly.
+  const aligned = new Uint8Array(expectedBytes);
+  aligned.set(buf);
+  return new Float32Array(aligned.buffer);
+}
+
+// ── Freshness ──────────────────────────────────────────────────────────────
+
+// Same model AND same frame name list (order-sensitive: both sides are
+// sorted filenames from the same readdirSync+sort convention). Either
+// changing lets a rebuild pick up new/removed frames or a model swap.
+export function indexIsCurrent(
+  index: MomentIndexFile,
+  frameNames: string[],
+  model: string
+): boolean {
+  if (index.model !== model) {
+    return false;
+  }
+  if (index.frames.length !== frameNames.length) {
+    return false;
+  }
+  for (let i = 0; i < frameNames.length; i++) {
+    if (index.frames[i].name !== frameNames[i]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// ── Top-K similarity ─────────────────────────────────────────────────────
+
+export interface FrameScore {
+  frameIdx: number;
+  score: number;
+}
+
+// vectors is frameCount*dim contiguous f32; both frame and query vectors are
+// L2-normalized by the embedder (src/embed.mjs), so similarity is a plain
+// dot product. Sort is a fully deterministic total order (score desc, then
+// frameIdx asc) rather than relying on the engine's sort-stability guarantee
+// for equal scores.
+export function topKFrames(
+  vectors: Float32Array,
+  dim: number,
+  queryVec: Float32Array,
+  k: number
+): FrameScore[] {
+  const frameCount = dim > 0 ? Math.floor(vectors.length / dim) : 0;
+  const scores: FrameScore[] = [];
+  for (let f = 0; f < frameCount; f++) {
+    const base = f * dim;
+    let dot = 0;
+    for (let d = 0; d < dim; d++) {
+      dot += vectors[base + d] * queryVec[d];
+    }
+    scores.push({ frameIdx: f, score: dot });
+  }
+  scores.sort((a, b) => b.score - a.score || a.frameIdx - b.frameIdx);
+  return scores.slice(0, Math.max(0, k));
+}
+
+// ── Clustering ─────────────────────────────────────────────────────────────
+
+export interface MomentHit {
+  atSec: number;
+  name: string;
+  score: number;
+}
+
+export interface Moment {
+  bestAtSec: number;
+  bestFrame: string;
+  fromSec: number;
+  score: number;
+  toSec: number;
+}
+
+export interface ClusterMomentsOptions {
+  frameStepSec: number;
+  gapSec?: number;
+  maxMoments: number;
+  minScore: number;
+}
+
+// Drop hits below minScore, then merge the survivors into moments whenever
+// consecutive (by time) hits are at most gapSec apart. Each moment's score
+// is the max hit score in its group (scores are ranks, not probabilities,
+// so "best frame in the span" is the meaningful summary); toSec extends one
+// frame step past the last hit so the moment covers that frame's own span.
+export function clusterMoments(
+  hits: MomentHit[],
+  opts: ClusterMomentsOptions
+): Moment[] {
+  const gapSec = opts.gapSec ?? DEFAULT_MOMENT_GAP_SEC;
+  const kept = hits.filter((h) => h.score >= opts.minScore);
+  if (kept.length === 0) {
+    return [];
+  }
+
+  const sorted = [...kept].sort(
+    (a, b) => a.atSec - b.atSec || a.name.localeCompare(b.name)
+  );
+  const groups: MomentHit[][] = [];
+  let current: MomentHit[] = [sorted[0]];
+  for (let i = 1; i < sorted.length; i++) {
+    const hit = sorted[i];
+    const prev = current.at(-1) as MomentHit;
+    if (hit.atSec - prev.atSec <= gapSec) {
+      current.push(hit);
+    } else {
+      groups.push(current);
+      current = [hit];
+    }
+  }
+  groups.push(current);
+
+  const moments = groups.map((group): Moment => {
+    const first = group[0];
+    const last = group.at(-1) as MomentHit;
+    let best = group[0];
+    for (const h of group) {
+      if (h.score > best.score) {
+        best = h;
+      }
+    }
+    return {
+      fromSec: first.atSec,
+      toSec: last.atSec + opts.frameStepSec,
+      score: best.score,
+      bestFrame: best.name,
+      bestAtSec: best.atSec,
+    };
+  });
+
+  moments.sort((a, b) => b.score - a.score || a.fromSec - b.fromSec);
+  return moments.slice(0, opts.maxMoments);
+}
+
+// ── Scene-log free-text matches ───────────────────────────────────────────
+
+export interface SceneLogSegmentLike {
+  fromSec: number;
+  summary: string;
+  toSec: number;
+}
+
+export interface SceneLogLike {
+  segments: SceneLogSegmentLike[];
+}
+
+export interface SummaryMatch {
+  fromSec: number;
+  score: number;
+  summary: string;
+  toSec: number;
+}
+
+function tokenize(text: string): string[] {
+  return normalizeText(text).split(" ").filter(Boolean);
+}
+
+// Case-insensitive token-overlap score: the fraction of the query's DISTINCT
+// tokens that appear anywhere in the segment summary's token set.
+// Deduplicating the query tokens keeps a repeated word ("the dog and the
+// cat") from inflating its own weight in the fraction. Only segments with
+// score > 0 are returned.
+export function summaryMatches(
+  sceneLog: SceneLogLike | null | undefined,
+  query: string
+): SummaryMatch[] {
+  const segments = sceneLog?.segments ?? [];
+  if (segments.length === 0) {
+    return [];
+  }
+  const queryTokens = Array.from(new Set(tokenize(query)));
+  if (queryTokens.length === 0) {
+    return [];
+  }
+  const results: SummaryMatch[] = [];
+  for (const seg of segments) {
+    const summaryTokens = new Set(tokenize(seg.summary));
+    const present = queryTokens.filter((t) => summaryTokens.has(t)).length;
+    const score = present / queryTokens.length;
+    if (score > 0) {
+      results.push({
+        fromSec: seg.fromSec,
+        toSec: seg.toSec,
+        score,
+        summary: seg.summary,
+      });
+    }
+  }
+  return results;
+}
+
+// ── Merge embedding + summary results ─────────────────────────────────────
+
+export interface SceneSearchResult {
+  bestAtSec?: number;
+  bestFrame?: string;
+  fromSec: number;
+  score: number;
+  source: "embedding" | "summary" | "both";
+  summary?: string;
+  toSec: number;
+}
+
+function intervalsOverlap(
+  aFrom: number,
+  aTo: number,
+  bFrom: number,
+  bTo: number
+): boolean {
+  return aFrom < bTo && bFrom < aTo;
+}
+
+// Union of embedding-derived moments and scene-log summary matches. Each
+// embedding moment keeps its own time range (the visual anchor); when a
+// not-yet-consumed summary match's range overlaps it, the two merge into one
+// "both" result carrying max(score) and the best (highest-scoring)
+// overlapping summary's text, and every summary that overlapped gets
+// consumed so it doesn't also linger as a redundant standalone result. When
+// several embedding moments contend for the same summary (rare), the first
+// one processed - the highest-scoring, since callers pass clusterMoments's
+// already-score-sorted output - claims it. Remaining, never-overlapped
+// summaries are appended as standalone "summary" results.
+export function mergeSceneResults(
+  embeddingMoments: Moment[],
+  summaryMoments: SummaryMatch[],
+  limit = DEFAULT_SEARCH_LIMIT
+): SceneSearchResult[] {
+  const consumed = new Set<number>();
+  const results: SceneSearchResult[] = [];
+
+  for (const moment of embeddingMoments) {
+    const overlapping = summaryMoments
+      .map((summary, idx) => ({ summary, idx }))
+      .filter(
+        ({ summary, idx }) =>
+          !consumed.has(idx) &&
+          intervalsOverlap(
+            moment.fromSec,
+            moment.toSec,
+            summary.fromSec,
+            summary.toSec
+          )
+      )
+      .sort(
+        (a, b) =>
+          b.summary.score - a.summary.score ||
+          a.summary.fromSec - b.summary.fromSec
+      );
+
+    if (overlapping.length === 0) {
+      results.push({
+        fromSec: moment.fromSec,
+        toSec: moment.toSec,
+        score: moment.score,
+        source: "embedding",
+        bestAtSec: moment.bestAtSec,
+        bestFrame: moment.bestFrame,
+      });
+      continue;
+    }
+
+    for (const { idx } of overlapping) {
+      consumed.add(idx);
+    }
+    const best = overlapping[0].summary;
+    results.push({
+      fromSec: moment.fromSec,
+      toSec: moment.toSec,
+      score: Math.max(moment.score, best.score),
+      source: "both",
+      bestAtSec: moment.bestAtSec,
+      bestFrame: moment.bestFrame,
+      summary: best.summary,
+    });
+  }
+
+  summaryMoments.forEach((summary, idx) => {
+    if (consumed.has(idx)) {
+      return;
+    }
+    results.push({
+      fromSec: summary.fromSec,
+      toSec: summary.toSec,
+      score: summary.score,
+      source: "summary",
+      summary: summary.summary,
+    });
+  });
+
+  results.sort((a, b) => b.score - a.score || a.fromSec - b.fromSec);
+  return results.slice(0, limit);
+}
+
+// ── Full search (reads the sidecar off disk; no spawn) ────────────────────
+
+function listFrameFileNames(framesDir: string): string[] {
+  if (!existsSync(framesDir)) {
+    return [];
+  }
+  return readdirSync(framesDir)
+    .filter((n) => n.toLowerCase().endsWith(".jpg"))
+    .sort();
+}
+
+function readIndexFile(indexPath: string): MomentIndexFile | null {
+  if (!existsSync(indexPath)) {
+    return null;
+  }
+  try {
+    return JSON.parse(readFileSync(indexPath, "utf8")) as MomentIndexFile;
+  } catch {
+    return null;
+  }
+}
+
+export interface SearchScenesOptions {
+  limit?: number;
+}
+
+export interface SearchScenesResult {
+  indexed: boolean;
+  results: SceneSearchResult[];
+}
+
+export function searchScenes(
+  slug: string,
+  project: Project,
+  queryVec: Float32Array,
+  query: string,
+  opts: SearchScenesOptions = {}
+): SearchScenesResult {
+  const limit = opts.limit ?? DEFAULT_SEARCH_LIMIT;
+  const index = readIndexFile(momentIndexPath(slug));
+  const frameNames = listFrameFileNames(projectPaths(slug).frames);
+  if (!(index && indexIsCurrent(index, frameNames, MOMENT_MODEL))) {
+    return { indexed: false, results: [] };
+  }
+
+  const vectors = decodeVectors(
+    index.vectorsB64,
+    index.frames.length,
+    index.dim
+  );
+  const k = Math.min(64, index.frames.length);
+  const top = topKFrames(vectors, index.dim, queryVec, k);
+  const hits: MomentHit[] = top.map(({ frameIdx, score }) => ({
+    atSec: index.frames[frameIdx].atSec,
+    score,
+    name: index.frames[frameIdx].name,
+  }));
+  const embeddingMoments = clusterMoments(hits, {
+    minScore: DEFAULT_MOMENT_MIN_SCORE,
+    maxMoments: limit,
+    frameStepSec: index.frameStepSec,
+  });
+  const summaries = summaryMatches(project.sceneLog, query);
+  const results = mergeSceneResults(embeddingMoments, summaries, limit);
+  return { indexed: true, results };
+}
+
+// ── Bun-side IO: index building + query embedding (spawn node) ───────────
+// The only two functions in this module that touch fs writes or spawn a
+// process; everything above is pure and unit-tested without either.
+
+export interface BuildMomentIndexOptions {
+  force?: boolean;
+}
+
+export interface BuildMomentIndexResult {
+  built: boolean;
+  frameCount: number;
+  model: string;
+  path: string;
+  skippedReason?: "current" | "no-frames";
+}
+
+// Skip (without spawning) when there are no frames to index, or when an
+// existing sidecar is already current for the present frame list and model.
+// Otherwise spawn src/embed.mjs under Node (mirrors transcribeToWords in
+// src/ingest.ts) to (re)build the sidecar atomically.
+export async function buildMomentIndex(
+  slug: string,
+  opts: BuildMomentIndexOptions = {}
+): Promise<BuildMomentIndexResult> {
+  const paths = projectPaths(slug);
+  const indexPath = momentIndexPath(slug);
+  const frameNames = listFrameFileNames(paths.frames);
+  if (frameNames.length === 0) {
+    return {
+      built: false,
+      skippedReason: "no-frames",
+      frameCount: 0,
+      model: MOMENT_MODEL,
+      path: indexPath,
+    };
+  }
+
+  if (!opts.force) {
+    const existing = readIndexFile(indexPath);
+    if (existing && indexIsCurrent(existing, frameNames, MOMENT_MODEL)) {
+      return {
+        built: false,
+        skippedReason: "current",
+        frameCount: existing.frames.length,
+        model: existing.model,
+        path: indexPath,
+      };
+    }
+  }
+
+  const proc = Bun.spawn(
+    ["node", embedScriptPath(), "index", paths.frames, indexPath, MOMENT_MODEL],
+    { stdout: "inherit", stderr: "inherit" }
+  );
+  if ((await proc.exited) !== 0) {
+    throw new Error("moment index build failed");
+  }
+  const built = readIndexFile(indexPath);
+  if (!built) {
+    throw new Error("moment index build did not produce an index file");
+  }
+  return {
+    built: true,
+    frameCount: built.frames.length,
+    model: built.model,
+    path: indexPath,
+  };
+}
+
+export interface EmbedQueryResult {
+  model: string;
+  vector: Float32Array;
+}
+
+// One-shot text query embedding: spawn `node embed.mjs query`, parse its
+// single-line stdout JSON. Kept self-contained (rather than reusing a long-
+// lived process) for the CLI/MCP call pattern; the Next server can later
+// embed in-process instead.
+export async function embedQueryText(text: string): Promise<EmbedQueryResult> {
+  const proc = Bun.spawn(
+    ["node", embedScriptPath(), "query", text, MOMENT_MODEL],
+    { stdout: "pipe", stderr: "inherit" }
+  );
+  const stdout = await new Response(proc.stdout).text();
+  if ((await proc.exited) !== 0) {
+    throw new Error("moment query embedding failed");
+  }
+  const parsed = JSON.parse(stdout.trim()) as {
+    model: string;
+    dim: number;
+    vector: number[];
+  };
+  return { vector: Float32Array.from(parsed.vector), model: parsed.model };
+}

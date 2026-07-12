@@ -1,10 +1,21 @@
 import assert from "node:assert/strict";
-import { statSync } from "node:fs";
+import { mkdirSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { addMusic, addTitle } from "../src/actions.ts";
-import { runOverlays, runRanges, runStatusJson } from "../src/cli-query.ts";
+import {
+  formatSceneMatchesHuman,
+  runMomentSearch,
+  runOverlays,
+  runRanges,
+  runStatusJson,
+} from "../src/cli-query.ts";
 import { SAMPLE_RATE } from "../src/edl.ts";
+import {
+  encodeVectors,
+  MOMENT_MODEL,
+  momentIndexPath,
+} from "../src/moment-search.ts";
 import { projectPaths } from "../src/paths.ts";
 import {
   makeProject,
@@ -517,4 +528,126 @@ test("runStatusJson applies VAD snap when silences are passed and snap is enable
     runStatusJson(p, [{ startSec: 1.9, endSec: 2.3 }])
   );
   assert.ok(withSilences.keptDurationSec < withoutSilences.keptDurationSec);
+});
+
+// ── Moment search formatters (src/cli-query.ts) ───────────────────────────
+
+test("formatSceneMatchesHuman formats scene lines with score and label", () => {
+  const out = formatSceneMatchesHuman({
+    indexed: true,
+    results: [
+      {
+        fromSec: 12,
+        toSec: 21,
+        score: 0.41,
+        source: "both",
+        summary: "people laughing",
+      },
+    ],
+  });
+  assert.match(out, /12\.0s-21\.0s\s+0\.41\s+both\s+people laughing/);
+});
+
+test("formatSceneMatchesHuman reports when there are no scene matches", () => {
+  const out = formatSceneMatchesHuman({ indexed: true, results: [] });
+  assert.match(out, /no scene matches/);
+});
+
+test("formatSceneMatchesHuman reports when no index has been built", () => {
+  const out = formatSceneMatchesHuman({ indexed: false, results: [] });
+  assert.match(out, /no moment index/);
+});
+
+test("runMomentSearch emits the documented JSON shape", () => {
+  const project = makeProject({ slug: "x" });
+  const out = runMomentSearch(
+    project,
+    "hello",
+    { indexed: true, results: [] },
+    { json: true }
+  );
+  const parsed = JSON.parse(out);
+  assert.deepEqual(Object.keys(parsed).sort(), [
+    "indexed",
+    "query",
+    "scenes",
+    "text",
+  ]);
+  assert.equal(parsed.query, "hello");
+  assert.equal(parsed.indexed, true);
+  assert.equal(Array.isArray(parsed.text), true);
+  assert.deepEqual(parsed.scenes, []);
+});
+
+test("runMomentSearch human output includes both a text and scene matches section", () => {
+  const project = makeProject({ slug: "x" });
+  const out = runMomentSearch(
+    project,
+    "Hello",
+    { indexed: false, results: [] },
+    { json: false }
+  );
+  assert.match(out, /text matches:/);
+  assert.match(out, /scene matches:/);
+  assert.match(out, /no moment index/);
+});
+
+// ── Moment search CLI wiring (src/cli.ts): fast, no-network paths only ────
+// openklip search always needs a real embedding (network on first run), so
+// only the argument-validation and no-spawn buildMomentIndex shortcuts are
+// covered here; the real embed.mjs pipeline is covered by the
+// OPENKLIP_INTEGRATION-gated test in tests/moment-search.test.ts.
+
+test("CLI index reports no frames to index when frames dir is empty", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const r = await runCli(["index", slug]);
+    assert.equal(r.code, 0);
+    assert.match(r.out, /no frames to index/);
+  });
+});
+
+test("CLI index reports an already-current index without rebuilding", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const framesDir = projectPaths(slug).frames;
+    mkdirSync(framesDir, { recursive: true });
+    writeFileSync(join(framesDir, "0001.jpg"), "fake");
+    writeFileSync(
+      momentIndexPath(slug),
+      JSON.stringify({
+        version: 1,
+        model: MOMENT_MODEL,
+        dim: 1,
+        frameStepSec: 3,
+        frames: [{ name: "0001.jpg", atSec: 0 }],
+        vectorsB64: encodeVectors(new Float32Array([1])),
+      })
+    );
+
+    const r = await runCli(["index", slug]);
+    assert.equal(r.code, 0);
+    assert.match(r.out, /already current/);
+  });
+});
+
+test("CLI index requires a slug", async () => {
+  const r = await runCli(["index"]);
+  assert.equal(r.code, 1);
+  assert.match(r.out, /usage: openklip index/);
+});
+
+test("CLI search requires a query", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const r = await runCli(["search", slug]);
+    assert.equal(r.code, 1);
+    assert.match(r.out, /usage: openklip search/);
+  });
+});
+
+test("CLI search requires a slug", async () => {
+  const r = await runCli(["search"]);
+  assert.equal(r.code, 1);
+  assert.match(r.out, /usage: openklip search/);
 });

@@ -1,6 +1,7 @@
 import type { SilenceSpan } from "./audio-analysis-core.ts";
 import { transitionExportPreview } from "./cut-transition-gate.ts";
 import type { Project } from "./edl.ts";
+import type { SearchScenesResult } from "./moment-search.ts";
 import {
   grepTranscript,
   listOverlays,
@@ -191,4 +192,45 @@ export function spanForPhraseOverlay(
 ): { fromSec: number; matched: boolean; toSec: number } {
   const span = placeFromPhrase(project, phrase);
   return { matched: span.matched, fromSec: span.fromSec, toSec: span.toSec };
+}
+
+// One line per scene result: "  12.0s-21.0s  0.41  both  <summary-or-frame>".
+export function formatSceneMatchesHuman(result: SearchScenesResult): string {
+  if (!result.indexed) {
+    return "  (no moment index yet; run: openklip index <slug>)\n";
+  }
+  if (result.results.length === 0) {
+    return "  no scene matches\n";
+  }
+  const lines = result.results.map((r) => {
+    const label = r.summary ?? r.bestFrame ?? "";
+    return `  ${r.fromSec.toFixed(1)}s-${r.toSec.toFixed(1)}s  ${r.score.toFixed(2)}  ${r.source}  ${label}`;
+  });
+  return `${lines.join("\n")}\n`;
+}
+
+// Combined moment search: transcript text matches (grepTranscript, reusing
+// formatGrepHuman) plus scene matches (embedding + scene-log blend). The
+// scene half is precomputed by the caller (searchScenes needs an
+// already-embedded query vector and project frames on disk, which this pure
+// formatter has no business touching).
+export function runMomentSearch(
+  project: Project,
+  query: string,
+  sceneResult: SearchScenesResult,
+  options: { json?: boolean }
+): string {
+  const textResult = grepTranscript(project, query, { all: true });
+  if (options.json) {
+    return jsonOut({
+      query,
+      indexed: sceneResult.indexed,
+      text: textResult.matches,
+      scenes: sceneResult.results,
+    });
+  }
+  return (
+    `text matches:\n${formatGrepHuman(textResult)}` +
+    `\nscene matches:\n${formatSceneMatchesHuman(sceneResult)}`
+  );
 }

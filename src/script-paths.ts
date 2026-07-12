@@ -8,6 +8,10 @@ export function transcribeScriptPath(): string {
   return repoPath("src", "transcribe.mjs");
 }
 
+export function embedScriptPath(): string {
+  return repoPath("src", "embed.mjs");
+}
+
 export function graphicRuntimeEntryPath(): string {
   return repoPath("src", "graphic-runtime-entry.ts");
 }
