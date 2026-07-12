@@ -76,3 +76,11 @@ Second-opinion review (Second Opinion mode, `$tstack-review`): grok composer-2.5
 Review verdict after fixes: PASS. Remote CI pending on the PR; real-footage acceptance still gates tag/publish only.
 
 Remote CI on PR #88: green (test 2m20s, integration 59s) after the --isolate fix; the prior remote failure was cross-file mock.module leakage hitting pre-existing assembly/export smoke tests, not multicam code. Note: main's own CI has been red at the lint step since 986e796; this branch incidentally repairs that formatting.
+
+## Fresh-context review (Return mode), 2026-07-13
+
+Independent re-read of the two commits nobody had reviewed yet (159e7bb fix commit, cd1f408 isolate fix) rather than trusting the same-context self-grade. Traced the lock-pinning math by hand (no aliasing bug), confirmed `mutateProject`'s revision/history-snapshot/actions.jsonl claims against `src/projectStore.ts` source, and actually executed the generated offset/short-cam `tpad` filter string against real ffmpeg (exit 0, output exactly 12.000000s) rather than trusting the string-matching unit test. Verdict: PASS, no blocking findings. Two non-blocking notes (transcription re-runs unconditionally on every camMix call, a docs count typo) and two coverage gaps (no direct test on the `camMixOrRemix` dispatch function itself; the `tpad` real-ffmpeg path is untested by CI, only by string match) — none block merge. Full report in-thread.
+
+## Ship Check, 2026-07-13
+
+Bare `/tstack-ship` invocation, Check mode (no landing action requested). Refreshed all evidence: branch clean, no new commits since 82c8d42, PR #88 mergeStateStatus CLEAN / mergeable MERGEABLE, no new comments or requested changes, both remote CI jobs still green on the current HEAD, origin/main unmoved at 986e796. No freshness-rule violation — the fresh review above still holds. Verdict: PASS. No action taken (no merge performed).
