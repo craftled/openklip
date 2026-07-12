@@ -34,6 +34,14 @@ test("features: linked tools resolve", () => {
   }
 });
 
+test("features: moment-search entry links resolve", () => {
+  const feature = features.find((f) => f.id === "moment-search");
+  assert.ok(feature, "moment-search feature missing from registry");
+  assert.equal(feature?.title, "Moment search: text + scene");
+  assert.ok(getAgentTool("moment_search"));
+  assert.ok(getAction("cut"));
+});
+
 test("features: linked actions resolve", () => {
   for (const feature of features) {
     for (const actionName of feature.links?.actions ?? []) {

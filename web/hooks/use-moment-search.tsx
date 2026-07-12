@@ -2,14 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  type MomentTextMatch,
+  mergeMomentTextMatches,
+} from "@/lib/moment-keep";
+import {
   defaultMomentSearchTab,
   MOMENT_SEARCH_RESULT_LIMIT,
   type MomentSearchTab,
 } from "@/lib/moment-search-display";
-import {
-  type PhraseSearchMatch,
-  phraseSearchMatches,
-} from "@/lib/phrase-search";
 
 const DEBOUNCE_MS = 250;
 const POLL_MS = 2000;
@@ -207,13 +207,14 @@ export function useMomentSearch({ slug, words }: UseMomentSearchParams) {
     };
   }, [applyStatus, debouncedQuery, indexed, slug]);
 
-  const textResults = useMemo<PhraseSearchMatch[]>(() => {
+  const textResults = useMemo<MomentTextMatch[]>(() => {
     const trimmed = debouncedQuery.trim();
     if (!trimmed) {
       return [];
     }
-    return phraseSearchMatches({ words }, trimmed, { mode: "kept" }).slice(
-      0,
+    return mergeMomentTextMatches(
+      { words },
+      trimmed,
       MOMENT_SEARCH_RESULT_LIMIT
     );
   }, [words, debouncedQuery]);

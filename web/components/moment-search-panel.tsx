@@ -6,15 +6,23 @@
 // that file's header). Mirrors how web/components/task-progress-panel.tsx
 // imports @engine/agent-task-types.
 import { frameNameForTime } from "@engine/moment-search-frame-name";
-import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from "react";
+import type {
+  DragEvent,
+  MouseEvent,
+  KeyboardEvent as ReactKeyboardEvent,
+  ReactNode,
+} from "react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { onMomentCardDragStart } from "@/hooks/use-moment-keep";
 import {
   type MomentSceneResult,
   type TranscriptWord,
   useMomentSearch,
 } from "@/hooks/use-moment-search";
 import { Search, X } from "@/lib/icon";
+import type { MomentTextMatch } from "@/lib/moment-keep";
 import {
   buildTextSnippet,
   countBadge,
@@ -22,10 +30,10 @@ import {
   MOMENT_SEARCH_RESULT_LIMIT,
   momentFrameThumbnailUrl,
 } from "@/lib/moment-search-display";
-import type { PhraseSearchMatch } from "@/lib/phrase-search";
 import { cn } from "@/lib/utils";
 
 interface MomentSearchPanelProps {
+  keepMoment: (fromSec: number, toSec: number) => void;
   onSeek: (sourceSec: number) => void;
   slug: string;
   words: TranscriptWord[];
@@ -38,6 +46,7 @@ interface MomentSearchPanelProps {
 function MomentResultCard({
   children,
   fromSec,
+  keepMoment,
   onSeek,
   slug,
   thumbnailName,
@@ -45,18 +54,37 @@ function MomentResultCard({
 }: {
   children: ReactNode;
   fromSec: number;
+  keepMoment: (fromSec: number, toSec: number) => void;
   onSeek: (sourceSec: number) => void;
   slug: string;
   thumbnailName: string;
   toSec: number;
 }) {
+  const onDragStart = (event: DragEvent) => {
+    onMomentCardDragStart(event, { fromSec, toSec });
+  };
+
+  const onKeep = (event: MouseEvent) => {
+    event.stopPropagation();
+    keepMoment(fromSec, toSec);
+  };
+
+  // The Keep button overlays the seek button as a SIBLING (absolutely
+  // positioned over the thumbnail), never a descendant: nested interactive
+  // elements are invalid HTML and React flags them as a hydration hazard.
+  // The overlay film itself stays pointer-events-none so clicks anywhere but
+  // the Keep button still reach the seek button underneath.
   return (
-    <li>
+    <li
+      className="group/moment-card relative cursor-grab active:cursor-grabbing"
+      data-moment-card
+      data-moment-from-sec={fromSec}
+      data-moment-to-sec={toSec}
+      draggable
+      onDragStart={onDragStart}
+    >
       <button
-        className="group/moment-card block w-full overflow-hidden rounded-md text-left focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
-        data-moment-card
-        data-moment-from-sec={fromSec}
-        data-moment-to-sec={toSec}
+        className="block w-full overflow-hidden rounded-md text-left focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
         onClick={() => onSeek(fromSec)}
         type="button"
       >
@@ -65,6 +93,7 @@ function MomentResultCard({
           <img
             alt=""
             className="h-full w-full object-cover"
+            draggable={false}
             height={108}
             src={momentFrameThumbnailUrl(slug, thumbnailName)}
             width={192}
@@ -75,17 +104,30 @@ function MomentResultCard({
         </span>
         {children}
       </button>
+      <span className="pointer-events-none absolute inset-x-0 top-0 flex aspect-video items-center justify-center rounded-md bg-black/0 opacity-0 transition-opacity group-focus-within/moment-card:bg-black/25 group-focus-within/moment-card:opacity-100 group-hover/moment-card:bg-black/25 group-hover/moment-card:opacity-100">
+        <Button
+          className="pointer-events-auto h-7 px-2.5 text-xs shadow-sm"
+          onClick={onKeep}
+          size="sm"
+          type="button"
+          variant="secondary"
+        >
+          Keep
+        </Button>
+      </span>
     </li>
   );
 }
 
 function TextResultCard({
+  keepMoment,
   match,
   onSeek,
   slug,
   words,
 }: {
-  match: PhraseSearchMatch;
+  keepMoment: (fromSec: number, toSec: number) => void;
+  match: MomentTextMatch;
   onSeek: (sourceSec: number) => void;
   slug: string;
   words: TranscriptWord[];
@@ -94,12 +136,21 @@ function TextResultCard({
   return (
     <MomentResultCard
       fromSec={match.fromSec}
+      keepMoment={keepMoment}
       onSeek={onSeek}
       slug={slug}
       thumbnailName={frameNameForTime(match.fromSec)}
       toSec={match.toSec}
     >
       <p className="mt-1 line-clamp-2 text-[11px] text-muted-foreground leading-4">
+        {match.hasCutWords ? (
+          <Badge
+            className="mr-1 align-middle text-[9px] uppercase"
+            variant="outline"
+          >
+            cut
+          </Badge>
+        ) : null}
         {snippet.before ? `${snippet.before} ` : ""}
         <strong className="font-semibold text-foreground">
           {snippet.match}
@@ -111,10 +162,12 @@ function TextResultCard({
 }
 
 function SceneResultCard({
+  keepMoment,
   onSeek,
   result,
   slug,
 }: {
+  keepMoment: (fromSec: number, toSec: number) => void;
   onSeek: (sourceSec: number) => void;
   result: MomentSceneResult;
   slug: string;
@@ -123,6 +176,7 @@ function SceneResultCard({
   return (
     <MomentResultCard
       fromSec={result.fromSec}
+      keepMoment={keepMoment}
       onSeek={onSeek}
       slug={slug}
       thumbnailName={thumbnailName}
@@ -172,6 +226,7 @@ function ErrorRow({ onRetry }: { onRetry: () => void }) {
 }
 
 export function MomentSearchPanel({
+  keepMoment,
   onSeek,
   slug,
   words,
@@ -214,6 +269,7 @@ export function MomentSearchPanel({
       <ul className="grid grid-cols-2 gap-x-3 gap-y-4">
         {textResults.map((match) => (
           <TextResultCard
+            keepMoment={keepMoment}
             key={`${match.range[0]}-${match.range[1]}`}
             match={match}
             onSeek={onSeek}
@@ -239,6 +295,7 @@ export function MomentSearchPanel({
       <ul className="grid grid-cols-2 gap-x-3 gap-y-4">
         {sceneResults.map((result) => (
           <SceneResultCard
+            keepMoment={keepMoment}
             key={`${result.fromSec}-${result.toSec}-${result.source}`}
             onSeek={onSeek}
             result={result}

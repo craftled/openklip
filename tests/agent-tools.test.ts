@@ -36,6 +36,7 @@ test("agentToolManifest includes query tools and registry mutations", () => {
   assert.ok(names.includes("title-add-phrase"));
   assert.ok(names.includes("graphic-add-phrase"));
   assert.ok(names.includes("graphic_show"));
+  assert.ok(names.includes("moment_search"));
   assert.ok(names.includes("music_bpm"));
   assert.ok(names.includes("audio_measure"));
   assert.ok(names.includes("export"));
@@ -1564,5 +1565,71 @@ test("task_list actor filter matching nothing returns an empty array, not an err
       actor: "human",
     })) as { tasks: unknown[] };
     assert.deepEqual(result.tasks, []);
+  });
+});
+
+// ── moment_search: combined transcript + visual scene search ────────────────
+
+test("agentToolManifest includes moment_search with slug, query, and optional limit", () => {
+  const names = agentToolNames("mcp");
+  assert.ok(names.includes("moment_search"));
+
+  const manifest = agentToolManifest("mcp");
+  const tool = manifest.find((m) => m.name === "moment_search");
+  assert.ok(tool, "moment_search tool missing from manifest");
+  assert.match(
+    tool?.summary ?? "",
+    /first call may block while the visual index builds/i
+  );
+
+  const schema = tool?.inputSchema as {
+    properties?: Record<string, unknown>;
+    required?: string[];
+  };
+  assert.ok(schema.properties?.slug, "moment_search takes a slug");
+  assert.ok(schema.properties?.query, "moment_search takes a query");
+  assert.ok(schema.properties?.limit, "moment_search takes an optional limit");
+  assert.deepEqual(schema.required?.sort(), ["query", "slug"]);
+});
+
+test("callAgentTool moment_search returns text matches without a visual index", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(
+      slug,
+      makeProject({
+        slug,
+        words: [
+          {
+            id: "w0",
+            text: "hello",
+            startSample: 0,
+            endSample: SAMPLE_RATE,
+            deleted: false,
+          },
+          {
+            id: "w1",
+            text: "world",
+            startSample: SAMPLE_RATE,
+            endSample: SAMPLE_RATE * 2,
+            deleted: false,
+          },
+        ],
+        durationSamples: SAMPLE_RATE * 2,
+      })
+    );
+    const result = (await callAgentTool("moment_search", {
+      slug,
+      query: "hello",
+    })) as {
+      indexed: boolean;
+      query: string;
+      text: Array<{ ids: string[] }>;
+      scenes: unknown[];
+    };
+    assert.equal(result.query, "hello");
+    assert.equal(result.indexed, false);
+    assert.equal(result.text.length, 1);
+    assert.deepEqual(result.text[0].ids, ["w0"]);
+    assert.deepEqual(result.scenes, []);
   });
 });

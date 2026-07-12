@@ -10,6 +10,7 @@ import {
   useEffect,
   useState,
 } from "react";
+import { AudioDrawer } from "@/components/audio-drawer";
 import {
   CutTransitionSweep,
   type CutTransitionSweepHandle,
@@ -24,9 +25,9 @@ import { PlayerControls } from "@/components/player-controls";
 import { PreviewOverlays } from "@/components/preview-overlays";
 import { PreviewTransitionNotice } from "@/components/preview-transition-notice";
 import { SafeAreaGuides } from "@/components/safe-area-guides";
-import { AudioDrawer } from "@/components/audio-drawer";
 import { TimelineDrawer } from "@/components/timeline-drawer";
-import { Search, Spline, Volume2, Aperture } from "@/lib/icon";
+import { useMomentDropZone } from "@/hooks/use-moment-keep";
+import { Aperture, Search, Spline, Volume2 } from "@/lib/icon";
 import { ORIENTATION_RATIO, type Orientation } from "@/lib/preview-layout";
 import { cn } from "@/lib/utils";
 import type { CaptionGroup } from "../../../src/captions";
@@ -35,6 +36,7 @@ export interface EditorPreviewPaneProps {
   activeCoverBroll: boolean;
   activePipBroll: boolean;
   activeSplitBroll: boolean;
+  audio: ComponentProps<typeof AudioDrawer>;
   brollRef: RefObject<HTMLVideoElement | null>;
   captionGroups: CaptionGroup[];
   captionStyleId?: string;
@@ -49,6 +51,7 @@ export interface EditorPreviewPaneProps {
   exportSettingsCrop: ExportCrop;
   fmtTime: (sec: number) => string;
   graphics: GraphicItem[];
+  keepMoment: (fromSec: number, toSec: number) => void;
   keptDurationSec: number;
   mediaVersion: number;
   mobileChatOpen?: boolean;
@@ -86,8 +89,10 @@ export interface EditorPreviewPaneProps {
   sourceHeight: number;
   sourceWidth: number;
   sweepRef: RefObject<CutTransitionSweepHandle | null>;
-  audio: ComponentProps<typeof AudioDrawer>;
-  timeline: ComponentProps<typeof TimelineDrawer>;
+  timeline: Omit<
+    ComponentProps<typeof TimelineDrawer>,
+    "fmtTime" | "keepMoment"
+  >;
   titles: {
     endSample: number;
     id: string;
@@ -117,6 +122,7 @@ export function EditorPreviewPane({
   exporting,
   fmtTime,
   graphics,
+  keepMoment,
   keptDurationSec,
   mediaVersion,
   mobileChatOpen,
@@ -162,6 +168,7 @@ export function EditorPreviewPane({
   zoomScale,
 }: EditorPreviewPaneProps) {
   const [previewMediaFailed, setPreviewMediaFailed] = useState(false);
+  const momentDrop = useMomentDropZone(keepMoment);
 
   useEffect(() => {
     setPreviewMediaFailed(false);
@@ -196,9 +203,14 @@ export function EditorPreviewPane({
         <div
           className={cn(
             "group/preview relative cursor-pointer overflow-hidden bg-black",
-            orientation !== "landscape" && "mx-auto"
+            orientation !== "landscape" && "mx-auto",
+            momentDrop.dropClassName
           )}
           onClick={onPreviewClick}
+          onDragEnter={momentDrop.onDragEnter}
+          onDragLeave={momentDrop.onDragLeave}
+          onDragOver={momentDrop.onDragOver}
+          onDrop={momentDrop.onDrop}
           style={
             orientation === "landscape"
               ? {
@@ -325,6 +337,8 @@ export function EditorPreviewPane({
           </button>
           <TimelineDrawer
             {...timeline}
+            fmtTime={fmtTime}
+            keepMoment={keepMoment}
             triggerChildren={
               <>
                 <Spline className="size-2.5" />

@@ -74,6 +74,7 @@ interface AgentSidebarProps {
   assets: BinAsset[];
   colorScheme: ColorScheme;
   configPanel: ReactNode;
+  keepMoment: (fromSec: number, toSec: number) => void;
   mediaVersion?: number;
   onAssetsUpdated: (update: AssetBinUpdate) => void;
   onCloseSettings: () => void;
@@ -100,6 +101,7 @@ export function AgentSidebar({
   onAssetsUpdated,
   onCloseSettings,
   onOpenSettings,
+  keepMoment,
   onSeek,
   onSelectSettingsSection,
   onSidebarViewChange,
@@ -413,6 +415,7 @@ export function AgentSidebar({
             ) : sidebarView === "search" ? (
               <div className="flex min-h-0 flex-1 flex-col overflow-y-auto pt-1.5 pb-1">
                 <MomentSearchPanel
+                  keepMoment={keepMoment}
                   onSeek={onSeek}
                   slug={activeSlug}
                   words={words}

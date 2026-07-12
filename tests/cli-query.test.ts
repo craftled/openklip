@@ -4,7 +4,10 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { addMusic, addTitle } from "../src/actions.ts";
 import {
+  composeMomentSearchResult,
+  formatMomentTextMatchesHuman,
   formatSceneMatchesHuman,
+  grepMomentTextMatches,
   runMomentSearch,
   runOverlays,
   runRanges,
@@ -590,6 +593,156 @@ test("runMomentSearch human output includes both a text and scene matches sectio
   assert.match(out, /text matches:/);
   assert.match(out, /scene matches:/);
   assert.match(out, /no moment index/);
+});
+
+// ── Moment search text matches include cut words (Lane C) ─────────────────
+
+function makeHesitationsFixture() {
+  return makeProject({
+    slug: "hesitations-fixture",
+    words: [
+      {
+        id: "w0",
+        text: "some",
+        startSample: 0,
+        endSample: SAMPLE_RATE,
+        deleted: false,
+      },
+      {
+        id: "w1",
+        text: "hesitations",
+        startSample: SAMPLE_RATE,
+        endSample: SAMPLE_RATE * 2,
+        deleted: true,
+      },
+      {
+        id: "w2",
+        text: "here",
+        startSample: SAMPLE_RATE * 2,
+        endSample: SAMPLE_RATE * 3,
+        deleted: false,
+      },
+    ],
+    durationSamples: SAMPLE_RATE * 3,
+  });
+}
+
+test("grepMomentTextMatches finds a phrase that was cut from the transcript", () => {
+  const project = makeHesitationsFixture();
+  const matches = grepMomentTextMatches(project, "hesitations");
+  assert.equal(matches.length, 1);
+  assert.equal(matches[0].cut, true);
+  assert.deepEqual(matches[0].ids, ["w1"]);
+  assert.equal(matches[0].text, "hesitations");
+});
+
+test("grepMomentTextMatches merges kept and cut hits sorted by fromSec", () => {
+  const project = makeProject({
+    words: [
+      {
+        id: "w0",
+        text: "hello",
+        startSample: 0,
+        endSample: SAMPLE_RATE,
+        deleted: false,
+      },
+      {
+        id: "w1",
+        text: "there",
+        startSample: SAMPLE_RATE,
+        endSample: SAMPLE_RATE * 2,
+        deleted: false,
+      },
+      {
+        id: "w2",
+        text: "hello",
+        startSample: SAMPLE_RATE * 2,
+        endSample: SAMPLE_RATE * 3,
+        deleted: false,
+      },
+      {
+        id: "w3",
+        text: "there",
+        startSample: SAMPLE_RATE * 3,
+        endSample: SAMPLE_RATE * 4,
+        deleted: true,
+      },
+      {
+        id: "w4",
+        text: "again",
+        startSample: SAMPLE_RATE * 4,
+        endSample: SAMPLE_RATE * 5,
+        deleted: true,
+      },
+    ],
+    durationSamples: SAMPLE_RATE * 5,
+  });
+  const matches = grepMomentTextMatches(project, "hello there");
+  assert.equal(matches.length, 2);
+  assert.equal(matches[0].fromSec, 0);
+  assert.equal(matches[0].cut, false);
+  assert.equal(matches[1].fromSec, 2);
+  assert.equal(matches[1].cut, true);
+});
+
+test("grepMomentTextMatches dedupes kept and cut matches at the same word-index range", () => {
+  const project = makeProject({
+    words: [
+      {
+        id: "w0",
+        text: "hello",
+        startSample: 0,
+        endSample: SAMPLE_RATE,
+        deleted: true,
+      },
+      {
+        id: "w1",
+        text: "there",
+        startSample: SAMPLE_RATE,
+        endSample: SAMPLE_RATE * 2,
+        deleted: true,
+      },
+    ],
+    durationSamples: SAMPLE_RATE * 2,
+  });
+  const matches = grepMomentTextMatches(project, "hello there");
+  assert.equal(matches.length, 1);
+  assert.equal(matches[0].cut, true);
+});
+
+test("composeMomentSearchResult text entries include cut flag for deleted matches", () => {
+  const project = makeHesitationsFixture();
+  const payload = composeMomentSearchResult(project, "hesitations", {
+    indexed: false,
+    results: [],
+  });
+  assert.equal(payload.text.length, 1);
+  assert.equal(payload.text[0].cut, true);
+  assert.deepEqual(payload.text[0].ids, ["w1"]);
+});
+
+test("formatMomentTextMatchesHuman appends [cut] for cut matches", () => {
+  const out = formatMomentTextMatchesHuman("hesitations", [
+    {
+      fromSec: 1,
+      toSec: 2,
+      ids: ["w1"],
+      text: "hesitations",
+      cut: true,
+    },
+  ]);
+  assert.match(out, /hesitations {2}\[cut\]/);
+});
+
+test("runMomentSearch human output marks cut text matches with [cut]", () => {
+  const project = makeHesitationsFixture();
+  const out = runMomentSearch(
+    project,
+    "hesitations",
+    { indexed: false, results: [] },
+    { json: false }
+  );
+  assert.match(out, /hesitations {2}\[cut\]/);
 });
 
 // ── Moment search CLI wiring (src/cli.ts): fast, no-network paths only ────

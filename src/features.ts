@@ -116,6 +116,20 @@ const RAW_FEATURES: FeatureDef[] = [
     },
   },
   {
+    id: "moment-search",
+    title: "Moment search: text + scene",
+    description:
+      "Search sidebar tab (Mod+Shift+F) for transcript text and visual moments: local CLIP frame embeddings blended with scene-log summaries. CLI: openklip index and openklip search. MCP: moment_search.",
+    group: "editing",
+    status: "shipped",
+    surfaces: ["cli", "gui", "mcp"],
+    links: {
+      cli: ["index", "search"],
+      tools: ["moment_search"],
+      actions: ["cut"],
+    },
+  },
+  {
     id: "cleanup-review",
     title: "Cleanup review",
     description:

@@ -56,6 +56,7 @@ export function EditorColumn({
                 curSample={transcript.curSample}
                 inBroll={transcript.inBroll}
                 inZoom={transcript.inZoom}
+                keepMoment={transcript.keepMoment}
                 matchRanges={transcript.matchRanges}
                 onCutSelection={transcript.onCutSelection}
                 onRestoreSelection={transcript.onRestoreSelection}

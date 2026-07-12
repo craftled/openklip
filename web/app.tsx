@@ -47,6 +47,7 @@ import { useEditorExport } from "@/hooks/use-editor-export";
 import { useEditorSelection } from "@/hooks/use-editor-selection";
 import { useEditorTimeline } from "@/hooks/use-editor-timeline";
 import { useLookControls } from "@/hooks/use-look-controls";
+import { useMomentKeep } from "@/hooks/use-moment-keep";
 import { useOverlayEditors } from "@/hooks/use-overlay-editors";
 import { usePreviewPlayback } from "@/hooks/use-preview-playback";
 import { useProjectConfigActions } from "@/hooks/use-project-config-actions";
@@ -341,6 +342,14 @@ export function App({
     selectTranscriptRange,
     setProject:
       setProject as unknown as UseTranscriptSearchParams["setProject"],
+    slug: project.slug,
+    words: project.words,
+  });
+
+  const { keepMoment } = useMomentKeep({
+    enqueueSave,
+    onSeek,
+    setProject,
     slug: project.slug,
     words: project.words,
   });
@@ -818,6 +827,7 @@ export function App({
           assets={project.assets.map(withAssetKind)}
           colorScheme={colorScheme}
           configPanel={configPanel}
+          keepMoment={keepMoment}
           mediaVersion={project.mediaVersion}
           onAssetsUpdated={applyAssetUpdate}
           onCloseSettings={() => setSettingsOpen(false)}
@@ -868,6 +878,7 @@ export function App({
                   exporting,
                   fmtTime: formatEditorTime,
                   graphics: project.graphics ?? [],
+                  keepMoment,
                   keptDurationSec: keptDuration,
                   mediaVersion: project.mediaVersion ?? 0,
                   mobileChatOpen: mobileRightPanel === "chat",
@@ -928,6 +939,7 @@ export function App({
                   curSample,
                   inBroll,
                   inZoom,
+                  keepMoment,
                   matchRanges: searchMatchRanges,
                   onCutSelection: cutSelection,
                   onRestoreSelection: restoreSelection,
