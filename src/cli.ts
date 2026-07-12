@@ -29,6 +29,9 @@ import {
   formatBrollSuggestJson,
   suggestBroll,
 } from "./broll-suggest.ts";
+import { camMix, planTimelineSummary } from "./cam-mix.ts";
+import { camRemix } from "./cam-remix.ts";
+import { type CamRole, ingestCam, listCams, setCam } from "./cams.ts";
 import { isCaptionStyleId, listCaptionStyles } from "./caption-styles.ts";
 import { buildCleanupReport, partitionSafeCandidates } from "./cleanup.ts";
 import {
@@ -297,6 +300,23 @@ Multi-take assembly
                                        --pad <ms>   seam pad (0-500, default 50)
                                        --force      overwrite an existing edit
                                      add a per-segment "why" note via the agent tool
+
+Contextual cam switch
+  openklip cam-add <slug> <video>    ingest a cam into cams/<id>/
+                                       --id <camId>  --name <text>
+                                       --role speaker|wide  --offset <ms>  --force
+  openklip cams <slug> [--json]      list ingested cams (id, name, role, offset, duration)
+  openklip cam-set <slug> <camId>    patch cam metadata
+                                       --name <text>  --role speaker|wide  --offset <ms>
+  openklip cam-mix <slug>            mix speaker cams down to a single source
+                                       --mode follow|auto  --agent <id>
+                                       --master-mix <path>
+                                       --min-shot <ms>  --max-shot <ms>
+                                       --interjection <ms>  --lead <ms>
+                                       --wide auto|off  --json
+  openklip cam-override <slug> <fromSec>-<toSec> <shot>
+                                     lock a manual shot override and re-mix
+                                       --json
 
 Review & export
   openklip status <slug>             summarize the current edit
@@ -2921,6 +2941,212 @@ try {
         console.log(`  missing kept words: ${report.missingKept.join(", ")}`);
       }
       process.exitCode = report.ok ? 0 : 1;
+      break;
+    }
+    case "cam-add": {
+      if (!(rest[0] && rest[1])) {
+        throw new Error(
+          "usage: openklip cam-add <slug> <video> [--id <camId>] [--name <text>] [--role speaker|wide] [--offset <ms>] [--force]"
+        );
+      }
+      const slug = rest[0];
+      const id = flagValue(rest, "--id");
+      const name = flagValue(rest, "--name");
+      const roleRaw = flagValue(rest, "--role");
+      const offsetRaw = flagValue(rest, "--offset");
+      const force = rest.includes("--force");
+      const video = rest.slice(1).filter((a, i, arr) => {
+        const prev = arr[i - 1];
+        return (
+          a !== "--id" &&
+          a !== "--name" &&
+          a !== "--role" &&
+          a !== "--offset" &&
+          a !== "--force" &&
+          prev !== "--id" &&
+          prev !== "--name" &&
+          prev !== "--role" &&
+          prev !== "--offset"
+        );
+      })[0];
+      if (!video) {
+        throw new Error(
+          "usage: openklip cam-add <slug> <video> [--id <camId>]"
+        );
+      }
+      let role: CamRole | undefined;
+      if (roleRaw === "speaker") {
+        role = "speaker";
+      } else if (roleRaw === "wide") {
+        role = "wide";
+      } else if (roleRaw !== undefined) {
+        throw new Error("--role must be speaker or wide");
+      }
+      const offsetMs = offsetRaw === undefined ? undefined : Number(offsetRaw);
+      if (
+        offsetMs !== undefined &&
+        !(Number.isFinite(offsetMs) && Number.isInteger(offsetMs))
+      ) {
+        throw new Error("--offset must be an integer number of milliseconds");
+      }
+      const cam = await ingestCam(slug, video, {
+        id,
+        name,
+        role,
+        offsetMs,
+        force,
+      });
+      console.log(
+        `cam "${cam.id}" ingested: ${samplesToSec(cam.durationSamples).toFixed(1)}s (${cam.role})`
+      );
+      break;
+    }
+    case "cams": {
+      if (!rest[0]) {
+        throw new Error("usage: openklip cams <slug> [--json]");
+      }
+      const cams = await listCams(rest[0]);
+      if (rest.includes("--json")) {
+        console.log(JSON.stringify(cams, null, 2));
+        break;
+      }
+      if (cams.length === 0) {
+        console.log("no cams. Run: openklip cam-add <slug> <video>");
+        break;
+      }
+      for (const c of cams) {
+        const dur = samplesToSec(c.durationSamples).toFixed(1);
+        const res = `${c.width}x${c.height}`;
+        console.log(
+          `${c.id.padEnd(8)}  ${c.name.padEnd(16)}  ${c.role.padEnd(8)}  ${`${c.offsetMs}ms`.padStart(8)}  ${`${dur}s`.padStart(7)}  ${res}`
+        );
+      }
+      console.log(`\n${cams.length} cam(s)`);
+      break;
+    }
+    case "cam-set": {
+      if (!(rest[0] && rest[1])) {
+        throw new Error(
+          "usage: openklip cam-set <slug> <camId> [--name <text>] [--role speaker|wide] [--offset <ms>]"
+        );
+      }
+      const slug = rest[0];
+      const camId = rest[1];
+      const name = flagValue(rest, "--name");
+      const roleRaw = flagValue(rest, "--role");
+      const offsetRaw = flagValue(rest, "--offset");
+      let role: CamRole | undefined;
+      if (roleRaw === "speaker") {
+        role = "speaker";
+      } else if (roleRaw === "wide") {
+        role = "wide";
+      } else if (roleRaw !== undefined) {
+        throw new Error("--role must be speaker or wide");
+      }
+      const offsetMs = offsetRaw === undefined ? undefined : Number(offsetRaw);
+      if (
+        offsetMs !== undefined &&
+        !(Number.isFinite(offsetMs) && Number.isInteger(offsetMs))
+      ) {
+        throw new Error("--offset must be an integer number of milliseconds");
+      }
+      const cam = await setCam(slug, camId, { name, role, offsetMs });
+      console.log(
+        `cam "${cam.id}" updated: ${cam.name} (${cam.role}, offset ${cam.offsetMs}ms)`
+      );
+      break;
+    }
+    case "cam-mix": {
+      if (!rest[0]) {
+        throw new Error(
+          "usage: openklip cam-mix <slug> [--mode follow|auto] [--agent <id>] [--master-mix <path>] [--min-shot <ms>] [--max-shot <ms>] [--interjection <ms>] [--lead <ms>] [--wide auto|off] [--json]"
+        );
+      }
+      const slug = rest[0];
+      const modeRaw = flagValue(rest, "--mode");
+      let mode: "follow" | "auto" | undefined;
+      if (modeRaw === "follow") {
+        mode = "follow";
+      } else if (modeRaw === "auto") {
+        mode = "auto";
+      } else if (modeRaw !== undefined) {
+        throw new Error("--mode must be follow or auto");
+      }
+      const agent = flagValue(rest, "--agent");
+      const masterMix = flagValue(rest, "--master-mix");
+      const wideRaw = flagValue(rest, "--wide");
+      let wide: "auto" | "off" | undefined;
+      if (wideRaw === "auto") {
+        wide = "auto";
+      } else if (wideRaw === "off") {
+        wide = "off";
+      } else if (wideRaw !== undefined) {
+        throw new Error("--wide must be auto or off");
+      }
+      const settings = {
+        ...(flagNumber(rest, "--min-shot") === undefined
+          ? {}
+          : { minShotMs: flagNumber(rest, "--min-shot") }),
+        ...(flagNumber(rest, "--max-shot") === undefined
+          ? {}
+          : { maxShotMs: flagNumber(rest, "--max-shot") }),
+        ...(flagNumber(rest, "--interjection") === undefined
+          ? {}
+          : { interjectionMs: flagNumber(rest, "--interjection") }),
+        ...(flagNumber(rest, "--lead") === undefined
+          ? {}
+          : { leadMs: flagNumber(rest, "--lead") }),
+        ...(wide === undefined ? {} : { wide }),
+      };
+      const result = await camMix(slug, {
+        mode,
+        settings: Object.keys(settings).length > 0 ? settings : undefined,
+        masterMix,
+        agent,
+      });
+      const cams = await listCams(slug);
+      const summary = planTimelineSummary(result.plan, cams);
+      if (rest.includes("--json")) {
+        console.log(JSON.stringify({ ...result, timeline: summary }, null, 2));
+        break;
+      }
+      console.log(summary);
+      console.log(`source -> ${result.sourcePath}`);
+      break;
+    }
+    case "cam-override": {
+      if (!(rest[0] && rest[1] && rest[2])) {
+        throw new Error(
+          "usage: openklip cam-override <slug> <fromSec>-<toSec> <shot> [--json]"
+        );
+      }
+      const slug = rest[0];
+      const spanSpec = rest[1];
+      const shot = rest[2];
+      const dash = spanSpec.indexOf("-");
+      if (dash <= 0) {
+        throw new Error(
+          `bad span "${spanSpec}" (want <fromSec>-<toSec>, e.g. 12.5-18)`
+        );
+      }
+      const fromSec = Number(spanSpec.slice(0, dash));
+      const toSec = Number(spanSpec.slice(dash + 1));
+      if (!(Number.isFinite(fromSec) && Number.isFinite(toSec))) {
+        throw new Error(
+          `bad span "${spanSpec}" (fromSec and toSec must be numbers)`
+        );
+      }
+      const result = await camRemix(slug, {
+        overrides: [{ fromSec, toSec, shot }],
+      });
+      const cams = await listCams(slug);
+      const summary = planTimelineSummary(result.plan, cams);
+      if (rest.includes("--json")) {
+        console.log(JSON.stringify({ ...result, timeline: summary }, null, 2));
+        break;
+      }
+      console.log(summary);
+      console.log(`source -> ${result.sourcePath}`);
       break;
     }
     case "take-add": {

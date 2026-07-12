@@ -1,4 +1,5 @@
 import type { SilenceSpan } from "@engine/audio-analysis-core";
+import type { MulticamProvenance } from "@engine/cam-mix";
 import type {
   Audio,
   ColorAdjust,
@@ -97,6 +98,7 @@ export interface EditorProject {
   };
   mediaVersion?: number;
   motion?: { speed?: number };
+  multicam?: MulticamProvenance;
   music?: MusicPlacementView[];
   padMs: number;
   revision?: number;

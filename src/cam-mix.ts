@@ -10,13 +10,13 @@ import {
   loadCamActivity,
   speakingSpans,
 } from "./cam-activity.ts";
+import { autoMixPlan } from "./cam-automix.ts";
 import {
   type CamSwitchSettings,
   CamSwitchSettingsSchema,
   followSpeakerPlan,
   type PlanSpan,
   PlanSpanSchema,
-  ruleBasedAutoPlan,
   validatePlan,
 } from "./cam-plan.ts";
 import type { Cam } from "./cams.ts";
@@ -428,10 +428,12 @@ export async function camMix(
     settings?: Partial<CamSwitchSettings>;
     masterMix?: string;
     plan?: PlanSpan[];
+    agent?: string;
   }
 ): Promise<CamMixResult> {
   const mode = opts?.mode ?? "follow";
   const settings = resolveSettings(opts?.settings);
+  let plannedBy = mode === "follow" ? "follow" : "rules";
 
   const cams = await listCams(slug);
   const speakers = speakerCams(cams);
@@ -476,23 +478,6 @@ export async function camMix(
 
   const planCams = cams.map((c) => ({ id: c.id, role: c.role }));
 
-  let rawPlan: PlanSpan[];
-  if (opts?.plan) {
-    rawPlan = opts.plan;
-  } else if (mode === "follow") {
-    rawPlan = followSpeakerPlan(spans, {
-      cams: planCams,
-      durationSamples,
-      settings,
-    });
-  } else {
-    rawPlan = ruleBasedAutoPlan(spans, {
-      cams: planCams,
-      durationSamples,
-      settings,
-    });
-  }
-
   const followPlan = followSpeakerPlan(spans, {
     cams: planCams,
     durationSamples,
@@ -506,6 +491,32 @@ export async function camMix(
     pcmBuf.byteLength / Float32Array.BYTES_PER_ELEMENT
   );
   const silences = analyzeSilences(pcm);
+
+  let rawPlan: PlanSpan[];
+  if (opts?.plan) {
+    rawPlan = opts.plan;
+  } else if (mode === "follow") {
+    rawPlan = followPlan;
+  } else {
+    const autoResult = await autoMixPlan(
+      {
+        attributions,
+        cams: cams.map((c) => ({
+          id: c.id,
+          name: c.name,
+          role: c.role,
+        })),
+        durationSamples,
+        settings,
+        silences,
+        spans,
+        words: freshWords,
+      },
+      { agent: opts?.agent }
+    );
+    rawPlan = autoResult.plan;
+    plannedBy = autoResult.plannedBy;
+  }
 
   const plan = validatePlan(rawPlan, {
     cams: planCams,
@@ -565,8 +576,17 @@ export async function camMix(
     }
   }
 
-  const words = resolveWords(existingWords, freshWords);
-  const plannedBy = mode === "follow" ? "follow" : "rules";
+  const attrByWordId = new Map(
+    attributions.map((a) => [a.wordId, a.camId] as const)
+  );
+  const resolvedWords = resolveWords(existingWords, freshWords);
+  const words = resolvedWords.map((w) => {
+    const camId = attrByWordId.get(w.id);
+    if (!camId) {
+      return w;
+    }
+    return { ...w, speaker: camId };
+  });
 
   const multicam: MulticamProvenance = {
     version: 1,

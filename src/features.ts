@@ -184,6 +184,21 @@ const RAW_FEATURES: FeatureDef[] = [
     },
   },
   {
+    id: "contextual-cam-switch",
+    title: "Contextual cam switch",
+    description:
+      "Multicam: per-speaker cams, automatic speaker ID, follow-speaker or LLM auto scene mix with synthetic wide, mixed down to a normal project.",
+    group: "editing",
+    status: "shipped",
+    since: "0.42.0.0",
+    surfaces: ["cli", "gui", "mcp"],
+    links: {
+      cli: ["cam-add", "cams", "cam-set", "cam-mix", "cam-override"],
+      tools: ["cam_add", "list_cams", "cam_set", "cam_mix", "cam_override"],
+      templates: ["cam-mix"],
+    },
+  },
+  {
     id: "preview",
     title: "Preview",
     description:

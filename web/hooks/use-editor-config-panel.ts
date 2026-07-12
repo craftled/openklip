@@ -366,6 +366,7 @@ export function useEditorConfigPanel(
       highlights: project.highlights,
       musicAssets,
       musicPlacements: project.music ?? [],
+      multicam: project.multicam ?? null,
       onAssembled: onHistoryReverted,
       pendingSaves,
       sampleRate: sr,

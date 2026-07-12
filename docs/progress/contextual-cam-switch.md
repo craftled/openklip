@@ -8,6 +8,14 @@ Orchestration: Claude Fable 5 reviews/judges; grok lanes (`grok-composer-2.5-fas
 - 2026-07-12: worktree baseline was red (377/556, 179 fail, 167 errors) — root cause: `ffprobe-static` ships an x86_64 binary in `bin/darwin/arm64/`, and this machine has no Rosetta (`EBADARCH`). Same broken binary exists in the main checkout. Local fix: `brew install ffmpeg`, then symlink `node_modules/ffprobe-static/bin/darwin/arm64/ffprobe -> /opt/homebrew/bin/ffprobe`. Bundled `ffmpeg-static` ffmpeg is native arm64 and fine. Flag for repo: consider FFPROBE env taking precedence over the package path in `src/ffmpeg.ts:25-35`, or a doctor check.
 - Permission note: direct `grok --always-approve` invocations are blocked by the Claude Code permission classifier unless allowlisted; `tstack helper run grok --prompt-file <brief>` is the working path.
 
+## Status 2026-07-12 (evening)
+
+- Phase A LANDED (commit ae4bcd6): cams engine, activity/attribution, planner/validator. Review patches: locked-span inheritance in applyOverrides (+regression), enforceMinShot indexing hardened, negative-offset audio alignment (adelay→atrim), windowDb consolidated into audio-analysis-core export.
+- Phase B LANDED (commits e87b64b, aed2504): cam-mix renderer + camMix orchestration, cam-automix LLM planner (all paths through validatePlan, rules fallback). Review patches: raw f32 declared to ffmpeg (no temp-WAV bridge), agent-layer frames extraction, poisoned integration test relocated to mock-free file, full lint cleanup.
+- Suite: 2025 tests / 0 fail incl. real-ffmpeg integration paths; typecheck + ultracite clean.
+- Phase C/D IN FLIGHT (parallel): C7 wiring (cli/agent-tools/features/edl Word.speaker/cam-remix/playbook) + D8 GUI panel (mode picker, mix timeline viz, speaker table, re-mix).
+- Acceptance fixtures ready: two 36s cams with real alternating speech (macOS say voices) in scratchpad/fixtures/.
+
 ## Phase log
 
 - Phase A (parallel, disjoint new modules; no cross-imports — types consolidated at wiring):
