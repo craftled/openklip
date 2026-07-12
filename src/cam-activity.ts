@@ -377,6 +377,11 @@ export function programAudioArgs(
   const filterParts: string[] = [];
 
   speakers.forEach((cam, i) => {
+    // Ingested cam audio is headerless 16k mono f32le PCM; ffmpeg needs the
+    // format declared before the input. Other containers probe normally.
+    if (cam.audioPath.endsWith(".f32")) {
+      inputArgs.push("-f", "f32le", "-ar", "16000", "-ac", "1");
+    }
     inputArgs.push("-i", cam.audioPath);
     const offsetMs = Math.round(cam.offsetMs);
     // Positive offset: cam starts after project t0 — delay its audio.

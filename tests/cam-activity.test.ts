@@ -438,3 +438,20 @@ test("programAudioArgs trims lead-in for negative offsets instead of clamping", 
   assert.ok(filter.includes("adelay=250"), "positive offset still delays");
   assert.ok(!filter.includes("adelay=0"), "no zero-clamped delay for the negative cam");
 });
+
+test("programAudioArgs declares raw f32 input format before .f32 inputs", () => {
+  const cams = [
+    { id: "cam1", role: "speaker" as const, offsetMs: 0, audioPath: "/p/cams/cam1/audio16k.f32" },
+    { id: "cam2", role: "speaker" as const, offsetMs: 0, audioPath: "/p/master.wav" },
+  ];
+  const args = programAudioArgs(cams, { out: "/tmp/out.wav" });
+  const f32Idx = args.indexOf("/p/cams/cam1/audio16k.f32");
+  assert.deepEqual(
+    args.slice(f32Idx - 7, f32Idx),
+    ["-f", "f32le", "-ar", "16000", "-ac", "1", "-i"],
+    "raw PCM input gets format flags"
+  );
+  const wavIdx = args.indexOf("/p/master.wav");
+  assert.equal(args[wavIdx - 1], "-i", "container input probes normally, no forced format");
+  assert.notEqual(args[wavIdx - 2], "f32le");
+});
