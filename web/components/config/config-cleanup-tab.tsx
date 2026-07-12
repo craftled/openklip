@@ -9,6 +9,7 @@ import type {
 } from "@/lib/cleanup-tab";
 
 export interface ConfigCleanupTabProps {
+  aiPassEnabled?: boolean;
   applying?: boolean;
   lastUndo: CleanupUndoSnapshot | null;
   onApply: (candidate: CleanupCandidate) => void;
@@ -32,6 +33,7 @@ export interface ConfigCleanupTabProps {
 }
 
 export function ConfigCleanupTab({
+  aiPassEnabled = true,
   applying = false,
   lastUndo,
   onPendingHighlightChange,
@@ -50,6 +52,7 @@ export function ConfigCleanupTab({
   return (
     <Section defaultOpen title="Cleanup">
       <CleanupPanel
+        aiPassEnabled={aiPassEnabled}
         applying={applying}
         lastUndo={lastUndo}
         onApply={onApply}

@@ -28,6 +28,7 @@ const emptyCleanupReport: CleanupReport = {
 
 function minimalCleanupProps(): ConfigPanelProps["cleanup"] {
   return {
+    aiPassEnabled: false,
     applying: false,
     lastUndo: null,
     onApply: () => undefined,
