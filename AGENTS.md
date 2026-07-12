@@ -588,4 +588,4 @@ Durable, non-obvious notes for cloud agents. The startup update script already r
 
 ### Known test flake (not environment-related)
 
-- `bun test` reports 6 failing `syncAssetsFromFolder` tests in the full run, but they pass when the file is run in isolation (`bun test tests/asset-scanner.test.ts`). Cause: `tests/project-data.test.ts` calls `mock.module("@engine/asset-scanner", ...)` with a throwing stub, and Bun's global module mock leaks into `tests/asset-scanner.test.ts` when both run together. This is a pre-existing test-isolation bug, independent of node/bun/ffmpeg versions.
+- Bun's `mock.module` leaks across test files in a shared-process run (historically 6 `syncAssetsFromFolder` failures via `tests/project-data.test.ts`; later ffmpeg-stub leakage from `tests/cams.test.ts` broke assembly/export smoke tests on CI). Fixed structurally on 2026-07-12: the `test` script and CI now run `bun test --isolate` (fresh global object per test file, ~6s overhead on a ~38s suite). If you invoke `bun test` directly without `--isolate`, cross-file mock leakage can still produce phantom failures - use `bun run test`.

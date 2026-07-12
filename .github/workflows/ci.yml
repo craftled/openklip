@@ -28,7 +28,7 @@ jobs:
         run: bun run typecheck --incremental false --pretty false
 
       - name: Unit tests
-        run: bun test
+        run: bun run test
 
       - name: Agent loop smoke audit
         run: bun run agent-smoke-audit
