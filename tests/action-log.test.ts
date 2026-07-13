@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
 import { appendFileSync, existsSync } from "node:fs";
+import { join } from "node:path";
 import { test } from "node:test";
 import {
   appendActionLog,
+  MAX_ACTION_LOG_BYTES,
+  MAX_ACTION_LOG_ENTRIES,
+  pruneActionLog,
   readActionLog,
   summarizeForLog,
 } from "../src/action-log.ts";
@@ -217,6 +221,98 @@ test('isActionLogEntry accepts actor "system" (background maintenance, e.g. asse
     revisionAfter: 1,
   };
   assert.equal(isActionLogEntry(entry), true);
+});
+
+test("pruneActionLog drops oldest entries when the count cap is exceeded", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    for (let index = 0; index < 12; index += 1) {
+      await appendActionLog(slug, {
+        at: index,
+        action: "pad",
+        actor: "cli",
+        revisionBefore: index,
+        revisionAfter: index + 1,
+      });
+    }
+    const { pruned, kept } = await pruneActionLog(slug, { maxEntries: 5 });
+    assert.equal(pruned, 7);
+    assert.equal(kept, 5);
+    const entries = await readActionLog(slug);
+    assert.equal(entries.length, 5);
+    assert.equal(entries[0].revisionAfter, 12);
+    assert.equal(entries.at(-1)?.revisionAfter, 8);
+  });
+});
+
+test("pruneActionLog keeps the newest revision tail for revert-last", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    for (let index = 0; index < 8; index += 1) {
+      await appendActionLog(slug, {
+        at: index,
+        action: "pad",
+        actor: "cli",
+        revisionBefore: index,
+        revisionAfter: index + 1,
+      });
+    }
+    await pruneActionLog(slug, { maxEntries: 3 });
+    const entries = await readActionLog(slug);
+    assert.equal(entries[0].revisionAfter, 8);
+    assert.equal(entries[0].revisionBefore, 7);
+  });
+});
+
+test("pruneActionLog enforces the byte cap without touching history snapshots", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    for (let index = 0; index < 40; index += 1) {
+      await appendActionLog(slug, {
+        at: index,
+        action: "cut",
+        actor: "cli",
+        input: `entry-${index}-${"x".repeat(80)}`,
+        revisionBefore: index,
+        revisionAfter: index + 1,
+      });
+    }
+    const logPath = projectPaths(slug).actionsLog;
+    const beforeSize = (await Bun.file(logPath).arrayBuffer()).byteLength;
+    assert.ok(beforeSize > 4096);
+    const historyDir = projectPaths(slug).historyDir;
+    const { mkdirSync, writeFileSync } = await import("node:fs");
+    mkdirSync(historyDir, { recursive: true });
+    writeFileSync(
+      join(historyDir, "rev-0.json"),
+      JSON.stringify(makeProject({ slug }), null, 2)
+    );
+    const { pruned } = await pruneActionLog(slug, {
+      maxBytes: 2048,
+      maxEntries: MAX_ACTION_LOG_ENTRIES,
+    });
+    assert.ok(pruned > 0);
+    const afterSize = (await Bun.file(logPath).arrayBuffer()).byteLength;
+    assert.ok(afterSize <= 2048);
+    assert.ok(existsSync(join(historyDir, "rev-0.json")));
+  });
+});
+
+test("appendActionLog rotates when default caps are exceeded in tests", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    assert.ok(MAX_ACTION_LOG_ENTRIES >= 100);
+    assert.ok(MAX_ACTION_LOG_BYTES >= 1024);
+    for (let index = 0; index < 8; index += 1) {
+      await appendActionLog(slug, {
+        at: index,
+        action: "pad",
+        actor: "cli",
+        revisionBefore: index,
+        revisionAfter: index + 1,
+      });
+    }
+    const { pruned } = await pruneActionLog(slug, { maxEntries: 4 });
+    assert.equal(pruned, 4);
+    const entries = await readActionLog(slug);
+    assert.equal(entries.length, 4);
+  });
 });
 
 test("summarizeForLog truncates huge values and survives circular refs", () => {

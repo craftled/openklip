@@ -36,6 +36,7 @@ import { isCaptionStyleId, listCaptionStyles } from "./caption-styles.ts";
 import {
   buildCleanupReport,
   CLEANUP_CATEGORY_DISPLAY_ORDER,
+  resolveCleanupConfig,
 } from "./cleanup.ts";
 import {
   executeMomentSearch,
@@ -342,6 +343,12 @@ Review & export
   openklip cleanup <slug> [--json]   filler-word and dead-air candidates by category (safe/review)
                                        --apply-safe      apply the safe candidates and print what changed
                                        --apply-enabled   apply enabled categories plus all dead-air at minSec
+  openklip cleanup-config <slug>     cleanup thresholds and category toggles
+                                       --json
+                                       --min-sec <n|inherit>  --keep-pad-sec <n|inherit>
+                                       --hesitation on|off|inherit
+                                       --hedging on|off|inherit
+                                       --repeat on|off|inherit
   openklip dead-air-rm <slug> <id>   remove a registered dead-air span by id
   openklip export-set <slug>           set export aspect and manual reframe crop
                                        --aspect <id>  source|16:9|9:16|1:1
@@ -466,6 +473,47 @@ function parseOnOff(value: string, label: string): boolean {
     return false;
   }
   throw new Error(`usage: ${label} <on|off>`);
+}
+
+function parseNullableNumberFlag(value: string, flag: string): number | null {
+  if (value.toLowerCase() === "inherit") {
+    return null;
+  }
+  const n = Number(value);
+  if (!Number.isFinite(n)) {
+    throw new Error(
+      `openklip cleanup-config ${flag} must be a number or inherit`
+    );
+  }
+  return n;
+}
+
+function parseCategoryToggle(value: string, flag: string): boolean | null {
+  const mode = value.toLowerCase();
+  if (mode === "on") {
+    return true;
+  }
+  if (mode === "off") {
+    return false;
+  }
+  if (mode === "inherit") {
+    return null;
+  }
+  throw new Error(
+    `openklip cleanup-config ${flag} must be on, off, or inherit`
+  );
+}
+
+function formatCleanupConfigLine(project: Project): string {
+  const config = resolveCleanupConfig(project);
+  const parts = [
+    `minSec ${config.minSec.toFixed(1)}s`,
+    `keepPadSec ${config.keepPadSec.toFixed(2)}s`,
+    `hesitation ${config.categories.hesitation ? "on" : "off"}`,
+    `hedging ${config.categories.hedging ? "on" : "off"}`,
+    `repeat ${config.categories.repeat ? "on" : "off"}`,
+  ];
+  return `cleanup-config: ${parts.join(", ")}`;
 }
 
 function flagValue(args: string[], flag: string): string | undefined {
@@ -2324,6 +2372,57 @@ try {
       process.stdout.write(
         runOverlays(project, { json: rest.includes("--json") })
       );
+      break;
+    }
+    case "cleanup-config": {
+      if (!rest[0]) {
+        throw new Error(
+          "usage: openklip cleanup-config <slug> [--json] [--min-sec <n>] [--keep-pad-sec <n>] [--hesitation on|off|inherit] [--hedging on|off|inherit] [--repeat on|off|inherit]"
+        );
+      }
+      const slug = rest[0];
+      const flags = rest.slice(1);
+      const minSecRaw = flagValue(flags, "--min-sec");
+      const keepPadSecRaw = flagValue(flags, "--keep-pad-sec");
+      const hesitation = flagValue(flags, "--hesitation");
+      const hedging = flagValue(flags, "--hedging");
+      const repeat = flagValue(flags, "--repeat");
+      const input: {
+        hedging?: boolean | null;
+        hesitation?: boolean | null;
+        keepPadSec?: number | null;
+        minSec?: number | null;
+        repeat?: boolean | null;
+      } = {};
+      if (minSecRaw !== undefined) {
+        input.minSec = parseNullableNumberFlag(minSecRaw, "--min-sec");
+      }
+      if (keepPadSecRaw !== undefined) {
+        input.keepPadSec = parseNullableNumberFlag(
+          keepPadSecRaw,
+          "--keep-pad-sec"
+        );
+      }
+      if (hesitation !== undefined) {
+        input.hesitation = parseCategoryToggle(hesitation, "--hesitation");
+      }
+      if (hedging !== undefined) {
+        input.hedging = parseCategoryToggle(hedging, "--hedging");
+      }
+      if (repeat !== undefined) {
+        input.repeat = parseCategoryToggle(repeat, "--repeat");
+      }
+      const project =
+        Object.keys(input).length === 0
+          ? await loadProject(slug)
+          : (await runLoggedAction(slug, "cleanup-config", input)).project;
+      if (flags.includes("--json")) {
+        process.stdout.write(
+          `${JSON.stringify(resolveCleanupConfig(project), null, 2)}\n`
+        );
+        break;
+      }
+      console.log(formatCleanupConfigLine(project));
       break;
     }
     case "cleanup": {

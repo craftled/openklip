@@ -1,5 +1,12 @@
 import { existsSync, statSync } from "node:fs";
-import { appendFile, mkdir, open, readFile } from "node:fs/promises";
+import {
+  appendFile,
+  mkdir,
+  open,
+  readFile,
+  rename,
+  writeFile,
+} from "node:fs/promises";
 import {
   type ActionLogEntry,
   type Actor,
@@ -19,6 +26,11 @@ export function actorFromEnv(): Actor | undefined {
 
 const SUMMARY_MAX = 200;
 const TAIL_CHUNK_BYTES = 64 * 1024;
+
+/** Newest N entries kept on disk. Independent of history snapshots (rev-*.json). */
+export const MAX_ACTION_LOG_ENTRIES = 5000;
+/** Hard size cap for working/actions.jsonl (16 MiB). */
+export const MAX_ACTION_LOG_BYTES = 16 * 1024 * 1024;
 
 // One-line, bounded description of an arbitrary value for the log. Never
 // throws: circular structures fall back to String(value), and undefined stays
@@ -75,6 +87,84 @@ export async function appendActionLog(
     existsSync(p.actionsLog) && !(await endsWithNewline(p.actionsLog));
   const prefix = needsHealing ? "\n" : "";
   await appendFile(p.actionsLog, `${prefix}${JSON.stringify(entry)}\n`);
+  try {
+    await pruneActionLog(slug);
+  } catch {
+    // Best-effort: a prune failure must not fail an append that already landed.
+  }
+}
+
+function serializeActionLogEntries(entries: ActionLogEntry[]): string {
+  if (entries.length === 0) {
+    return "";
+  }
+  return `${entries.map((entry) => JSON.stringify(entry)).join("\n")}\n`;
+}
+
+async function readActionLogEntriesChronological(
+  path: string
+): Promise<ActionLogEntry[]> {
+  let raw: string;
+  try {
+    raw = await readFile(path, "utf8");
+  } catch {
+    return [];
+  }
+  const entries: ActionLogEntry[] = [];
+  for (const line of raw.split("\n")) {
+    if (!line.trim()) {
+      continue;
+    }
+    const entry = parseLogLine(line);
+    if (entry) {
+      entries.push(entry);
+    }
+  }
+  return entries;
+}
+
+/** Drop oldest entries when count or byte caps are exceeded. Snapshots in
+ * working/history/ are untouched, so revision revert still works for any rev
+ * that still has a rev-<n>.json file. */
+export async function pruneActionLog(
+  slug: string,
+  opts: { maxBytes?: number; maxEntries?: number } = {}
+): Promise<{ kept: number; pruned: number }> {
+  const fp = projectPaths(slug).actionsLog;
+  if (!existsSync(fp)) {
+    return { kept: 0, pruned: 0 };
+  }
+
+  const maxEntries = opts.maxEntries ?? MAX_ACTION_LOG_ENTRIES;
+  const maxBytes = opts.maxBytes ?? MAX_ACTION_LOG_BYTES;
+  const entries = await readActionLogEntriesChronological(fp);
+  if (entries.length === 0) {
+    return { kept: 0, pruned: 0 };
+  }
+
+  const size = statSync(fp).size;
+  const needsEntryPrune = entries.length > maxEntries;
+  const needsSizePrune = size > maxBytes;
+  if (!(needsEntryPrune || needsSizePrune)) {
+    return { kept: entries.length, pruned: 0 };
+  }
+
+  let kept = needsEntryPrune ? entries.slice(-maxEntries) : [...entries];
+  let body = serializeActionLogEntries(kept);
+  while (kept.length > 1 && Buffer.byteLength(body, "utf8") > maxBytes) {
+    kept = kept.slice(1);
+    body = serializeActionLogEntries(kept);
+  }
+
+  const pruned = entries.length - kept.length;
+  if (pruned === 0) {
+    return { kept: kept.length, pruned: 0 };
+  }
+
+  const tmp = `${fp}.tmp-${process.pid}`;
+  await writeFile(tmp, body);
+  await rename(tmp, fp);
+  return { kept: kept.length, pruned };
 }
 
 function parseLogLine(line: string): ActionLogEntry | undefined {
