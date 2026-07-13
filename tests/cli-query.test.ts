@@ -817,6 +817,18 @@ test("CLI search requires a slug", async () => {
   assert.match(r.out, /usage: openklip search/);
 });
 
+test("CLI search rejects --limit outside 1-100", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const over = await runCli(["search", slug, "test", "--limit", "101"]);
+    assert.equal(over.code, 1);
+    assert.match(over.out, /--limit must be an integer between 1 and 100/);
+    const under = await runCli(["search", slug, "test", "--limit", "0"]);
+    assert.equal(under.code, 1);
+    assert.match(under.out, /--limit must be an integer between 1 and 100/);
+  });
+});
+
 test("CLI search on a project with no frames yet returns transcript matches without embedding", async () => {
   await withTempProjectsRoot(async ({ slug }) => {
     writeFixtureProject(slug, { ...makeHesitationsFixture(), slug });

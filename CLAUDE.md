@@ -14,9 +14,14 @@ See `AGENTS.md` for the full OpenKlip edit loop, CLI commands, MCP tools, and gu
 
 ## Current release memory
 
-- Code truth checked on 2026-07-13 (post multicam + moment-search + cleanup-parity merge): `VERSION` and `package.json` are `0.42.0.0` (prepared, unpublished); `bun test --isolate` runs 2300 tests (2292 pass, 8 skip without `OPENKLIP_INTEGRATION=1`). Plain `bun test` (no `--isolate`) can be flaky from cross-file `mock.module` leakage between test files sharing one process (see AGENTS.md's "Known test flake" note); `--isolate` (a real bun flag: fresh global object per test file) sidesteps it, and both `package.json`'s `test`/`ci` scripts and CI now use it. `src/agent-tools.ts` exposes 93 MCP tools; `openklip features --json` lists 54 capabilities from `src/features.ts`; `openklip actions --json` lists 46 registry actions.
-- Release docs: `CHANGELOG.md` is authoritative history, `docs/RELEASE-NOTES.md` holds GitHub release bodies, and `TODO.md#known-limitations` is the single current gaps list.
-- Published GitHub releases through `v0.41.1.1` (`gh release list`). `v0.41.1.3` is prepared as a draft in `docs/RELEASE-NOTES.md` from PR #83 plus local asset/timeline/runtime follow-ups, but is not published until `main` is pushed and a tag/release is created. `v0.42.0.0` (contextual cam switch / multicam) is prepared the same way from local feature work; its spec (`docs/specs/contextual-cam-switch-v1.md`) makes real multi-cam footage acceptance a release gate that has not been run yet, so do not tag or publish until that gate passes and `main` is synced.
+Re-checked 2026-07-13 after multicam + moment-search + cleanup-parity merged (PR #88).
+
+- **Version:** `0.42.0.0` in `VERSION` and `package.json` (prepared, unpublished).
+- **Tests:** `bun test --isolate` runs 2300 tests (2292 pass, 8 skip without `OPENKLIP_INTEGRATION=1`). Prefer `--isolate` in scripts and CI.
+- **Test flake:** plain `bun test` (no `--isolate`) can leak `mock.module` stubs across files in one process; see AGENTS.md "Known test flake". `--isolate` gives each test file a fresh global object.
+- **Counts:** 98 MCP tools (`openklip tools --json --surface mcp`; measure via file+parse, not pipe+grep), 54 capabilities (`openklip features --json`), 46 registry actions (`openklip actions --json`). A prior pass recorded 93 tools; that undercounted moment-search and cleanup-parity additions.
+- **Release docs:** `CHANGELOG.md` is authoritative history, `docs/RELEASE-NOTES.md` holds GitHub release bodies, `TODO.md#known-limitations` is the single current gaps list.
+- **Published GitHub releases:** through `v0.41.1.1` (`gh release list`). `v0.41.1.3` is a prepared draft (PR #83 plus local follow-ups), not published until tagged. `v0.42.0.0` is a prepared draft from the three v0.42 feature sets; do not tag or publish until real multi-cam footage acceptance passes (`docs/specs/contextual-cam-switch-v1.md`) and `main` is synced.
 
 ## Subagent fleet (cost routing)
 

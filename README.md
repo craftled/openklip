@@ -125,7 +125,7 @@ Verified against the current codebase (`VERSION` / `package.json` `0.42.0.0`, 23
 - **Browser editor**: open `http://localhost:<port>/<slug>` or `/?slug=<slug>` after `openklip serve`; script-first transcript editing (select words, Delete to cut)
 - **Workspace**: macOS folder picker on empty landing; inline project create; projects root persisted in `.openklip/projects-root`
 - **CLI**: full edit surface; `openklip actions --json` mutations manifest; `openklip tools --json` full agent tool list; `openklip features --json` capability catalog from `src/features.ts`; `openklip brief <slug> --audit` ship-readiness check against `brief.md`
-- **MCP server**: `openklip mcp` (stdio) exposes 93 tools across query, mutation, task progress, revert, and export surfaces; `.cursor/mcp.json` wired for Cursor
+- **MCP server**: `openklip mcp` (stdio) exposes 98 tools across query, mutation, task progress, revert, and export surfaces; `.cursor/mcp.json` wired for Cursor
 - **Edit templates**: `templates/<id>/skill.md` playbooks; `openklip template set`; brand presets at ingest (`openklip brand`)
 - **Agent selector**: drive filler cuts via Claude Code, Codex, Cursor, or Grok subscription CLIs
 - **Design system**: default shadcn/ui tokens with Base UI primitives (`app/globals.css`, `components.json`); light/dark via `.dark` class; icons via `web/lib/icon.tsx`
@@ -190,7 +190,7 @@ In Cursor, enable the bundled MCP server (`.cursor/mcp.json`) and call the same 
 
 | Agent / surface | Mutate `project.json` in chat | Typical workflow |
 | --- | --- | --- |
-| **Cursor** (MCP enabled) | Yes, via 93 MCP tools | Chat edits call `cut`, `broll-add`, `export`, etc. directly |
+| **Cursor** (MCP enabled) | Yes, via 98 MCP tools | Chat edits call `cut`, `broll-add`, `export`, etc. directly |
 | **Claude Code / Desktop** (MCP enabled) | Yes, via MCP | Same tool surface as Cursor |
 | **Codex** | CLI hints in chat | Run `openklip` commands the model suggests |
 | **Grok / other CLIs** | CLI hints in chat | Agent selector shells out for filler cuts; mutations via terminal |
