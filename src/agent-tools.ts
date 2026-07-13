@@ -56,6 +56,7 @@ import {
 import { exportAllHighlights, exportHighlight } from "./highlight-export.ts";
 import { detectHighlights, highlightClipLines } from "./highlights.ts";
 import { listLuts } from "./lut.ts";
+import { MAX_SEARCH_LIMIT } from "./moment-search.ts";
 import { projectPaths } from "./paths.ts";
 import { auditProjectForShip } from "./project-brief-audit.ts";
 import {
@@ -707,7 +708,7 @@ const queryTools: AgentToolDef[] = [
     schema: z.object({
       slug,
       query: z.string().min(1),
-      limit: z.number().int().min(1).max(100).optional(),
+      limit: z.number().int().min(1).max(MAX_SEARCH_LIMIT).optional(),
     }),
     run: async ({ slug: projectSlug, query, limit }) => {
       const project = await loadProject(projectSlug);

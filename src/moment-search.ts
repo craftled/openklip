@@ -54,6 +54,7 @@ export const DEFAULT_PEAK_MARGIN = 0.02;
 export const DEFAULT_MOMENT_GAP_SEC = 6.01;
 
 export const DEFAULT_SEARCH_LIMIT = 24;
+export const MAX_SEARCH_LIMIT = 100;
 
 // ── Sidecar index file format ──────────────────────────────────────────────
 

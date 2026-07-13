@@ -108,7 +108,11 @@ import {
 import { type Keyframe, KeyframeSchema } from "./keyframes.ts";
 import { listLuts, lutPath } from "./lut.ts";
 import { startMcpServer } from "./mcp-server.ts";
-import { buildMomentIndex, isMomentIndexCurrent } from "./moment-search.ts";
+import {
+  buildMomentIndex,
+  isMomentIndexCurrent,
+  MAX_SEARCH_LIMIT,
+} from "./moment-search.ts";
 import {
   buildPackageArgv,
   checkPackagePreflight,
@@ -190,7 +194,7 @@ Moment search
   openklip index <slug> [--force]    build/refresh the local visual frame-embedding index
   openklip search <slug> "<query>"   find moments by visual + transcript text query
                                        --json          machine-readable output
-                                       --limit <n>     max scene matches (default 24)
+                                       --limit <n>     max scene matches (1-100, default 24)
 
 Transcript edits
   openklip transcript <slug>         print every word with id, time, cut state
@@ -959,8 +963,13 @@ try {
       const tail = rest.slice(1);
       const limitRaw = flagValue(tail, "--limit");
       const limit = limitRaw === undefined ? undefined : Number(limitRaw);
-      if (limit !== undefined && !(Number.isInteger(limit) && limit > 0)) {
-        throw new Error("--limit must be a positive integer");
+      if (
+        limit !== undefined &&
+        !(Number.isInteger(limit) && limit >= 1 && limit <= MAX_SEARCH_LIMIT)
+      ) {
+        throw new Error(
+          `--limit must be an integer between 1 and ${MAX_SEARCH_LIMIT}`
+        );
       }
       const json = tail.includes("--json");
       const queryParts: string[] = [];
