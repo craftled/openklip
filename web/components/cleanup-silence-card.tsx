@@ -7,6 +7,7 @@ import { ElasticSlider } from "@/components/elastic-slider";
 import { Button } from "@/components/ui/button";
 import {
   type CleanupPeaksResponse,
+  type CleanupSilencesProgress,
   useCleanupPeaks,
 } from "@/hooks/use-cleanup-tab-data";
 import {
@@ -53,13 +54,6 @@ function ThresholdSlider({
   );
 }
 
-export interface CleanupSilenceProgress {
-  message: string;
-  phase: "analyzing" | "reading" | "writing";
-  step: number;
-  total: number;
-}
-
 export interface CleanupSilenceCardProps {
   applying?: boolean;
   onApplyAllSilences: () => void;
@@ -68,7 +62,7 @@ export interface CleanupSilenceCardProps {
   report: CleanupReport;
   selectedCandidate: CleanupCandidate | null;
   silencesLoading?: boolean;
-  silencesProgress?: CleanupSilenceProgress | null;
+  silencesProgress?: CleanupSilencesProgress | null;
   slug: string;
 }
 

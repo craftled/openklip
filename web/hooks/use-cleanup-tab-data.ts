@@ -15,7 +15,7 @@ export interface CleanupPeaksResponse {
   toSec: number;
 }
 
-interface SilencesJobProgress {
+export interface CleanupSilencesProgress {
   message: string;
   phase: "analyzing" | "reading" | "writing";
   step: number;
@@ -24,14 +24,14 @@ interface SilencesJobProgress {
 
 interface SilencesStartResponse {
   jobId?: string;
-  progress?: SilencesJobProgress;
+  progress?: CleanupSilencesProgress;
   silences?: SilenceSpan[];
   status?: "running";
 }
 
 interface SilencesJobResponse {
   error?: string;
-  progress?: SilencesJobProgress;
+  progress?: CleanupSilencesProgress;
   silences?: SilenceSpan[];
   status: "done" | "error" | "running";
 }
@@ -44,7 +44,7 @@ const peaksCache = new Map<string, CleanupPeaksResponse>();
 async function pollSilencesJob(
   slug: string,
   jobId: string,
-  onProgress?: (p: SilencesJobProgress) => void
+  onProgress?: (p: CleanupSilencesProgress) => void
 ): Promise<SilenceSpan[] | null> {
   for (;;) {
     const res = await fetch(
@@ -90,7 +90,7 @@ export function useCleanupSilences({
     return;
   });
   const [silencesProgress, setSilencesProgress] =
-    useState<SilencesJobProgress | null>(null);
+    useState<CleanupSilencesProgress | null>(null);
 
   useEffect(() => {
     if (projectSilences != null) {

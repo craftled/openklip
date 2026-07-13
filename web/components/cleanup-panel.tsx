@@ -9,15 +9,15 @@ import {
 import type { Project } from "@engine/edl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AgentModelSelect } from "@/components/agent-model-select";
-import {
-  CleanupSilenceCard,
-  type CleanupSilenceProgress,
-} from "@/components/cleanup-silence-card";
+import { CleanupSilenceCard } from "@/components/cleanup-silence-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useCleanupAiPass } from "@/hooks/use-cleanup-ai-pass";
-import type { CleanupPeaksResponse } from "@/hooks/use-cleanup-tab-data";
+import type {
+  CleanupPeaksResponse,
+  CleanupSilencesProgress,
+} from "@/hooks/use-cleanup-tab-data";
 import { deadAirCandidatesFromReport } from "@/lib/cleanup-silence";
 import {
   CATEGORY_CARD_META,
@@ -415,7 +415,7 @@ export interface CleanupPanelProps {
   registeredSpans?: RegisteredDeadAirSpan[];
   report: CleanupReport;
   silencesLoading?: boolean;
-  silencesProgress?: CleanupSilenceProgress | null;
+  silencesProgress?: CleanupSilencesProgress | null;
   slug: string;
 }
 

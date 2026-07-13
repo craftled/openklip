@@ -480,6 +480,12 @@ export interface CamSwitchPanelProps {
   slug: string;
 }
 
+type RemixedProject = Project & { multicam?: MulticamProvenance | null };
+
+function projectFromMixResult(data: { project: Project }): RemixedProject {
+  return data.project as RemixedProject;
+}
+
 export function CamSwitchPanel({
   multicam: multicamProp,
   onRemixed,
@@ -635,53 +641,49 @@ export function CamSwitchPanel({
     setSettings((prev) => ({ ...prev, ...patch }));
   }, []);
 
-  const onRemix = useCallback(async () => {
-    setMixing(true);
-    setMixError(null);
-    try {
-      const result = await camMixAction(slug, { mode, settings });
-      if (!result.ok) {
-        setMixError(result.error);
-        return;
+  const applyRemixedProject = useCallback(
+    (project: RemixedProject) => {
+      setMulticam(project.multicam ?? null);
+      if (project.multicam?.settings) {
+        setSettings(project.multicam.settings);
       }
-      const remixed = result.data.project as Project & {
-        multicam?: MulticamProvenance | null;
-      };
-      setMulticam(remixed.multicam ?? null);
-      if (remixed.multicam?.settings) {
-        setSettings(remixed.multicam.settings);
-      }
-      onRemixed?.(remixed);
+      onRemixed?.(project);
       router.refresh();
-    } finally {
-      setMixing(false);
-    }
-  }, [mode, onRemixed, router, settings, slug]);
+    },
+    [onRemixed, router]
+  );
 
-  const onCamOverride = useCallback(
-    async (fromSec: number, toSec: number, shot: string) => {
+  const withMixing = useCallback(
+    async (
+      run: () => Promise<
+        { ok: true; data: { project: Project } } | { ok: false; error: string }
+      >
+    ) => {
       setMixing(true);
       setMixError(null);
       try {
-        const result = await camOverrideAction(slug, { fromSec, toSec, shot });
+        const result = await run();
         if (!result.ok) {
           setMixError(result.error);
           return;
         }
-        const remixed = result.data.project as Project & {
-          multicam?: MulticamProvenance | null;
-        };
-        setMulticam(remixed.multicam ?? null);
-        if (remixed.multicam?.settings) {
-          setSettings(remixed.multicam.settings);
-        }
-        onRemixed?.(remixed);
-        router.refresh();
+        applyRemixedProject(projectFromMixResult(result.data));
       } finally {
         setMixing(false);
       }
     },
-    [onRemixed, router, slug]
+    [applyRemixedProject]
+  );
+
+  const onRemix = useCallback(() => {
+    void withMixing(() => camMixAction(slug, { mode, settings }));
+  }, [mode, settings, slug, withMixing]);
+
+  const onCamOverride = useCallback(
+    (fromSec: number, toSec: number, shot: string) => {
+      void withMixing(() => camOverrideAction(slug, { fromSec, toSec, shot }));
+    },
+    [slug, withMixing]
   );
 
   if (!(visible || loadingCams)) {
@@ -706,12 +708,10 @@ export function CamSwitchPanel({
       onAddCamRoleChange={setAddCamRole}
       onCamNameChange={onCamNameChange}
       onCamOffsetChange={onCamOffsetChange}
-      onCamOverride={(fromSec, toSec, shot) =>
-        void onCamOverride(fromSec, toSec, shot)
-      }
+      onCamOverride={onCamOverride}
       onCamRoleChange={onCamRoleChange}
       onModeChange={setMode}
-      onRemix={() => void onRemix()}
+      onRemix={onRemix}
       onSettingsChange={onSettingsChange}
       onToggleCamAudio={onToggleCamAudio}
       playingCamId={playingCamId}

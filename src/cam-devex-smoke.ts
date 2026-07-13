@@ -61,13 +61,14 @@ export async function runCamDevexSmoke(): Promise<CamDevexSmokeResult> {
     const override = await camRemix(slug, {
       overrides: [{ fromSec: 0.5, toSec: 1.5, shot: "a" }],
     });
-    const locked = override.plan.some((span) => span.locked);
+    const lockedSpans = override.plan.filter((span) => span.locked);
     steps.push({
       name: "cam-override",
-      ok: locked,
-      detail: locked
-        ? `locked spans=${override.plan.filter((s) => s.locked).length}`
-        : "no locked span after override",
+      ok: lockedSpans.length > 0,
+      detail:
+        lockedSpans.length > 0
+          ? `locked spans=${lockedSpans.length}`
+          : "no locked span after override",
     });
 
     const ok = steps.every((step) => step.ok);

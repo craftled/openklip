@@ -157,24 +157,18 @@ function resolveAnalysisOpts(opts: AnalyzeSilencesOpts = {}) {
 
 const PCM_CHUNK_SEC = 120;
 
-function chunkOverlapSec(
-  resolved: ReturnType<typeof resolveAnalysisOpts>
-): number {
-  // Overlap must cover at least one min-silence window across chunk seams.
-  return Math.max(0.5, resolved.minSilenceMs / 1000 + resolved.windowMs / 1000);
-}
-
 async function analyzePcmChunked(
   slug: string,
   resolved: ReturnType<typeof resolveAnalysisOpts>,
+  totalSec: number,
   onProgress?: (p: AudioAnalysisProgress) => void
-): Promise<SilenceSpan[]> {
-  const audioRaw = projectPaths(slug).audioRaw;
-  const fileStat = await stat(audioRaw);
-  const totalSec = Math.floor(fileStat.size / 4) / resolved.sampleRate;
+): Promise<{ silences: SilenceSpan[]; totalSteps: number }> {
   const chunkCount = Math.max(1, Math.ceil(totalSec / PCM_CHUNK_SEC));
   const totalSteps = chunkCount + 2;
-  const overlapSec = chunkOverlapSec(resolved);
+  const overlapSec = Math.max(
+    0.5,
+    resolved.minSilenceMs / 1000 + resolved.windowMs / 1000
+  );
   const spans: SilenceSpan[] = [];
 
   for (let i = 0; i < chunkCount; i++) {
@@ -207,7 +201,7 @@ async function analyzePcmChunked(
     step: chunkCount + 1,
     total: totalSteps,
   });
-  return mergeSilenceSpans(spans);
+  return { silences: mergeSilenceSpans(spans), totalSteps };
 }
 
 // Return a fresh cached analysis when the on-disk cache is valid for the
@@ -253,11 +247,18 @@ export async function computeAudioAnalysis(
   if (!existsSync(paths.audioRaw)) {
     throw missingAudioRawError();
   }
-  const sourceMtimeMs = (await stat(paths.audioRaw)).mtimeMs;
+  const audioStat = await stat(paths.audioRaw);
+  const sourceMtimeMs = audioStat.mtimeMs;
   const cachePath = audioAnalysisPath(slug);
   const resolved = resolveAnalysisOpts(opts);
+  const totalSec = Math.floor(audioStat.size / 4) / resolved.sampleRate;
 
-  const silences = await analyzePcmChunked(slug, resolved, onProgress);
+  const { silences, totalSteps } = await analyzePcmChunked(
+    slug,
+    resolved,
+    totalSec,
+    onProgress
+  );
 
   const analysis: AudioAnalysis = {
     version: 1,
@@ -266,14 +267,11 @@ export async function computeAudioAnalysis(
     silences,
   };
 
-  const fileStat = await stat(paths.audioRaw);
-  const totalSec = Math.floor(fileStat.size / 4) / resolved.sampleRate;
-  const chunkCount = Math.max(1, Math.ceil(totalSec / PCM_CHUNK_SEC));
   onProgress?.({
     phase: "writing",
     message: "Writing cache",
-    step: chunkCount + 2,
-    total: chunkCount + 2,
+    step: totalSteps,
+    total: totalSteps,
   });
   await writeCache(paths.working, cachePath, analysis);
   return analysis;
