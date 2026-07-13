@@ -20,7 +20,9 @@ import {
 } from "@engine/agent-tasks";
 import { analyzeAssets, assetCardLines } from "@engine/asset-cards";
 import { loadBrief } from "@engine/brief";
+import { categorizeAgentCutIds } from "@engine/cleanup";
 import type { Project } from "@engine/edl";
+import { samplesToSec } from "@engine/edl";
 import { projectsRoot } from "@engine/paths";
 import { loadProject, mutateProject } from "@engine/projectStore";
 import { agentGuiMutateMeta } from "@engine/provenance";
@@ -44,6 +46,27 @@ export type AgentResult =
       ok: true;
       cut: number;
       words: Array<{ id: string; text: string }>;
+    }
+  | { ok: false; error: string };
+
+export type CleanupCutsCategory = "hesitation" | "hedging" | "repeat";
+
+export type CleanupCutsResult =
+  | {
+      ok: true;
+      agent: string;
+      byCategory: {
+        hesitation: string[];
+        hedging: string[];
+        repeat: string[];
+      };
+      words: Array<{
+        id: string;
+        text: string;
+        startSec: number;
+        endSec: number;
+        category: CleanupCutsCategory;
+      }>;
     }
   | { ok: false; error: string };
 
@@ -79,6 +102,64 @@ export async function suggestFillerCuts(
       agentGuiMutateMeta("filler-cuts", agent, { agent })
     );
     return { ok: true, cut: cutWords.length, words: cutWords };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+// Ask the selected agent which transcript words are filler or false starts,
+// classify them for the Cleanup tab, and return without mutating project.json.
+export async function suggestCleanupCuts(
+  slug: string,
+  agent: string
+): Promise<CleanupCutsResult> {
+  try {
+    const project = await loadProject(slug);
+    const { ids, agent: resolvedAgent } = await runFillerAgent(
+      project.words.map((w) => ({ id: w.id, text: w.text })),
+      { agent }
+    );
+    const byCategory = categorizeAgentCutIds(project, ids);
+    const wordById = new Map(project.words.map((w) => [w.id, w]));
+    const categoryById = new Map<string, CleanupCutsCategory>();
+    for (const id of byCategory.hesitation) {
+      categoryById.set(id, "hesitation");
+    }
+    for (const id of byCategory.hedging) {
+      categoryById.set(id, "hedging");
+    }
+    for (const id of byCategory.repeat) {
+      categoryById.set(id, "repeat");
+    }
+
+    const words: Array<{
+      id: string;
+      text: string;
+      startSec: number;
+      endSec: number;
+      category: CleanupCutsCategory;
+    }> = [];
+    const seen = new Set<string>();
+    for (const id of ids) {
+      if (seen.has(id)) {
+        continue;
+      }
+      const w = wordById.get(id);
+      const category = categoryById.get(id);
+      if (!(w && category)) {
+        continue;
+      }
+      seen.add(id);
+      words.push({
+        id: w.id,
+        text: w.text,
+        startSec: samplesToSec(w.startSample),
+        endSec: samplesToSec(w.endSample),
+        category,
+      });
+    }
+
+    return { ok: true, agent: resolvedAgent, byCategory, words };
   } catch (e) {
     return { ok: false, error: (e as Error).message };
   }

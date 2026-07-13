@@ -375,6 +375,68 @@ export function findFillerPromiseMessages(providerLabel: string): {
   };
 }
 
+export function suggestCleanupCutsLoadingMessage(
+  providerLabel: string
+): string {
+  return `${providerLabel} is scanning for false starts…`;
+}
+
+export function suggestCleanupCutsSuccessToast(result: {
+  words: Array<{ id: string; text: string }>;
+}): ToastPayload {
+  const count = result.words.length;
+  return {
+    kind: "success",
+    title:
+      count > 0
+        ? `Found ${count} AI suggestion${count === 1 ? "" : "s"}`
+        : "No false starts or mistakes found",
+    ...(count > 0
+      ? {
+          description: result.words
+            .slice(0, 6)
+            .map((word) => `${word.id} "${word.text}"`)
+            .join(", "),
+        }
+      : {}),
+  };
+}
+
+export function suggestCleanupCutsFailedToast(error: string): ToastPayload {
+  return {
+    kind: "error",
+    title: "AI cleanup scan failed",
+    description: error,
+  };
+}
+
+export function suggestCleanupCutsPromiseMessages(providerLabel: string): {
+  error: (error: unknown) => { description?: string; message: string };
+  loading: string;
+  success: (result: { words: Array<{ id: string; text: string }> }) => {
+    description?: string;
+    message: string;
+  };
+} {
+  return {
+    loading: suggestCleanupCutsLoadingMessage(providerLabel),
+    success: (result) => {
+      const payload = suggestCleanupCutsSuccessToast(result);
+      return {
+        message: payload.title,
+        description: payload.description,
+      };
+    },
+    error: (error) => {
+      const payload = suggestCleanupCutsFailedToast((error as Error).message);
+      return {
+        message: payload.title,
+        description: payload.description,
+      };
+    },
+  };
+}
+
 export function analyzeAssetsPromiseMessages(providerLabel: string): {
   error: (error: unknown) => { description?: string; message: string };
   loading: string;

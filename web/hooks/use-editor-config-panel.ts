@@ -4,6 +4,7 @@ import { DEFAULT_CAPTION_STYLE } from "@engine/caption-styles";
 import type { ColorAdjust, ExportSettings, Filter } from "@engine/edl";
 import type { Keyframe } from "@engine/keyframes";
 import type { ReactNode } from "react";
+import type { ConfigCleanupTabProps } from "@/components/config/config-cleanup-tab";
 import type { ConfigEditTabProps } from "@/components/config/config-edit-tab";
 import type { ConfigHistoryTabProps } from "@/components/config/config-panel";
 import type { ConfigProjectTabProps } from "@/components/config/config-project-tab";
@@ -46,7 +47,20 @@ export interface UseEditorConfigPanelParams {
   chosenGraphicTemplate: string;
   chosenMusicAsset: string;
   chosenStillAsset: string;
-  cleanupReport: ConfigProjectTabProps["cleanupReport"];
+  cleanupActions: Pick<
+    ConfigCleanupTabProps,
+    | "lastUndo"
+    | "onApply"
+    | "onApplyAllSafe"
+    | "onApplyAllSilences"
+    | "onApplyEnabled"
+    | "onPatchCleanupThreshold"
+    | "onPendingHighlightChange"
+    | "onRemoveSpan"
+    | "onToggleCategory"
+    | "onUndoLast"
+  >;
+  cleanupReport: ConfigCleanupTabProps["report"];
   clearSelection: () => void;
   color: ColorAdjust | null;
   curSec: number;
@@ -118,8 +132,6 @@ export interface UseEditorConfigPanelParams {
   projectActions: Pick<
     ConfigProjectTabProps,
     | "onAddMusic"
-    | "onApplyAllSafeCleanup"
-    | "onApplyCleanup"
     | "onChooseMusicAsset"
     | "onDetectBpm"
     | "onDetectHighlights"
@@ -127,7 +139,6 @@ export interface UseEditorConfigPanelParams {
     | "onPatchAudio"
     | "onPatchMusic"
     | "onPatchSnap"
-    | "onRemoveDeadAirSpan"
     | "onRemoveMusic"
     | "onSaveBrief"
     | "onSeekHighlight"
@@ -166,6 +177,7 @@ export function useEditorConfigPanel(
     chosenGraphicTemplate,
     chosenMusicAsset,
     chosenStillAsset,
+    cleanupActions,
     cleanupReport,
     clearSelection,
     color,
@@ -338,6 +350,17 @@ export function useEditorConfigPanel(
       vignetteOn,
       ...lookActions,
     },
+    cleanup: {
+      applying: pendingSaves > 0,
+      registeredSpans: (project.cuts?.deadAir ?? []).map((span) => ({
+        endSec: span.endSample / project.sampleRate,
+        id: span.id,
+        startSec: span.startSample / project.sampleRate,
+      })),
+      report: cleanupReport,
+      slug: project.slug,
+      ...cleanupActions,
+    },
     project: {
       applyingVision,
       assets: project.assets ?? [],
@@ -350,12 +373,6 @@ export function useEditorConfigPanel(
       bpmDetectingAssetId,
       chosenGraphicTemplate,
       chosenMusicAsset,
-      cleanupReport,
-      deadAirSpans: (project.cuts?.deadAir ?? []).map((span) => ({
-        id: span.id,
-        startSec: span.startSample / project.sampleRate,
-        endSec: span.endSample / project.sampleRate,
-      })),
       detectingHighlights,
       durationSec: project.durationSamples / sr,
       graphicBeatCount,
