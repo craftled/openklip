@@ -93,7 +93,9 @@ async function ensureMapMotionReady(): Promise<HeadlessMapMotion> {
     };
     mapInstance.once("error", (event) => {
       finish(
-        new Error(`map-motion map error: ${event.error?.message ?? "unknown"}`)
+        new Error(
+          `map-motion tile fetch failed: ${event.error?.message?.trim() || "unknown"}`
+        )
       );
     });
     mapInstance.once("load", () => {

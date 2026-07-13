@@ -4,8 +4,10 @@ import {
   boundsForCoordinates,
   buildArcCoordinates,
   cameraStateForFrame,
+  mapMotionErrorMessage,
   routeProgressForFrame,
   trimCoordinates,
+  waitMapIdle,
 } from "../web/lib/map-motion-runtime.ts";
 
 describe("map-motion runtime math", () => {
@@ -49,5 +51,33 @@ describe("map-motion runtime math", () => {
     ]);
     expect(bounds.center[0]).toBeCloseTo(-96, 0);
     expect(bounds.zoom).toBeGreaterThan(1);
+  });
+
+  it("waitMapIdle rejects immediately when the map reports a tile error", async () => {
+    const handlers = new Map<string, Array<(...args: unknown[]) => void>>();
+    const map = {
+      once(event: string, handler: (...args: unknown[]) => void) {
+        const list = handlers.get(event) ?? [];
+        list.push(handler);
+        handlers.set(event, list);
+      },
+      triggerRepaint() {
+        const errorHandlers = handlers.get("error") ?? [];
+        for (const handler of errorHandlers) {
+          handler({ error: { message: "Failed to fetch" } });
+        }
+      },
+    };
+
+    await expect(waitMapIdle(map)).rejects.toThrow(
+      /map-motion tile fetch failed: Failed to fetch/
+    );
+  });
+
+  it("mapMotionErrorMessage prefers the map error detail", () => {
+    expect(mapMotionErrorMessage({ error: { message: "network down" } })).toBe(
+      "network down"
+    );
+    expect(mapMotionErrorMessage(undefined, "fallback")).toBe("fallback");
   });
 });
