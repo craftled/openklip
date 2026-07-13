@@ -1,9 +1,10 @@
 import { existsSync } from "node:fs";
 import {
-  loadAudioAnalysis,
   missingAudioRawError,
+  tryLoadCachedAudioAnalysis,
 } from "@engine/audio-analysis";
 import { assertValidSlug, projectPaths } from "@engine/paths";
+import { startSilencesJob } from "@engine/silences-jobs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,16 +37,21 @@ export async function GET(_req: Request, { params }: RouteParams) {
   }
 
   try {
-    const analysis = await loadAudioAnalysis(slug);
-    return Response.json({ silences: analysis.silences });
+    const cached = await tryLoadCachedAudioAnalysis(slug);
+    if (cached) {
+      return Response.json({ silences: cached.silences });
+    }
   } catch {
-    // Do not echo the caught error's message here: an unexpected fs error
-    // (e.g. EACCES) formats as "EACCES: permission denied, open '<absolute
-    // path>'" in Node/Bun, which would leak the project's filesystem
-    // location to an unauthenticated caller.
     return Response.json(
       { error: "failed to load audio analysis" },
       { status: 500 }
     );
   }
+
+  const job = startSilencesJob(slug);
+  return Response.json({
+    jobId: job.id,
+    status: job.status,
+    progress: job.progress,
+  });
 }

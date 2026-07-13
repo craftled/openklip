@@ -138,6 +138,102 @@ export async function readPcmRange(
   }
 }
 
+export interface AudioAnalysisProgress {
+  message: string;
+  phase: "analyzing" | "reading" | "writing";
+  step: number;
+  total: number;
+}
+
+function resolveAnalysisOpts(opts: AnalyzeSilencesOpts = {}) {
+  return {
+    sampleRate: opts.sampleRate ?? DEFAULT_SAMPLE_RATE,
+    windowMs: opts.windowMs ?? DEFAULT_WINDOW_MS,
+    thresholdDb: opts.thresholdDb ?? DEFAULT_THRESHOLD_DB,
+    minSilenceMs: opts.minSilenceMs ?? DEFAULT_MIN_SILENCE_MS,
+  };
+}
+
+// Return a fresh cached analysis when the on-disk cache is valid for the
+// current audio source and requested options; null when a cold compute is
+// needed. Throws missingAudioRawError when audio16k.f32 is absent.
+export async function tryLoadCachedAudioAnalysis(
+  slug: string,
+  opts: AnalyzeSilencesOpts = {}
+): Promise<AudioAnalysis | null> {
+  const paths = projectPaths(slug);
+  if (!existsSync(paths.audioRaw)) {
+    throw missingAudioRawError();
+  }
+  const sourceMtimeMs = (await stat(paths.audioRaw)).mtimeMs;
+  const cachePath = audioAnalysisPath(slug);
+  const resolved = resolveAnalysisOpts(opts);
+
+  if (!existsSync(cachePath)) {
+    return null;
+  }
+
+  const cached = await tryReadCache(cachePath);
+  if (
+    cached &&
+    cached.sourceMtimeMs === sourceMtimeMs &&
+    cached.sampleRate === resolved.sampleRate &&
+    cached.windowMs === resolved.windowMs &&
+    cached.thresholdDb === resolved.thresholdDb &&
+    cached.minSilenceMs === resolved.minSilenceMs
+  ) {
+    return cached;
+  }
+  return null;
+}
+
+// Cold path: read the full PCM, detect silences, and write the cache.
+export async function computeAudioAnalysis(
+  slug: string,
+  opts: AnalyzeSilencesOpts = {},
+  onProgress?: (p: AudioAnalysisProgress) => void
+): Promise<AudioAnalysis> {
+  const paths = projectPaths(slug);
+  if (!existsSync(paths.audioRaw)) {
+    throw missingAudioRawError();
+  }
+  const sourceMtimeMs = (await stat(paths.audioRaw)).mtimeMs;
+  const cachePath = audioAnalysisPath(slug);
+  const resolved = resolveAnalysisOpts(opts);
+
+  onProgress?.({
+    phase: "reading",
+    message: "Reading audio PCM",
+    step: 1,
+    total: 3,
+  });
+  const pcm = await readPcm(slug);
+
+  onProgress?.({
+    phase: "analyzing",
+    message: "Detecting silences",
+    step: 2,
+    total: 3,
+  });
+  const silences = analyzeSilences(pcm, resolved);
+
+  const analysis: AudioAnalysis = {
+    version: 1,
+    ...resolved,
+    sourceMtimeMs,
+    silences,
+  };
+
+  onProgress?.({
+    phase: "writing",
+    message: "Writing cache",
+    step: 3,
+    total: 3,
+  });
+  await writeCache(paths.working, cachePath, analysis);
+  return analysis;
+}
+
 // Load the cached silence analysis, recomputing when the cache is missing,
 // corrupt, stale (its recorded sourceMtimeMs no longer matches audioRaw's
 // current mtime), or was computed with different analysis options than this
@@ -148,52 +244,11 @@ export async function loadAudioAnalysis(
   slug: string,
   opts: AnalyzeSilencesOpts = {}
 ): Promise<AudioAnalysis> {
-  const paths = projectPaths(slug);
-  if (!existsSync(paths.audioRaw)) {
-    throw missingAudioRawError();
+  const cached = await tryLoadCachedAudioAnalysis(slug, opts);
+  if (cached) {
+    return cached;
   }
-  const sourceMtimeMs = (await stat(paths.audioRaw)).mtimeMs;
-  const cachePath = audioAnalysisPath(slug);
-
-  const sampleRate = opts.sampleRate ?? DEFAULT_SAMPLE_RATE;
-  const windowMs = opts.windowMs ?? DEFAULT_WINDOW_MS;
-  const thresholdDb = opts.thresholdDb ?? DEFAULT_THRESHOLD_DB;
-  const minSilenceMs = opts.minSilenceMs ?? DEFAULT_MIN_SILENCE_MS;
-
-  if (existsSync(cachePath)) {
-    const cached = await tryReadCache(cachePath);
-    if (
-      cached &&
-      cached.sourceMtimeMs === sourceMtimeMs &&
-      cached.sampleRate === sampleRate &&
-      cached.windowMs === windowMs &&
-      cached.thresholdDb === thresholdDb &&
-      cached.minSilenceMs === minSilenceMs
-    ) {
-      return cached;
-    }
-  }
-
-  const pcm = await readPcm(slug);
-  const silences = analyzeSilences(pcm, {
-    sampleRate,
-    windowMs,
-    thresholdDb,
-    minSilenceMs,
-  });
-
-  const analysis: AudioAnalysis = {
-    version: 1,
-    sampleRate,
-    windowMs,
-    thresholdDb,
-    minSilenceMs,
-    sourceMtimeMs,
-    silences,
-  };
-
-  await writeCache(paths.working, cachePath, analysis);
-  return analysis;
+  return computeAudioAnalysis(slug, opts);
 }
 
 async function tryReadCache(cachePath: string): Promise<AudioAnalysis | null> {
