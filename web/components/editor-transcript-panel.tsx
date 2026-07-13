@@ -26,6 +26,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useMomentDropZone } from "@/hooks/use-moment-keep";
 import { Copy, RotateCcw, Scissors, X } from "@/lib/icon";
 import {
   selectedWordStats,
@@ -51,6 +52,7 @@ interface EditorTranscriptPanelProps {
   curSample: number;
   inBroll: (word: TranscriptWord) => boolean;
   inZoom: (word: TranscriptWord) => boolean;
+  keepMoment: (fromSec: number, toSec: number) => void;
   matchRanges?: ReadonlyArray<readonly [number, number]>;
   onCutSelection: (range?: readonly [number, number] | null) => void;
   onRestoreSelection: (range?: readonly [number, number] | null) => void;
@@ -69,6 +71,7 @@ export function EditorTranscriptPanel({
   curSample,
   inBroll,
   inZoom,
+  keepMoment,
   matchRanges,
   onCutSelection,
   onRestoreSelection,
@@ -82,6 +85,7 @@ export function EditorTranscriptPanel({
   const editorRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const [editorMounted, setEditorMounted] = useState(false);
+  const momentDrop = useMomentDropZone(keepMoment);
   const paragraphs = transcriptParagraphs(words);
   const minuteMarkers = useMemo(() => transcriptMinuteMarkers(words), [words]);
   const selection = selectedWordStats(words, selRange);
@@ -239,7 +243,14 @@ export function EditorTranscriptPanel({
 
   return (
     <TooltipProvider>
-      <ScrollArea className="h-full min-h-0" ref={scrollAreaRef}>
+      <ScrollArea
+        className={cn("h-full min-h-0", momentDrop.dropClassName)}
+        onDragEnter={momentDrop.onDragEnter}
+        onDragLeave={momentDrop.onDragLeave}
+        onDragOver={momentDrop.onDragOver}
+        onDrop={momentDrop.onDrop}
+        ref={scrollAreaRef}
+      >
         <div className="flex min-h-full flex-col px-4 pt-4 pb-12 sm:px-6">
           {selection.total > 0 ? (
             <TranscriptSelectionToolbar

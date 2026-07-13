@@ -3,6 +3,7 @@ export type IngestPhase =
   | "proxy"
   | "audio"
   | "frames"
+  | "index"
   | "transcribe"
   | "finalize"
   | "done";

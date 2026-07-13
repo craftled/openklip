@@ -3,6 +3,7 @@ import { test } from "node:test";
 import {
   withBriefLock,
   withChatsLock,
+  withMomentIndexLock,
   withProjectLock,
   withTasksLock,
 } from "../src/project-lock.ts";
@@ -129,6 +130,65 @@ test("withProjectLock and withTasksLock are independent (task writes stay respon
   // before either end.
   assert.ok(log[0]?.endsWith("start"));
   assert.ok(log[1]?.endsWith("start"));
+});
+
+test("withMomentIndexLock serializes overlapping calls for the same slug", async () => {
+  const log: string[] = [];
+  const slow = (id: string) =>
+    withMomentIndexLock("proj", async () => {
+      log.push(`start${id}`);
+      await delay(10);
+      log.push(`end${id}`);
+    });
+  await Promise.all([slow("A"), slow("B")]);
+  assert.ok(
+    log.join(",") === "startA,endA,startB,endB" ||
+      log.join(",") === "startB,endB,startA,endA",
+    `expected serialized order, got ${log.join(",")}`
+  );
+});
+
+test("withMomentIndexLock does not block a different slug", async () => {
+  const log: string[] = [];
+  const slow = (slug: string) =>
+    withMomentIndexLock(slug, async () => {
+      log.push(`start-${slug}`);
+      await delay(10);
+      log.push(`end-${slug}`);
+    });
+  await Promise.all([slow("a"), slow("b")]);
+  assert.ok(log[0]?.startsWith("start"), `first entry: ${log[0]}`);
+  assert.ok(log[1]?.startsWith("start"), `second entry: ${log[1]}`);
+});
+
+test("withProjectLock and withMomentIndexLock are independent (a project mutation stays responsive during an index build)", async () => {
+  const log: string[] = [];
+  const index = withMomentIndexLock("proj", async () => {
+    log.push("i-start");
+    await delay(15);
+    log.push("i-end");
+  });
+  const project = withProjectLock("proj", async () => {
+    log.push("p-start");
+    await delay(5);
+    log.push("p-end");
+  });
+  await Promise.all([index, project]);
+  assert.ok(log[0]?.endsWith("start"));
+  assert.ok(log[1]?.endsWith("start"));
+});
+
+test("a failing withMomentIndexLock call does not block subsequent ones", async () => {
+  let ranAfter = false;
+  await assert.rejects(
+    withMomentIndexLock("proj", () => {
+      throw new Error("boom");
+    })
+  );
+  await withMomentIndexLock("proj", () => {
+    ranAfter = true;
+  });
+  assert.equal(ranAfter, true);
 });
 
 test("a failing withProjectLock call does not block subsequent ones", async () => {

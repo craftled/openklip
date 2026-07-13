@@ -110,6 +110,25 @@ export function transitionFallbackToast(
   };
 }
 
+export function momentKeptToast(
+  fromSec: number,
+  toSec: number,
+  restoredCount: number,
+  formatClock: (sec: number) => string
+): ToastPayload {
+  return {
+    kind: "success",
+    title: `Kept ${formatClock(fromSec)}-${formatClock(toSec)} - restored ${restoredCount} word${restoredCount === 1 ? "" : "s"}`,
+  };
+}
+
+export function momentAlreadyInEditToast(): ToastPayload {
+  return {
+    kind: "info",
+    title: "Already in the edit",
+  };
+}
+
 export function nothingToPlayToast(): ToastPayload {
   return {
     kind: "info",

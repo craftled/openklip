@@ -35,6 +35,8 @@ import {
   CLEANUP_CATEGORY_DISPLAY_ORDER,
 } from "./cleanup.ts";
 import {
+  executeMomentSearch,
+  runMomentSearch,
   runOverlays,
   runRanges,
   runStatusJson,
@@ -103,6 +105,7 @@ import {
 import { type Keyframe, KeyframeSchema } from "./keyframes.ts";
 import { listLuts, lutPath } from "./lut.ts";
 import { startMcpServer } from "./mcp-server.ts";
+import { buildMomentIndex, isMomentIndexCurrent } from "./moment-search.ts";
 import {
   buildPackageArgv,
   checkPackagePreflight,
@@ -179,6 +182,12 @@ Transcript (read)
                                      slice words around ids
   openklip transcript phrase <slug> "phrase" [--json]
                                      first match span for overlay placement
+
+Moment search
+  openklip index <slug> [--force]    build/refresh the local visual frame-embedding index
+  openklip search <slug> "<query>"   find moments by visual + transcript text query
+                                       --json          machine-readable output
+                                       --limit <n>     max scene matches (default 24)
 
 Transcript edits
   openklip transcript <slug>         print every word with id, time, cut state
@@ -894,6 +903,73 @@ try {
         throw new Error("usage: openklip broll <slug> <file>");
       }
       await registerAsset(rest[0], rest[1], "broll", "cli");
+      break;
+    }
+    case "index": {
+      if (!rest[0]) {
+        throw new Error("usage: openklip index <slug> [--force]");
+      }
+      const slug = rest[0];
+      const tail = rest.slice(1);
+      const result = await buildMomentIndex(slug, {
+        force: tail.includes("--force"),
+      });
+      if (result.skippedReason === "no-frames") {
+        console.log(`no frames to index for ${slug} (run ingest first)`);
+        break;
+      }
+      if (result.skippedReason === "current") {
+        console.log(
+          `index already current: ${result.frameCount} frame(s), model ${result.model}\n${result.path}`
+        );
+        break;
+      }
+      console.log(
+        `indexed ${result.frameCount} frame(s), model ${result.model}\n${result.path}`
+      );
+      break;
+    }
+    case "search": {
+      if (!(rest[0] && rest[1])) {
+        throw new Error(
+          'usage: openklip search <slug> "<query>" [--json] [--limit N]'
+        );
+      }
+      const slug = rest[0];
+      const tail = rest.slice(1);
+      const limitRaw = flagValue(tail, "--limit");
+      const limit = limitRaw === undefined ? undefined : Number(limitRaw);
+      if (limit !== undefined && !(Number.isInteger(limit) && limit > 0)) {
+        throw new Error("--limit must be a positive integer");
+      }
+      const json = tail.includes("--json");
+      const queryParts: string[] = [];
+      for (let i = 0; i < tail.length; i++) {
+        const arg = tail[i];
+        if (arg === "--json") {
+          continue;
+        }
+        if (arg === "--limit") {
+          i++;
+          continue;
+        }
+        queryParts.push(arg);
+      }
+      const query = queryParts.join(" ");
+      if (!query) {
+        throw new Error(
+          'usage: openklip search <slug> "<query>" [--json] [--limit N]'
+        );
+      }
+      const project = await loadProject(slug);
+      const wasCurrent = isMomentIndexCurrent(slug);
+      const payload = await executeMomentSearch(slug, project, query, {
+        limit,
+      });
+      if (!(wasCurrent || json) && payload.indexed) {
+        console.log("(built moment index)");
+      }
+      process.stdout.write(runMomentSearch(payload, { json }));
       break;
     }
     case "transcript": {

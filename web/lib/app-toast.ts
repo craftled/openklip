@@ -14,6 +14,8 @@ import {
   chatUnarchiveFailedToast,
   type ExportTransitionResultData,
   ingestPartialSuccessToast,
+  momentAlreadyInEditToast,
+  momentKeptToast,
   nothingToPlayToast,
   playbackFailedToast,
   projectCreateFailedToast,
@@ -195,6 +197,19 @@ export function toastSaveError(message: string): void {
 
 export function toastRevealError(message: string): void {
   show(revealFailedToast(message));
+}
+
+export function toastMomentKept(
+  fromSec: number,
+  toSec: number,
+  restoredCount: number,
+  formatClock: (sec: number) => string
+): void {
+  show(momentKeptToast(fromSec, toSec, restoredCount, formatClock));
+}
+
+export function toastMomentAlreadyInEdit(): void {
+  show(momentAlreadyInEditToast());
 }
 
 export function toastAssetUploadSuccess(count: number): void {

@@ -31,6 +31,7 @@ import { loadBrief, saveBrief } from "./brief.ts";
 import { logBriefSet } from "./brief-log.ts";
 import { suggestBroll } from "./broll-suggest.ts";
 import { buildCleanupReport } from "./cleanup.ts";
+import { executeMomentSearch } from "./cli-query.ts";
 import { transitionExportPreview } from "./cut-transition-gate.ts";
 import { runDoctor } from "./doctor.ts";
 import { PhraseAnchorSchema, type Project, samplesToSec } from "./edl.ts";
@@ -694,6 +695,20 @@ const queryTools: AgentToolDef[] = [
           projectSlug ? { slug: projectSlug } : undefined
         ),
       };
+    },
+  }),
+  defineQueryTool({
+    name: "moment_search",
+    summary:
+      "Search transcript text and visual scenes in one call (CLIP frame embeddings blended with scene-log summaries). The first call may block while the visual index builds if it is missing or stale.",
+    schema: z.object({
+      slug,
+      query: z.string().min(1),
+      limit: z.number().int().min(1).max(100).optional(),
+    }),
+    run: async ({ slug: projectSlug, query, limit }) => {
+      const project = await loadProject(projectSlug);
+      return executeMomentSearch(projectSlug, project, query, { limit });
     },
   }),
   defineQueryTool({
