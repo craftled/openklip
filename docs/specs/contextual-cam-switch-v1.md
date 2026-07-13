@@ -102,8 +102,8 @@ respect locked spans. A canned-reply test suite covers malformed/degenerate agen
 6. Overrides + re-mix (`cam-set`, `cam_override`, locked spans).
 7. CLI/MCP wiring, features.ts entry, playbook template.
 8. GUI panel (speaker table, mode picker, mix viz, re-mix).
-9. Docs sync + real-footage acceptance → release 0.42.0.0.
+9. Docs sync + programmatic acceptance (`tests/multicam-acceptance.test.ts`, CI cam-mix integration) → release 0.42.0.0. Human eyeball on real per-speaker footage deferred until adoption.
 
 ## Open items
 
-- Path to the real multi-cam acceptance recording (Tomas to provide before slice 9).
+- Optional: human review on real per-speaker multi-cam recordings when available (not blocking publish).

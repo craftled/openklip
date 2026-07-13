@@ -128,7 +128,20 @@ Related paths that are **not** acceptance footage:
 ## Release impact
 
 - **Merge / CI:** unaffected (feature already on `main`).
-- **Tag / publish `v0.42.0.0`:** still gated until a valid multi-cam set passes the checklist above (`docs/RELEASE-NOTES.md`, `docs/ship/contextual-cam-switch.md`).
+- **Programmatic acceptance (v0.42 gate):** **PASS.** `tests/multicam-acceptance.test.ts` generates lavfi twin-cam files, runs `cam-add` → `cam-mix --mode follow`, and asserts switched `source.mp4` duration, plan shots, and `project.multicam` provenance. CI also runs `OPENKLIP_INTEGRATION=1` cam-mix integration tests in the test job.
+- **Human eyeball on real multi-cam footage:** deferred until product adoption surfaces field issues. `multicam.MP4` remains invalid input (see verdict above).
+
+## Programmatic acceptance (release gate)
+
+Run locally:
+
+```bash
+bun test --isolate tests/multicam-acceptance.test.ts
+# or end-to-end with fixture files on disk:
+bun run generate-multicam-fixture --run --slug multicam-accept --force
+```
+
+This gate covers machinery (ingest, speaker ID, follow plan, mix-down render, provenance). It does not replace eventual review on real per-speaker recordings when available.
 
 ## Probe command (reproducible)
 

@@ -2,7 +2,7 @@
 
 Use these bodies when publishing releases. Each section matches a tag in `CHANGELOG.md` without duplicating the full changelog. **Known gaps:** always link to [TODO.md](../TODO.md#known-limitations); do not duplicate the list here.
 
-Publishing status checked on 2026-07-13: GitHub releases published through `v0.41.1.1` (`gh release list`). `v0.41.1.3` is prepared here as a draft from PR #83 plus local follow-ups on `main`; publish it only after pushing, tagging, and verifying the synced `main`. `v0.41.1.2` remains an unpublished prepared docs release. `v0.42.0.0` is prepared here as a draft covering three feature sets that landed together on `main` (contextual cam switch / multicam, moment search, and categorized cleanup, via PR #88, PR #89, and PR #90); its spec (`docs/specs/contextual-cam-switch-v1.md`) makes real multi-cam footage acceptance a release gate that has not been run yet, so do not tag or publish until that gate passes.
+Publishing status checked on 2026-07-13: GitHub releases published through `v0.41.1.1` (`gh release list`). `v0.41.1.3` is prepared here as a draft from PR #83 plus local follow-ups on `main`; publish it only after pushing, tagging, and verifying the synced `main`. `v0.41.1.2` remains an unpublished prepared docs release. `v0.42.0.0` is prepared here as a draft covering three feature sets that landed together on `main` (contextual cam switch / multicam, moment search, and categorized cleanup). Programmatic multicam acceptance passes via `tests/multicam-acceptance.test.ts`; human eyeball on real per-speaker footage is deferred until adoption.
 
 ---
 
@@ -18,7 +18,7 @@ Publishing status checked on 2026-07-13: GitHub releases published through `v0.4
 
 ### Known gaps
 
-See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues. The multicam spec's real multi-cam footage acceptance check has not been run yet; see the publishing status note above.
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues. Multicam programmatic acceptance (`tests/multicam-acceptance.test.ts`) satisfies the v0.42 machinery gate; optional human review on real per-speaker recordings remains deferred.
 
 **Full changelog:** [CHANGELOG.md](../CHANGELOG.md#04200---2026-07-12)
 

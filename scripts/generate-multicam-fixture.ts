@@ -266,12 +266,21 @@ function parseArgs(argv: string[]): {
   };
 }
 
-async function runAcceptanceSmoke(input: {
-  files: GeneratedCamFiles;
-  force: boolean;
+export interface MulticamAcceptanceResult {
+  durationSec: number;
+  planSpanCount: number;
+  shots: string[];
   slug: string;
-}): Promise<void> {
-  const { slug, files, force } = input;
+  sourcePath: string;
+}
+
+/** Full cam-add → cam-mix pipeline on generated lavfi twin-cam files. */
+export async function runMulticamAcceptanceProgram(input: {
+  files: GeneratedCamFiles;
+  force?: boolean;
+  slug: string;
+}): Promise<MulticamAcceptanceResult> {
+  const { slug, files, force = false } = input;
   await ingestBlank({
     slug,
     durationSec: 1,
@@ -297,9 +306,13 @@ async function runAcceptanceSmoke(input: {
   }
   const mix = await camMix(slug, { mode: "follow" });
   const meta = await probe(mix.sourcePath);
-  console.log(
-    `\nAcceptance smoke OK: slug=${slug} source=${mix.sourcePath} duration=${meta.durationSec.toFixed(2)}s`
-  );
+  return {
+    slug,
+    sourcePath: mix.sourcePath,
+    durationSec: meta.durationSec,
+    planSpanCount: mix.plan.length,
+    shots: [...new Set(mix.plan.map((span) => span.shot))],
+  };
 }
 
 function printNextSteps(files: GeneratedCamFiles): void {
@@ -331,7 +344,7 @@ function printNextSteps(files: GeneratedCamFiles): void {
   console.log("  openklip cam-mix multicam-accept --mode follow --json");
   console.log("  openklip serve multicam-accept");
   console.log(
-    "\nNote: lavfi fixtures prove cam-mix machinery; the v0.42 spec still prefers real footage for the human release gate."
+    "\nNote: lavfi fixtures satisfy the programmatic v0.42 acceptance gate (tests/multicam-acceptance.test.ts). Real-footage eyeball review is deferred until adoption surfaces issues."
   );
 }
 
@@ -358,11 +371,14 @@ if (import.meta.main) {
     printNextSteps(files);
 
     if (parsed.runAcceptance) {
-      await runAcceptanceSmoke({
+      const result = await runMulticamAcceptanceProgram({
         slug: parsed.slug,
         files,
         force: parsed.force,
       });
+      console.log(
+        `\nAcceptance smoke OK: slug=${result.slug} source=${result.sourcePath} duration=${result.durationSec.toFixed(2)}s planSpans=${result.planSpanCount} shots=${result.shots.join(",")}`
+      );
     }
   } catch (err) {
     console.error(
