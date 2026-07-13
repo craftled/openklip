@@ -32,6 +32,7 @@ import {
 import { isCaptionStyleId, listCaptionStyles } from "./caption-styles.ts";
 import { buildCleanupReport, partitionSafeCandidates } from "./cleanup.ts";
 import {
+  executeMomentSearch,
   runMomentSearch,
   runOverlays,
   runRanges,
@@ -101,11 +102,7 @@ import {
 import { type Keyframe, KeyframeSchema } from "./keyframes.ts";
 import { listLuts, lutPath } from "./lut.ts";
 import { startMcpServer } from "./mcp-server.ts";
-import {
-  buildMomentIndex,
-  embedQueryText,
-  searchScenes,
-} from "./moment-search.ts";
+import { buildMomentIndex, isMomentIndexCurrent } from "./moment-search.ts";
 import {
   buildPackageArgv,
   checkPackagePreflight,
@@ -979,21 +976,14 @@ try {
         );
       }
       const project = await loadProject(slug);
-
-      const buildResult = await buildMomentIndex(slug);
-      if (buildResult.built && !json) {
-        console.log(
-          `(built moment index: ${buildResult.frameCount} frame(s), model ${buildResult.model})`
-        );
-      }
-
-      const { vector } = await embedQueryText(query);
-      const sceneResult = searchScenes(slug, project, vector, query, {
+      const wasCurrent = isMomentIndexCurrent(slug);
+      const payload = await executeMomentSearch(slug, project, query, {
         limit,
       });
-      process.stdout.write(
-        runMomentSearch(project, query, sceneResult, { json })
-      );
+      if (!(wasCurrent || json) && payload.indexed) {
+        console.log("(built moment index)");
+      }
+      process.stdout.write(runMomentSearch(payload, { json }));
       break;
     }
     case "transcript": {

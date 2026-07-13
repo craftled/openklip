@@ -563,12 +563,11 @@ test("formatSceneMatchesHuman reports when no index has been built", () => {
 
 test("runMomentSearch emits the documented JSON shape", () => {
   const project = makeProject({ slug: "x" });
-  const out = runMomentSearch(
-    project,
-    "hello",
-    { indexed: true, results: [] },
-    { json: true }
-  );
+  const payload = composeMomentSearchResult(project, "hello", {
+    indexed: true,
+    results: [],
+  });
+  const out = runMomentSearch(payload, { json: true });
   const parsed = JSON.parse(out);
   assert.deepEqual(Object.keys(parsed).sort(), [
     "indexed",
@@ -584,15 +583,26 @@ test("runMomentSearch emits the documented JSON shape", () => {
 
 test("runMomentSearch human output includes both a text and scene matches section", () => {
   const project = makeProject({ slug: "x" });
-  const out = runMomentSearch(
-    project,
-    "Hello",
-    { indexed: false, results: [] },
-    { json: false }
-  );
+  const payload = composeMomentSearchResult(project, "Hello", {
+    indexed: false,
+    results: [],
+  });
+  const out = runMomentSearch(payload, { json: false });
   assert.match(out, /text matches:/);
   assert.match(out, /scene matches:/);
   assert.match(out, /no moment index/);
+});
+
+test("runMomentSearch human output appends an error line when the payload carries one", () => {
+  const project = makeProject({ slug: "x" });
+  const payload = composeMomentSearchResult(
+    project,
+    "Hello",
+    { indexed: false, results: [] },
+    { error: "moment index build failed" }
+  );
+  const out = runMomentSearch(payload, { json: false });
+  assert.match(out, /error: moment index build failed/);
 });
 
 // ── Moment search text matches include cut words (Lane C) ─────────────────
@@ -736,20 +746,22 @@ test("formatMomentTextMatchesHuman appends [cut] for cut matches", () => {
 
 test("runMomentSearch human output marks cut text matches with [cut]", () => {
   const project = makeHesitationsFixture();
-  const out = runMomentSearch(
-    project,
-    "hesitations",
-    { indexed: false, results: [] },
-    { json: false }
-  );
+  const payload = composeMomentSearchResult(project, "hesitations", {
+    indexed: false,
+    results: [],
+  });
+  const out = runMomentSearch(payload, { json: false });
   assert.match(out, /hesitations {2}\[cut\]/);
 });
 
 // ── Moment search CLI wiring (src/cli.ts): fast, no-network paths only ────
-// openklip search always needs a real embedding (network on first run), so
-// only the argument-validation and no-spawn buildMomentIndex shortcuts are
-// covered here; the real embed.mjs pipeline is covered by the
-// OPENKLIP_INTEGRATION-gated test in tests/moment-search.test.ts.
+// A query against a genuinely current visual index always needs a real
+// embedding (network on first run) - that path is covered by the
+// OPENKLIP_INTEGRATION-gated test in tests/moment-search.test.ts. Everything
+// below either fails argument validation before touching the engine, or (see
+// "CLI search on a project with no frames yet") exercises the real binary
+// through executeMomentSearch's no-op-build short-circuit, which never calls
+// embedQueryText when there is nothing to search - safe to run unguarded.
 
 test("CLI index reports no frames to index when frames dir is empty", async () => {
   await withTempProjectsRoot(async ({ slug }) => {
@@ -803,4 +815,17 @@ test("CLI search requires a slug", async () => {
   const r = await runCli(["search"]);
   assert.equal(r.code, 1);
   assert.match(r.out, /usage: openklip search/);
+});
+
+test("CLI search on a project with no frames yet returns transcript matches without embedding", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, { ...makeHesitationsFixture(), slug });
+    const r = await runCli(["search", slug, "hesitations", "--json"]);
+    assert.equal(r.code, 0);
+    const parsed = JSON.parse(r.out);
+    assert.equal(parsed.indexed, false);
+    assert.equal(parsed.text.length, 1);
+    assert.equal(parsed.text[0].cut, true);
+    assert.deepEqual(parsed.scenes, []);
+  });
 });

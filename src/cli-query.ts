@@ -102,9 +102,17 @@ function phraseRunsForMomentMode(
   return matches;
 }
 
-// Kept + cut transcript hits for moment search. Mirrors web/lib/moment-keep.ts
-// merge semantics (dedupe by word-index range, sort by fromSec) without
-// importing web code into src/.
+// Kept + cut transcript hits for moment search. Mirrors web/lib/moment-keep.ts's
+// mergePhraseSearchMatchLists (dedupe by word-index range, kept before cut on
+// a tie, sort by fromSec) without importing web code into src/ - these are
+// two independent implementations of the same merge, not one shared function.
+// Allowed to differ: this one is UNBOUNDED (CLI/MCP callers want the full
+// result; no `limit` param here) where the web version truncates to a render
+// limit, and this one's sort has no secondary tie-break (the web version
+// additionally sorts by range[0] when fromSec ties, since it re-orders after
+// truncating). Not allowed to differ: which matches survive the merge, or
+// the dedupe/kept-vs-cut semantics themselves - if you change either here,
+// check the other side.
 export function grepMomentTextMatches(
   project: Project,
   phrase: string
@@ -363,6 +371,18 @@ export async function executeMomentSearch(
       };
     }
   }
+  // buildMomentIndex can legitimately no-op (e.g. no frames yet - a
+  // blank-canvas project, or one still mid-ingest): re-check rather than
+  // assume a build attempt always leaves a current index, so a query embed
+  // (a real CLIP spawn) never runs with nothing to search against.
+  if (!isMomentIndexCurrent(slug)) {
+    return {
+      indexed: false,
+      query,
+      text: grepMomentTextMatches(project, query),
+      scenes: [],
+    };
+  }
   const { vector } = await embedQueryText(query);
   const sceneResult = searchScenes(slug, project, vector, query, {
     limit: options.limit,
@@ -375,18 +395,26 @@ export async function executeMomentSearch(
 // scene half is precomputed by the caller (searchScenes needs an
 // already-embedded query vector and project frames on disk, which this pure
 // formatter has no business touching).
+// Formats an already-composed MomentSearchPayload (see composeMomentSearchResult
+// / executeMomentSearch) - the CLI's only caller runs through executeMomentSearch
+// so both the transcript-only-on-build-failure fallback and the "nothing to
+// search yet" case share one code path with the MCP tool, instead of the CLI
+// hand-rolling its own build+embed+search sequence with different error
+// handling (see the review finding this refactor closes).
 export function runMomentSearch(
-  project: Project,
-  query: string,
-  sceneResult: SearchScenesResult,
+  payload: MomentSearchPayload,
   options: { json?: boolean }
 ): string {
-  const payload = composeMomentSearchResult(project, query, sceneResult);
   if (options.json) {
     return jsonOut(payload);
   }
+  const sceneResult: SearchScenesResult = {
+    indexed: payload.indexed,
+    results: payload.scenes,
+  };
   return (
-    `text matches:\n${formatMomentTextMatchesHuman(query, payload.text)}` +
-    `\nscene matches:\n${formatSceneMatchesHuman(sceneResult)}`
+    `text matches:\n${formatMomentTextMatchesHuman(payload.query, payload.text)}` +
+    `\nscene matches:\n${formatSceneMatchesHuman(sceneResult)}` +
+    (payload.error ? `\nerror: ${payload.error}\n` : "")
   );
 }
