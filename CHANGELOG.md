@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.42.0.1 - 2026-07-13
 
 ### Added
 - **Multicam GUI parity** (PR #101): Config → Project **Cameras** ingests cams, edits name/role/offset, tunes mix guardrails, locks manual shot spans (`camOverrideAction`), and shows the mix timeline in follow and auto modes.
