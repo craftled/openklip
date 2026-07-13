@@ -1,11 +1,14 @@
 import {
   clearElevenLabsApiKey,
   clearReveApiKey,
+  clearXaiApiKey,
   readIntegrationsStatus,
   setElevenLabsApiKey,
   setReveApiKey,
+  setXaiApiKey,
   testElevenLabsApiKey,
   testReveApiKey,
+  testXaiApiKey,
 } from "@engine/integrations-config";
 import { z } from "zod";
 
@@ -16,18 +19,21 @@ const SaveIntegrationsRequestSchema = z
   .object({
     elevenLabsApiKey: z.string().trim().min(1).optional(),
     reveApiKey: z.string().trim().min(1).optional(),
+    xaiApiKey: z.string().trim().min(1).optional(),
   })
   .strict()
   .refine(
-    (data) => Boolean(data.elevenLabsApiKey || data.reveApiKey),
+    (data) =>
+      Boolean(data.elevenLabsApiKey || data.reveApiKey || data.xaiApiKey),
     "at least one provider API key is required"
   );
 
 const TestIntegrationsRequestSchema = z
   .object({
-    provider: z.enum(["elevenLabs", "reve"]).optional(),
+    provider: z.enum(["elevenLabs", "reve", "xai"]).optional(),
     elevenLabsApiKey: z.string().trim().optional(),
     reveApiKey: z.string().trim().optional(),
+    xaiApiKey: z.string().trim().optional(),
   })
   .strict();
 
@@ -64,6 +70,9 @@ export async function PUT(req: Request): Promise<Response> {
     if (parsed.data.reveApiKey) {
       status = setReveApiKey(parsed.data.reveApiKey);
     }
+    if (parsed.data.xaiApiKey) {
+      status = setXaiApiKey(parsed.data.xaiApiKey);
+    }
     return Response.json(status);
   } catch (e) {
     return Response.json({ error: (e as Error).message }, { status: 500 });
@@ -87,11 +96,22 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   const provider =
-    parsed.data.provider ?? (parsed.data.reveApiKey ? "reve" : "elevenLabs");
+    parsed.data.provider ??
+    (parsed.data.xaiApiKey
+      ? "xai"
+      : parsed.data.reveApiKey
+        ? "reve"
+        : "elevenLabs");
 
   if (provider === "reve") {
     return Response.json({
       reve: await testReveApiKey(parsed.data.reveApiKey),
+    });
+  }
+
+  if (provider === "xai") {
+    return Response.json({
+      xai: await testXaiApiKey(parsed.data.xaiApiKey),
     });
   }
 
@@ -105,6 +125,9 @@ export function DELETE(req: Request): Response {
   try {
     if (provider === "reve") {
       return Response.json(clearReveApiKey());
+    }
+    if (provider === "xai") {
+      return Response.json(clearXaiApiKey());
     }
     return Response.json(clearElevenLabsApiKey());
   } catch (e) {

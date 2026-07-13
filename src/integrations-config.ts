@@ -20,6 +20,7 @@ const IntegrationsConfigSchema = z
   .object({
     elevenLabs: ProviderConfigSchema,
     reve: ProviderConfigSchema,
+    xai: ProviderConfigSchema,
   })
   .catchall(z.unknown());
 
@@ -32,6 +33,7 @@ export interface ProviderStatus {
 export interface IntegrationStatus {
   elevenLabs: ProviderStatus;
   reve: ProviderStatus;
+  xai: ProviderStatus;
 }
 
 function maskApiKey(apiKey: string): string {
@@ -55,6 +57,18 @@ export interface ElevenLabsDetails {
   voiceCount: number | null;
   voiceLimit: number | null;
   voiceSlotsUsed: number | null;
+  voices: string[];
+}
+
+export interface XaiVoiceDetails {
+  apiKeyBlocked: boolean | null;
+  apiKeyDisabled: boolean | null;
+  apiKeyName: string | null;
+  builtinVoiceCount: number | null;
+  customVoiceCount: number | null;
+  customVoiceLimit: number;
+  customVoices: string[];
+  teamBlocked: boolean | null;
   voices: string[];
 }
 
@@ -89,7 +103,7 @@ function saveConfig(config: z.infer<typeof IntegrationsConfigSchema>): void {
   }
 }
 
-type ProviderId = "elevenLabs" | "reve";
+type ProviderId = "elevenLabs" | "reve" | "xai";
 
 function providerStatus(
   provider?: z.infer<typeof ProviderConfigSchema>
@@ -107,6 +121,7 @@ export function readIntegrationsStatus(): IntegrationStatus {
   return {
     elevenLabs: providerStatus(config.elevenLabs),
     reve: providerStatus(config.reve),
+    xai: providerStatus(config.xai),
   };
 }
 
@@ -162,6 +177,18 @@ export function clearReveApiKey(): IntegrationStatus {
 
 export function readReveApiKey(): string | null {
   return readProviderApiKey("reve");
+}
+
+export function setXaiApiKey(apiKey: string): IntegrationStatus {
+  return setProviderApiKey("xai", apiKey, "xAI");
+}
+
+export function clearXaiApiKey(): IntegrationStatus {
+  return clearProviderApiKey("xai");
+}
+
+export function readXaiApiKey(): string | null {
+  return readProviderApiKey("xai");
 }
 
 export async function testElevenLabsApiKey(
@@ -320,6 +347,140 @@ async function fetchElevenLabsJson(
     throw new Error(`ElevenLabs ${path} failed with HTTP ${res.status}`);
   }
   return await res.json();
+}
+
+export async function testXaiApiKey(
+  apiKey = readXaiApiKey()
+): Promise<IntegrationTestResult> {
+  const trimmed = apiKey?.trim();
+  if (!trimmed) {
+    return {
+      ok: false,
+      message: "Add an xAI API key before testing.",
+      status: null,
+    };
+  }
+
+  try {
+    const res = await fetch("https://api.x.ai/v1/tts/voices", {
+      headers: {
+        Authorization: `Bearer ${trimmed}`,
+      },
+    });
+
+    if (res.ok) {
+      return {
+        ok: true,
+        message: "xAI accepted this API key.",
+        status: res.status,
+      };
+    }
+
+    if (res.status === 401) {
+      return {
+        ok: false,
+        message: "xAI rejected this API key.",
+        status: res.status,
+      };
+    }
+
+    if (res.status === 403) {
+      return {
+        ok: false,
+        message: "xAI refused this key or IP for this request.",
+        status: res.status,
+      };
+    }
+
+    return {
+      ok: false,
+      message: `xAI test failed with HTTP ${res.status}.`,
+      status: res.status,
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      message: `Could not reach xAI: ${(e as Error).message}`,
+      status: null,
+    };
+  }
+}
+
+async function fetchXaiJson(path: string, apiKey: string): Promise<unknown> {
+  const res = await fetch(`https://api.x.ai${path}`, {
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+    },
+  });
+  if (!res.ok) {
+    throw new Error(`xAI ${path} failed with HTTP ${res.status}`);
+  }
+  return await res.json();
+}
+
+const XAI_CUSTOM_VOICE_LIMIT = 30;
+
+function booleanOrNull(value: unknown): boolean | null {
+  return typeof value === "boolean" ? value : null;
+}
+
+function formatXaiVoiceLabel(voice: Record<string, unknown>): string | null {
+  const voiceId = stringOrNull(voice.voice_id);
+  const name = stringOrNull(voice.name);
+  if (name && voiceId) {
+    return `${name} (${voiceId})`;
+  }
+  return name ?? voiceId;
+}
+
+function voiceLabelsFromList(raw: unknown, limit = 5): string[] {
+  const obj = objectOrNull(raw);
+  if (!Array.isArray(obj?.voices)) {
+    return [];
+  }
+  return obj.voices
+    .map((voice) => formatXaiVoiceLabel(objectOrNull(voice) ?? {}))
+    .filter((label): label is string => Boolean(label))
+    .slice(0, limit);
+}
+
+export async function fetchXaiVoiceDetails(): Promise<XaiVoiceDetails> {
+  const apiKey = readXaiApiKey();
+  if (!apiKey) {
+    throw new Error("Add an xAI API key before loading details.");
+  }
+
+  const [apiKeyRaw, builtinRaw, customRaw] = await Promise.all([
+    fetchXaiJson("/v1/api-key", apiKey).catch(() => null),
+    fetchXaiJson("/v1/tts/voices", apiKey),
+    fetchXaiJson("/v1/custom-voices?limit=100", apiKey).catch(() => null),
+  ]);
+
+  const apiKeyInfo = objectOrNull(apiKeyRaw);
+  const builtinObj = objectOrNull(builtinRaw);
+  const customObj = objectOrNull(customRaw);
+
+  let customVoiceCount: number | null = null;
+  if (Array.isArray(customObj?.voices)) {
+    customVoiceCount = customObj.voices.length;
+    if (stringOrNull(customObj.pagination_token)) {
+      customVoiceCount = null;
+    }
+  }
+
+  return {
+    apiKeyBlocked: booleanOrNull(apiKeyInfo?.api_key_blocked),
+    apiKeyDisabled: booleanOrNull(apiKeyInfo?.api_key_disabled),
+    apiKeyName: stringOrNull(apiKeyInfo?.name),
+    builtinVoiceCount: Array.isArray(builtinObj?.voices)
+      ? builtinObj.voices.length
+      : null,
+    customVoiceCount,
+    customVoiceLimit: XAI_CUSTOM_VOICE_LIMIT,
+    customVoices: voiceLabelsFromList(customRaw),
+    teamBlocked: booleanOrNull(apiKeyInfo?.team_blocked),
+    voices: voiceLabelsFromList(builtinRaw),
+  };
 }
 
 export async function fetchElevenLabsDetails(): Promise<ElevenLabsDetails> {

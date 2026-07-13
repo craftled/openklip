@@ -11,17 +11,22 @@ import { Input } from "@/components/ui/input";
 import {
   clearElevenLabsApiKey,
   clearReveApiKey,
+  clearXaiApiKey,
   type ElevenLabsDetails,
   fetchElevenLabsDetails,
   fetchIntegrationsStatus,
+  fetchXaiVoiceDetails,
   type IntegrationsStatus,
   type IntegrationTestStatus,
   type ProviderKeyStatus,
   type ProviderTestResult,
   saveElevenLabsApiKey,
   saveReveApiKey,
+  saveXaiApiKey,
   testElevenLabsApiKey,
   testReveApiKey,
+  testXaiApiKey,
+  type XaiVoiceDetails,
 } from "@/lib/integrations-client";
 
 function formatUpdatedAt(value: string | null): string {
@@ -76,6 +81,7 @@ export function SettingsIntegrationsPanel() {
   const [status, setStatus] = useState<IntegrationsStatus>({
     elevenLabs: { hasApiKey: false, keyPreview: null, updatedAt: null },
     reve: { hasApiKey: false, keyPreview: null, updatedAt: null },
+    xai: { hasApiKey: false, keyPreview: null, updatedAt: null },
   });
   const [testStatus, setTestStatus] = useState<
     IntegrationTestStatus["elevenLabs"] | null
@@ -307,6 +313,11 @@ export function SettingsIntegrationsPanel() {
             ) : null}
           </div>
         </SettingsRow>
+        <XaiIntegrationRow
+          isLoading={isLoading}
+          onStatusChange={setStatus}
+          status={status.xai}
+        />
       </SettingsSection>
       <SettingsSection title="Images">
         <ReveIntegrationRow
@@ -316,6 +327,209 @@ export function SettingsIntegrationsPanel() {
         />
       </SettingsSection>
     </>
+  );
+}
+
+function XaiIntegrationRow({
+  status,
+  isLoading,
+  onStatusChange,
+}: {
+  status: ProviderKeyStatus;
+  isLoading: boolean;
+  onStatusChange: (next: IntegrationsStatus) => void;
+}) {
+  const [apiKey, setApiKey] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
+  const [details, setDetails] = useState<XaiVoiceDetails | null>(null);
+  const [testStatus, setTestStatus] = useState<ProviderTestResult | null>(null);
+
+  const trimmedApiKey = apiKey.trim();
+  const updatedAt = formatUpdatedAt(status.updatedAt);
+  const keyStatus =
+    details?.apiKeyBlocked || details?.apiKeyDisabled || details?.teamBlocked
+      ? "Blocked"
+      : (details?.apiKeyName ?? "—");
+  const customVoices =
+    details?.customVoiceCount === null && details?.customVoices.length
+      ? `${formatNumber(details.customVoices.length)}+`
+      : `${formatNumber(details?.customVoiceCount ?? null)} / ${formatNumber(
+          details?.customVoiceLimit ?? 30
+        )}`;
+
+  const onSave = async () => {
+    if (!trimmedApiKey) {
+      return;
+    }
+    setError(null);
+    setTestStatus(null);
+    setIsSaving(true);
+    try {
+      onStatusChange(await saveXaiApiKey(trimmedApiKey));
+      setApiKey("");
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const onClear = async () => {
+    setError(null);
+    setTestStatus(null);
+    setIsSaving(true);
+    try {
+      onStatusChange(await clearXaiApiKey());
+      setDetails(null);
+      setApiKey("");
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const onTest = async () => {
+    setError(null);
+    setTestStatus(null);
+    setIsTesting(true);
+    try {
+      const next = await testXaiApiKey(trimmedApiKey || undefined);
+      setTestStatus(next);
+      if (next.ok && !trimmedApiKey) {
+        setDetails(await fetchXaiVoiceDetails());
+      }
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
+  const onRefreshDetails = async () => {
+    setError(null);
+    setIsLoadingDetails(true);
+    try {
+      setDetails(await fetchXaiVoiceDetails());
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setIsLoadingDetails(false);
+    }
+  };
+
+  return (
+    <SettingsRow
+      description="Paste an xAI API key for Grok Voice (TTS, Voice Agent, and custom voices)."
+      title={
+        <span className="flex items-center gap-2">
+          <span>Grok Voice</span>
+          <Badge
+            className="h-4 px-1.5 text-xs"
+            variant={status.hasApiKey ? "outline" : "secondary"}
+          >
+            {isLoading
+              ? "Checking"
+              : status.hasApiKey
+                ? "Connected"
+                : "Not connected"}
+          </Badge>
+        </span>
+      }
+    >
+      <div className="mt-2 flex flex-col gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <Input
+            autoComplete="off"
+            className="h-8 text-sm"
+            onChange={(event) => setApiKey(event.target.value)}
+            placeholder={
+              status.keyPreview
+                ? `Saved ${status.keyPreview} · enter a new key to replace`
+                : "Paste xAI API key"
+            }
+            type="password"
+            value={apiKey}
+          />
+          <div className="flex shrink-0 gap-2">
+            <Button
+              disabled={!trimmedApiKey || isSaving || isTesting}
+              onClick={onSave}
+              size="sm"
+              type="button"
+              variant={trimmedApiKey ? "default" : "outline"}
+            >
+              {isSaving ? "Saving" : "Save"}
+            </Button>
+            <Button
+              disabled={
+                isSaving || isTesting || !(trimmedApiKey || status.hasApiKey)
+              }
+              onClick={onTest}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              {isTesting ? "Testing" : "Test"}
+            </Button>
+            <Button
+              disabled={!status.hasApiKey || isSaving || isTesting}
+              onClick={onClear}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              Clear
+            </Button>
+            <Button
+              disabled={
+                !status.hasApiKey || isSaving || isTesting || isLoadingDetails
+              }
+              onClick={onRefreshDetails}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              {isLoadingDetails ? "Refreshing" : "Refresh"}
+            </Button>
+          </div>
+        </div>
+        {details ? (
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <DetailItem label="Key" value={keyStatus} />
+            <DetailItem
+              label="Built-in voices"
+              value={formatNumber(details.builtinVoiceCount)}
+            />
+            <DetailItem label="Custom voices" value={customVoices} />
+          </div>
+        ) : null}
+        {details?.voices.length ? (
+          <p className="text-muted-foreground text-xs">
+            Built-in: {details.voices.join(", ")}
+          </p>
+        ) : null}
+        {details?.customVoices.length ? (
+          <p className="text-muted-foreground text-xs">
+            Custom: {details.customVoices.join(", ")}
+          </p>
+        ) : null}
+        {testStatus || updatedAt || error ? (
+          <p
+            className={
+              error || testStatus?.ok === false
+                ? "text-destructive text-xs"
+                : "text-muted-foreground text-xs"
+            }
+          >
+            {error ?? testStatus?.message ?? updatedAt}
+          </p>
+        ) : null}
+      </div>
+    </SettingsRow>
   );
 }
 
