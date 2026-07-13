@@ -159,6 +159,7 @@ function ToggleGroup({
 function ToggleGroupItem({
   className,
   children,
+  "data-cuelume-disable": cuelumeDisable,
   disabled,
   onPressedChange,
   pressed,
@@ -166,7 +167,10 @@ function ToggleGroupItem({
   value,
   variant = "default",
   ...props
-}: TogglePrimitive.Props & VariantProps<typeof toggleVariants>) {
+}: TogglePrimitive.Props &
+  VariantProps<typeof toggleVariants> & {
+    "data-cuelume-disable"?: boolean;
+  }) {
   const context = React.useContext(ToggleGroupContext);
   const isGroupedItem = typeof value === "string";
   const itemDisabled = disabled || context.disabled;
@@ -181,7 +185,7 @@ function ToggleGroupItem({
         }),
         className
       )}
-      data-cuelume-toggle=""
+      data-cuelume-toggle={cuelumeDisable ? undefined : ""}
       data-size={context.size || size}
       data-slot="toggle-group-item"
       data-spacing={context.spacing}

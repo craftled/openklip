@@ -58,6 +58,7 @@ export type ElasticSliderProps = Omit<
 > & {
   "aria-label"?: string;
   defaultValue?: number;
+  "data-cuelume-disable"?: boolean;
   disabled?: boolean;
   formatValue?: (value: number) => string;
   label: string;
@@ -72,6 +73,7 @@ export type ElasticSliderProps = Omit<
 export function ElasticSlider({
   "aria-label": ariaLabel,
   className,
+  "data-cuelume-disable": cuelumeDisable,
   defaultValue,
   disabled = false,
   formatValue,
@@ -508,9 +510,9 @@ export function ElasticSlider({
           "data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-ring/50 data-[focus-visible=true]:ring-offset-1 data-[focus-visible=true]:ring-offset-background"
         )}
         data-active={isActive}
-        data-cuelume-hover="tick"
-        data-cuelume-press=""
-        data-cuelume-release=""
+        data-cuelume-hover={cuelumeDisable ? undefined : "tick"}
+        data-cuelume-press={cuelumeDisable ? undefined : ""}
+        data-cuelume-release={cuelumeDisable ? undefined : ""}
         data-disabled={disabled}
         data-focus-visible={keyboardFocusRing}
         data-slot="elastic-slider-track"

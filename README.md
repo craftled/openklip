@@ -112,7 +112,6 @@ Verified against the current codebase (`VERSION` / `package.json` `0.42.0.0`, 23
 - **B-roll suggest** (v0.41.1.0): `openklip broll-suggest <slug> --phrase "..."` or `--text "..."` and MCP `broll_suggest` rank registered assets using existing asset cards (`summary`, `tags`, `bestFor`); respects `mustUse` / `avoid`; labeled benchmark fixture at `fixtures/broll-suggest/` (`tests/broll-suggest-benchmark.test.ts`)
 - **Graphic template previews** (v0.41.1.0): hover and button previews in the Config → Graphics picker (`web/components/graphic-template-preview.tsx`), including live WebGL shader previews when params allow
 - **Config shell + responsive panels**: Config lives in the left sidebar with color temperature plus captions/timing controls; Settings → **Features** lists shipped capabilities (`src/features.ts`); Chat stays reachable below the desktop sidebar breakpoint via an overlay button
-- **Interface sounds (optional)**: Settings → Appearance → **Interface sounds** enables subtle interaction sounds for buttons, toggles, sliders, and menus (default off).
 - **Written rationale**: `--note "<why>"` on any `cut` or overlay records why a pick was made; metadata only, never reaches ffmpeg, surfaces in `overlays` / transcript / MCP (`--note ""` clears it)
 - **Phrase-anchored cues**: phrase-placed overlays remember the spoken phrase and re-resolve onto the current kept words after a re-cut (`openklip reanchor`); a deleted phrase flags `stale` and keeps the last good span
 - **Multi-take assembly**: `openklip take-add` / `takes` / `assemble` splice the best take per line into one single-source `project.json` the cut/overlay/export engine edits unchanged; a Takes section in the Config panel (between Highlights and Music) browses ingested takes and assembles a selection directly in the browser, and now also uploads a new take from the browser (file-picker "Add take" control, no drag-drop)
@@ -169,6 +168,10 @@ Dev server (port 4399):
 bun run dev                            # latest project, or ?slug= in URL
 OPENKLIP_SLUG=<slug> bun run dev       # pin project when using serve-style env
 ```
+
+Settings:
+
+- Interface sounds is optional. Enable it in Settings, Appearance, Interface sounds.
 
 ---
 

@@ -77,12 +77,14 @@ function DropdownMenuLabel({
 
 function DropdownMenuItem({
   className,
+  "data-cuelume-disable": cuelumeDisable,
   inset,
   variant = "default",
   ...props
 }: MenuPrimitive.Item.Props & {
   inset?: boolean;
   variant?: "default" | "destructive";
+  "data-cuelume-disable"?: boolean;
 }) {
   return (
     <MenuPrimitive.Item
@@ -90,9 +92,9 @@ function DropdownMenuItem({
         "group/dropdown-menu-item relative flex cursor-pointer select-none items-center gap-1.5 rounded-md px-1.5 py-1 text-sm outline-hidden focus:bg-accent focus:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground data-disabled:pointer-events-none data-disabled:cursor-not-allowed data-inset:pl-7 data-[variant=destructive]:text-destructive data-disabled:opacity-50 data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive dark:data-[variant=destructive]:focus:bg-destructive/20 [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0 data-[variant=destructive]:*:[svg]:text-destructive",
         className
       )}
-      data-cuelume-hover="tick"
-      data-cuelume-press=""
-      data-cuelume-release=""
+      data-cuelume-hover={cuelumeDisable ? undefined : "tick"}
+      data-cuelume-press={cuelumeDisable ? undefined : ""}
+      data-cuelume-release={cuelumeDisable ? undefined : ""}
       data-inset={inset}
       data-slot="dropdown-menu-item"
       data-variant={variant}
@@ -107,11 +109,13 @@ function DropdownMenuSub({ ...props }: MenuPrimitive.SubmenuRoot.Props) {
 
 function DropdownMenuSubTrigger({
   className,
+  "data-cuelume-disable": cuelumeDisable,
   inset,
   children,
   ...props
 }: MenuPrimitive.SubmenuTrigger.Props & {
   inset?: boolean;
+  "data-cuelume-disable"?: boolean;
 }) {
   return (
     <MenuPrimitive.SubmenuTrigger
@@ -119,9 +123,9 @@ function DropdownMenuSubTrigger({
         "flex cursor-pointer select-none items-center gap-1.5 rounded-md px-1.5 py-1 text-sm outline-hidden focus:bg-accent focus:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground data-open:bg-accent data-popup-open:bg-accent data-inset:pl-7 data-open:text-accent-foreground data-popup-open:text-accent-foreground [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
         className
       )}
-      data-cuelume-hover="tick"
-      data-cuelume-press=""
-      data-cuelume-release=""
+      data-cuelume-hover={cuelumeDisable ? undefined : "tick"}
+      data-cuelume-press={cuelumeDisable ? undefined : ""}
+      data-cuelume-release={cuelumeDisable ? undefined : ""}
       data-inset={inset}
       data-slot="dropdown-menu-sub-trigger"
       {...props}
@@ -160,10 +164,12 @@ function DropdownMenuCheckboxItem({
   className,
   children,
   checked,
+  "data-cuelume-disable": cuelumeDisable,
   inset,
   ...props
 }: MenuPrimitive.CheckboxItem.Props & {
   inset?: boolean;
+  "data-cuelume-disable"?: boolean;
 }) {
   return (
     <MenuPrimitive.CheckboxItem
@@ -172,9 +178,9 @@ function DropdownMenuCheckboxItem({
         "relative flex cursor-pointer select-none items-center gap-1.5 rounded-md py-1 pr-8 pl-1.5 text-sm outline-hidden focus:bg-accent focus:text-accent-foreground focus:**:text-accent-foreground data-disabled:pointer-events-none data-disabled:cursor-not-allowed data-inset:pl-7 data-disabled:opacity-50 [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
         className
       )}
-      data-cuelume-hover="tick"
-      data-cuelume-press=""
-      data-cuelume-release=""
+      data-cuelume-hover={cuelumeDisable ? undefined : "tick"}
+      data-cuelume-press={cuelumeDisable ? undefined : ""}
+      data-cuelume-release={cuelumeDisable ? undefined : ""}
       data-inset={inset}
       data-slot="dropdown-menu-checkbox-item"
       {...props}
@@ -204,10 +210,12 @@ function DropdownMenuRadioGroup({ ...props }: MenuPrimitive.RadioGroup.Props) {
 function DropdownMenuRadioItem({
   className,
   children,
+  "data-cuelume-disable": cuelumeDisable,
   inset,
   ...props
 }: MenuPrimitive.RadioItem.Props & {
   inset?: boolean;
+  "data-cuelume-disable"?: boolean;
 }) {
   return (
     <MenuPrimitive.RadioItem
@@ -215,9 +223,9 @@ function DropdownMenuRadioItem({
         "relative flex cursor-pointer select-none items-center gap-1.5 rounded-md py-1 pr-8 pl-1.5 text-sm outline-hidden focus:bg-accent focus:text-accent-foreground focus:**:text-accent-foreground data-disabled:pointer-events-none data-disabled:cursor-not-allowed data-inset:pl-7 data-disabled:opacity-50 [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
         className
       )}
-      data-cuelume-hover="tick"
-      data-cuelume-press=""
-      data-cuelume-release=""
+      data-cuelume-hover={cuelumeDisable ? undefined : "tick"}
+      data-cuelume-press={cuelumeDisable ? undefined : ""}
+      data-cuelume-release={cuelumeDisable ? undefined : ""}
       data-inset={inset}
       data-slot="dropdown-menu-radio-item"
       {...props}
