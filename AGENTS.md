@@ -83,6 +83,11 @@ Time is integer audio samples at 48 kHz. The CLI takes seconds where a human num
 | Ingest an alternate take | `openklip take-add <slug> <video> [--id <takeId>] [--label <text>]` |
 | List ingested takes | `openklip takes <slug>` |
 | Splice takes into a new source | `openklip assemble <slug> <takeId:wStart-wEnd> [more...]` |
+| Ingest a cam video | `openklip cam-add <slug> <video> [--id <camId>] [--name <text>] [--role speaker\|wide] [--offset <ms>] [--force]` |
+| List ingested cams | `openklip cams <slug> [--json]` |
+| Patch cam metadata | `openklip cam-set <slug> <camId> [--name <text>] [--role speaker\|wide] [--offset <ms>]` |
+| Mix cams into a switched program | `openklip cam-mix <slug> [--mode follow\|auto] [--agent <id>] [--master-mix <path>] [--min-shot <ms>] [--max-shot <ms>] [--interjection <ms>] [--lead <ms>] [--wide auto\|off] [--json]` |
+| Lock a manual shot override and re-mix | `openklip cam-override <slug> <fromSec>-<toSec> <shot> [--json]` |
 | Apply brand preset (look defaults) | `openklip brand <slug> <name>` |
 | Set edit template (agent skill) | `openklip template set <slug> <id>` |
 | List / show edit templates | `openklip template list`, `openklip template show <id>` |
@@ -218,6 +223,20 @@ Pick the best lines across several recordings of the same script, then splice th
 
 Workflow: `take-add` each recording, read `take_transcript <slug> <takeId>` to find the best read of each line, then `assemble` the runs in script order. The planner lays them end-to-end with no gap at the seam and re-ids the merged transcript `w0..` (integer-exact source-sample → output-sample re-timing, so preview and export can't drift). Provenance (where every output span came from in take samples) is written to `project.json`'s `assembly` block. Via the `assemble` agent tool you can attach a per-segment `note` recording **why** that take won the line, and it rides into the provenance for the next pass. The exporter is unchanged: it reads the one assembled `source`. Concat uses an ffmpeg **filter** (not the demuxer) so mismatched takes are normalized to the first take's geometry/fps; the takes stay parked in `takes/` alongside the new source.
 
+### Contextual cam switch
+
+Turn per-speaker camera files into one professionally switched program: ingest each angle, run follow-speaker or LLM auto scene mixing, and patch obvious misfires with locked overrides, all rendered down to a normal single-source project the rest of the engine edits unchanged.
+
+| Command | What it does |
+| --- | --- |
+| `openklip cam-add <slug> <video>` | Ingest one cam into `cams/<id>/` (probe + 720p proxy + 16kHz PCM, no transcription). `--id <camId>` to name it, `--name <text>` for a display name, `--role speaker\|wide` (default `speaker`), `--offset <ms>` for manual sync (integer, may be negative), `--force` to overwrite. Up to 8 cams per project. |
+| `openklip cams <slug> [--json]` | List ingested cams: id, name, role, offset, duration, resolution. |
+| `openklip cam-set <slug> <camId> [--name <text>] [--role speaker\|wide] [--offset <ms>]` | Patch a cam's display name, role, or manual offset. |
+| `openklip cam-mix <slug> [--mode follow\|auto] [--agent <id>] [--master-mix <path>] [--min-shot <ms>] [--max-shot <ms>] [--interjection <ms>] [--lead <ms>] [--wide auto\|off] [--json]` | Mix ingested speaker cams into a single switched source. `follow` (default) is a deterministic speaker-follow planner; `auto` asks an LLM (`--agent`) for scene-mix variety, validated and clamped by the same guardrails, falling back to follow plus rule-based wides when no agent is available. `--master-mix` supplies external program audio instead of mixing all cam mics. Guardrails default to `minShotMs: 2000`, `interjectionMs: 700`, `leadMs: 250`, `maxShotMs: 25000`, and a synthetic `wide` (side-by-side for 2 speakers, grid for 3-4) unless `--wide off`. Requires at least 2 `speaker`-role cams. |
+| `openklip cam-override <slug> <fromSec>-<toSec> <shot> [--json]` | Lock a manual shot (a cam id or `wide`) for a source-time span and re-render. Locked spans survive later `cam-mix`/`cam-override` calls. |
+
+Workflow: `cam-add` each speaker's file (and an optional `wide` cam), `cam-set` to fix names/roles/offsets, then `cam-mix` to render. Speaker ID compares per-track RMS energy across each cam's own audio (no ML or cloud diarization); one Whisper pass transcribes the mixed program audio and each word is attributed to a cam by energy vote, landing as an optional `speaker` field on the word. The mix-down is one ffmpeg pass that writes `source.mp4` and `proxy.mp4` like any other project, so cuts, captions, reframe, and export work unchanged; re-running `cam-mix` or `cam-override` re-encodes. The GUI Config → Project **Cameras** section manages already-ingested cams (name, role, audio audition, follow/auto mode, re-mix) with a read-only mix timeline; ingesting a new cam, tuning guardrail settings, per-cam offset, and locking span overrides are CLI/MCP only today.
+
 ### Look & captions
 
 | Command | What it does |
@@ -293,8 +312,8 @@ The tool-calling edit prompt (`buildEditPrompt` in `src/agent-driver.ts`) advert
 
 | Layer | MCP tool names | Same as CLI |
 | --- | --- | --- |
-| Query | `list_projects`, `blank_ingest`, `transcript_grep`, `transcript_phrase`, `scene_log`, `highlights_list`, `highlights_detect`, `project_status`, `project_overlays`, `cleanup_report`, `history_list`, `task_list`, `template_list`, `features_list`, `graphic_list`, `graphic_show`, `load_skill`, `music_bpm`, `audio_measure`, `doctor`, `broll_suggest`, … | `openklip transcript grep`, `status --json`, `overlays --json`, `highlights`, `highlights-detect`, `cleanup --json`, `openklip history`, `openklip tasks`, `openklip template list`, `openklip features`, `openklip ingest --blank`, `openklip graphic list`, `openklip bpm`, `openklip audio measure`, `openklip doctor`, `openklip broll-suggest` |
-| Mutate | `cut`, `cut-text`, `broll-add`, `title-set`, `word-text`, `dead-air-add`, `dead-air-rm`, `audio`, `captions-style`, `captions-inset`, `take_add`, … | `openklip cut`, `broll-add`, `word-text`, `dead-air-rm`, `audio`, `captions-style`, `captions-inset`, `openklip take-add`, … |
+| Query | `list_projects`, `blank_ingest`, `transcript_grep`, `transcript_phrase`, `scene_log`, `highlights_list`, `highlights_detect`, `project_status`, `project_overlays`, `cleanup_report`, `history_list`, `task_list`, `template_list`, `features_list`, `graphic_list`, `graphic_show`, `load_skill`, `music_bpm`, `audio_measure`, `doctor`, `broll_suggest`, `list_cams`, … | `openklip transcript grep`, `status --json`, `overlays --json`, `highlights`, `highlights-detect`, `cleanup --json`, `openklip history`, `openklip tasks`, `openklip template list`, `openklip features`, `openklip ingest --blank`, `openklip graphic list`, `openklip bpm`, `openklip audio measure`, `openklip doctor`, `openklip broll-suggest`, `openklip cams` |
+| Mutate | `cut`, `cut-text`, `broll-add`, `title-set`, `word-text`, `dead-air-add`, `dead-air-rm`, `audio`, `captions-style`, `captions-inset`, `take_add`, `cam_add`, `cam_set`, `cam_mix`, `cam_override`, … | `openklip cut`, `broll-add`, `word-text`, `dead-air-rm`, `audio`, `captions-style`, `captions-inset`, `openklip take-add`, `openklip cam-add`, `openklip cam-set`, `openklip cam-mix`, `openklip cam-override`, … |
 | Phrase compose | `title-add-phrase`, `zoom-add-phrase`, `broll-add-phrase`, `graphic-add-phrase` | `openklip title-add-phrase`, … |
 | Brief | `brief_get`, `brief_set`, `brief_audit` | `openklip brief`, `openklip brief --set`, `openklip brief --audit` |
 | Agent task progress | `task_step`, `task_complete` | no CLI equivalent: scoped to the running agent's own task via `OPENKLIP_TASK_ID` |
@@ -569,4 +588,4 @@ Durable, non-obvious notes for cloud agents. The startup update script already r
 
 ### Known test flake (not environment-related)
 
-- `bun test` reports 6 failing `syncAssetsFromFolder` tests in the full run, but they pass when the file is run in isolation (`bun test tests/asset-scanner.test.ts`). Cause: `tests/project-data.test.ts` calls `mock.module("@engine/asset-scanner", ...)` with a throwing stub, and Bun's global module mock leaks into `tests/asset-scanner.test.ts` when both run together. This is a pre-existing test-isolation bug, independent of node/bun/ffmpeg versions.
+- Bun's `mock.module` leaks across test files in a shared-process run (historically 6 `syncAssetsFromFolder` failures via `tests/project-data.test.ts`; later ffmpeg-stub leakage from `tests/cams.test.ts` broke assembly/export smoke tests on CI). Fixed structurally on 2026-07-12: the `test` script and CI now run `bun test --isolate` (fresh global object per test file, ~6s overhead on a ~38s suite). If you invoke `bun test` directly without `--isolate`, cross-file mock leakage can still produce phantom failures - use `bun run test`.

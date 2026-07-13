@@ -75,7 +75,7 @@ Agent sidebar chats use `working/chats.json`, not `localStorage` (color scheme a
 
 ## What works today
 
-Verified against the current codebase (`VERSION` / `package.json` `0.41.1.3`, 2031 tests: 2026 pass, 5 skip without `OPENKLIP_INTEGRATION=1` and env-gated fixtures):
+Verified against the current codebase (`VERSION` / `package.json` `0.42.0.0`, 2300 tests: 2292 pass, 8 skip without `OPENKLIP_INTEGRATION=1` and env-gated fixtures):
 
 - **Ingest**: video → local transcript + preview proxy + `project.json` (`openklip ingest`; refuses re-ingest unless `--force`)
 - **Transcript editing**: click words to toggle `deleted`; `openklip cut` / `cut --text` / `restore` on CLI
@@ -115,6 +115,7 @@ Verified against the current codebase (`VERSION` / `package.json` `0.41.1.3`, 20
 - **Written rationale**: `--note "<why>"` on any `cut` or overlay records why a pick was made; metadata only, never reaches ffmpeg, surfaces in `overlays` / transcript / MCP (`--note ""` clears it)
 - **Phrase-anchored cues**: phrase-placed overlays remember the spoken phrase and re-resolve onto the current kept words after a re-cut (`openklip reanchor`); a deleted phrase flags `stale` and keeps the last good span
 - **Multi-take assembly**: `openklip take-add` / `takes` / `assemble` splice the best take per line into one single-source `project.json` the cut/overlay/export engine edits unchanged; a Takes section in the Config panel (between Highlights and Music) browses ingested takes and assembles a selection directly in the browser, and now also uploads a new take from the browser (file-picker "Add take" control, no drag-drop)
+- **Contextual cam switch** (v0.42.0.0): multicam ingest and mix (`openklip cam-add` / `cams` / `cam-set` / `cam-mix` / `cam-override`, MCP `cam_add` / `list_cams` / `cam_set` / `cam_mix` / `cam_override`); follow-speaker or LLM auto scene switching with synthetic wide, locked manual overrides (CLI/MCP only), and a mixed-down `source.mp4`/`proxy.mp4` so every existing feature keeps working unchanged; Config → Project **Cameras** section manages ingested cams (name/role, audio audition, mode picker, mix timeline, re-mix; adding a new cam is still CLI/MCP only); `templates/cam-mix/skill.md`
 - **Action history**: append-only per-project log (`working/actions.jsonl`) records every user-facing mutation with actor, optional `authorId` / `model` / `agentSurface`, input/result summaries, timestamp, and revision before/after; tail reads with `{ limit }` avoid parsing the whole file; History section with actor/action/task filters and per-entry **Show transcript diff** for transcript mutations; optional **Show edit attribution** in Settings → Appearance (default off) controls transcript hover, History author UI, and title/zoom/still overlay inspectors; `GET /api/projects/<slug>/history`; `openklip history` / MCP `history_list`
 - **Revert (undo)**: every logged mutation keeps a pre-mutation snapshot in `working/history/` (newest 100 revisions); `openklip revert <slug> (--to <rev> | --task <id> | --last) [--force]`, the MCP `revert` tool, and per-entry/per-task "Revert" buttons in the History panel restore `project.json` to an earlier state as a normal, itself-revertible mutation. Restores `project.json` only, not `brief.md`, chats, tasks, asset files, or derived media; see [TODO.md](./TODO.md#known-limitations) for the details
 - **Project brief**: `brief.md` at the project root holds audience, goal, tone, must-use assets, avoid list, target length, and export formats; agents read it on every chat/edit prompt (2000-char bounded); GUI Brief section in the Config panel; `openklip brief <slug> [--set <text...> | --file <path>]` and MCP `brief_get` / `brief_set`
@@ -124,7 +125,7 @@ Verified against the current codebase (`VERSION` / `package.json` `0.41.1.3`, 20
 - **Browser editor**: open `http://localhost:<port>/<slug>` or `/?slug=<slug>` after `openklip serve`; script-first transcript editing (select words, Delete to cut)
 - **Workspace**: macOS folder picker on empty landing; inline project create; projects root persisted in `.openklip/projects-root`
 - **CLI**: full edit surface; `openklip actions --json` mutations manifest; `openklip tools --json` full agent tool list; `openklip features --json` capability catalog from `src/features.ts`; `openklip brief <slug> --audit` ship-readiness check against `brief.md`
-- **MCP server**: `openklip mcp` (stdio) exposes 92 tools across query, mutation, task progress, revert, and export surfaces; `.cursor/mcp.json` wired for Cursor
+- **MCP server**: `openklip mcp` (stdio) exposes 93 tools across query, mutation, task progress, revert, and export surfaces; `.cursor/mcp.json` wired for Cursor
 - **Edit templates**: `templates/<id>/skill.md` playbooks; `openklip template set`; brand presets at ingest (`openklip brand`)
 - **Agent selector**: drive filler cuts via Claude Code, Codex, Cursor, or Grok subscription CLIs
 - **Design system**: default shadcn/ui tokens with Base UI primitives (`app/globals.css`, `components.json`); light/dark via `.dark` class; icons via `web/lib/icon.tsx`
@@ -189,7 +190,7 @@ In Cursor, enable the bundled MCP server (`.cursor/mcp.json`) and call the same 
 
 | Agent / surface | Mutate `project.json` in chat | Typical workflow |
 | --- | --- | --- |
-| **Cursor** (MCP enabled) | Yes, via 92 MCP tools | Chat edits call `cut`, `broll-add`, `export`, etc. directly |
+| **Cursor** (MCP enabled) | Yes, via 93 MCP tools | Chat edits call `cut`, `broll-add`, `export`, etc. directly |
 | **Claude Code / Desktop** (MCP enabled) | Yes, via MCP | Same tool surface as Cursor |
 | **Codex** | CLI hints in chat | Run `openklip` commands the model suggests |
 | **Grok / other CLIs** | CLI hints in chat | Agent selector shells out for filler cuts; mutations via terminal |

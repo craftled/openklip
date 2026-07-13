@@ -4,6 +4,10 @@ import { existsSync } from "node:fs";
 import { assembleFromSelection, listTakes, loadTake } from "@engine/assembly";
 import { loadBrief, saveBrief as saveBriefFile } from "@engine/brief";
 import { logBriefSet } from "@engine/brief-log";
+import type { camMix } from "@engine/cam-mix";
+import type { CamSwitchSettings } from "@engine/cam-plan";
+import { camMixOrRemix } from "@engine/cam-remix";
+import { type CamRole, listCams, setCam } from "@engine/cams";
 import type {
   ColorAdjust,
   Cuts,
@@ -570,6 +574,55 @@ export async function assembleFromSelectionAction(
     });
     const project = await loadProject(slug);
     return { ok: true, data: { ...result, project } };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+// ── Multicam cam switch GUI ─────────────────────────────────────────────────
+
+export async function listCamsAction(
+  slug: string
+): Promise<ActionResult<{ cams: Awaited<ReturnType<typeof listCams>> }>> {
+  try {
+    const cams = await listCams(slug);
+    return { ok: true, data: { cams } };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function camSetAction(
+  slug: string,
+  camId: string,
+  patch: { name?: string; role?: CamRole; offsetMs?: number }
+): Promise<ActionResult<{ cam: Awaited<ReturnType<typeof setCam>> }>> {
+  try {
+    const cam = await setCam(slug, camId, patch);
+    return { ok: true, data: { cam } };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function camMixAction(
+  slug: string,
+  opts: { mode: "follow" | "auto"; settings?: Partial<CamSwitchSettings> }
+): Promise<
+  ActionResult<{
+    mix: Awaited<ReturnType<typeof camMix>>;
+    project: Project;
+  }>
+> {
+  try {
+    // camMixOrRemix carries locked plan spans forward when multicam
+    // provenance exists; only the first mix plans entirely from scratch.
+    const mix = await camMixOrRemix(slug, {
+      mode: opts.mode,
+      settings: opts.settings,
+    });
+    const project = await loadProject(slug);
+    return { ok: true, data: { mix, project } };
   } catch (e) {
     return fail(e);
   }

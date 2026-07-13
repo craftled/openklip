@@ -1,5 +1,6 @@
 "use client";
 
+import type { MulticamProvenance } from "@engine/cam-mix";
 import type {
   Audio,
   CutSnap,
@@ -13,6 +14,7 @@ import {
   type AudioPatch,
 } from "@/components/audio-controls";
 import { BriefEditor } from "@/components/brief-editor";
+import { CamSwitchPanel } from "@/components/cam-switch-panel";
 import { Section } from "@/components/config/config-section";
 import { FrameBrowser } from "@/components/frame-browser";
 import {
@@ -51,6 +53,7 @@ export interface ConfigProjectTabProps {
   graphicSpanMode: GraphicSpanMode;
   graphicTemplates: GraphicTemplateOption[];
   highlights: Highlights | undefined;
+  multicam?: MulticamProvenance | null;
   musicAssets: { id: string; name: string }[];
   musicPlacements: MusicPlacementView[];
   onAddGraphic: () => void;
@@ -102,6 +105,7 @@ export function ConfigProjectTab({
   highlights,
   musicAssets,
   musicPlacements,
+  multicam,
   onAddGraphic,
   onAddGraphicAtCuts,
   onAddMusic,
@@ -146,6 +150,13 @@ export function ConfigProjectTab({
       </Section>
       <Section title="Takes">
         <TakesPanel onAssembled={onAssembled} slug={slug} />
+      </Section>
+      <Section title="Cameras">
+        <CamSwitchPanel
+          multicam={multicam}
+          onRemixed={onAssembled}
+          slug={slug}
+        />
       </Section>
       <Section title="Graphics">
         <GraphicSectionControls

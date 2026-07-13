@@ -30,6 +30,9 @@ import { measureMusicBpm } from "./bpm.ts";
 import { loadBrief, saveBrief } from "./brief.ts";
 import { logBriefSet } from "./brief-log.ts";
 import { suggestBroll } from "./broll-suggest.ts";
+import { planTimelineSummary } from "./cam-mix.ts";
+import { camMixOrRemix, camRemix } from "./cam-remix.ts";
+import { type CamRole, ingestCam, listCams, setCam } from "./cams.ts";
 import { buildCleanupReport } from "./cleanup.ts";
 import { executeMomentSearch } from "./cli-query.ts";
 import { transitionExportPreview } from "./cut-transition-gate.ts";
@@ -1312,6 +1315,189 @@ const queryTools: AgentToolDef[] = [
         { segments, ...(padMs === undefined ? {} : { padMs }) },
         { force, actor: toolActor() }
       ),
+  }),
+  // ── Contextual cam switch (cams/ + ffmpeg, like takes/assemble) ──
+  defineQueryTool({
+    name: "cam_add",
+    summary: "Ingest a cam video into cams/<id>/ (probe, proxy, 16k PCM).",
+    schema: z.object({
+      slug,
+      videoPath: z
+        .string()
+        .min(1)
+        .describe("Absolute or cwd-relative path to the cam video on disk"),
+      id: z.string().min(1).optional(),
+      name: z.string().optional(),
+      role: z.enum(["speaker", "wide"]).optional(),
+      offsetMs: z.number().int().optional(),
+      force: z.boolean().optional(),
+    }),
+    run: async ({
+      slug: projectSlug,
+      videoPath,
+      id,
+      name,
+      role,
+      offsetMs,
+      force,
+    }) => {
+      const cam = await ingestCam(projectSlug, videoPath, {
+        id,
+        name,
+        role: role as CamRole | undefined,
+        offsetMs,
+        force,
+      });
+      return {
+        id: cam.id,
+        name: cam.name,
+        role: cam.role,
+        offsetMs: cam.offsetMs,
+        durationSec: samplesToSec(cam.durationSamples),
+        width: cam.width,
+        height: cam.height,
+      };
+    },
+  }),
+  defineQueryTool({
+    name: "list_cams",
+    summary:
+      "List ingested cams for a project (id, name, role, offset, duration).",
+    schema: z.object({ slug }),
+    run: async ({ slug: projectSlug }) => {
+      const cams = await listCams(projectSlug);
+      return {
+        cams: cams.map((c) => ({
+          id: c.id,
+          name: c.name,
+          role: c.role,
+          offsetMs: c.offsetMs,
+          durationSec: samplesToSec(c.durationSamples),
+          width: c.width,
+          height: c.height,
+        })),
+      };
+    },
+  }),
+  defineQueryTool({
+    name: "cam_set",
+    summary: "Patch cam metadata (name, role, offset).",
+    schema: z.object({
+      slug,
+      camId: z.string().min(1),
+      name: z.string().optional(),
+      role: z.enum(["speaker", "wide"]).optional(),
+      offsetMs: z.number().int().optional(),
+    }),
+    run: async ({ slug: projectSlug, camId, name, role, offsetMs }) => {
+      const cam = await setCam(projectSlug, camId, {
+        name,
+        role: role as CamRole | undefined,
+        offsetMs,
+      });
+      return {
+        id: cam.id,
+        name: cam.name,
+        role: cam.role,
+        offsetMs: cam.offsetMs,
+      };
+    },
+  }),
+  defineQueryTool({
+    name: "cam_mix",
+    summary:
+      "Mix ingested speaker cams into a single source with follow-speaker or LLM auto scene switching.",
+    schema: z.object({
+      slug,
+      mode: z.enum(["follow", "auto"]).optional(),
+      agent: z.string().optional(),
+      masterMix: z.string().optional(),
+      minShotMs: z.number().positive().optional(),
+      maxShotMs: z.number().positive().optional(),
+      interjectionMs: z.number().positive().optional(),
+      leadMs: z.number().nonnegative().optional(),
+      wide: z.enum(["auto", "off"]).optional(),
+    }),
+    run: async ({
+      slug: projectSlug,
+      mode,
+      agent,
+      masterMix,
+      minShotMs,
+      maxShotMs,
+      interjectionMs,
+      leadMs,
+      wide,
+    }) => {
+      const settings = {
+        ...(minShotMs === undefined ? {} : { minShotMs }),
+        ...(maxShotMs === undefined ? {} : { maxShotMs }),
+        ...(interjectionMs === undefined ? {} : { interjectionMs }),
+        ...(leadMs === undefined ? {} : { leadMs }),
+        ...(wide === undefined ? {} : { wide }),
+      };
+      const result = await camMixOrRemix(projectSlug, {
+        mode,
+        agent,
+        masterMix,
+        settings: Object.keys(settings).length > 0 ? settings : undefined,
+      });
+      const cams = await listCams(projectSlug);
+      return {
+        ...result,
+        timeline: planTimelineSummary(result.plan, cams),
+      };
+    },
+  }),
+  defineQueryTool({
+    name: "cam_override",
+    summary:
+      "Lock a manual shot override for a source-time span and re-mix the project.",
+    schema: z.object({
+      slug,
+      fromSec: z.number().nonnegative(),
+      toSec: z.number().positive(),
+      shot: z.string().min(1),
+      mode: z.enum(["follow", "auto"]).optional(),
+      agent: z.string().optional(),
+      minShotMs: z.number().positive().optional(),
+      maxShotMs: z.number().positive().optional(),
+      interjectionMs: z.number().positive().optional(),
+      leadMs: z.number().nonnegative().optional(),
+      wide: z.enum(["auto", "off"]).optional(),
+    }),
+    run: async ({
+      slug: projectSlug,
+      fromSec,
+      toSec,
+      shot,
+      mode,
+      agent,
+      minShotMs,
+      maxShotMs,
+      interjectionMs,
+      leadMs,
+      wide,
+    }) => {
+      const settings = {
+        ...(minShotMs === undefined ? {} : { minShotMs }),
+        ...(maxShotMs === undefined ? {} : { maxShotMs }),
+        ...(interjectionMs === undefined ? {} : { interjectionMs }),
+        ...(leadMs === undefined ? {} : { leadMs }),
+        ...(wide === undefined ? {} : { wide }),
+      };
+      const result = await camRemix(projectSlug, {
+        overrides: [{ fromSec, toSec, shot }],
+        mode,
+        agent,
+        settings: Object.keys(settings).length > 0 ? settings : undefined,
+      });
+      const cams = await listCams(projectSlug);
+      return {
+        ...result,
+        timeline: planTimelineSummary(result.plan, cams),
+      };
+    },
   }),
 ];
 

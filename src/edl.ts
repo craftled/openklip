@@ -42,6 +42,8 @@ export const WordSchema = z.object({
    * words that have never been corrected.
    */
   originalText: z.string().optional(),
+  /** Attributed speaker cam id from multicam mix (absent until cam-mix). */
+  speaker: z.string().optional(),
 });
 export type Word = z.infer<typeof WordSchema>;
 

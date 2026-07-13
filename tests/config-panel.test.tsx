@@ -166,6 +166,7 @@ function minimalProps(
       highlights: undefined,
       musicAssets: [],
       musicPlacements: [],
+      multicam: null,
       onAddGraphic: () => undefined,
       onAddGraphicAtCuts: () => undefined,
       onAddMusic: () => undefined,
