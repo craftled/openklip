@@ -58,7 +58,7 @@ import {
   shouldUseSeamedVoice,
   voiceAffixes,
 } from "../src/exporter.ts";
-import { FFMPEG, FFPROBE, probe, run } from "../src/ffmpeg.ts";
+import { FFMPEG, ffprobeJson, probe, run } from "../src/ffmpeg.ts";
 import { projectPaths } from "../src/paths.ts";
 import { PRODUCT_ANNOUNCEMENT_CATALOG } from "../src/product-announcement.ts";
 import {
@@ -1902,24 +1902,15 @@ test("exportCut mixes a placed music bed under the voice (smoke)", {
     assert.ok(existsSync(p.out), "out.mp4 missing");
 
     // One mixed audio stream, and the bed must not stretch the cut duration.
-    const probeProc = Bun.spawn(
-      [
-        FFPROBE,
-        "-v",
-        "quiet",
-        "-print_format",
-        "json",
-        "-show_streams",
-        "-show_format",
-        p.out,
-      ],
-      { stdout: "pipe", stderr: "pipe" }
-    );
-    const probed = JSON.parse(await new Response(probeProc.stdout).text()) as {
-      format?: { duration?: string };
-      streams?: Array<{ codec_type?: string }>;
-    };
-    await probeProc.exited;
+    const probed = await ffprobeJson([
+      "-v",
+      "quiet",
+      "-print_format",
+      "json",
+      "-show_streams",
+      "-show_format",
+      p.out,
+    ]);
     const audioStreams = (probed.streams ?? []).filter(
       (s) => s.codec_type === "audio"
     );
@@ -2109,24 +2100,15 @@ async function probeOut(outPath: string): Promise<{
   audioStreamCount: number;
   durationSec: number;
 }> {
-  const proc = Bun.spawn(
-    [
-      FFPROBE,
-      "-v",
-      "quiet",
-      "-print_format",
-      "json",
-      "-show_streams",
-      "-show_format",
-      outPath,
-    ],
-    { stdout: "pipe", stderr: "pipe" }
-  );
-  const probed = JSON.parse(await new Response(proc.stdout).text()) as {
-    format?: { duration?: string };
-    streams?: Array<{ codec_type?: string; sample_rate?: string }>;
-  };
-  await proc.exited;
+  const probed = await ffprobeJson([
+    "-v",
+    "quiet",
+    "-print_format",
+    "json",
+    "-show_streams",
+    "-show_format",
+    outPath,
+  ]);
   const audioStreams = (probed.streams ?? []).filter(
     (s) => s.codec_type === "audio"
   );

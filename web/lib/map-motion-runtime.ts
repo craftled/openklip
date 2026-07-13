@@ -18,6 +18,10 @@ export const MAP_MOTION_DEFAULT_STYLES = {
   light: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
 } as const;
 
+export interface MapMotionMapErrorEvent {
+  error?: { message?: string };
+}
+
 export interface MapMotionMap {
   addLayer: (layer: unknown, beforeId?: string) => void;
   addSource: (id: string, source: unknown) => void;
@@ -29,7 +33,10 @@ export interface MapMotionMap {
     pitch?: number;
     zoom?: number;
   }) => void;
-  once: (event: string, handler: () => void) => void;
+  once: (
+    event: string,
+    handler: ((event?: MapMotionMapErrorEvent) => void) | (() => void)
+  ) => void;
   removeLayer: (id: string) => void;
   removeSource: (id: string) => void;
   setPaintProperty: (layerId: string, name: string, value: unknown) => void;
@@ -429,9 +436,23 @@ export function disposeMapMotion(map: MapMotionMap): void {
   }
 }
 
+export function mapMotionErrorMessage(
+  event?: MapMotionMapErrorEvent,
+  fallback = "unknown map error"
+): string {
+  return event?.error?.message?.trim() || fallback;
+}
+
 export function waitMapIdle(map: MapMotionMap): Promise<void> {
-  const idle = new Promise<void>((resolve) => {
+  const idle = new Promise<void>((resolve, reject) => {
     map.once("idle", resolve);
+    map.once("error", (event) => {
+      reject(
+        new Error(
+          `map-motion tile fetch failed: ${mapMotionErrorMessage(event)}`
+        )
+      );
+    });
     map.triggerRepaint?.();
   });
   return withTimeout(idle, MAP_IDLE_TIMEOUT_MS, "map idle wait");
