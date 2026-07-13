@@ -22,46 +22,67 @@ export const FFMPEG =
   process.env.FFMPEG ??
   localBinary("ffmpeg-static", "ffmpeg") ??
   "ffmpeg";
-function executableOnHost(bin: string): boolean {
-  if (bin.includes("/") && !existsSync(bin)) {
+
+// ffprobe-static resolves through createRequire so Turbopack does not hash the
+// package path. On Apple Silicon the published darwin/arm64 binary is still
+// x86_64-only; posix_spawn then returns EBADARCH. spawnFfprobe below falls back
+// to a system ffprobe on PATH when that happens.
+export const FFPROBE =
+  optionalRequire<{ path?: string }>("ffprobe-static")?.path ??
+  process.env.FFPROBE ??
+  localBinary(
+    "ffprobe-static",
+    "bin",
+    process.platform,
+    process.arch,
+    "ffprobe"
+  ) ??
+  "ffprobe";
+
+const SYSTEM_FFPROBE_CANDIDATES = [
+  "/opt/homebrew/bin/ffprobe",
+  "/usr/local/bin/ffprobe",
+  "ffprobe",
+] as const;
+
+export function isFfprobeArchMismatchError(error: unknown): boolean {
+  if (!error || typeof error !== "object") {
     return false;
   }
-  try {
-    const proc = Bun.spawnSync([bin, "-version"], {
-      stdout: "ignore",
-      stderr: "ignore",
-    });
-    return proc.exitCode === 0;
-  } catch {
-    return false;
-  }
+  const record = error as { code?: string; errno?: number };
+  return record.code === "EBADARCH" || record.errno === -86;
 }
 
-function resolveFfprobe(): string {
-  const candidates = [
-    process.env.FFPROBE,
-    optionalRequire<{ path?: string }>("ffprobe-static")?.path,
-    localBinary(
-      "ffprobe-static",
-      "bin",
-      process.platform,
-      process.arch,
-      "ffprobe"
-    ),
-    "/opt/homebrew/bin/ffprobe",
-    "/usr/local/bin/ffprobe",
-    "ffprobe",
-  ].filter((c): c is string => Boolean(c));
+function ffprobeSpawnCandidates(): string[] {
+  const seen = new Set<string>();
+  const candidates: string[] = [];
+  for (const candidate of [FFPROBE, ...SYSTEM_FFPROBE_CANDIDATES]) {
+    if (seen.has(candidate)) {
+      continue;
+    }
+    seen.add(candidate);
+    candidates.push(candidate);
+  }
+  return candidates;
+}
 
-  for (const candidate of candidates) {
-    if (executableOnHost(candidate)) {
-      return candidate;
+function spawnFfprobe(args: string[]) {
+  const candidates = ffprobeSpawnCandidates();
+  let lastError: unknown;
+  for (const bin of candidates) {
+    try {
+      return Bun.spawn([bin, ...args], { stdout: "pipe", stderr: "pipe" });
+    } catch (error) {
+      lastError = error;
+      if (!isFfprobeArchMismatchError(error)) {
+        throw error;
+      }
     }
   }
-  return "ffprobe";
+  throw lastError instanceof Error
+    ? lastError
+    : new Error(String(lastError ?? "ffprobe spawn failed"));
 }
-
-export const FFPROBE = resolveFfprobe();
 
 export async function run(
   bin: string,
@@ -93,10 +114,27 @@ function parseProbeJson(out: string): {
   };
 }
 
+export async function ffprobeJson(
+  args: string[],
+  label = "ffprobe"
+): Promise<ReturnType<typeof parseProbeJson>> {
+  const proc = spawnFfprobe(args);
+  const [out, err, code] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+    proc.exited,
+  ]);
+  if (code !== 0) {
+    throw new Error(
+      `${label} failed (exit ${code}):\n${err.slice(-1800) || out.slice(-1800)}`
+    );
+  }
+  return parseProbeJson(out);
+}
+
 export async function probe(file: string): Promise<ProbeResult> {
-  const proc = Bun.spawn(
+  const json = await ffprobeJson(
     [
-      FFPROBE,
       "-v",
       "quiet",
       "-print_format",
@@ -105,11 +143,8 @@ export async function probe(file: string): Promise<ProbeResult> {
       "-show_format",
       file,
     ],
-    { stdout: "pipe", stderr: "pipe" }
+    "ffprobe"
   );
-  const out = await new Response(proc.stdout).text();
-  await proc.exited;
-  const json = parseProbeJson(out);
   const v = (json.streams ?? []).find((s) => s.codec_type === "video");
   const a = (json.streams ?? []).find((s) => s.codec_type === "audio");
   const durationSec = Number(
@@ -138,12 +173,9 @@ export async function probe(file: string): Promise<ProbeResult> {
 export async function probeAudio(
   file: string
 ): Promise<{ durationSec: number }> {
-  const proc = Bun.spawn(
-    [FFPROBE, "-v", "quiet", "-print_format", "json", "-show_format", file],
-    { stdout: "pipe", stderr: "pipe" }
+  const json = await ffprobeJson(
+    ["-v", "quiet", "-print_format", "json", "-show_format", file],
+    "ffprobe(audio)"
   );
-  const out = await new Response(proc.stdout).text();
-  await proc.exited;
-  const json = parseProbeJson(out);
   return { durationSec: Number(json.format?.duration ?? 0) };
 }
