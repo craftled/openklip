@@ -38,16 +38,6 @@ function wordOverlapsSpan(
   return startSec < toSec && endSec > fromSec;
 }
 
-export function wordIdsInSpan(
-  words: readonly MomentSpanWord[],
-  fromSec: number,
-  toSec: number
-): string[] {
-  return words
-    .filter((w) => wordOverlapsSpan(w, fromSec, toSec))
-    .map((w) => w.id);
-}
-
 export function deletedWordIdsInSpan(
   words: readonly MomentSpanWord[],
   fromSec: number,
@@ -69,6 +59,13 @@ function matchHasCutWords(
   return match.ids.some((id) => deletedIds.has(id));
 }
 
+// Independent web-side reimplementation of the same kept+cut merge as
+// src/cli-query.ts's grepMomentTextMatches (engine-side, unbounded, CLI/MCP
+// only) - see that function's header for exactly what's allowed to differ
+// (this one truncates to `limit` and has a range[0] tie-break the engine
+// side doesn't need) versus what must stay in sync (which matches survive,
+// dedupe/kept-vs-cut semantics). Not shared code because the engine side
+// must not import web code, and this side must not import node:fs.
 export function mergePhraseSearchMatchLists(
   kept: readonly PhraseSearchMatch[],
   cut: readonly PhraseSearchMatch[],
@@ -114,6 +111,16 @@ export function encodeMomentDragPayload(payload: MomentDragPayload): string {
   return JSON.stringify(payload);
 }
 
+// No real drag in this app can ever produce a span wider than a single
+// project's duration (every producer - onMomentCardDragStart, the Keep
+// button - sources fromSec/toSec from a real clusterMoments/search result).
+// This is a generous, project-duration-agnostic sanity ceiling on a pure
+// decoder that has no access to the actual project: a malformed or
+// adversarially-crafted payload with a huge span would otherwise overlap
+// (and restore) essentially every word in the project instead of one
+// moment. 24h comfortably exceeds any real project this app edits.
+const MAX_MOMENT_DRAG_SPAN_SEC = 24 * 60 * 60;
+
 export function decodeMomentDragPayload(raw: string): MomentDragPayload | null {
   try {
     const parsed: unknown = JSON.parse(raw);
@@ -133,7 +140,10 @@ export function decodeMomentDragPayload(raw: string): MomentDragPayload | null {
       typeof fromSec !== "number" ||
       typeof toSec !== "number" ||
       !Number.isFinite(fromSec) ||
-      !Number.isFinite(toSec)
+      !Number.isFinite(toSec) ||
+      fromSec < 0 ||
+      toSec <= fromSec ||
+      toSec - fromSec > MAX_MOMENT_DRAG_SPAN_SEC
     ) {
       return null;
     }

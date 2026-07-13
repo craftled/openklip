@@ -129,8 +129,18 @@ function failAllPending(err: Error): void {
 }
 
 // Drop the current child reference and fail whatever was still waiting on
-// it. The next embedText() call sees `child === null` and respawns.
-function resetChild(err: Error): void {
+// it, but ONLY if `proc` is still the current child. Two independent async
+// signals fire for the same dead child - readLoop's stdout-EOF path and
+// spawnChild's own proc.exited listener below - and they are not guaranteed
+// to resolve on the same tick. If a new, healthy child was already spawned
+// by the time the second (stale) signal runs, this guard keeps it from
+// rejecting that new child's live in-flight request and orphaning it (a
+// leaked node process with no reference left to shut down). The next
+// embedText() call sees `child === null` and respawns.
+function resetChild(err: Error, proc: EmbedChild): void {
+  if (child !== proc) {
+    return;
+  }
   failAllPending(err);
   child = null;
   stdoutBuffer = "";
@@ -173,9 +183,9 @@ async function readLoop(proc: EmbedChild): Promise<void> {
     }
     // stdout closed: the child exited on its own. Fail anything still
     // in flight so callers don't hang; the next embedText() respawns.
-    resetChild(new Error("moment embed worker exited"));
+    resetChild(new Error("moment embed worker exited"), proc);
   } catch (e) {
-    resetChild(toError(e));
+    resetChild(toError(e), proc);
   }
 }
 
@@ -187,7 +197,7 @@ function spawnChild(): EmbedChild {
   }) as EmbedChild;
   void readLoop(proc);
   void proc.exited.then(() => {
-    resetChild(new Error("moment embed worker exited"));
+    resetChild(new Error("moment embed worker exited"), proc);
   });
   return proc;
 }

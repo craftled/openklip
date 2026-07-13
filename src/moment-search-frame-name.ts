@@ -4,8 +4,9 @@
 // at module scope), so client components (the Search sidebar panel's Text
 // tab, which picks a thumbnail for a transcript match) can value-import
 // this one function without dragging node:fs into the browser bundle.
-// Pattern: src/action-log-entry.ts / src/agent-task-types.ts. Import from
-// HERE; src/moment-search.ts re-exports it for the engine-side callers.
+// Pattern: src/action-log-entry.ts / src/agent-task-types.ts. Every caller,
+// web and engine, imports from HERE directly - src/moment-search.ts does
+// NOT re-export it (that would be a barrel export).
 
 // Ingest frame i (1-based) covers [(i-1)*step, i*step) seconds (mirrors
 // FRAME_STEP_SEC in src/scene-log.ts and src/embed.mjs). Flooring picks the

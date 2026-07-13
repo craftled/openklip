@@ -8,7 +8,6 @@ import {
   MOMENT_DRAG_MIME,
   mergeMomentTextMatches,
   mergePhraseSearchMatchLists,
-  wordIdsInSpan,
 } from "../web/lib/moment-keep.ts";
 import type { PhraseSearchMatch } from "../web/lib/phrase-search.ts";
 
@@ -36,28 +35,7 @@ function word(
   };
 }
 
-// ── wordIdsInSpan / deletedWordIdsInSpan ─────────────────────────────────
-
-test("wordIdsInSpan includes words overlapping [fromSec, toSec)", () => {
-  const words = [
-    word("w0", 0, 1, "a"),
-    word("w1", 1, 2, "b"),
-    word("w2", 2, 3, "c"),
-    word("w3", 3, 4, "d"),
-  ];
-  assert.deepEqual(wordIdsInSpan(words, 1, 3), ["w1", "w2"]);
-});
-
-test("wordIdsInSpan treats span end as exclusive", () => {
-  const words = [word("w0", 0, 1, "a"), word("w1", 1, 2, "b")];
-  assert.deepEqual(wordIdsInSpan(words, 1, 1.5), ["w1"]);
-  assert.deepEqual(wordIdsInSpan(words, 2, 3), []);
-});
-
-test("wordIdsInSpan includes deleted words", () => {
-  const words = [word("w0", 0, 1, "a", true), word("w1", 1, 2, "b", false)];
-  assert.deepEqual(wordIdsInSpan(words, 0, 2), ["w0", "w1"]);
-});
+// ── deletedWordIdsInSpan ──────────────────────────────────────────────────
 
 test("deletedWordIdsInSpan returns only deleted overlapping ids", () => {
   const words = [
@@ -68,12 +46,18 @@ test("deletedWordIdsInSpan returns only deleted overlapping ids", () => {
   assert.deepEqual(deletedWordIdsInSpan(words, 0, 3), ["w0", "w2"]);
 });
 
-test("wordIdsInSpan uses half-open overlap at boundaries", () => {
-  const words = [word("w0", 0.5, 1.5, "mid")];
-  assert.deepEqual(wordIdsInSpan(words, 0, 0.5), []);
-  assert.deepEqual(wordIdsInSpan(words, 0, 0.51), ["w0"]);
-  assert.deepEqual(wordIdsInSpan(words, 1.5, 2), []);
-  assert.deepEqual(wordIdsInSpan(words, 1.49, 2), ["w0"]);
+test("deletedWordIdsInSpan treats span end as exclusive", () => {
+  const words = [word("w0", 0, 1, "a", true), word("w1", 1, 2, "b", true)];
+  assert.deepEqual(deletedWordIdsInSpan(words, 1, 1.5), ["w1"]);
+  assert.deepEqual(deletedWordIdsInSpan(words, 2, 3), []);
+});
+
+test("deletedWordIdsInSpan uses half-open overlap at boundaries", () => {
+  const words = [word("w0", 0.5, 1.5, "mid", true)];
+  assert.deepEqual(deletedWordIdsInSpan(words, 0, 0.5), []);
+  assert.deepEqual(deletedWordIdsInSpan(words, 0, 0.51), ["w0"]);
+  assert.deepEqual(deletedWordIdsInSpan(words, 1.5, 2), []);
+  assert.deepEqual(deletedWordIdsInSpan(words, 1.49, 2), ["w0"]);
 });
 
 // ── mergeMomentTextMatches ───────────────────────────────────────────────
@@ -135,6 +119,42 @@ test("decodeMomentDragPayload returns null for malformed input", () => {
     decodeMomentDragPayload(JSON.stringify({ fromSec: "x", toSec: 2 })),
     null
   );
+});
+
+test("decodeMomentDragPayload rejects a negative fromSec", () => {
+  assert.equal(
+    decodeMomentDragPayload(JSON.stringify({ fromSec: -1, toSec: 2 })),
+    null
+  );
+});
+
+test("decodeMomentDragPayload rejects a reversed or zero-width span", () => {
+  assert.equal(
+    decodeMomentDragPayload(JSON.stringify({ fromSec: 5, toSec: 2 })),
+    null
+  );
+  assert.equal(
+    decodeMomentDragPayload(JSON.stringify({ fromSec: 5, toSec: 5 })),
+    null
+  );
+});
+
+test("decodeMomentDragPayload rejects a span far wider than any real project (guards the bulk-restore case)", () => {
+  // A forward (fromSec < toSec), non-negative span can still overlap every
+  // word in the project if it is absurdly wide - "reject reversed/negative"
+  // alone would NOT catch this input, since 0 < 1e9 holds.
+  assert.equal(
+    decodeMomentDragPayload(JSON.stringify({ fromSec: 0, toSec: 1e9 })),
+    null
+  );
+});
+
+test("decodeMomentDragPayload accepts a span right at the sanity ceiling", () => {
+  const oneDaySec = 24 * 60 * 60;
+  const decoded = decodeMomentDragPayload(
+    JSON.stringify({ fromSec: 0, toSec: oneDaySec })
+  );
+  assert.deepEqual(decoded, { fromSec: 0, toSec: oneDaySec });
 });
 
 test("MOMENT_DRAG_MIME is the custom dataTransfer type", () => {
