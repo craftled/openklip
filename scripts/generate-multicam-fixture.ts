@@ -246,8 +246,7 @@ function parseArgs(argv: string[]): {
 
   const durationSec =
     durIdx === -1 ? DEFAULT_DURATION_SEC : Number(argv[durIdx + 1]);
-  const segments =
-    segIdx === -1 ? DEFAULT_SEGMENTS : Number(argv[segIdx + 1]);
+  const segments = segIdx === -1 ? DEFAULT_SEGMENTS : Number(argv[segIdx + 1]);
 
   if (Number.isNaN(durationSec) || durationSec <= 0) {
     throw new Error("--duration requires a positive number");
@@ -310,12 +309,20 @@ function printNextSteps(files: GeneratedCamFiles): void {
   if (files.wide) {
     console.log(`  ${files.wide}`);
   }
-  console.log(`\nDuration: ${files.durationSec}s per file (${files.segments} alternating tone segments)`);
+  console.log(
+    `\nDuration: ${files.durationSec}s per file (${files.segments} alternating tone segments)`
+  );
   console.log("\nManual cam-mix:");
   console.log("  export OPENKLIP_PROJECTS_ROOT=~/Movies/OpenKlip");
-  console.log("  openklip ingest --blank --slug multicam-accept --duration 1 --force");
-  console.log(`  openklip cam-add multicam-accept ${files.speakerA} --id a --name "Speaker A"`);
-  console.log(`  openklip cam-add multicam-accept ${files.speakerB} --id b --name "Speaker B"`);
+  console.log(
+    "  openklip ingest --blank --slug multicam-accept --duration 1 --force"
+  );
+  console.log(
+    `  openklip cam-add multicam-accept ${files.speakerA} --id a --name "Speaker A"`
+  );
+  console.log(
+    `  openklip cam-add multicam-accept ${files.speakerB} --id b --name "Speaker B"`
+  );
   if (files.wide) {
     console.log(
       `  openklip cam-add multicam-accept ${files.wide} --id wide --role wide --name "Wide"`
@@ -358,7 +365,9 @@ if (import.meta.main) {
       });
     }
   } catch (err) {
-    console.error(`error: ${err instanceof Error ? err.message : String(err)}\n`);
+    console.error(
+      `error: ${err instanceof Error ? err.message : String(err)}\n`
+    );
     printUsage();
     process.exit(1);
   }
