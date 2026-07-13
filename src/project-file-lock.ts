@@ -22,12 +22,20 @@ export const PROJECT_LOCK_STALE_MS = 10_000;
  *  - the lock is free (no file) and is created successfully, or
  *  - the existing lock's mtime is older than LOCK_STALE_MS (crashed holder)
  *    and is removed (once), or
- *  - LOCK_TIMEOUT_MS elapses, in which case an error is thrown with the
- *    message: "timed out waiting for the project.json lock: <lockPath>"
+ *  - `timeoutMs` elapses (default PROJECT_LOCK_TIMEOUT_MS, right for the
+ *    sub-second project.json read-modify-write this was built for), in which
+ *    case an error is thrown with the message: "timed out waiting for the
+ *    project.json lock: <lockPath>". A holder whose own work can legitimately
+ *    take longer (e.g. buildMomentIndex's CLIP spawn) should pass a longer
+ *    override so a second, patiently-waiting caller isn't given a spurious
+ *    timeout while the first is still genuinely working, not stuck.
  *
  * Callers must release the lock with `unlink(lockPath)` in a finally block. */
-export async function acquireProjectFileLock(lockPath: string): Promise<void> {
-  const deadline = Date.now() + PROJECT_LOCK_TIMEOUT_MS;
+export async function acquireProjectFileLock(
+  lockPath: string,
+  timeoutMs: number = PROJECT_LOCK_TIMEOUT_MS
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
   let brokeStale = false;
   for (;;) {
     try {

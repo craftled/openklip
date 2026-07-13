@@ -202,7 +202,11 @@ const index = {
   ).toString("base64"),
 };
 
-const tmpPath = `${outJson}.tmp`;
+// pid-suffixed so two of these processes writing the same outJson (the
+// caller's own lock should already prevent that - see withMomentIndexLock /
+// acquireProjectFileLock in src/moment-search.ts - this is defense in depth,
+// not the only safeguard) can never collide on the same tmp path.
+const tmpPath = `${outJson}.${process.pid}.tmp`;
 writeFileSync(tmpPath, JSON.stringify(index));
 renameSync(tmpPath, outJson);
 console.error(`[embed] ${files.length} frame(s) -> ${outJson}`);

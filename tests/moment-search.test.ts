@@ -631,6 +631,47 @@ test("buildMomentIndex skips with current when an up-to-date index already exist
   });
 });
 
+test("buildMomentIndex serializes two concurrent calls for the same slug (both see the same already-current index, neither spawns)", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const framesDir = projectPaths(slug).frames;
+    mkdirSync(framesDir, { recursive: true });
+    writeFileSync(join(framesDir, "0001.jpg"), "fake");
+
+    const index = makeIndex({
+      dim: 2,
+      frames: [{ name: "0001.jpg", atSec: 0 }],
+      vectorsB64: encodeVectors(new Float32Array([1, 0])),
+    });
+    writeFileSync(momentIndexPath(slug), JSON.stringify(index));
+
+    // Both calls race for withMomentIndexLock/acquireProjectFileLock; each
+    // re-checks frame/index staleness fresh AFTER acquiring its turn, so
+    // whichever runs second sees the (unchanged) already-current index and
+    // also skips - neither ever reaches the spawn. If this ran unlocked, the
+    // two calls racing readIndexFile()/writeFileSync(tmpPath) is exactly the
+    // hazard this fix closes (see the review finding this test guards).
+    const [a, b] = await Promise.all([
+      buildMomentIndex(slug),
+      buildMomentIndex(slug),
+    ]);
+    for (const result of [a, b]) {
+      assert.equal(result.built, false);
+      assert.equal(result.skippedReason, "current");
+      assert.equal(result.frameCount, 1);
+    }
+  });
+});
+
+test("buildMomentIndex releases its cross-process lockfile after finishing", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const result = await buildMomentIndex(slug);
+    assert.equal(result.skippedReason, "no-frames");
+    assert.equal(existsSync(`${momentIndexPath(slug)}.lock`), false);
+  });
+});
+
 // ── Integration: real embed.mjs + ffmpeg-generated solid-color frames ────
 // Opt-in like the rest of the repo's networked/real-binary smokes: needs
 // ffmpeg to synthesize frames AND a live download of the CLIP weights on

@@ -6,9 +6,12 @@
 // it is unit-testable without a project on disk; those two functions are the
 // Bun-side IO boundary that spawns src/embed.mjs under Node.
 import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { unlink } from "node:fs/promises";
 import type { Project } from "./edl.ts";
 import { projectPaths } from "./paths.ts";
 import { normalizeText } from "./phrase-match.ts";
+import { acquireProjectFileLock } from "./project-file-lock.ts";
+import { withMomentIndexLock } from "./project-lock.ts";
 import { embedScriptPath } from "./script-paths.ts";
 
 // frameNameForTime (the inverse of frameTimeSec) lives in its own fs-free
@@ -514,57 +517,111 @@ export interface BuildMomentIndexResult {
   skippedReason?: "current" | "no-frames";
 }
 
+// Generous kill-timeout for the index-build spawn: a first-time run pays a
+// one-time CLIP model download (~150MB) on top of embedding every frame, so
+// this has to tolerate a slow connection and a large frame set, not just a
+// hung process. Chosen well above realistic legitimate durations so it only
+// ever fires on a genuinely wedged child.
+export const MOMENT_INDEX_BUILD_TIMEOUT_MS = 600_000;
+
+// How long a SECOND caller (a different request, CLI invocation, or agent)
+// waits for the cross-process file lock below before giving up. Must exceed
+// MOMENT_INDEX_BUILD_TIMEOUT_MS: a waiter timing out before the current
+// build's own kill-timeout can even fire would be a spurious failure, not a
+// real problem (the first build is still legitimately allowed to be running).
+const MOMENT_INDEX_LOCK_WAIT_MS = MOMENT_INDEX_BUILD_TIMEOUT_MS + 60_000;
+
 // Skip (without spawning) when there are no frames to index, or when an
 // existing sidecar is already current for the present frame list and model.
 // Otherwise spawn src/embed.mjs under Node (mirrors transcribeToWords in
 // src/ingest.ts) to (re)build the sidecar atomically.
-export async function buildMomentIndex(
+//
+// Locked two ways, mirroring mutateProject in src/projectStore.ts exactly:
+// withMomentIndexLock serializes calls within this process (multiple
+// requests hitting the same server), and the O_CREAT|O_EXCL lockfile from
+// src/project-file-lock.ts serializes across processes (the CLI, the MCP
+// server, and the web server can all call this for the same slug - see that
+// module's own header for why this class of hazard needs both layers).
+// Because the frame/staleness check happens fresh INSIDE the lock, a second
+// caller that queues behind an in-flight build simply sees the just-built
+// index as current and skips, instead of racing a duplicate spawn against
+// the same output path.
+export function buildMomentIndex(
   slug: string,
   opts: BuildMomentIndexOptions = {}
 ): Promise<BuildMomentIndexResult> {
-  const paths = projectPaths(slug);
-  const indexPath = momentIndexPath(slug);
-  const frameNames = listFrameFileNames(paths.frames);
-  if (frameNames.length === 0) {
-    return {
-      built: false,
-      skippedReason: "no-frames",
-      frameCount: 0,
-      model: MOMENT_MODEL,
-      path: indexPath,
-    };
-  }
+  return withMomentIndexLock(slug, async () => {
+    const paths = projectPaths(slug);
+    const indexPath = momentIndexPath(slug);
+    const lockPath = `${indexPath}.lock`;
+    await acquireProjectFileLock(lockPath, MOMENT_INDEX_LOCK_WAIT_MS);
+    try {
+      const frameNames = listFrameFileNames(paths.frames);
+      if (frameNames.length === 0) {
+        return {
+          built: false,
+          skippedReason: "no-frames",
+          frameCount: 0,
+          model: MOMENT_MODEL,
+          path: indexPath,
+        };
+      }
 
-  if (!opts.force) {
-    const existing = readIndexFile(indexPath);
-    if (existing && indexIsCurrent(existing, frameNames, MOMENT_MODEL)) {
+      if (!opts.force) {
+        const existing = readIndexFile(indexPath);
+        if (existing && indexIsCurrent(existing, frameNames, MOMENT_MODEL)) {
+          return {
+            built: false,
+            skippedReason: "current",
+            frameCount: existing.frames.length,
+            model: existing.model,
+            path: indexPath,
+          };
+        }
+      }
+
+      const proc = Bun.spawn(
+        [
+          "node",
+          embedScriptPath(),
+          "index",
+          paths.frames,
+          indexPath,
+          MOMENT_MODEL,
+        ],
+        { stdout: "inherit", stderr: "inherit" }
+      );
+      const killTimer = setTimeout(
+        () => proc.kill(),
+        MOMENT_INDEX_BUILD_TIMEOUT_MS
+      );
+      let exitCode: number;
+      try {
+        exitCode = await proc.exited;
+      } finally {
+        clearTimeout(killTimer);
+      }
+      if (exitCode !== 0) {
+        throw new Error("moment index build failed");
+      }
+      const built = readIndexFile(indexPath);
+      if (!built) {
+        throw new Error("moment index build did not produce an index file");
+      }
       return {
-        built: false,
-        skippedReason: "current",
-        frameCount: existing.frames.length,
-        model: existing.model,
+        built: true,
+        frameCount: built.frames.length,
+        model: built.model,
         path: indexPath,
       };
+    } finally {
+      try {
+        await unlink(lockPath);
+      } catch {
+        // Best-effort: a stale-break by another process already removed it.
+      }
     }
-  }
-
-  const proc = Bun.spawn(
-    ["node", embedScriptPath(), "index", paths.frames, indexPath, MOMENT_MODEL],
-    { stdout: "inherit", stderr: "inherit" }
-  );
-  if ((await proc.exited) !== 0) {
-    throw new Error("moment index build failed");
-  }
-  const built = readIndexFile(indexPath);
-  if (!built) {
-    throw new Error("moment index build did not produce an index file");
-  }
-  return {
-    built: true,
-    frameCount: built.frames.length,
-    model: built.model,
-    path: indexPath,
-  };
+  });
 }
 
 export interface EmbedQueryResult {
