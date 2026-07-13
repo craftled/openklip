@@ -5,9 +5,11 @@ import { join } from "node:path";
 import { test } from "node:test";
 import {
   analyzeSilences,
+  computeAudioAnalysis,
   loadAudioAnalysis,
   readPcm,
 } from "../src/audio-analysis.ts";
+import { mergeSilenceSpans } from "../src/audio-analysis-core.ts";
 import { projectPaths } from "../src/paths.ts";
 import {
   makeProject,
@@ -115,6 +117,19 @@ test("analyzeSilences: minSilenceMs filters out short dips", () => {
 
   const kept = analyzeSilences(pcm, { minSilenceMs: 50 });
   assert.equal(kept.length, 1, "100ms dip should survive a 50ms minimum");
+});
+
+test("mergeSilenceSpans: merges overlapping and adjacent spans", () => {
+  const merged = mergeSilenceSpans([
+    { startSec: 1, endSec: 2 },
+    { startSec: 1.8, endSec: 3 },
+    { startSec: 4, endSec: 5 },
+  ]);
+  assert.equal(merged.length, 2);
+  assert.equal(merged[0].startSec, 1);
+  assert.equal(merged[0].endSec, 3);
+  assert.equal(merged[1].startSec, 4);
+  assert.equal(merged[1].endSec, 5);
 });
 
 // ── readPcm ──────────────────────────────────────────────────────────────
@@ -301,5 +316,51 @@ test("loadAudioAnalysis: a stale source mtime forces recomputation", async () =>
     // poisoned value.
     const onDisk = JSON.parse(await readFile(cachePath(slug), "utf8"));
     assert.deepEqual(onDisk.silences, first.silences);
+  });
+});
+
+test("computeAudioAnalysis: reports chunked progress for multi-step analysis", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject());
+    const pcm = toneAndSilencePcm();
+    writeFileSync(
+      projectPaths(slug).audioRaw,
+      Buffer.from(pcm.buffer, pcm.byteOffset, pcm.byteLength)
+    );
+
+    const progress: { message: string; step: number; total: number }[] = [];
+    await computeAudioAnalysis(slug, {}, (p) => {
+      progress.push({ message: p.message, step: p.step, total: p.total });
+    });
+    assert.ok(progress.some((p) => /Merging silence spans/.test(p.message)));
+    assert.ok(progress.some((p) => /Writing cache/.test(p.message)));
+    assert.ok(progress.at(-1)?.step === progress.at(-1)?.total);
+  });
+});
+
+test("computeAudioAnalysis: chunked path matches full-file silences at chunk seams", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject());
+    const pcm = concatPcm([tonePcm(118), new Float32Array(SR * 2), tonePcm(5)]);
+    writeFileSync(
+      projectPaths(slug).audioRaw,
+      Buffer.from(pcm.buffer, pcm.byteOffset, pcm.byteLength)
+    );
+
+    const fullSpans = analyzeSilences(pcm);
+    const chunked = await computeAudioAnalysis(slug);
+    assert.equal(chunked.silences.length, fullSpans.length);
+    const tolerance = 0.08;
+    for (let i = 0; i < fullSpans.length; i++) {
+      assert.ok(
+        Math.abs(chunked.silences[i].startSec - fullSpans[i].startSec) <=
+          tolerance,
+        `start drift at ${i}: full=${fullSpans[i].startSec} chunked=${chunked.silences[i].startSec}`
+      );
+      assert.ok(
+        Math.abs(chunked.silences[i].endSec - fullSpans[i].endSec) <= tolerance,
+        `end drift at ${i}: full=${fullSpans[i].endSec} chunked=${chunked.silences[i].endSec}`
+      );
+    }
   });
 });

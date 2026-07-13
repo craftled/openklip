@@ -153,6 +153,8 @@ export interface UseEditorConfigPanelParams {
   selection: SelectionDerived;
   selRange: readonly [number, number] | null;
   setSelected: ConfigEditTabProps["setSelected"];
+  silencesLoading?: boolean;
+  silencesProgress?: ConfigCleanupTabProps["silencesProgress"];
   stillAssets: ConfigEditTabProps["stillAssets"];
   timelineCallbacks: UseConfigPanelParams["timelineCallbacks"];
   titlePos: ConfigEditTabProps["titlePos"];
@@ -179,6 +181,8 @@ export function useEditorConfigPanel(
     chosenStillAsset,
     cleanupActions,
     cleanupReport,
+    silencesLoading,
+    silencesProgress,
     clearSelection,
     color,
     curSec,
@@ -358,6 +362,8 @@ export function useEditorConfigPanel(
         startSec: span.startSample / project.sampleRate,
       })),
       report: cleanupReport,
+      silencesLoading,
+      silencesProgress,
       slug: project.slug,
       ...cleanupActions,
     },

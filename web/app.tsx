@@ -325,7 +325,11 @@ export function App({
     [project.assets]
   );
   const cleanupTabActive = sidebarView === "config" && configTab === "cleanup";
-  const { silences: hydratedSilences } = useCleanupSilences({
+  const {
+    silences: hydratedSilences,
+    silencesLoading,
+    silencesProgress,
+  } = useCleanupSilences({
     slug: project.slug,
     enabled: cleanupTabActive,
     projectSilences: project.silences,
@@ -696,6 +700,8 @@ export function App({
       onUndoLast: undoLastCleanup,
     },
     cleanupReport: cleanupReportView,
+    silencesLoading,
+    silencesProgress,
     clearSelection: clearSel,
     color,
     curSec,

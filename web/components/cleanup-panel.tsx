@@ -14,7 +14,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useCleanupAiPass } from "@/hooks/use-cleanup-ai-pass";
-import type { CleanupPeaksResponse } from "@/hooks/use-cleanup-tab-data";
+import type {
+  CleanupPeaksResponse,
+  CleanupSilencesProgress,
+} from "@/hooks/use-cleanup-tab-data";
 import { deadAirCandidatesFromReport } from "@/lib/cleanup-silence";
 import {
   CATEGORY_CARD_META,
@@ -411,6 +414,8 @@ export interface CleanupPanelProps {
   peaksOverride?: CleanupPeaksResponse | null;
   registeredSpans?: RegisteredDeadAirSpan[];
   report: CleanupReport;
+  silencesLoading?: boolean;
+  silencesProgress?: CleanupSilencesProgress | null;
   slug: string;
 }
 
@@ -437,6 +442,8 @@ export function CleanupPanel({
   peaksOverride,
   registeredSpans,
   report,
+  silencesLoading,
+  silencesProgress,
   slug,
 }: CleanupPanelProps) {
   const [aiCandidates, setAiCandidates] =
@@ -550,6 +557,8 @@ export function CleanupPanel({
         peaksOverride={peaksOverride}
         report={report}
         selectedCandidate={selectedDeadAirCandidate}
+        silencesLoading={silencesLoading}
+        silencesProgress={silencesProgress}
         slug={slug}
       />
 

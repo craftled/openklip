@@ -568,3 +568,18 @@ test("hydrated silences remove the degraded dead-air warning from the report", (
   });
   assert.doesNotMatch(html, /dead-air detection needs audio analysis/i);
 });
+
+test("silence card shows hydration progress while silences load", () => {
+  const html = renderPanel({
+    silencesLoading: true,
+    silencesProgress: {
+      message: "Reading audio chunk 2/4",
+      phase: "reading",
+      step: 2,
+      total: 5,
+    },
+  });
+  assert.match(html, /data-cleanup-silences-progress/);
+  assert.match(html, /Reading audio chunk 2\/4/);
+  assert.match(html, /\(2\/5\)/);
+});

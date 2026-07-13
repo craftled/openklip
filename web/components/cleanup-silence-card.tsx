@@ -7,6 +7,7 @@ import { ElasticSlider } from "@/components/elastic-slider";
 import { Button } from "@/components/ui/button";
 import {
   type CleanupPeaksResponse,
+  type CleanupSilencesProgress,
   useCleanupPeaks,
 } from "@/hooks/use-cleanup-tab-data";
 import {
@@ -60,6 +61,8 @@ export interface CleanupSilenceCardProps {
   peaksOverride?: CleanupPeaksResponse | null;
   report: CleanupReport;
   selectedCandidate: CleanupCandidate | null;
+  silencesLoading?: boolean;
+  silencesProgress?: CleanupSilencesProgress | null;
   slug: string;
 }
 
@@ -70,6 +73,8 @@ export function CleanupSilenceCard({
   peaksOverride,
   report,
   selectedCandidate,
+  silencesLoading = false,
+  silencesProgress = null,
   slug,
 }: CleanupSilenceCardProps) {
   const deadAirCandidates = useMemo(
@@ -99,6 +104,18 @@ export function CleanupSilenceCard({
             report.config.keepPadSec
           )}
         </p>
+        {silencesLoading || silencesProgress ? (
+          <p
+            className="text-muted-foreground text-xs"
+            data-cleanup-silences-progress
+          >
+            {silencesProgress?.message ??
+              "Analyzing silences for dead-air detection…"}
+            {silencesProgress
+              ? ` (${silencesProgress.step}/${silencesProgress.total})`
+              : null}
+          </p>
+        ) : null}
       </div>
 
       <div className="flex flex-col gap-2">
