@@ -1,18 +1,20 @@
 import { test } from "bun:test";
 import assert from "node:assert/strict";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { camMix } from "../src/cam-mix.ts";
 import type { PlanSpan } from "../src/cam-plan.ts";
 import { DEFAULT_CAM_SWITCH_SETTINGS } from "../src/cam-plan.ts";
 import {
+  camMixOrRemix,
   camRemix,
   hasMulticamProvenance,
   resolveCamRemixPlan,
 } from "../src/cam-remix.ts";
-import type { Cam } from "../src/cams.ts";
-import { CamSchema } from "../src/cams.ts";
+import { type Cam, CamSchema, ingestCam } from "../src/cams.ts";
 import { SAMPLE_RATE } from "../src/edl.ts";
-import { camDir, camFile } from "../src/paths.ts";
+import { FFMPEG } from "../src/ffmpeg.ts";
+import { camDir, camFile, projectPaths } from "../src/paths.ts";
 import {
   makeProject,
   withTempProjectsRoot,
@@ -234,5 +236,98 @@ test("hasMulticamProvenance is true only for projects with a multicam block", as
 test("hasMulticamProvenance is false when no project exists", async () => {
   await withTempProjectsRoot(async ({ slug }) => {
     assert.equal(await hasMulticamProvenance(slug), false);
+  });
+});
+
+test("camMixOrRemix calls camMix directly when no multicam provenance exists", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    seedCam(slug, mkCam({ id: "cam1" }));
+    await assert.rejects(() => camMixOrRemix(slug), /at least 2 speaker cams/i);
+  });
+});
+
+test("camMixOrRemix integration: routes to camRemix and preserves a locked override once provenance exists", {
+  timeout: 180_000,
+}, async () => {
+  if (process.env.OPENKLIP_INTEGRATION !== "1") {
+    return;
+  }
+  if (typeof FFMPEG !== "string" || !existsSync(FFMPEG)) {
+    return;
+  }
+
+  await withTempProjectsRoot(async ({ slug }) => {
+    const dir = projectPaths(slug).dir;
+    const videoA = join(dir, "cam-a.mp4");
+    const videoB = join(dir, "cam-b.mp4");
+
+    const lavfiBase = ["-y", "-f", "lavfi", "-i"];
+
+    await Bun.spawn([
+      FFMPEG,
+      ...lavfiBase,
+      "color=c=red:s=320x240:r=30:d=6",
+      "-f",
+      "lavfi",
+      "-i",
+      "sine=frequency=440:sample_rate=48000:duration=6",
+      "-c:v",
+      "libx264",
+      "-pix_fmt",
+      "yuv420p",
+      "-c:a",
+      "aac",
+      "-shortest",
+      videoA,
+    ]).exited;
+
+    await Bun.spawn([
+      FFMPEG,
+      ...lavfiBase,
+      "color=c=blue:s=320x240:r=30:d=6",
+      "-f",
+      "lavfi",
+      "-i",
+      "sine=frequency=880:sample_rate=48000:duration=6",
+      "-c:v",
+      "libx264",
+      "-pix_fmt",
+      "yuv420p",
+      "-c:a",
+      "aac",
+      "-shortest",
+      videoB,
+    ]).exited;
+
+    await ingestCam(slug, videoA, { id: "cam1", name: "Red", force: true });
+    await ingestCam(slug, videoB, { id: "cam2", name: "Blue", force: true });
+
+    await camMix(slug, { mode: "follow" });
+
+    const withLock = await camRemix(slug, {
+      overrides: [{ fromSec: 1, toSec: 3, shot: "cam2" }],
+    });
+    const lockedSpan = withLock.plan.find(
+      (s) =>
+        s.shot === "cam2" &&
+        s.locked === true &&
+        s.fromSample === sec(1) &&
+        s.toSample === sec(3)
+    );
+    assert.ok(lockedSpan, "override is locked after the first camRemix call");
+
+    const result = await camMixOrRemix(slug, { mode: "follow" });
+    const survived = result.plan.find(
+      (s) =>
+        s.shot === "cam2" &&
+        s.locked === true &&
+        s.fromSample === sec(1) &&
+        s.toSample === sec(3)
+    );
+    assert.ok(
+      survived,
+      "locked override survives a plain camMixOrRemix call once provenance exists"
+    );
   });
 });

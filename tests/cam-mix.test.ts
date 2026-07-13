@@ -581,3 +581,86 @@ test("buildCamMixVideoFilter pads missing footage so segment durations stay exac
     "fully covered cam1 span gets no pad"
   );
 });
+
+test("camMix integration: offset/short cam padding renders exact duration via real ffmpeg", {
+  timeout: 180_000,
+}, async () => {
+  if (process.env.OPENKLIP_INTEGRATION !== "1") {
+    return;
+  }
+  if (typeof FFMPEG !== "string" || !existsSync(FFMPEG)) {
+    return;
+  }
+
+  await withTempProjectsRoot(async ({ slug }) => {
+    const dir = projectPaths(slug).dir;
+    const videoA = join(dir, "cam-a.mp4");
+    const videoB = join(dir, "cam-b.mp4");
+
+    await Bun.spawn([
+      FFMPEG,
+      "-y",
+      "-f",
+      "lavfi",
+      "-i",
+      "color=c=blue:s=320x240:r=30:d=12",
+      "-f",
+      "lavfi",
+      "-i",
+      "sine=frequency=440:sample_rate=48000:duration=12",
+      "-c:v",
+      "libx264",
+      "-pix_fmt",
+      "yuv420p",
+      "-c:a",
+      "aac",
+      "-shortest",
+      videoA,
+    ]).exited;
+
+    await Bun.spawn([
+      FFMPEG,
+      "-y",
+      "-f",
+      "lavfi",
+      "-i",
+      "color=c=red:s=320x240:r=30:d=4",
+      "-f",
+      "lavfi",
+      "-i",
+      "sine=frequency=880:sample_rate=48000:duration=4",
+      "-c:v",
+      "libx264",
+      "-pix_fmt",
+      "yuv420p",
+      "-c:a",
+      "aac",
+      "-shortest",
+      videoB,
+    ]).exited;
+
+    await ingestCam(slug, videoA, { id: "cam1", name: "A", force: true });
+    await ingestCam(slug, videoB, {
+      id: "cam2",
+      name: "B",
+      offsetMs: 2000,
+      force: true,
+    });
+
+    const plan = [
+      { fromSample: 0, toSample: sec(4), shot: "cam2" },
+      { fromSample: sec(4), toSample: sec(8), shot: "cam2" },
+      { fromSample: sec(8), toSample: sec(12), shot: "cam1" },
+    ];
+
+    const result = await camMix(slug, { mode: "follow", plan });
+    const sourcePath = result.sourcePath;
+    assert.ok(existsSync(sourcePath));
+
+    const meta = await probe(sourcePath);
+    assert.ok(
+      Math.abs(meta.durationSec - 12) < 0.15,
+      `expected ~12s output (padding keeps segments exact), got ${meta.durationSec}s`
+    );
+  });
+});

@@ -30,6 +30,9 @@ jobs:
       - name: Unit tests
         run: bun run test
 
+      - name: Multicam ffmpeg integration tests
+        run: OPENKLIP_INTEGRATION=1 bun test --isolate tests/cam-mix.test.ts tests/cam-remix.test.ts -t integration
+
       - name: Agent loop smoke audit
         run: bun run agent-smoke-audit
 
