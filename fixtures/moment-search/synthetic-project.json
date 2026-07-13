@@ -1,0 +1,113 @@
+{
+  "slug": "moment-benchmark",
+  "description": "Synthetic project for deterministic moment-search benchmarks: transcript words plus scene-log segments aligned to four-scene and uniform visual indexes.",
+  "sceneLog": {
+    "analyzedAt": "2026-07-13T00:00:00.000Z",
+    "segments": [
+      {
+        "fromSec": 0,
+        "toSec": 6,
+        "summary": "solid blue color fill"
+      },
+      {
+        "fromSec": 18,
+        "toSec": 24,
+        "summary": "SMPTE stripes test pattern"
+      },
+      {
+        "fromSec": 36,
+        "toSec": 42,
+        "summary": "fractal mandelbrot zoom animation"
+      },
+      {
+        "fromSec": 42,
+        "toSec": 48,
+        "summary": "poolside patio with laptop in summer backyard"
+      },
+      {
+        "fromSec": 54,
+        "toSec": 60,
+        "summary": "dark black frame with no visible subject"
+      }
+    ]
+  },
+  "words": [
+    {
+      "id": "w0",
+      "text": "Welcome",
+      "startSec": 1,
+      "endSec": 1.5,
+      "deleted": false
+    },
+    {
+      "id": "w1",
+      "text": "to",
+      "startSec": 1.5,
+      "endSec": 1.8,
+      "deleted": false
+    },
+    {
+      "id": "w2",
+      "text": "the",
+      "startSec": 1.8,
+      "endSec": 2,
+      "deleted": false
+    },
+    {
+      "id": "w3",
+      "text": "demo",
+      "startSec": 2,
+      "endSec": 2.5,
+      "deleted": false
+    },
+    {
+      "id": "w4",
+      "text": "design",
+      "startSec": 12,
+      "endSec": 12.6,
+      "deleted": false
+    },
+    {
+      "id": "w5",
+      "text": "feedback",
+      "startSec": 12.6,
+      "endSec": 13.2,
+      "deleted": false
+    },
+    {
+      "id": "w6",
+      "text": "session",
+      "startSec": 13.2,
+      "endSec": 13.8,
+      "deleted": false
+    },
+    {
+      "id": "w7",
+      "text": "canvas",
+      "startSec": 24,
+      "endSec": 24.5,
+      "deleted": false
+    },
+    {
+      "id": "w8",
+      "text": "design",
+      "startSec": 24.5,
+      "endSec": 25,
+      "deleted": false
+    },
+    {
+      "id": "w9",
+      "text": "you",
+      "startSec": 30,
+      "endSec": 30.3,
+      "deleted": true
+    },
+    {
+      "id": "w10",
+      "text": "know",
+      "startSec": 30.3,
+      "endSec": 30.6,
+      "deleted": true
+    }
+  ]
+}

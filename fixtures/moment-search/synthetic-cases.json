@@ -1,0 +1,130 @@
+{
+  "slug": "moment-benchmark",
+  "description": "Deterministic moment-search cases over synthetic-project.json. Scene cases pass queryVector directly into searchScenes (no CLIP spawn). Text cases use grepMomentTextMatches.",
+  "cases": [
+    {
+      "id": "text-design-feedback-kept",
+      "kind": "text",
+      "query": "design feedback",
+      "expectedMatches": [
+        {
+          "fromSec": 12,
+          "toSec": 13.2,
+          "cut": false,
+          "text": "design feedback"
+        }
+      ]
+    },
+    {
+      "id": "text-canvas-design-kept",
+      "kind": "text",
+      "query": "canvas design",
+      "expectedMatches": [
+        {
+          "fromSec": 24,
+          "toSec": 25,
+          "cut": false,
+          "text": "canvas design"
+        }
+      ]
+    },
+    {
+      "id": "text-you-know-cut",
+      "kind": "text",
+      "query": "you know",
+      "expectedMatches": [
+        {
+          "fromSec": 30,
+          "toSec": 30.6,
+          "cut": true,
+          "text": "you know"
+        }
+      ]
+    },
+    {
+      "id": "text-no-match",
+      "kind": "text",
+      "query": "quantum entanglement",
+      "expectedMatches": []
+    },
+    {
+      "id": "scene-blue-localized",
+      "kind": "scene",
+      "index": "four-scene",
+      "query": "xq_visual_probe_alpha",
+      "queryVector": [1, 0],
+      "expectedTop1": {
+        "fromSec": 0,
+        "toSec": 3,
+        "source": "embedding",
+        "minScore": 0.27
+      },
+      "expectedCount": 1
+    },
+    {
+      "id": "scene-bars-localized",
+      "kind": "scene",
+      "index": "four-scene",
+      "query": "xq_bars_visual_probe",
+      "queryVector": [0, 1],
+      "expectedTop1": {
+        "fromSec": 18,
+        "toSec": 21,
+        "source": "embedding",
+        "minScore": 0.27
+      },
+      "expectedCount": 1
+    },
+    {
+      "id": "scene-mandelbrot-localized",
+      "kind": "scene",
+      "index": "four-scene",
+      "query": "xq_mandel_visual_probe",
+      "queryVector": [0.928477, 0.371391],
+      "expectedTop1": {
+        "fromSec": 36,
+        "toSec": 39,
+        "source": "embedding",
+        "minScore": 0.27
+      },
+      "expectedCount": 1
+    },
+    {
+      "id": "scene-blue-summary-blend",
+      "kind": "scene",
+      "index": "four-scene",
+      "query": "solid blue color fill",
+      "queryVector": [1, 0],
+      "expectedTop1": {
+        "fromSec": 0,
+        "toSec": 3,
+        "source": "both",
+        "minScore": 0.27
+      },
+      "expectedCount": 1
+    },
+    {
+      "id": "scene-summary-only",
+      "kind": "scene",
+      "index": "uniform",
+      "query": "poolside patio",
+      "queryVector": [0.24, 0.9701425],
+      "expectedTop1": {
+        "fromSec": 42,
+        "toSec": 48,
+        "source": "summary",
+        "minScore": 0.5
+      },
+      "expectedCount": 1
+    },
+    {
+      "id": "scene-absurd-reject",
+      "kind": "scene",
+      "index": "uniform",
+      "query": "xq_absurd_visual_probe zeta",
+      "queryVector": [0.24, 0.9701425],
+      "expectedCount": 0,
+      "note": "Uniform frames score below DEFAULT_MOMENT_MIN_SCORE (0.26) for this query vector, and the probe string has no scene-log token overlap."
+    }
+  ]
+}
