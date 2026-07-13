@@ -54,7 +54,7 @@ export function EditorPreviewExportButton({
       <button
         aria-busy={busy ? true : undefined}
         className={cn(
-          "flex shrink-0 items-center gap-1 rounded-sm px-1 py-0.5 text-[11px] text-foreground/85 leading-snug transition-colors hover:bg-muted/60 hover:text-foreground active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50",
+          "flex shrink-0 items-center gap-1 rounded-sm px-1 py-0.5 text-[11px] text-foreground/85 leading-snug transition-colors hover:bg-muted/60 hover:text-foreground active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-50",
           className
         )}
         disabled={disabled}

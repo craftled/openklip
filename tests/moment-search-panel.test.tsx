@@ -102,3 +102,25 @@ test("SceneResultCard renders a populated scene match with its summary", () => {
   assert.match(html, /two people laughing at a whiteboard/);
   assert.match(html, /data-moment-to-sec="18"/);
 });
+
+test("the moment result card gives scale-on-press feedback when seeking", () => {
+  const result: MomentSceneResult = {
+    fromSec: 12,
+    toSec: 18,
+    score: 0.31,
+    source: "both",
+    summary: "a card to press",
+  };
+  const html = renderToStaticMarkup(
+    <ul>
+      <SceneResultCard
+        keepMoment={noop}
+        onSeek={noop}
+        result={result}
+        slug="demo"
+      />
+    </ul>
+  );
+  assert.match(html, /active:scale-\[0\.98\]/);
+  assert.match(html, /transition-transform/);
+});

@@ -553,7 +553,7 @@ export function ConfigEditTab({
                         </span>
                         <Button
                           aria-label={`Remove keyframe ${formatKeyframeProperty(kf.property)}`}
-                          className="size-6! shrink-0"
+                          className="shrink-0"
                           onClick={() =>
                             updateGraphic(selGraphic.id, {
                               keyframes: removeKeyframeAt(

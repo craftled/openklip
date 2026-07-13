@@ -53,6 +53,17 @@ function buttonTag(html: string, marker: string): string {
   return html.slice(start, end + 1);
 }
 
+// The full <button>...</button> element (opening tag through children) that
+// carries the given marker attribute, for asserting on icon children.
+function buttonElement(html: string, marker: string): string {
+  const idx = html.indexOf(marker);
+  assert.ok(idx >= 0, `missing ${marker} in markup`);
+  const start = html.lastIndexOf("<button", idx);
+  const closeIdx = html.indexOf("</button>", idx);
+  assert.ok(closeIdx >= 0, `no closing </button> after ${marker}`);
+  return html.slice(start, closeIdx + "</button>".length);
+}
+
 test("two matches render a count and an enabled Cut all with word count", () => {
   const html = renderSearch({ matches: TWO_MATCHES });
   assert.match(html, /2 matches/);
@@ -94,4 +105,21 @@ test("note input is present with an accessible label", () => {
   assert.match(html, /for="transcript-search-note"/);
   assert.match(html, /id="transcript-search-note"/);
   assert.match(html, /Cut note/);
+});
+
+test("match row buttons have an interruptible scale-on-press transform", () => {
+  const html = renderSearch({ matches: TWO_MATCHES });
+  // The exact-value marker (not just the prefix) avoids matching the
+  // enclosing <ul data-transcript-search-matches> wrapper.
+  const tag = buttonTag(html, 'data-transcript-search-match="true"');
+  assert.match(tag, /active:scale-\[0\.98\]/);
+  assert.match(tag, /transition-\[color,background-color,transform\]/);
+});
+
+test("Cut first and Cut all buttons align their Scissors icon inline-start", () => {
+  const html = renderSearch({ matches: TWO_MATCHES });
+  const cutFirst = buttonElement(html, "data-transcript-search-cut-first");
+  const cutAll = buttonElement(html, "data-transcript-search-cut-all");
+  assert.match(cutFirst, /data-icon="inline-start"/);
+  assert.match(cutAll, /data-icon="inline-start"/);
 });

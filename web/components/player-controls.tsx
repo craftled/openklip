@@ -2,6 +2,7 @@
 
 import { type ReactNode, useCallback, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { IconSwap } from "@/components/ui/icon-swap";
 import {
   Captions,
   Maximize,
@@ -204,11 +205,15 @@ export function PlayerControls({
       onClick={(e) => e.stopPropagation()}
     >
       <CtrlButton label={playing ? "Pause" : "Play"} onClick={onPlayToggle}>
-        {playing ? <Pause /> : <Play />}
+        <IconSwap activeKey={playing}>
+          {playing ? <Pause /> : <Play className="translate-x-px" />}
+        </IconSwap>
       </CtrlButton>
 
       <CtrlButton label={muted ? "Unmute" : "Mute"} onClick={onToggleMute}>
-        {muted || volume === 0 ? <VolumeX /> : <Volume2 />}
+        <IconSwap activeKey={muted || volume === 0}>
+          {muted || volume === 0 ? <VolumeX /> : <Volume2 />}
+        </IconSwap>
       </CtrlButton>
 
       {onToggleMusicMute && (
@@ -216,7 +221,7 @@ export function PlayerControls({
           aria-label={musicMuted ? "Unmute music" : "Mute music"}
           aria-pressed={musicMuted}
           className={cn(
-            "size-10 shrink-0 rounded-full text-white/70 fine-hover:hover:bg-white/10 fine-hover:hover:text-white active:scale-[0.97] sm:size-8 [&_svg]:size-4",
+            "size-10 shrink-0 rounded-full text-white/70 fine-hover:hover:bg-white/10 fine-hover:hover:text-white active:scale-[0.96] sm:size-8 [&_svg]:size-4",
             musicMuted && "text-white/40"
           )}
           data-music-mute
@@ -225,7 +230,9 @@ export function PlayerControls({
           type="button"
           variant="ghost"
         >
-          {musicMuted ? <MusicOff /> : <Music />}
+          <IconSwap activeKey={musicMuted}>
+            {musicMuted ? <MusicOff /> : <Music />}
+          </IconSwap>
         </Button>
       )}
 
@@ -299,7 +306,7 @@ export function PlayerControls({
         aria-label="Playback speed"
         className={cn(
           TRANSPORT_NUM,
-          "h-10 min-w-10 rounded-full px-2 py-0 text-white/82 fine-hover:hover:bg-white/10 fine-hover:hover:text-white active:scale-[0.97] sm:h-8 sm:min-w-8 sm:rounded-full sm:px-1.5 sm:py-0 [&_svg]:size-4"
+          "h-10 min-w-10 rounded-full px-2 py-0 text-white/82 fine-hover:hover:bg-white/10 fine-hover:hover:text-white active:scale-[0.96] sm:h-8 sm:min-w-8 sm:rounded-full sm:px-1.5 sm:py-0 [&_svg]:size-4"
         )}
         onClick={onCycleSpeed}
         type="button"
@@ -334,7 +341,9 @@ export function PlayerControls({
         }
         onClick={onFullscreen}
       >
-        {fullscreenActive ? <Minimize /> : <Maximize />}
+        <IconSwap activeKey={fullscreenActive}>
+          {fullscreenActive ? <Minimize /> : <Maximize />}
+        </IconSwap>
       </CtrlButton>
     </div>
   );
@@ -356,7 +365,7 @@ export function CtrlButton({
       aria-label={label}
       aria-pressed={active}
       className={cn(
-        "size-10 shrink-0 rounded-full text-white/70 fine-hover:hover:bg-white/10 fine-hover:hover:text-white active:scale-[0.97] sm:size-8 [&_svg]:size-4",
+        "size-10 shrink-0 rounded-full text-white/70 fine-hover:hover:bg-white/10 fine-hover:hover:text-white active:scale-[0.96] sm:size-8 [&_svg]:size-4",
         active && "bg-white/10 text-white"
       )}
       onClick={onClick}

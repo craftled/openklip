@@ -18,6 +18,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { IconSwap } from "@/components/ui/icon-swap";
 import { Input } from "@/components/ui/input";
 import {
   SidebarMenuAction,
@@ -133,13 +134,23 @@ export function ChatListItem({
             onClick={onSelect}
             size="sm"
           >
-            {inProgress ? (
-              <ChatProgressIndicator />
-            ) : isChatThreadCompleted(thread) ? (
-              <ChatCompletedIndicator />
-            ) : (
-              <MessageSquare className={APP_ICON_CLASS} />
-            )}
+            <IconSwap
+              activeKey={
+                inProgress
+                  ? "progress"
+                  : isChatThreadCompleted(thread)
+                    ? "done"
+                    : "idle"
+              }
+            >
+              {inProgress ? (
+                <ChatProgressIndicator />
+              ) : isChatThreadCompleted(thread) ? (
+                <ChatCompletedIndicator />
+              ) : (
+                <MessageSquare className={APP_ICON_CLASS} />
+              )}
+            </IconSwap>
             <span className="min-w-0 flex-1 truncate">{thread.title}</span>
             <span className="shrink-0 text-muted-foreground/58 text-xs tabular-nums">
               {timeLabel}

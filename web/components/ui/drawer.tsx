@@ -48,7 +48,7 @@ function DrawerContent({
       <DrawerPrimitive.Viewport className="pointer-events-none fixed inset-0 z-50 flex items-end justify-center">
         <DrawerPrimitive.Popup
           className={cn(
-            "group/drawer-content data-closed:slide-out-to-bottom data-open:slide-in-from-bottom pointer-events-auto flex max-h-[80vh] w-full flex-col rounded-t-xl border-t bg-popover text-popover-foreground text-sm data-closed:animate-out data-open:animate-in",
+            "group/drawer-content data-closed:slide-out-to-bottom data-open:slide-in-from-bottom pointer-events-auto flex max-h-[80vh] w-full flex-col rounded-t-xl border-t bg-popover text-popover-foreground text-sm shadow-lg data-closed:animate-out data-open:animate-in",
             className
           )}
           data-slot="drawer-content"

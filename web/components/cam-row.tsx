@@ -4,6 +4,7 @@ import type { Cam, CamRole } from "@engine/cams";
 import { useEffect, useRef, useState } from "react";
 import { MediaAudioVisualizerWave } from "@/components/media-audio-visualizer-wave";
 import { Button } from "@/components/ui/button";
+import { IconSwap } from "@/components/ui/icon-swap";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -125,7 +126,9 @@ export function CamRowView({
             type="button"
             variant="ghost"
           >
-            {playing ? <Pause /> : <Play />}
+            <IconSwap activeKey={playing}>
+              {playing ? <Pause /> : <Play />}
+            </IconSwap>
           </Button>
           <div className="h-6 w-16 overflow-hidden">
             {playing ? (

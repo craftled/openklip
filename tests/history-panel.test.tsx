@@ -259,6 +259,24 @@ test("HistoryList renders an enabled revert affordance for a revertible entry", 
   assert.doesNotMatch(html, /disabled=""/);
 });
 
+// better-ui principle 13 (minimum hit area): RevertButton is a Button
+// size="icon-sm" (28px on desktop, 44px on mobile via the shared responsive
+// scale), but a "size-5" override on the className shrinks it below that
+// baseline. Dropping the override lets the Button's own responsive size
+// apply, restoring the baseline hit area without a pseudo-element.
+test("HistoryList's revert affordance has no size-5 override, so the Button's own responsive icon-sm size applies", () => {
+  const html = renderToStaticMarkup(
+    <HistoryList entries={[older]} snapshotRevisions={[0]} />
+  );
+  const button = html.match(
+    /<button[^>]*aria-label="Revert to before this"[^>]*>/
+  )?.[0];
+  assert.ok(button, "revert button renders");
+  assert.doesNotMatch(button as string, /size-5\b/);
+  assert.match(button as string, /size-11\b/);
+  assert.match(button as string, /sm:size-7\b/);
+});
+
 test("HistoryList disables the revert affordance when no snapshot exists for the entry", () => {
   const html = renderToStaticMarkup(
     <HistoryList entries={[older]} snapshotRevisions={[]} />

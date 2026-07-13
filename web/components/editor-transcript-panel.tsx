@@ -440,7 +440,7 @@ function TranscriptMinuteRail({
           <span className="font-medium text-[10px] leading-none opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
             {marker.minute}m
           </span>
-          <span className="h-px w-3 rounded-full bg-current transition-all group-hover:w-4 group-focus-visible:w-4" />
+          <span className="h-px w-3 rounded-full bg-current transition-[width] group-hover:w-4 group-focus-visible:w-4" />
         </button>
       ))}
     </nav>
@@ -596,7 +596,7 @@ function TranscriptSelectionToolbar({
   return (
     <TooltipProvider>
       <div
-        className="mx-auto mb-3 flex w-full max-w-2xl items-center gap-1.5 rounded-md border bg-background/95 p-1 shadow-sm"
+        className="mx-auto mb-3 flex w-full max-w-2xl items-center gap-1.5 rounded-lg border bg-background/95 p-1 shadow-sm"
         data-transcript-selection-toolbar
       >
         <Badge className="shrink-0" variant="secondary">

@@ -276,3 +276,19 @@ test("cam override form exposes validation error marker", () => {
   );
   assert.doesNotMatch(html, /data-cam-override-error/);
 });
+
+test("add camera control outer radius stays concentric with the inner upload label", () => {
+  const html = renderPanel();
+  const outer = tagWith(html, "data-cam-add", "div");
+  // Outer wraps its content with p-1.5 (6px); the inner upload label is
+  // rounded-md (8px). Concentric outer radius = 8 + 6 = 14px = rounded-xl.
+  assert.match(outer, /rounded-xl/);
+  assert.ok(
+    !outer.includes("rounded-md "),
+    "outer add-cam container should no longer carry the mismatched rounded-md"
+  );
+  assert.match(
+    html,
+    /inline-flex cursor-pointer items-center gap-1\.5 whitespace-nowrap rounded-md border px-2 py-1 text-xs hover:bg-muted\/50/
+  );
+});

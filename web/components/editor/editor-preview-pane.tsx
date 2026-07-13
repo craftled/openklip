@@ -328,7 +328,7 @@ export function EditorPreviewPane({
         </div>
         <div className="flex items-center gap-1.5 px-0.5 pt-1 text-[10px] text-muted-foreground">
           <button
-            className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-full bg-muted px-1 py-px text-[10px] text-muted-foreground leading-none transition-colors hover:bg-muted/80 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            className="relative inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-full bg-muted px-1 py-px text-[10px] text-muted-foreground leading-none transition-colors after:absolute after:inset-x-0 after:-inset-y-2 hover:bg-muted/80 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             onClick={onFocusTranscriptSearch}
             type="button"
           >
@@ -345,7 +345,7 @@ export function EditorPreviewPane({
                 <span>Timeline</span>
               </>
             }
-            triggerClassName="h-auto min-w-0 cursor-pointer gap-1 rounded-full bg-muted px-1 py-px font-normal text-[10px] text-muted-foreground leading-none shadow-none hover:bg-muted/80 hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring sm:h-auto"
+            triggerClassName="relative h-auto min-w-0 cursor-pointer gap-1 rounded-full border-0 bg-muted px-1 py-px font-normal text-[10px] text-muted-foreground leading-none shadow-none transition-colors after:absolute after:inset-x-0 after:-inset-y-2 hover:bg-muted/80 hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring sm:h-auto"
             triggerVariant="ghost"
           />
           <AudioDrawer
@@ -356,14 +356,14 @@ export function EditorPreviewPane({
                 <span>Improve sound</span>
               </>
             }
-            triggerClassName="h-auto min-w-0 cursor-pointer gap-1 rounded-full bg-muted px-1 py-px font-normal text-[10px] text-muted-foreground leading-none shadow-none hover:bg-muted/80 hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring sm:h-auto"
+            triggerClassName="relative h-auto min-w-0 cursor-pointer gap-1 rounded-full border-0 bg-muted px-1 py-px font-normal text-[10px] text-muted-foreground leading-none shadow-none transition-colors after:absolute after:inset-x-0 after:-inset-y-2 hover:bg-muted/80 hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring sm:h-auto"
             triggerVariant="ghost"
           />
           <button
             aria-label={vignetteOn ? "Turn vignette off" : "Turn vignette on"}
             aria-pressed={vignetteOn}
             className={cn(
-              "inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-full px-1 py-px text-[10px] leading-none transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+              "relative inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-full px-1 py-px text-[10px] leading-none transition-colors after:absolute after:inset-x-0 after:-inset-y-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
               vignetteOn
                 ? "bg-foreground/10 text-foreground"
                 : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"

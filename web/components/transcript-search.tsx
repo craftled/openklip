@@ -102,7 +102,7 @@ export function TranscriptSearch({
                 >
                   <button
                     className={cn(
-                      "flex min-w-0 flex-1 items-center gap-2 rounded-sm px-1.5 py-1 text-left font-[450] text-[12px] leading-normal transition-colors hover:bg-muted",
+                      "flex min-w-0 flex-1 items-center gap-2 rounded-sm px-1.5 py-1 text-left font-[450] text-[12px] leading-normal transition-[color,background-color,transform] hover:bg-muted active:scale-[0.98]",
                       index === activeMatchIndex && "bg-accent"
                     )}
                     data-transcript-search-match
@@ -151,7 +151,7 @@ export function TranscriptSearch({
               type="button"
               variant="outline"
             >
-              <Scissors />
+              <Scissors data-icon="inline-start" />
               Cut first ({plural(firstWordCount, "word", "words")})
             </Button>
             <Button
@@ -163,7 +163,7 @@ export function TranscriptSearch({
               type="button"
               variant="outline"
             >
-              <Scissors />
+              <Scissors data-icon="inline-start" />
               Cut all ({plural(allWordCount, "word", "words")})
             </Button>
           </div>

@@ -461,19 +461,27 @@ export function CinemaPlayer({
       <PreviewTransitionNotice message={previewTransitionNoticeText ?? null} />
       <CutTransitionSweep ref={sweepRef} />
 
-      {/* Center play affordance when paused */}
-      {!playing && (
-        <Button
-          aria-label="Play"
-          className="absolute top-1/2 left-1/2 z-20 size-16 -translate-x-1/2 -translate-y-1/2 rounded-full bg-black/40 text-white backdrop-blur-sm fine-hover:hover:scale-105 fine-hover:hover:bg-black/55 active:scale-[0.97]"
-          onClick={togglePlay}
-          size="icon-lg"
-          type="button"
-          variant="ghost"
-        >
-          <Play />
-        </Button>
-      )}
+      {/* Center play affordance when paused — stays mounted and cross-fades so
+          the exit is smooth and interruptible (matches the top-bar chrome). */}
+      <Button
+        aria-hidden={playing}
+        aria-label="Play"
+        className={cn(
+          "absolute top-1/2 left-1/2 z-20 size-16 -translate-x-1/2 -translate-y-1/2 rounded-full bg-black/40 text-white backdrop-blur-sm transition-[opacity,scale,background-color] duration-200 ease-out fine-hover:hover:scale-105 fine-hover:hover:bg-black/55 active:scale-[0.96]",
+          playing
+            ? "pointer-events-none scale-90 opacity-0"
+            : "scale-100 opacity-100"
+        )}
+        onClick={togglePlay}
+        size="icon-lg"
+        tabIndex={playing ? -1 : 0}
+        type="button"
+        variant="ghost"
+      >
+        {/* Optical centering: the play triangle's visual mass sits left of its
+            geometric center, so nudge it right. */}
+        <Play className="translate-x-[1px]" />
+      </Button>
 
       {/* ── Top bar ─────────────────────────────────────────────── */}
       <div
@@ -495,7 +503,7 @@ export function CinemaPlayer({
         <div className="flex shrink-0 items-center gap-1.5">
           {onExport && (
             <Button
-              className="h-8 gap-1.5 rounded-full bg-transparent px-2.5 py-0 font-medium text-[13px] text-white/82 fine-hover:hover:bg-white/10 fine-hover:hover:text-white active:scale-[0.97] disabled:cursor-not-allowed [&_svg]:size-4"
+              className="h-8 gap-1.5 rounded-full bg-transparent px-2.5 py-0 font-medium text-[13px] text-white/82 fine-hover:hover:bg-white/10 fine-hover:hover:text-white active:scale-[0.96] disabled:cursor-not-allowed [&_svg]:size-4"
               disabled={exportDisabled}
               onClick={onExport}
               type="button"
@@ -507,7 +515,7 @@ export function CinemaPlayer({
           )}
           <Button
             aria-label="Close player"
-            className="size-8 rounded-full text-white/62 fine-hover:hover:bg-white/10 fine-hover:hover:text-white active:scale-[0.97] [&_svg]:size-4"
+            className="size-8 rounded-full text-white/62 fine-hover:hover:bg-white/10 fine-hover:hover:text-white active:scale-[0.96] [&_svg]:size-4"
             onClick={onClose}
             size="icon"
             type="button"

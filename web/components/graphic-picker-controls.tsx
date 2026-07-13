@@ -456,7 +456,7 @@ export function GraphicSectionControls({
           </>
         )}
       </p>
-      <div className="space-y-2 rounded-md border border-border/60 p-2">
+      <div className="space-y-2 rounded-2xl border border-border/60 p-2">
         <p className="font-medium text-muted-foreground text-xs">
           <Upload className="mr-1 inline size-3" />
           Upload project-local template

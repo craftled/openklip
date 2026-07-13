@@ -539,6 +539,28 @@ test("selecting a dead-air row switches the silence card selection marker", () =
   assert.match(htmlFirst, /data-cleanup-row-selected/);
 });
 
+test("selectable dead-air rows get a scale-on-press transform, non-selectable filler rows do not", () => {
+  const html = renderPanel({
+    report: report({
+      candidates: [
+        candidate({ id: "f-1", kind: "filler", category: "hesitation" }),
+        deadAirCandidate({ id: "da-1" }),
+      ],
+      categoryCounts: {
+        hesitation: 1,
+        hedging: 0,
+        repeat: 0,
+        "dead-air": 1,
+      },
+    }),
+  });
+  const deadAirRow = tagWith(html, 'data-cleanup-row-kind="dead-air"', "li");
+  assert.match(deadAirRow, /active:scale-\[0\.98\]/);
+  assert.match(deadAirRow, /transition-transform/);
+  const fillerRow = tagWith(html, 'data-cleanup-row-kind="filler"', "li");
+  assert.doesNotMatch(fillerRow, /active:scale/);
+});
+
 test("hydrated silences remove the degraded dead-air warning from the report", () => {
   const project = makeProject({
     words: [

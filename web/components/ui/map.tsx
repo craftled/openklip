@@ -860,9 +860,9 @@ function ControlButton({
     <button
       aria-label={label}
       className={cn(
-        "flex size-8 items-center justify-center transition-all",
+        "flex size-8 items-center justify-center transition-[color,background-color,scale]",
         "first:rounded-t-md last:rounded-b-md",
-        "hover:bg-accent dark:hover:bg-accent/40",
+        "hover:bg-accent active:scale-[0.96] dark:hover:bg-accent/40",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
         "disabled:pointer-events-none disabled:opacity-50"
       )}

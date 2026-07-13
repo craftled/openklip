@@ -45,6 +45,7 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
+import { IconSwap } from "@/components/ui/icon-swap";
 import {
   InputGroup,
   InputGroupAddon,
@@ -1277,7 +1278,7 @@ export const PromptInputSubmit = ({
       variant={variant}
       {...props}
     >
-      {children ?? Icon}
+      {children ?? <IconSwap activeKey={status ?? "idle"}>{Icon}</IconSwap>}
     </InputGroupButton>
   );
 };

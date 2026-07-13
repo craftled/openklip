@@ -110,7 +110,7 @@ export function ChatResizeHandle({
     <button
       aria-label={`Resize chat panel (${Math.round(width)}px)`}
       className={cn(
-        "absolute inset-y-0 left-0 z-20 w-1.5 cursor-col-resize touch-none",
+        "absolute inset-y-0 left-0 z-20 w-1.5 cursor-col-resize touch-none after:absolute after:-inset-x-2 after:inset-y-0",
         "bg-transparent transition-colors hover:bg-foreground/15 active:bg-foreground/25"
       )}
       onKeyDown={onKeyDown}

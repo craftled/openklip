@@ -108,6 +108,51 @@ function fullColor(color: ColorAdjust | null | undefined): ColorAdjust {
   return { ...NEUTRAL_COLOR, ...(color ?? {}) };
 }
 
+// Before/after preview toggle. Pulled out of FilterControls so it can be
+// rendered statically in tests: FilterControls' Dialog only mounts this into
+// a portal once opened (Base UI Dialog does not keep closed content
+// mounted), so the button itself is otherwise unreachable from a static
+// render of the closed dialog trigger.
+export function PreviewToggleButton({
+  comparing,
+  failed,
+  onError,
+  onToggle,
+  src,
+}: {
+  comparing: boolean;
+  failed: boolean;
+  onError: () => void;
+  onToggle: () => void;
+  src: string;
+}) {
+  return (
+    <button
+      aria-label={`Show ${comparing ? "after" : "before"} filter preview`}
+      aria-pressed={comparing}
+      className="relative aspect-video overflow-hidden rounded-md border bg-muted text-left outline-none transition-[background-color,transform] hover:bg-muted/80 focus-visible:ring-3 focus-visible:ring-ring/50 active:scale-[0.98]"
+      onClick={onToggle}
+      type="button"
+    >
+      {failed ? (
+        <div className="flex h-full items-center justify-center px-4 text-center text-muted-foreground text-xs">
+          Preview unavailable (render a proxy first).
+        </div>
+      ) : (
+        // biome-ignore lint/performance/noImgElement: server-rendered single frame, not a Next asset
+        <img
+          alt="Filter preview frame"
+          className="h-full w-full object-cover"
+          height={360}
+          onError={onError}
+          src={src}
+          width={640}
+        />
+      )}
+    </button>
+  );
+}
+
 function isNeutral(c: ColorAdjust): boolean {
   return (
     c.temperature === 0 &&
@@ -247,29 +292,13 @@ export function FilterControls({
         <div className="grid grid-cols-1 gap-6 md:grid-cols-[minmax(0,0.9fr)_minmax(20rem,1fr)]">
           {/* Live preview frame */}
           <div className="flex min-w-0 flex-col gap-3">
-            <button
-              aria-label={`Show ${comparing ? "after" : "before"} filter preview`}
-              aria-pressed={comparing}
-              className="relative aspect-video overflow-hidden rounded-md border bg-muted text-left outline-none transition-colors hover:bg-muted/80 focus-visible:ring-3 focus-visible:ring-ring/50"
-              onClick={toggleCompare}
-              type="button"
-            >
-              {failed ? (
-                <div className="flex h-full items-center justify-center px-4 text-center text-muted-foreground text-xs">
-                  Preview unavailable (render a proxy first).
-                </div>
-              ) : (
-                // biome-ignore lint/performance/noImgElement: server-rendered single frame, not a Next asset
-                <img
-                  alt="Filter preview frame"
-                  className="h-full w-full object-cover"
-                  height={360}
-                  onError={() => setFailed(true)}
-                  src={src}
-                  width={640}
-                />
-              )}
-            </button>
+            <PreviewToggleButton
+              comparing={comparing}
+              failed={failed}
+              onError={() => setFailed(true)}
+              onToggle={toggleCompare}
+              src={src}
+            />
             <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_9rem] md:grid-cols-1 lg:grid-cols-[minmax(0,1fr)_9rem]">
               <ToggleGroup
                 aria-label="Preview comparison"

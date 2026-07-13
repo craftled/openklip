@@ -92,7 +92,7 @@ export function EditorPreviewHeader({
           <button
             aria-label="Open chat"
             className={cn(
-              "flex size-5 shrink-0 items-center justify-center rounded-sm text-muted-foreground/70 transition-colors hover:bg-muted/60 hover:text-foreground active:scale-[0.97] xl:hidden",
+              "flex size-5 shrink-0 items-center justify-center rounded-sm text-muted-foreground/70 transition-colors hover:bg-muted/60 hover:text-foreground active:scale-[0.96] xl:hidden",
               mobileChatOpen && "bg-muted/60 text-foreground"
             )}
             onClick={onOpenChat}

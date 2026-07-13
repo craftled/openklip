@@ -40,7 +40,7 @@ export function EditorPreviewFormatMenu({
       <DropdownMenuTrigger
         aria-label={`Preview format ${ORIENTATION_LABEL[orientation]}`}
         className={cn(
-          "shrink-0 rounded-full bg-muted px-1 py-px text-[10px] text-muted-foreground leading-none transition-colors hover:bg-muted/80 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+          "relative shrink-0 rounded-full bg-muted px-1 py-px text-[10px] text-muted-foreground leading-none transition-colors after:absolute after:inset-x-0 after:-inset-y-2 hover:bg-muted/80 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
           className
         )}
       >

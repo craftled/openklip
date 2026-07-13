@@ -21,6 +21,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { IconSwap } from "@/components/ui/icon-swap";
 import {
   Message,
   MessageAvatar,
@@ -54,22 +55,24 @@ function TaskStepRow({ step }: { step: AgentTask["steps"][number] }) {
       data-task-step={step.id}
     >
       <div className="flex items-center gap-1.5 font-[450] text-[13px] leading-normal">
-        {done ? (
-          <Check aria-hidden className="size-3 shrink-0 text-foreground" />
-        ) : null}
-        {running ? (
-          <IconLoader
-            aria-hidden
-            className="size-3 shrink-0 animate-spin text-primary"
-          />
-        ) : null}
-        {step.status === "pending" ? (
-          <span
-            aria-hidden
-            className="size-3 shrink-0 rounded-full border border-border"
-          />
-        ) : null}
-        {failed ? <X aria-hidden className="size-3 shrink-0" /> : null}
+        <IconSwap activeKey={step.status} className="size-3 shrink-0">
+          {done ? (
+            <Check aria-hidden className="size-3 shrink-0 text-foreground" />
+          ) : null}
+          {running ? (
+            <IconLoader
+              aria-hidden
+              className="size-3 shrink-0 animate-spin text-primary"
+            />
+          ) : null}
+          {step.status === "pending" ? (
+            <span
+              aria-hidden
+              className="size-3 shrink-0 rounded-full border border-border"
+            />
+          ) : null}
+          {failed ? <X aria-hidden className="size-3 shrink-0" /> : null}
+        </IconSwap>
         <span
           className={
             running

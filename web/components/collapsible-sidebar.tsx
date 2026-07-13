@@ -100,17 +100,21 @@ export function CollapsibleSidebarSection({
                 variant="ghost"
               >
                 {showFolderIcon ? (
+                  // Both folder icons stay mounted and cross-fade on open/close
+                  // (better-ui principle 7). No motion state is available here —
+                  // the panel-open state lives in a DOM data attribute — so this
+                  // is the CSS cross-fade: scale 0.25→1, opacity 0→1, blur 4px→0.
                   <span className="relative inline-flex size-4 shrink-0 items-center justify-center">
                     <FolderClosed
                       className={cn(
                         APP_ICON_CLASS,
-                        "group-data-panel-open:hidden"
+                        "absolute inset-0 transition-[opacity,scale,filter] duration-200 ease-[cubic-bezier(0.2,0,0,1)] group-data-panel-open:scale-[0.25] group-data-panel-open:opacity-0 group-data-panel-open:blur-[4px] motion-reduce:transition-none"
                       )}
                     />
                     <FolderOpen
                       className={cn(
-                        "hidden group-data-panel-open:block",
-                        APP_ICON_CLASS
+                        APP_ICON_CLASS,
+                        "absolute inset-0 scale-[0.25] opacity-0 blur-[4px] transition-[opacity,scale,filter] duration-200 ease-[cubic-bezier(0.2,0,0,1)] group-data-panel-open:scale-100 group-data-panel-open:opacity-100 group-data-panel-open:blur-0 motion-reduce:transition-none"
                       )}
                     />
                   </span>

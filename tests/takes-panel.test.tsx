@@ -192,3 +192,20 @@ test("Add take renders its own error separately from assembleError", () => {
   const html = renderPanel({ addTakeError: "take upload failed" });
   assert.match(html, /take upload failed/);
 });
+
+test("take row has an interruptible scale-on-press transform", () => {
+  const html = renderPanel({ takes: [take()] });
+  const rowTag = tagWith(html, "data-takes-row");
+  assert.match(rowTag, /active:scale-\[0\.98\]/);
+  assert.match(rowTag, /transition-\[color,background-color,transform\]/);
+});
+
+test("transcript word chips have a scale-on-press transform", () => {
+  const html = renderPanel({
+    selectedTakeId: "takeA",
+    selectedWords: take().words,
+  });
+  const wordTag = tagWith(html, "data-takes-word");
+  assert.match(wordTag, /active:scale-\[0\.96\]/);
+  assert.match(wordTag, /transition-\[background-color,transform\]/);
+});

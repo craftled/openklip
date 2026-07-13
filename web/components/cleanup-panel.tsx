@@ -233,7 +233,7 @@ function CleanupRow({
       className={cn(
         "flex items-start gap-1.5 rounded border bg-background/50 px-2 py-1",
         selected && "ring-1 ring-ring",
-        selectable && "cursor-pointer"
+        selectable && "cursor-pointer transition-transform active:scale-[0.98]"
       )}
       data-cleanup-ai-row={aiSuggestion ? "" : undefined}
       data-cleanup-row

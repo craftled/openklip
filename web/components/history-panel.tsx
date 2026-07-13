@@ -622,7 +622,7 @@ function RevertButton({
   return (
     <Button
       aria-label={disabled ? disabledLabel : label}
-      className="size-5 shrink-0 rounded-sm text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-40"
+      className="shrink-0 rounded-sm text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-40"
       disabled={disabled || reverting}
       onClick={onArm}
       size="icon-sm"
