@@ -11,14 +11,19 @@ import { join } from "node:path";
 import {
   clearElevenLabsApiKey,
   clearReveApiKey,
+  clearXaiApiKey,
   fetchElevenLabsDetails,
+  fetchXaiVoiceDetails,
   readElevenLabsApiKey,
   readIntegrationsStatus,
   readReveApiKey,
+  readXaiApiKey,
   setElevenLabsApiKey,
   setReveApiKey,
+  setXaiApiKey,
   testElevenLabsApiKey,
   testReveApiKey,
+  testXaiApiKey,
 } from "../src/integrations-config.ts";
 
 const realFetch = globalThis.fetch;
@@ -234,6 +239,125 @@ describe("integrations config", () => {
       ok: false,
       message: "Reve rejected this API key.",
       status: 401,
+    });
+  });
+
+  test("stores xAI keys locally without exposing them in status", async () => {
+    await withTempRepo((root) => {
+      expect(readIntegrationsStatus().xai.hasApiKey).toBe(false);
+
+      const status = setXaiApiKey("  xai-secret  ");
+
+      expect(status.xai.hasApiKey).toBe(true);
+      expect(status.xai.keyPreview).toBe("••••••••cret");
+      expect(readXaiApiKey()).toBe("xai-secret");
+      expect(readIntegrationsStatus()).not.toHaveProperty("xai.apiKey");
+
+      const configPath = join(root, ".openklip", "integrations.json");
+      expect(readFileSync(configPath, "utf8")).toContain("xai-secret");
+    });
+  });
+
+  test("clears saved xAI keys", async () => {
+    await withTempRepo(() => {
+      setXaiApiKey("xai-secret");
+
+      const status = clearXaiApiKey();
+
+      expect(status.xai.hasApiKey).toBe(false);
+      expect(readXaiApiKey()).toBeNull();
+    });
+  });
+
+  test("tests an xAI key against GET /v1/tts/voices", async () => {
+    const calls: Array<{ headers: Headers; url: string }> = [];
+    globalThis.fetch = (async (
+      input: RequestInfo | URL,
+      init?: RequestInit
+    ) => {
+      await Promise.resolve();
+      calls.push({
+        url: String(input),
+        headers: new Headers(init?.headers),
+      });
+      return Response.json({
+        voices: [{ voice_id: "eve", name: "Eve", language: "en" }],
+      });
+    }) as typeof fetch;
+
+    const result = await testXaiApiKey("secret-key");
+
+    expect(result).toEqual({
+      ok: true,
+      message: "xAI accepted this API key.",
+      status: 200,
+    });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url).toBe("https://api.x.ai/v1/tts/voices");
+    expect(calls[0]?.headers.get("authorization")).toBe("Bearer secret-key");
+  });
+
+  test("maps rejected xAI keys to a clear failure", async () => {
+    globalThis.fetch = (async () =>
+      Response.json(
+        { error: "invalid api key" },
+        { status: 401 }
+      )) as typeof fetch;
+
+    const result = await testXaiApiKey("bad-key");
+
+    expect(result).toEqual({
+      ok: false,
+      message: "xAI rejected this API key.",
+      status: 401,
+    });
+  });
+
+  test("fetches xAI voice details without returning secret fields", async () => {
+    await withTempRepo(async () => {
+      setXaiApiKey("saved-key");
+      globalThis.fetch = (async (input: RequestInfo | URL) => {
+        await Promise.resolve();
+        const url = String(input);
+        if (url.endsWith("/v1/api-key")) {
+          return Response.json({
+            redacted_api_key: "xai-...key",
+            name: "OpenKlip dev",
+            api_key_blocked: false,
+            api_key_disabled: false,
+            team_blocked: false,
+          });
+        }
+        if (url.includes("/v1/tts/voices")) {
+          return Response.json({
+            voices: [
+              { voice_id: "eve", name: "Eve", language: "en" },
+              { voice_id: "luna", name: "Luna", language: "en" },
+            ],
+          });
+        }
+        if (url.includes("/v1/custom-voices")) {
+          return Response.json({
+            voices: [{ voice_id: "abc12345", name: "Brand voice" }],
+          });
+        }
+        return Response.json({ error: "unexpected url" }, { status: 500 });
+      }) as typeof fetch;
+
+      const details = await fetchXaiVoiceDetails();
+
+      expect(details).toEqual({
+        apiKeyBlocked: false,
+        apiKeyDisabled: false,
+        apiKeyName: "OpenKlip dev",
+        builtinVoiceCount: 2,
+        customVoiceCount: 1,
+        customVoiceLimit: 30,
+        customVoices: ["Brand voice (abc12345)"],
+        teamBlocked: false,
+        voices: ["Eve (eve)", "Luna (luna)"],
+      });
+      expect(details).not.toHaveProperty("redacted_api_key");
     });
   });
 });

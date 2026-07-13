@@ -44,6 +44,12 @@ const EMPTY_PROVIDER = {
   updatedAt: null,
 };
 
+const EMPTY_STATUS = {
+  elevenLabs: EMPTY_PROVIDER,
+  reve: EMPTY_PROVIDER,
+  xai: EMPTY_PROVIDER,
+};
+
 describe("/api/integrations", () => {
   test("saves and clears ElevenLabs status without returning the key", async () => {
     await withTempRepo(async () => {
@@ -56,6 +62,7 @@ describe("/api/integrations", () => {
           updatedAt: expect.any(String),
         },
         reve: EMPTY_PROVIDER,
+        xai: EMPTY_PROVIDER,
       });
 
       const status = GET();
@@ -66,14 +73,12 @@ describe("/api/integrations", () => {
           updatedAt: expect.any(String),
         },
         reve: EMPTY_PROVIDER,
+        xai: EMPTY_PROVIDER,
       });
 
       const cleared = DELETE(deleteRequest());
       expect(cleared.status).toBe(200);
-      expect(await cleared.json()).toEqual({
-        elevenLabs: EMPTY_PROVIDER,
-        reve: EMPTY_PROVIDER,
-      });
+      expect(await cleared.json()).toEqual(EMPTY_STATUS);
     });
   });
 
@@ -133,7 +138,9 @@ describe("/api/integrations", () => {
         });
       }) as typeof fetch;
 
-      const res = await GET_DETAILS();
+      const res = await GET_DETAILS(
+        new Request("http://localhost/api/integrations/details")
+      );
 
       expect(res.status).toBe(200);
       expect(await res.json()).toEqual({
@@ -177,6 +184,7 @@ describe("/api/integrations", () => {
           keyPreview: expect.any(String),
           updatedAt: expect.any(String),
         },
+        xai: EMPTY_PROVIDER,
       });
 
       const tested = await POST(jsonRequest({ provider: "reve" }));
@@ -185,9 +193,87 @@ describe("/api/integrations", () => {
       expect(seenAuth).toEqual(["Bearer reve-secret"]);
 
       const cleared = DELETE(deleteRequest("reve"));
-      expect(await cleared.json()).toEqual({
+      expect(await cleared.json()).toEqual(EMPTY_STATUS);
+    });
+  });
+
+  test("saves, tests, and clears the xAI key independently", async () => {
+    await withTempRepo(async () => {
+      const seenAuth: string[] = [];
+      globalThis.fetch = (async (input, init) => {
+        await Promise.resolve();
+        expect(String(input)).toBe("https://api.x.ai/v1/tts/voices");
+        seenAuth.push(new Headers(init?.headers).get("authorization") ?? "");
+        return Response.json({ voices: [{ voice_id: "eve", name: "Eve" }] });
+      }) as typeof fetch;
+
+      const saved = await PUT(jsonRequest({ xaiApiKey: "xai-secret" }));
+      expect(await saved.json()).toEqual({
         elevenLabs: EMPTY_PROVIDER,
         reve: EMPTY_PROVIDER,
+        xai: {
+          hasApiKey: true,
+          keyPreview: expect.any(String),
+          updatedAt: expect.any(String),
+        },
+      });
+
+      const tested = await POST(
+        jsonRequest({ provider: "xai", xaiApiKey: "typed-key" })
+      );
+      const testJson = await tested.json();
+      expect(testJson.xai.ok).toBe(true);
+      expect(seenAuth[0]).toBe("Bearer typed-key");
+
+      const cleared = DELETE(deleteRequest("xai"));
+      expect(await cleared.json()).toEqual(EMPTY_STATUS);
+    });
+  });
+
+  test("xAI details route returns normalized voice data", async () => {
+    await withTempRepo(async () => {
+      await PUT(jsonRequest({ xaiApiKey: "saved-key" }));
+      globalThis.fetch = (async (input) => {
+        await Promise.resolve();
+        const url = String(input);
+        if (url.endsWith("/v1/api-key")) {
+          return Response.json({
+            name: "OpenKlip dev",
+            api_key_blocked: false,
+            api_key_disabled: false,
+            team_blocked: false,
+          });
+        }
+        if (url.includes("/v1/tts/voices")) {
+          return Response.json({
+            voices: [
+              { voice_id: "eve", name: "Eve" },
+              { voice_id: "luna", name: "Luna" },
+            ],
+          });
+        }
+        return Response.json({
+          voices: [{ voice_id: "abc12345", name: "Brand voice" }],
+        });
+      }) as typeof fetch;
+
+      const res = await GET_DETAILS(
+        new Request("http://localhost/api/integrations/details?provider=xai")
+      );
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({
+        xai: {
+          apiKeyBlocked: false,
+          apiKeyDisabled: false,
+          apiKeyName: "OpenKlip dev",
+          builtinVoiceCount: 2,
+          customVoiceCount: 1,
+          customVoiceLimit: 30,
+          customVoices: ["Brand voice (abc12345)"],
+          teamBlocked: false,
+          voices: ["Eve (eve)", "Luna (luna)"],
+        },
       });
     });
   });

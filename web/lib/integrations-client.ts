@@ -7,6 +7,7 @@ export interface ProviderKeyStatus {
 export interface IntegrationsStatus {
   elevenLabs: ProviderKeyStatus;
   reve: ProviderKeyStatus;
+  xai: ProviderKeyStatus;
 }
 
 export interface ProviderTestResult {
@@ -32,6 +33,18 @@ export interface ElevenLabsDetails {
   voices: string[];
 }
 
+export interface XaiVoiceDetails {
+  apiKeyBlocked: boolean | null;
+  apiKeyDisabled: boolean | null;
+  apiKeyName: string | null;
+  builtinVoiceCount: number | null;
+  customVoiceCount: number | null;
+  customVoiceLimit: number;
+  customVoices: string[];
+  teamBlocked: boolean | null;
+  voices: string[];
+}
+
 function providerKeyStatus(
   data: Partial<ProviderKeyStatus> | undefined
 ): ProviderKeyStatus {
@@ -46,6 +59,7 @@ function mapStatus(data: Partial<IntegrationsStatus>): IntegrationsStatus {
   return {
     elevenLabs: providerKeyStatus(data.elevenLabs),
     reve: providerKeyStatus(data.reve),
+    xai: providerKeyStatus(data.xai),
   };
 }
 
@@ -103,6 +117,72 @@ export async function testElevenLabsApiKey(
       message: data.elevenLabs?.message ?? "ElevenLabs test did not run.",
       status: data.elevenLabs?.status ?? null,
     },
+  };
+}
+
+export async function saveXaiApiKey(
+  xaiApiKey: string
+): Promise<IntegrationsStatus> {
+  const res = await fetch("/api/integrations", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ xaiApiKey }),
+  });
+  return readStatusResponse(res, "Save integration failed");
+}
+
+export async function clearXaiApiKey(): Promise<IntegrationsStatus> {
+  const res = await fetch("/api/integrations?provider=xai", {
+    method: "DELETE",
+  });
+  return readStatusResponse(res, "Clear integration failed");
+}
+
+export async function testXaiApiKey(
+  xaiApiKey?: string
+): Promise<ProviderTestResult> {
+  const res = await fetch("/api/integrations", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(
+      xaiApiKey?.trim() ? { provider: "xai", xaiApiKey } : { provider: "xai" }
+    ),
+  });
+  const data = (await res.json()) as {
+    xai?: Partial<ProviderTestResult>;
+    error?: string;
+  };
+  if (!res.ok) {
+    throw new Error(data.error ?? `Test integration failed (${res.status})`);
+  }
+  return {
+    ok: data.xai?.ok ?? false,
+    message: data.xai?.message ?? "xAI test did not run.",
+    status: data.xai?.status ?? null,
+  };
+}
+
+export async function fetchXaiVoiceDetails(): Promise<XaiVoiceDetails> {
+  const res = await fetch("/api/integrations/details?provider=xai");
+  const data = (await res.json()) as {
+    xai?: Partial<XaiVoiceDetails>;
+    error?: string;
+  };
+  if (!res.ok) {
+    throw new Error(
+      data.error ?? `Load integration details failed (${res.status})`
+    );
+  }
+  return {
+    apiKeyBlocked: data.xai?.apiKeyBlocked ?? null,
+    apiKeyDisabled: data.xai?.apiKeyDisabled ?? null,
+    apiKeyName: data.xai?.apiKeyName ?? null,
+    builtinVoiceCount: data.xai?.builtinVoiceCount ?? null,
+    customVoiceCount: data.xai?.customVoiceCount ?? null,
+    customVoiceLimit: data.xai?.customVoiceLimit ?? 30,
+    customVoices: data.xai?.customVoices ?? [],
+    teamBlocked: data.xai?.teamBlocked ?? null,
+    voices: data.xai?.voices ?? [],
   };
 }
 
