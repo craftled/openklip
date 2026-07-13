@@ -21,7 +21,7 @@ Re-checked 2026-07-13 after multicam + moment-search + cleanup-parity merged (PR
 - **Test flake:** plain `bun test` (no `--isolate`) can leak `mock.module` stubs across files in one process; see AGENTS.md "Known test flake". `--isolate` gives each test file a fresh global object.
 - **Counts:** 98 MCP tools (`openklip tools --json --surface mcp`; measure via file+parse, not pipe+grep), 54 capabilities (`openklip features --json`), 46 registry actions (`openklip actions --json`). A prior pass recorded 93 tools; that undercounted moment-search and cleanup-parity additions.
 - **Release docs:** `CHANGELOG.md` is authoritative history, `docs/RELEASE-NOTES.md` holds GitHub release bodies, `TODO.md#known-limitations` is the single current gaps list.
-- **Published GitHub releases:** through `v0.41.1.1` (`gh release list`). `v0.41.1.3` is a prepared draft (PR #83 plus local follow-ups), not published until tagged. `v0.42.0.0` is a prepared draft from the three v0.42 feature sets; programmatic multicam acceptance passes via `tests/multicam-acceptance.test.ts` (lavfi twin-cam gate). Real-footage eyeball review is deferred until adoption.
+- **Published GitHub releases:** through `v0.42.0.0` (published 2026-07-13). Counts on `main`: 98 MCP tools, 54 capabilities, 46 registry actions; `bun test --isolate` 2342 pass, 8 skip.
 
 ## Subagent fleet (cost routing)
 

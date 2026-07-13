@@ -2,7 +2,7 @@
 
 Use these bodies when publishing releases. Each section matches a tag in `CHANGELOG.md` without duplicating the full changelog. **Known gaps:** always link to [TODO.md](../TODO.md#known-limitations); do not duplicate the list here.
 
-Publishing status checked on 2026-07-13: GitHub releases published through `v0.41.1.1` (`gh release list`). `v0.41.1.3` is prepared here as a draft from PR #83 plus local follow-ups on `main`; publish it only after pushing, tagging, and verifying the synced `main`. `v0.41.1.2` remains an unpublished prepared docs release. `v0.42.0.0` is prepared here as a draft covering three feature sets that landed together on `main` (contextual cam switch / multicam, moment search, and categorized cleanup). Programmatic multicam acceptance passes via `tests/multicam-acceptance.test.ts`; human eyeball on real per-speaker footage is deferred until adoption.
+Publishing status checked on 2026-07-13: published `v0.41.1.2`, `v0.41.1.3`, and `v0.42.0.0` on GitHub. Multicam programmatic acceptance (`tests/multicam-acceptance.test.ts`) satisfies the v0.42 machinery gate; human eyeball on real per-speaker footage remains deferred.
 
 ---
 
@@ -14,7 +14,7 @@ Publishing status checked on 2026-07-13: GitHub releases published through `v0.4
 - **Contextual cam switch (multicam)**: ingest per-speaker cam files (`openklip cam-add`, up to 8 cams, `speaker`/`wide` roles, manual `--offset`), automatic speaker ID from per-track audio energy (no ML or cloud diarization), and mix down to a switched program with follow-speaker or LLM auto scene modes (`openklip cam-mix`), a synthetic wide shot when no physical wide cam exists, and locked manual overrides (`openklip cam-override`) that survive re-mix. CLI `cam-add` / `cams` / `cam-set` / `cam-mix` / `cam-override`; MCP `cam_add` / `list_cams` / `cam_set` / `cam_mix` / `cam_override`; GUI Config → Project **Cameras** section; `templates/cam-mix/skill.md`. Transcript words gain an optional `speaker` field (the attributed cam id) once a project has been through `cam-mix`.
 - **Moment search: text + scene**: find moments in the source footage by transcript text or visual content. Ingest indexes sample frames with a local CLIP model into `working/moment-index.json` (lazy backfill on older projects, or `openklip index`); a fourth left-rail **Search** tab (Mod+Shift+F) shows text and scene results as thumbnail cards, click seeks, and dragging a card (or its hover **Keep** button) restores any cut words in that span. Same engine on `openklip search <slug> "query"` and the MCP `moment_search` tool.
 - **Categorized cleanup (Cutback parity)**: cleanup candidates now carry a category (hesitation, hedging, repeat, dead-air) via a new deterministic repeated-n-gram detector for immediate repeats and false starts; `cleanup-config` persists category toggles and thresholds to `project.cuts.cleanup`; `cleanup-apply` (CLI `--apply-enabled`) applies enabled categories at any risk plus all dead-air at the configured threshold. A dedicated Cleanup tab in the Config panel adds a real waveform silence card, per-category cards with bulk apply and undo, and an "AI false-start pass" through the subscription agent CLI.
-- **Verification**: `bun run typecheck`, `bun run check`, `bun test --isolate` (2292 pass, 8 skip); 98 MCP tools; 54 capabilities; 46 registry actions.
+- **Verification**: `bun run typecheck`, `bun run check`, `bun test --isolate` (2342 pass, 8 skip); 98 MCP tools; 54 capabilities; 46 registry actions; `bun run multicam-acceptance`.
 
 ### Known gaps
 
