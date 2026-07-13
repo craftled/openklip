@@ -22,17 +22,46 @@ export const FFMPEG =
   process.env.FFMPEG ??
   localBinary("ffmpeg-static", "ffmpeg") ??
   "ffmpeg";
-export const FFPROBE =
-  optionalRequire<{ path?: string }>("ffprobe-static")?.path ??
-  process.env.FFPROBE ??
-  localBinary(
-    "ffprobe-static",
-    "bin",
-    process.platform,
-    process.arch,
-    "ffprobe"
-  ) ??
-  "ffprobe";
+function executableOnHost(bin: string): boolean {
+  if (bin.includes("/") && !existsSync(bin)) {
+    return false;
+  }
+  try {
+    const proc = Bun.spawnSync([bin, "-version"], {
+      stdout: "ignore",
+      stderr: "ignore",
+    });
+    return proc.exitCode === 0;
+  } catch {
+    return false;
+  }
+}
+
+function resolveFfprobe(): string {
+  const candidates = [
+    process.env.FFPROBE,
+    optionalRequire<{ path?: string }>("ffprobe-static")?.path,
+    localBinary(
+      "ffprobe-static",
+      "bin",
+      process.platform,
+      process.arch,
+      "ffprobe"
+    ),
+    "/opt/homebrew/bin/ffprobe",
+    "/usr/local/bin/ffprobe",
+    "ffprobe",
+  ].filter((c): c is string => Boolean(c));
+
+  for (const candidate of candidates) {
+    if (executableOnHost(candidate)) {
+      return candidate;
+    }
+  }
+  return "ffprobe";
+}
+
+export const FFPROBE = resolveFfprobe();
 
 export async function run(
   bin: string,
