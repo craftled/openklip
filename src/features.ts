@@ -116,17 +116,55 @@ const RAW_FEATURES: FeatureDef[] = [
     },
   },
   {
+    id: "moment-search",
+    title: "Moment search: text + scene",
+    description:
+      "Search sidebar tab (Mod+Shift+F) for transcript text and visual moments: local CLIP frame embeddings blended with scene-log summaries. CLI: openklip index and openklip search. MCP: moment_search.",
+    group: "editing",
+    status: "shipped",
+    surfaces: ["cli", "gui", "mcp"],
+    links: {
+      cli: ["index", "search"],
+      tools: ["moment_search"],
+      actions: ["cut"],
+    },
+  },
+  {
     id: "cleanup-review",
     title: "Cleanup review",
     description:
-      "Filler-word and dead-air candidates with safe vs review risk; apply-all-safe batch action.",
+      "Filler cleanup by category (hesitation, hedging, repeat) plus dead-air candidates with persisted minSec/keepPadSec thresholds; apply-all-safe or apply-enabled batch actions.",
     group: "editing",
     status: "shipped",
     surfaces: ["cli", "gui", "mcp"],
     links: {
       cli: ["cleanup"],
       tools: ["cleanup_report"],
-      actions: ["cut", "dead-air-add", "dead-air-rm"],
+      actions: [
+        "cut",
+        "dead-air-add",
+        "dead-air-rm",
+        "cleanup-config",
+        "cleanup-apply",
+      ],
+    },
+  },
+  {
+    id: "cleanup-silence-waveform",
+    title: "Cleanup silence waveform",
+    description:
+      "Silence waveform on the Cleanup tab plus categorized AI cleanup apply: dead-air from audio analysis, peaks API, and batch cleanup-apply with undo-safe created-vs-extended span tracking.",
+    group: "editing",
+    status: "shipped",
+    surfaces: ["cli", "gui", "mcp"],
+    links: {
+      tools: ["cleanup_report"],
+      actions: [
+        "cleanup-apply",
+        "cleanup-config",
+        "dead-air-add",
+        "dead-air-rm",
+      ],
     },
   },
   {

@@ -140,6 +140,21 @@ test("readPcm: throws an actionable error when audio16k.f32 is missing", async (
   });
 });
 
+test("readPcm: the missing-audio error never embeds the absolute filesystem path (info-disclosure guard, this message reaches unauthenticated API responses)", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject());
+    const absolutePath = projectPaths(slug).audioRaw;
+    await assert.rejects(
+      () => readPcm(slug),
+      (e: Error) => {
+        assert.match(e.message, /re-ingest/i);
+        assert.equal(e.message.includes(absolutePath), false);
+        return true;
+      }
+    );
+  });
+});
+
 // ── loadAudioAnalysis cache ──────────────────────────────────────────────
 
 function cachePath(slug: string): string {

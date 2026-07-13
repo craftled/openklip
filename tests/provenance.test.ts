@@ -6,6 +6,7 @@ import {
   matchesAuthorFilter,
   resolveProvenance,
   stampOverlayProvenanceFromMutation,
+  stampProvenanceFromMutation,
   stampWordProvenance,
 } from "../src/provenance.ts";
 import {
@@ -116,6 +117,48 @@ test("stampWordProvenance writes optional word fields", () => {
   assert.equal(words[1].authoredRevision, 3);
   assert.equal(words[1].authoredTaskId, "t1");
   assert.equal(typeof words[1].authoredAt, "number");
+});
+
+test("stampProvenanceFromMutation stamps words cut by cleanup-apply", () => {
+  const words: Word[] = [
+    {
+      id: "w0",
+      text: "um",
+      startSample: 0,
+      endSample: 100,
+      deleted: true,
+    },
+    {
+      id: "w1",
+      text: "hello",
+      startSample: 100,
+      endSample: 200,
+      deleted: false,
+    },
+  ];
+  const project = {
+    words,
+    broll: [],
+    titles: [],
+    zooms: [],
+    stills: [],
+    graphics: [],
+  };
+  stampProvenanceFromMutation(
+    project,
+    {
+      action: "cleanup-apply",
+      input: { mode: "safe" },
+      taskId: "task-cleanup",
+    },
+    { wordIds: ["w0"], deadAirSpanIds: [], extendedSpanIds: [], warnings: [] },
+    { authorId: "ai:cursor" },
+    7
+  );
+  assert.equal(words[0].authoredBy, "ai:cursor");
+  assert.equal(words[0].authoredRevision, 7);
+  assert.equal(words[0].authoredTaskId, "task-cleanup");
+  assert.equal(words[1].authoredBy, undefined);
 });
 
 test("stampOverlayProvenanceFromMutation stamps b-roll on add", () => {

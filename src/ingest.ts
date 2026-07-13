@@ -5,6 +5,7 @@ import { type Project, ProjectSchema, SAMPLE_RATE, type Word } from "./edl.ts";
 import { FFMPEG, probe, run } from "./ffmpeg.ts";
 import { assertProjectCanBeIngested } from "./ingest-guard.ts";
 import type { IngestPhase, IngestProgress } from "./ingest-types.ts";
+import { buildMomentIndex } from "./moment-search.ts";
 import { projectPaths, slugFromVideo } from "./paths.ts";
 import { cwdPath } from "./repo-paths.ts";
 import { transcribeScriptPath } from "./script-paths.ts";
@@ -127,6 +128,7 @@ const INGEST_STEPS: Array<{ message: string; phase: IngestPhase }> = [
   { phase: "proxy", message: "Building 720p preview" },
   { phase: "audio", message: "Extracting audio" },
   { phase: "frames", message: "Extracting frames" },
+  { phase: "index", message: "Indexing frames" },
   { phase: "transcribe", message: "Transcribing" },
   { phase: "finalize", message: "Finishing" },
 ];
@@ -203,6 +205,19 @@ export async function ingest(
   ).catch((e: Error) =>
     console.warn(`[ingest]   frames skipped: ${e.message}`)
   );
+
+  emit("index");
+  console.log(
+    "[ingest] indexing frames for visual search (first run downloads the CLIP model)..."
+  );
+  // Non-fatal, unlike transcribe below: an embedding/model-download failure
+  // should not block getting a project. Search lazy-builds the index later
+  // (openklip search / openklip index) if this step is skipped or fails.
+  try {
+    await buildMomentIndex(slug);
+  } catch (e) {
+    console.warn(`[ingest]   moment index skipped: ${(e as Error).message}`);
+  }
 
   emit("transcribe");
   console.log(

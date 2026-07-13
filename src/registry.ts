@@ -16,6 +16,7 @@ import {
   addStill,
   addTitle,
   addZoom,
+  applyCleanup,
   cutAllByText,
   cutByText,
   cutWords,
@@ -36,6 +37,7 @@ import {
   setCaptionMaxWords,
   setCaptionStyle,
   setCaptions,
+  setCleanupConfig,
   setCutSnap,
   setExportSettings,
   setLook,
@@ -557,6 +559,43 @@ export const actions: ActionDef[] = [
       setCutSnap(p, i);
       return { snap: p.cuts.snap };
     },
+  }),
+  defineAction({
+    name: "cleanup-config",
+    summary:
+      "Merge cleanup thresholds and category toggles into project.cuts.cleanup.",
+    surfaces: ["cli", "gui", "mcp"],
+    schema: z.object({
+      minSec: z.number().min(0.2).max(5).nullable().optional(),
+      keepPadSec: z.number().min(0).max(1).nullable().optional(),
+      // Keys mirror CLEANUP_FILLER_CATEGORIES in src/cleanup.ts.
+      hesitation: z.boolean().nullable().optional(),
+      hedging: z.boolean().nullable().optional(),
+      repeat: z.boolean().nullable().optional(),
+    }),
+    run: (p, i) => {
+      if (
+        i.minSec === undefined &&
+        i.keepPadSec === undefined &&
+        i.hesitation === undefined &&
+        i.hedging === undefined &&
+        i.repeat === undefined
+      ) {
+        throw new Error("cleanup-config requires at least one field");
+      }
+      setCleanupConfig(p, i);
+      return { cleanup: p.cuts.cleanup };
+    },
+  }),
+  defineAction({
+    name: "cleanup-apply",
+    summary:
+      'Apply cleanup candidates: mode "safe" matches apply-all-safe; mode "enabled" applies every candidate in enabled categories plus all dead-air at minSec. Repeat-enabled passes are intentionally iterative: a cut can expose new adjacent repeat candidates until a fixed point (third apply no-op on the convergence fixture).',
+    surfaces: ["cli", "gui", "mcp"],
+    schema: z.object({
+      mode: z.enum(["safe", "enabled"]),
+    }),
+    run: (p, i) => applyCleanup(p, i),
   }),
   defineAction({
     name: "dead-air-add",

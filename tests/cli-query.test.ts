@@ -1,10 +1,24 @@
 import assert from "node:assert/strict";
-import { statSync } from "node:fs";
+import { mkdirSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { addMusic, addTitle } from "../src/actions.ts";
-import { runOverlays, runRanges, runStatusJson } from "../src/cli-query.ts";
+import {
+  composeMomentSearchResult,
+  formatMomentTextMatchesHuman,
+  formatSceneMatchesHuman,
+  grepMomentTextMatches,
+  runMomentSearch,
+  runOverlays,
+  runRanges,
+  runStatusJson,
+} from "../src/cli-query.ts";
 import { SAMPLE_RATE } from "../src/edl.ts";
+import {
+  encodeVectors,
+  MOMENT_MODEL,
+  momentIndexPath,
+} from "../src/moment-search.ts";
 import { projectPaths } from "../src/paths.ts";
 import {
   makeProject,
@@ -517,4 +531,301 @@ test("runStatusJson applies VAD snap when silences are passed and snap is enable
     runStatusJson(p, [{ startSec: 1.9, endSec: 2.3 }])
   );
   assert.ok(withSilences.keptDurationSec < withoutSilences.keptDurationSec);
+});
+
+// ── Moment search formatters (src/cli-query.ts) ───────────────────────────
+
+test("formatSceneMatchesHuman formats scene lines with score and label", () => {
+  const out = formatSceneMatchesHuman({
+    indexed: true,
+    results: [
+      {
+        fromSec: 12,
+        toSec: 21,
+        score: 0.41,
+        source: "both",
+        summary: "people laughing",
+      },
+    ],
+  });
+  assert.match(out, /12\.0s-21\.0s\s+0\.41\s+both\s+people laughing/);
+});
+
+test("formatSceneMatchesHuman reports when there are no scene matches", () => {
+  const out = formatSceneMatchesHuman({ indexed: true, results: [] });
+  assert.match(out, /no scene matches/);
+});
+
+test("formatSceneMatchesHuman reports when no index has been built", () => {
+  const out = formatSceneMatchesHuman({ indexed: false, results: [] });
+  assert.match(out, /no moment index/);
+});
+
+test("runMomentSearch emits the documented JSON shape", () => {
+  const project = makeProject({ slug: "x" });
+  const payload = composeMomentSearchResult(project, "hello", {
+    indexed: true,
+    results: [],
+  });
+  const out = runMomentSearch(payload, { json: true });
+  const parsed = JSON.parse(out);
+  assert.deepEqual(Object.keys(parsed).sort(), [
+    "indexed",
+    "query",
+    "scenes",
+    "text",
+  ]);
+  assert.equal(parsed.query, "hello");
+  assert.equal(parsed.indexed, true);
+  assert.equal(Array.isArray(parsed.text), true);
+  assert.deepEqual(parsed.scenes, []);
+});
+
+test("runMomentSearch human output includes both a text and scene matches section", () => {
+  const project = makeProject({ slug: "x" });
+  const payload = composeMomentSearchResult(project, "Hello", {
+    indexed: false,
+    results: [],
+  });
+  const out = runMomentSearch(payload, { json: false });
+  assert.match(out, /text matches:/);
+  assert.match(out, /scene matches:/);
+  assert.match(out, /no moment index/);
+});
+
+test("runMomentSearch human output appends an error line when the payload carries one", () => {
+  const project = makeProject({ slug: "x" });
+  const payload = composeMomentSearchResult(
+    project,
+    "Hello",
+    { indexed: false, results: [] },
+    { error: "moment index build failed" }
+  );
+  const out = runMomentSearch(payload, { json: false });
+  assert.match(out, /error: moment index build failed/);
+});
+
+// ── Moment search text matches include cut words (Lane C) ─────────────────
+
+function makeHesitationsFixture() {
+  return makeProject({
+    slug: "hesitations-fixture",
+    words: [
+      {
+        id: "w0",
+        text: "some",
+        startSample: 0,
+        endSample: SAMPLE_RATE,
+        deleted: false,
+      },
+      {
+        id: "w1",
+        text: "hesitations",
+        startSample: SAMPLE_RATE,
+        endSample: SAMPLE_RATE * 2,
+        deleted: true,
+      },
+      {
+        id: "w2",
+        text: "here",
+        startSample: SAMPLE_RATE * 2,
+        endSample: SAMPLE_RATE * 3,
+        deleted: false,
+      },
+    ],
+    durationSamples: SAMPLE_RATE * 3,
+  });
+}
+
+test("grepMomentTextMatches finds a phrase that was cut from the transcript", () => {
+  const project = makeHesitationsFixture();
+  const matches = grepMomentTextMatches(project, "hesitations");
+  assert.equal(matches.length, 1);
+  assert.equal(matches[0].cut, true);
+  assert.deepEqual(matches[0].ids, ["w1"]);
+  assert.equal(matches[0].text, "hesitations");
+});
+
+test("grepMomentTextMatches merges kept and cut hits sorted by fromSec", () => {
+  const project = makeProject({
+    words: [
+      {
+        id: "w0",
+        text: "hello",
+        startSample: 0,
+        endSample: SAMPLE_RATE,
+        deleted: false,
+      },
+      {
+        id: "w1",
+        text: "there",
+        startSample: SAMPLE_RATE,
+        endSample: SAMPLE_RATE * 2,
+        deleted: false,
+      },
+      {
+        id: "w2",
+        text: "hello",
+        startSample: SAMPLE_RATE * 2,
+        endSample: SAMPLE_RATE * 3,
+        deleted: false,
+      },
+      {
+        id: "w3",
+        text: "there",
+        startSample: SAMPLE_RATE * 3,
+        endSample: SAMPLE_RATE * 4,
+        deleted: true,
+      },
+      {
+        id: "w4",
+        text: "again",
+        startSample: SAMPLE_RATE * 4,
+        endSample: SAMPLE_RATE * 5,
+        deleted: true,
+      },
+    ],
+    durationSamples: SAMPLE_RATE * 5,
+  });
+  const matches = grepMomentTextMatches(project, "hello there");
+  assert.equal(matches.length, 2);
+  assert.equal(matches[0].fromSec, 0);
+  assert.equal(matches[0].cut, false);
+  assert.equal(matches[1].fromSec, 2);
+  assert.equal(matches[1].cut, true);
+});
+
+test("grepMomentTextMatches dedupes kept and cut matches at the same word-index range", () => {
+  const project = makeProject({
+    words: [
+      {
+        id: "w0",
+        text: "hello",
+        startSample: 0,
+        endSample: SAMPLE_RATE,
+        deleted: true,
+      },
+      {
+        id: "w1",
+        text: "there",
+        startSample: SAMPLE_RATE,
+        endSample: SAMPLE_RATE * 2,
+        deleted: true,
+      },
+    ],
+    durationSamples: SAMPLE_RATE * 2,
+  });
+  const matches = grepMomentTextMatches(project, "hello there");
+  assert.equal(matches.length, 1);
+  assert.equal(matches[0].cut, true);
+});
+
+test("composeMomentSearchResult text entries include cut flag for deleted matches", () => {
+  const project = makeHesitationsFixture();
+  const payload = composeMomentSearchResult(project, "hesitations", {
+    indexed: false,
+    results: [],
+  });
+  assert.equal(payload.text.length, 1);
+  assert.equal(payload.text[0].cut, true);
+  assert.deepEqual(payload.text[0].ids, ["w1"]);
+});
+
+test("formatMomentTextMatchesHuman appends [cut] for cut matches", () => {
+  const out = formatMomentTextMatchesHuman("hesitations", [
+    {
+      fromSec: 1,
+      toSec: 2,
+      ids: ["w1"],
+      text: "hesitations",
+      cut: true,
+    },
+  ]);
+  assert.match(out, /hesitations {2}\[cut\]/);
+});
+
+test("runMomentSearch human output marks cut text matches with [cut]", () => {
+  const project = makeHesitationsFixture();
+  const payload = composeMomentSearchResult(project, "hesitations", {
+    indexed: false,
+    results: [],
+  });
+  const out = runMomentSearch(payload, { json: false });
+  assert.match(out, /hesitations {2}\[cut\]/);
+});
+
+// ── Moment search CLI wiring (src/cli.ts): fast, no-network paths only ────
+// A query against a genuinely current visual index always needs a real
+// embedding (network on first run) - that path is covered by the
+// OPENKLIP_INTEGRATION-gated test in tests/moment-search.test.ts. Everything
+// below either fails argument validation before touching the engine, or (see
+// "CLI search on a project with no frames yet") exercises the real binary
+// through executeMomentSearch's no-op-build short-circuit, which never calls
+// embedQueryText when there is nothing to search - safe to run unguarded.
+
+test("CLI index reports no frames to index when frames dir is empty", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const r = await runCli(["index", slug]);
+    assert.equal(r.code, 0);
+    assert.match(r.out, /no frames to index/);
+  });
+});
+
+test("CLI index reports an already-current index without rebuilding", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const framesDir = projectPaths(slug).frames;
+    mkdirSync(framesDir, { recursive: true });
+    writeFileSync(join(framesDir, "0001.jpg"), "fake");
+    writeFileSync(
+      momentIndexPath(slug),
+      JSON.stringify({
+        version: 1,
+        model: MOMENT_MODEL,
+        dim: 1,
+        frameStepSec: 3,
+        frames: [{ name: "0001.jpg", atSec: 0 }],
+        vectorsB64: encodeVectors(new Float32Array([1])),
+      })
+    );
+
+    const r = await runCli(["index", slug]);
+    assert.equal(r.code, 0);
+    assert.match(r.out, /already current/);
+  });
+});
+
+test("CLI index requires a slug", async () => {
+  const r = await runCli(["index"]);
+  assert.equal(r.code, 1);
+  assert.match(r.out, /usage: openklip index/);
+});
+
+test("CLI search requires a query", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    const r = await runCli(["search", slug]);
+    assert.equal(r.code, 1);
+    assert.match(r.out, /usage: openklip search/);
+  });
+});
+
+test("CLI search requires a slug", async () => {
+  const r = await runCli(["search"]);
+  assert.equal(r.code, 1);
+  assert.match(r.out, /usage: openklip search/);
+});
+
+test("CLI search on a project with no frames yet returns transcript matches without embedding", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, { ...makeHesitationsFixture(), slug });
+    const r = await runCli(["search", slug, "hesitations", "--json"]);
+    assert.equal(r.code, 0);
+    const parsed = JSON.parse(r.out);
+    assert.equal(parsed.indexed, false);
+    assert.equal(parsed.text.length, 1);
+    assert.equal(parsed.text[0].cut, true);
+    assert.deepEqual(parsed.scenes, []);
+  });
 });

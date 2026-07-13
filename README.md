@@ -75,14 +75,15 @@ Agent sidebar chats use `working/chats.json`, not `localStorage` (color scheme a
 
 ## What works today
 
-Verified against the current codebase (`VERSION` / `package.json` `0.42.0.0`, 2037 tests: 2032 pass, 5 skip without `OPENKLIP_INTEGRATION=1`):
+Verified against the current codebase (`VERSION` / `package.json` `0.42.0.0`, 2300 tests: 2292 pass, 8 skip without `OPENKLIP_INTEGRATION=1` and env-gated fixtures):
 
 - **Ingest**: video → local transcript + preview proxy + `project.json` (`openklip ingest`; refuses re-ingest unless `--force`)
 - **Transcript editing**: click words to toggle `deleted`; `openklip cut` / `cut --text` / `restore` on CLI
 - **Phrase search + batch cuts**: transcript search bar (Mod+F to focus, Enter next match, Escape clear) with exact and punctuation-insensitive matching, Kept/Cut scopes, click-to-seek, select-as-span, Cut first / Cut all and Restore / Restore all with affected-word counts and an optional note; same phrase engine as the CLI
 - **Bounded transcript reads**: `openklip transcript grep`, `span`, `phrase` for agent discovery without dumping full transcripts
+- **Moment search: text + scene**: Search sidebar tab (fourth left-rail tab, Mod+Shift+F) finds moments by transcript text or visual scene content — local CLIP frame embeddings (`Xenova/clip-vit-base-patch32` via transformers.js, indexed at ingest with lazy backfill and `openklip index`) blended with scene-log summaries; thumbnail cards seek on click, and dragging a card onto the preview/transcript/timeline or its Keep button restores any cut words in that span; `openklip search`, MCP `moment_search`
 - **Preview**: all-intra proxy; scheduler plays kept ranges only; compact center column (`max-w-2xl`)
-- **Editor layout**: fixed 20rem shadcn sidebars; left rail switches between Chats, Assets, and Config; right rail is a collapsible chat timeline; center column has extracted preview header/format/export chrome, transcript, and a compact bottom timeline drawer with denser lanes and full-width backgrounds on short projects
+- **Editor layout**: fixed 20rem shadcn sidebars; left rail switches between Chats, Assets, Search, and Config; right rail is a collapsible chat timeline; center column has extracted preview header/format/export chrome, transcript, and a compact bottom timeline drawer with denser lanes and full-width backgrounds on short projects
 - **Agent chat**: `/` skills menu, inline skill tokens; skills route to the same tool surface as `openklip tools` on `project.json`; the tool-calling edit prompt also advertises a skill index (id + description, capped at 20) the model can load in full with the read-only `load_skill` tool; Claude applies edits via MCP; other agents answer or suggest commands
 - **Asset cards**: `openklip analyze` or **Describe assets** in the asset bin runs per-asset subagents that write summary/tags/bestFor onto each b-roll/still so agents place media by meaning
 - **Cinema player**: fullscreen overlay with Linear-parity transport bar (`web/components/cinema-player.tsx`, `player-controls.tsx`)
@@ -96,7 +97,8 @@ Verified against the current codebase (`VERSION` / `package.json` `0.42.0.0`, 20
 - **Vision reframe sidecar** (macOS): `tools/vision-focus.swift` detects face center, falls back to attention saliency, attaches on-frame OCR text; GUI **Vision focus** button in Reframe; enriches speaker `sceneLog` segments with `focusX`/`focusY`
 - **LLM highlight detection**: `openklip highlights-detect <slug>` finds short-form clip candidates; `openklip export-highlight <slug> all` renders each to `output/highlights/{id}.mp4`; GUI **Highlights** panel (detect, list, seek)
 - **Music placement**: place a registered music asset under the edit with gain (0-2 in preview via Web Audio), fades, source in-point, and trim/loop mode (`openklip music-add` / `music-set` / `music-rm`); Config panel Music section, placed-music timeline track with drag-trim handles (parity with b-roll clips), preview bed with a mute toggle, mixed into the export by ffmpeg
-- **Cleanup review**: deterministic filler-word detection (isolated disfluencies auto-safe; ambiguous words and phrases flagged review) plus dead-air detection from real audio analysis, with per-candidate risk and an "apply all safe" batch action; `brief.md` and `project.cuts.cleanupPhrases` support **Always cut** / **Never cut** lists; Cleanup section in the Config panel, `openklip cleanup <slug> [--json] [--apply-safe]`, MCP `cleanup_report`
+- **Cleanup review**: candidates categorized as hesitations / hedging / repeats / dead-air (Cutback-style), combining deterministic filler detection, a repeated-n-gram false-start detector (immediate repeats up to 6 words, ≤0.6s apart, cut-first-keep-last), and dead-air from real audio analysis; per-candidate safe/review risk; category toggles and silence thresholds persist in `project.cuts.cleanup` (`cleanup-config` action, null unsets); one-click applies via `cleanup-apply` (`safe` keeps the legacy semantics, `enabled` applies checked categories at any risk plus all dead-air at the configured threshold, returning undo-ready span ids); `brief.md` and `project.cuts.cleanupPhrases` support **Always cut** / **Never cut** lists; dedicated Cleanup tab in the Config panel with per-category cards, bulk apply, and one-click undo; `openklip cleanup <slug> [--json] [--apply-safe] [--apply-enabled]`, MCP `cleanup_report`
+- **Cleanup silence waveform**: silence waveform on the Cleanup tab plus categorized AI cleanup apply; dead-air from audio analysis and peaks API; batch `cleanup-apply` with undo-safe created-vs-extended span tracking; MCP `cleanup_report`, actions `cleanup-apply`, `cleanup-config`, `dead-air-add`, `dead-air-rm`
 - **VAD snap + seam crossfades**: cut boundaries optionally snap onto detected silence (`cuts.snap`) and export joins the resulting seams with equal-power crossfades that reuse a few ms of removed audio to avoid clicks; wired through the exporter, preview scheduler, and every CLI/MCP range/status query so they all agree; Config panel Audio section, GUI/MCP `cuts-snap` action, and CLI `openklip cuts-snap`
 - **Ducking, loudness, voice highpass, and de-essing**: export-only audio quality pass sidechain-ducks the music bed under speech, applies single-pass loudness normalization toward a target LUFS, can highpass the voice track, and can de-ess it (ffmpeg's `deesser` filter, intensity 0-1); `openklip audio <slug>` and the Config panel Audio section (preview audio stays unprocessed)
 - **Blank canvas projects**: create motion-from-scratch without camera footage (`openklip ingest --blank`, MCP `blank_ingest`, GUI New project → Blank canvas)
@@ -123,7 +125,7 @@ Verified against the current codebase (`VERSION` / `package.json` `0.42.0.0`, 20
 - **Browser editor**: open `http://localhost:<port>/<slug>` or `/?slug=<slug>` after `openklip serve`; script-first transcript editing (select words, Delete to cut)
 - **Workspace**: macOS folder picker on empty landing; inline project create; projects root persisted in `.openklip/projects-root`
 - **CLI**: full edit surface; `openklip actions --json` mutations manifest; `openklip tools --json` full agent tool list; `openklip features --json` capability catalog from `src/features.ts`; `openklip brief <slug> --audit` ship-readiness check against `brief.md`
-- **MCP server**: `openklip mcp` (stdio) exposes 95 tools across query, mutation, task progress, revert, and export surfaces; `.cursor/mcp.json` wired for Cursor
+- **MCP server**: `openklip mcp` (stdio) exposes 93 tools across query, mutation, task progress, revert, and export surfaces; `.cursor/mcp.json` wired for Cursor
 - **Edit templates**: `templates/<id>/skill.md` playbooks; `openklip template set`; brand presets at ingest (`openklip brand`)
 - **Agent selector**: drive filler cuts via Claude Code, Codex, Cursor, or Grok subscription CLIs
 - **Design system**: default shadcn/ui tokens with Base UI primitives (`app/globals.css`, `components.json`); light/dark via `.dark` class; icons via `web/lib/icon.tsx`
@@ -188,7 +190,7 @@ In Cursor, enable the bundled MCP server (`.cursor/mcp.json`) and call the same 
 
 | Agent / surface | Mutate `project.json` in chat | Typical workflow |
 | --- | --- | --- |
-| **Cursor** (MCP enabled) | Yes, via 95 MCP tools | Chat edits call `cut`, `broll-add`, `export`, etc. directly |
+| **Cursor** (MCP enabled) | Yes, via 93 MCP tools | Chat edits call `cut`, `broll-add`, `export`, etc. directly |
 | **Claude Code / Desktop** (MCP enabled) | Yes, via MCP | Same tool surface as Cursor |
 | **Codex** | CLI hints in chat | Run `openklip` commands the model suggests |
 | **Grok / other CLIs** | CLI hints in chat | Agent selector shells out for filler cuts; mutations via terminal |

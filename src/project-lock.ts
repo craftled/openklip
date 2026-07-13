@@ -6,10 +6,10 @@
 // and one edit is lost. Chaining calls per slug on a promise queue makes them
 // strictly ordered. A failing call never blocks subsequent ones.
 //
-// project.json, chats.json, tasks.json, and brief.md get separate locks so a
-// long-running project mutation (e.g. an agent suggestion that shells out)
-// doesn't block chat, task, or brief writes: they touch different files and
-// don't conflict.
+// project.json, chats.json, tasks.json, brief.md, and moment-index.json get
+// separate locks so a long-running project mutation (e.g. an agent
+// suggestion that shells out) doesn't block chat, task, brief, or moment
+// index writes: they touch different files and don't conflict.
 //
 // Scope: this serializes within one process (one running server). Concurrent
 // processes (two CLI invocations, or a CLI agent and the server) are handled
@@ -40,6 +40,7 @@ const projectTails = new Map<string, Promise<unknown>>();
 const chatsTails = new Map<string, Promise<unknown>>();
 const tasksTails = new Map<string, Promise<unknown>>();
 const briefTails = new Map<string, Promise<unknown>>();
+const momentIndexTails = new Map<string, Promise<unknown>>();
 
 /** Serialize project.json mutations for one slug. */
 export function withProjectLock<T>(
@@ -71,4 +72,12 @@ export function withBriefLock<T>(
   fn: () => T | Promise<T>
 ): Promise<T> {
   return chain(briefTails, slug, fn);
+}
+
+/** Serialize moment-index.json builds for one slug. */
+export function withMomentIndexLock<T>(
+  slug: string,
+  fn: () => T | Promise<T>
+): Promise<T> {
+  return chain(momentIndexTails, slug, fn);
 }

@@ -468,6 +468,30 @@ export const CleanupPhrasesSchema = z.object({
   neverCut: z.array(z.string()).default([]),
 });
 
+// READ-side tolerance: out-of-range hand edits must not brick project load;
+// resolveCleanupConfig clamps/defaults on read. WRITER schemas stay strict.
+const cleanupCategoryBoolSchema = z.boolean().optional().catch(undefined);
+
+export const CleanupCategoriesSchema = z
+  .object({
+    // Keys mirror CLEANUP_FILLER_CATEGORIES in src/cleanup.ts.
+    hesitation: cleanupCategoryBoolSchema,
+    hedging: cleanupCategoryBoolSchema,
+    repeat: cleanupCategoryBoolSchema,
+  })
+  .optional()
+  .catch(undefined);
+
+export const CleanupSettingsSchema = z
+  .object({
+    minSec: z.number().min(0.2).max(5).optional().catch(undefined),
+    keepPadSec: z.number().min(0).max(1).optional().catch(undefined),
+    categories: CleanupCategoriesSchema,
+  })
+  .optional()
+  .catch(undefined);
+export type CleanupSettings = z.infer<typeof CleanupSettingsSchema>;
+
 export const CutsSchema = z
   .object({
     snap: CutSnapSchema,
@@ -475,6 +499,8 @@ export const CutsSchema = z
     deadAir: z.array(DeadAirSpanSchema).default([]),
     /** Optional per-project cleanup phrase overrides (brief lists still apply). */
     cleanupPhrases: CleanupPhrasesSchema.optional(),
+    /** Optional cleanup thresholds and category toggles for review/apply. */
+    cleanup: CleanupSettingsSchema,
   })
   .default({
     snap: {

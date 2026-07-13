@@ -34,6 +34,7 @@ import { planTimelineSummary } from "./cam-mix.ts";
 import { camMixOrRemix, camRemix } from "./cam-remix.ts";
 import { type CamRole, ingestCam, listCams, setCam } from "./cams.ts";
 import { buildCleanupReport } from "./cleanup.ts";
+import { executeMomentSearch } from "./cli-query.ts";
 import { transitionExportPreview } from "./cut-transition-gate.ts";
 import { runDoctor } from "./doctor.ts";
 import { PhraseAnchorSchema, type Project, samplesToSec } from "./edl.ts";
@@ -569,7 +570,7 @@ const queryTools: AgentToolDef[] = [
   defineQueryTool({
     name: "cleanup_report",
     summary:
-      "Filler-word and dead-air candidates with savings estimates and safe/review risk. Apply the safe ones with the cut action (filler wordIds) and the dead-air-add action (spans); leave review candidates to a human unless the brief says aggressive.",
+      "Filler-word and dead-air cleanup candidates grouped by category (hesitation, hedging, repeat, dead-air) with savings estimates, safe/review risk, and the effective project.cuts.cleanup config (minSec, keepPadSec, category toggles). Apply safe candidates with cleanup-apply mode safe, or enabled categories plus all dead-air at minSec with cleanup-apply mode enabled.",
     schema: z.object({ slug }),
     run: async ({ slug: projectSlug }) => {
       const project = await loadProject(projectSlug);
@@ -697,6 +698,20 @@ const queryTools: AgentToolDef[] = [
           projectSlug ? { slug: projectSlug } : undefined
         ),
       };
+    },
+  }),
+  defineQueryTool({
+    name: "moment_search",
+    summary:
+      "Search transcript text and visual scenes in one call (CLIP frame embeddings blended with scene-log summaries). The first call may block while the visual index builds if it is missing or stale.",
+    schema: z.object({
+      slug,
+      query: z.string().min(1),
+      limit: z.number().int().min(1).max(100).optional(),
+    }),
+    run: async ({ slug: projectSlug, query, limit }) => {
+      const project = await loadProject(projectSlug);
+      return executeMomentSearch(projectSlug, project, query, { limit });
     },
   }),
   defineQueryTool({

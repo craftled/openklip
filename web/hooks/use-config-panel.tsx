@@ -2,6 +2,7 @@
 
 import type { ComponentProps, ReactNode } from "react";
 import { useCallback, useMemo } from "react";
+import type { ConfigCleanupTabProps } from "@/components/config/config-cleanup-tab";
 import type { ConfigEditTabProps } from "@/components/config/config-edit-tab";
 import {
   type ConfigHistoryTabProps,
@@ -58,6 +59,7 @@ export interface UseConfigPanelTimelineCallbacks {
 
 export interface UseConfigPanelParams {
   activeTab: ConfigTabId;
+  cleanup: ConfigCleanupTabProps;
   edit: ConfigEditTabProps;
   embedded?: boolean;
   history: ConfigHistoryTabProps;
@@ -78,6 +80,7 @@ export function useConfigPanel({
   history,
   inspector,
   look,
+  cleanup,
   onCloseConfig,
   onTabChange,
   playback,
@@ -165,6 +168,7 @@ export function useConfigPanel({
     history,
     inspectorSummary,
     look,
+    cleanup,
     onClose: handleClose,
     onTabChange,
     project,

@@ -9,11 +9,41 @@ import {
 
 const emptyCleanupReport: CleanupReport = {
   candidates: [],
+  categoryCounts: {
+    hesitation: 0,
+    hedging: 0,
+    repeat: 0,
+    "dead-air": 0,
+  },
+  config: {
+    minSec: 0.7,
+    keepPadSec: 0.15,
+    categories: { hesitation: true, hedging: false, repeat: false },
+  },
   deadAirCount: 0,
   estSavedSec: 0,
   fillerCount: 0,
   warnings: [],
 };
+
+function minimalCleanupProps(): ConfigPanelProps["cleanup"] {
+  return {
+    aiPassEnabled: false,
+    applying: false,
+    lastUndo: null,
+    onApply: () => undefined,
+    onApplyAllSafe: () => undefined,
+    onApplyAllSilences: () => undefined,
+    onApplyEnabled: () => undefined,
+    onPatchCleanupThreshold: () => undefined,
+    onRemoveSpan: () => undefined,
+    onToggleCategory: () => undefined,
+    onUndoLast: () => undefined,
+    registeredSpans: [],
+    report: emptyCleanupReport,
+    slug: "demo",
+  };
+}
 
 function minimalLookProps(): ConfigPanelProps["look"] {
   return {
@@ -55,6 +85,7 @@ function minimalProps(
 ): ConfigPanelProps {
   return {
     activeTab: "look",
+    cleanup: minimalCleanupProps(),
     closeLabel: "Hide config",
     edit: {
       addBroll: () => undefined,
@@ -125,8 +156,6 @@ function minimalProps(
       bpmDetectingAssetId: null,
       chosenGraphicTemplate: "",
       chosenMusicAsset: "",
-      cleanupReport: emptyCleanupReport,
-      deadAirSpans: [],
       detectingHighlights: false,
       durationSec: 60,
       graphicBeatCount: 4,
@@ -141,8 +170,6 @@ function minimalProps(
       onAddGraphic: () => undefined,
       onAddGraphicAtCuts: () => undefined,
       onAddMusic: () => undefined,
-      onApplyAllSafeCleanup: () => undefined,
-      onApplyCleanup: () => undefined,
       onAssembled: () => undefined,
       onBeatCountChange: () => undefined,
       onChooseGraphicMusicAsset: () => undefined,
@@ -156,7 +183,6 @@ function minimalProps(
       onPatchAudio: () => undefined,
       onPatchMusic: () => undefined,
       onPatchSnap: () => undefined,
-      onRemoveDeadAirSpan: () => undefined,
       onRemoveMusic: () => undefined,
       onSaveBrief: async () => ({ ok: true as const }),
       onSeekHighlight: () => undefined,
@@ -207,6 +233,7 @@ test("ConfigPanel renders shell and tab bar", () => {
   assert.match(html, />Edit</);
   assert.match(html, />Look</);
   assert.match(html, />Project</);
+  assert.match(html, />Cleanup</);
   assert.match(html, />Tools</);
   assert.match(html, />History</);
 });
@@ -255,4 +282,12 @@ test("ConfigPanel renders project tab sections when active", () => {
   );
   assert.match(html, />Brief</);
   assert.match(html, />Graphics</);
+  assert.doesNotMatch(html, /data-cleanup-panel/);
+});
+
+test("ConfigPanel renders cleanup tab content when active", () => {
+  const html = renderToStaticMarkup(
+    <ConfigPanel {...minimalProps({ activeTab: "cleanup" })} />
+  );
+  assert.match(html, /data-cleanup-panel/);
 });

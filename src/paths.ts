@@ -78,6 +78,10 @@ export function projectPaths(slug: string) {
     proxy: join(working, "proxy.mp4"),
     audioRaw: join(working, "audio16k.f32"),
     frames: join(working, "frames"),
+    /** Visual moment-search sidecar: frame embedding vectors + metadata
+     * derived from frames/ (see src/moment-search.ts). Rebuildable cache,
+     * never hand-edited. */
+    momentIndex: join(working, "moment-index.json"),
     /** User drop folder : originals only. */
     assets: join(dir, "assets"),
     /** Generated asset proxies (ffmpeg output). */

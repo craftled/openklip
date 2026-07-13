@@ -17,7 +17,29 @@ import { findPhraseRuns, normalizeText } from "./phrase-match.ts";
 
 export type CleanupCandidateKind = "filler" | "dead-air";
 
+// Deterministic cleanup-engine categories. Intentionally NOT the same semantics
+// as AgentCutCategories / categorizeAgentCutIds (see that type below): the
+// engine never flags a lone "like"/"so" as hedging, and its "repeat" bucket is
+// only immediate n-gram false starts, not a general content catch-all.
+export type CleanupCandidateCategory =
+  | "hesitation"
+  | "hedging"
+  | "repeat"
+  | "dead-air";
+
+export const CLEANUP_FILLER_CATEGORIES = [
+  "hesitation",
+  "hedging",
+  "repeat",
+] as const;
+
+export const CLEANUP_CATEGORY_DISPLAY_ORDER = [
+  ...CLEANUP_FILLER_CATEGORIES,
+  "dead-air",
+] as const;
+
 export interface CleanupCandidate {
+  category: CleanupCandidateCategory;
   endSec: number;
   estSavedSec: number;
   id: string;
@@ -29,8 +51,27 @@ export interface CleanupCandidate {
   wordIds: string[];
 }
 
+export interface CleanupConfig {
+  categories: {
+    hedging: boolean;
+    hesitation: boolean;
+    repeat: boolean;
+  };
+  keepPadSec: number;
+  minSec: number;
+}
+
+export interface CleanupCategoryCounts {
+  "dead-air": number;
+  hedging: number;
+  hesitation: number;
+  repeat: number;
+}
+
 export interface CleanupReport {
   candidates: CleanupCandidate[];
+  categoryCounts: CleanupCategoryCounts;
+  config: CleanupConfig;
   deadAirCount: number;
   estSavedSec: number;
   fillerCount: number;
@@ -60,11 +101,26 @@ const CORE_FILLER_TOKENS = new Set([
 const REVIEW_REPEAT_TOKENS = new Set(["like", "so"]);
 
 export interface CleanupReportOpts {
+  config?: CleanupConfig;
   phraseConfig?: CleanupPhraseConfig;
 }
 
-const DEFAULT_DEAD_AIR_MIN_SEC = 0.7;
-const DEFAULT_DEAD_AIR_KEEP_PAD_SEC = 0.15;
+export const DEFAULT_DEAD_AIR_MIN_SEC = 0.7;
+export const DEFAULT_DEAD_AIR_KEEP_PAD_SEC = 0.15;
+export const DEFAULT_CLEANUP_CATEGORIES: Record<
+  (typeof CLEANUP_FILLER_CATEGORIES)[number],
+  boolean
+> = {
+  hesitation: true,
+  hedging: false,
+  repeat: false,
+};
+
+const MAX_REPEAT_GAP_SEC = 0.6;
+// Raised to 6 so long false starts ("I want to show you, I want to show you …")
+// surface as one repeat candidate; nested-preference still picks the longest n.
+const MAX_NGRAM = 6;
+const MIN_NGRAM = 1;
 // A dead-air candidate whose RAW (pre-pad) gap exceeds this is safe to
 // auto-apply; shorter pauses (still above minSec) are still natural-sounding
 // enough to want a human's eyes, so they stay "review".
@@ -126,10 +182,51 @@ function repeatedTokenRuns(keptWords: Word[], tokens: Set<string>): Word[][] {
   return runs;
 }
 
+function clampCleanupMinSec(value: number): number {
+  return Math.min(5, Math.max(0.2, value));
+}
+
+function clampCleanupKeepPadSec(value: number): number {
+  return Math.min(1, Math.max(0, value));
+}
+
+export function resolveCleanupConfig(project: Project): CleanupConfig {
+  const stored = project.cuts?.cleanup;
+  const categories = Object.fromEntries(
+    CLEANUP_FILLER_CATEGORIES.map((key) => [
+      key,
+      stored?.categories?.[key] ?? DEFAULT_CLEANUP_CATEGORIES[key],
+    ])
+  ) as CleanupConfig["categories"];
+  return {
+    minSec: clampCleanupMinSec(stored?.minSec ?? DEFAULT_DEAD_AIR_MIN_SEC),
+    keepPadSec: clampCleanupKeepPadSec(
+      stored?.keepPadSec ?? DEFAULT_DEAD_AIR_KEEP_PAD_SEC
+    ),
+    categories,
+  };
+}
+
+function countCategories(
+  candidates: CleanupCandidate[]
+): CleanupCategoryCounts {
+  const counts: CleanupCategoryCounts = {
+    hesitation: 0,
+    hedging: 0,
+    repeat: 0,
+    "dead-air": 0,
+  };
+  for (const c of candidates) {
+    counts[c.category]++;
+  }
+  return counts;
+}
+
 function fillerCandidateFromWords(
   words: Word[],
   risk: "safe" | "review",
-  reason: string
+  reason: string,
+  category: CleanupCandidateCategory
 ): CleanupCandidate {
   const first = words[0];
   const last = words[words.length - 1];
@@ -138,6 +235,7 @@ function fillerCandidateFromWords(
   return {
     id: `f-${first.id}`,
     kind: "filler",
+    category,
     wordIds: words.map((w) => w.id),
     startSec,
     endSec,
@@ -146,6 +244,123 @@ function fillerCandidateFromWords(
     risk,
     estSavedSec: Math.max(0, endSec - startSec),
   };
+}
+
+function wordsEstSavedSec(words: Word[]): number {
+  let total = 0;
+  for (const w of words) {
+    total += Math.max(
+      0,
+      samplesToSec(w.endSample) - samplesToSec(w.startSample)
+    );
+  }
+  return total;
+}
+
+function ngramTokens(words: Word[], start: number, size: number): string[] {
+  return words
+    .slice(start, start + size)
+    .map((w) => normalizeText(w.text))
+    .filter(Boolean);
+}
+
+function ngramsEqual(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((token, idx) => token === b[idx]);
+}
+
+// Immediate n-gram repeats (n=1..MAX_NGRAM) among kept words: same normalized sequence
+// appears >=2 times consecutively (gap <= MAX_REPEAT_GAP_SEC), cut all but the
+// last take. Prefer the longest n-gram when matches nest; skip word ids
+// already covered by core-filler or like/so candidates.
+export function repeatedSequenceCandidates(
+  keptWords: Word[],
+  blockedWordIds: Set<string>
+): CleanupCandidate[] {
+  const candidates: CleanupCandidate[] = [];
+  const covered = new Set<string>();
+
+  for (let i = 0; i < keptWords.length; ) {
+    const w = keptWords[i];
+    if (blockedWordIds.has(w.id) || covered.has(w.id)) {
+      i++;
+      continue;
+    }
+
+    let matched = false;
+    for (let n = MAX_NGRAM; n >= MIN_NGRAM; n--) {
+      if (i + n > keptWords.length) {
+        continue;
+      }
+      const gram = ngramTokens(keptWords, i, n);
+      if (gram.length < n) {
+        continue;
+      }
+
+      const occurrences: number[] = [];
+      let pos = i;
+      while (pos + n <= keptWords.length) {
+        const current = ngramTokens(keptWords, pos, n);
+        if (!ngramsEqual(gram, current)) {
+          break;
+        }
+        occurrences.push(pos);
+        const nextPos = pos + n;
+        if (nextPos + n > keptWords.length) {
+          break;
+        }
+        const gap =
+          samplesToSec(keptWords[nextPos].startSample) -
+          samplesToSec(keptWords[pos + n - 1].endSample);
+        if (gap > MAX_REPEAT_GAP_SEC) {
+          break;
+        }
+        pos = nextPos;
+      }
+
+      if (occurrences.length < 2) {
+        continue;
+      }
+
+      const cutWords: Word[] = [];
+      for (let o = 0; o < occurrences.length - 1; o++) {
+        const start = occurrences[o];
+        for (let j = 0; j < n; j++) {
+          cutWords.push(keptWords[start + j]);
+        }
+      }
+      if (cutWords.some((word) => blockedWordIds.has(word.id))) {
+        continue;
+      }
+
+      const phrase = gram.join(" ");
+      const first = cutWords[0];
+      const last = cutWords[cutWords.length - 1];
+      candidates.push({
+        id: `f-${first.id}`,
+        kind: "filler",
+        category: "repeat",
+        wordIds: cutWords.map((word) => word.id),
+        startSec: samplesToSec(first.startSample),
+        endSec: samplesToSec(last.endSample),
+        text: cutWords.map((word) => word.text).join(" "),
+        reason: `repeated "${phrase}"`,
+        risk: "review",
+        estSavedSec: wordsEstSavedSec(cutWords),
+      });
+      for (const word of cutWords) {
+        covered.add(word.id);
+      }
+      i = occurrences[occurrences.length - 1] + n;
+      matched = true;
+      break;
+    }
+
+    if (!matched) {
+      i++;
+    }
+  }
+
+  return candidates;
 }
 
 // Filler-word candidates over KEPT words only: isolated core disfluencies
@@ -173,7 +388,9 @@ export function fillerCandidates(
       run.length > 1
         ? "repeated filler"
         : `isolated '${normalizeText(run[0].text)}'`;
-    candidates.push(fillerCandidateFromWords(run, "safe", reason));
+    candidates.push(
+      fillerCandidateFromWords(run, "safe", reason, "hesitation")
+    );
   }
 
   for (const run of repeatedTokenRuns(keptWords, REVIEW_REPEAT_TOKENS)) {
@@ -181,17 +398,33 @@ export function fillerCandidates(
       fillerCandidateFromWords(
         run,
         "review",
-        `repeated "${normalizeText(run[0].text)}"`
+        `repeated "${normalizeText(run[0].text)}"`,
+        "repeat"
       )
     );
+  }
+
+  const blockedWordIds = new Set(candidates.flatMap((c) => c.wordIds));
+  // Intentional iterative refinement: a later cleanup-apply pass can surface
+  // new repeat adjacency after earlier cuts (post-cut adjacency is real in the
+  // rendered output). See cleanup-apply summary and the convergence test.
+  for (const repeat of repeatedSequenceCandidates(keptWords, blockedWordIds)) {
+    candidates.push(repeat);
+    for (const id of repeat.wordIds) {
+      blockedWordIds.add(id);
+    }
   }
 
   for (const phrase of phrases) {
     const risk = safePhraseSet.has(normalizeText(phrase)) ? "safe" : "review";
     for (const r of findPhraseRuns(project, phrase, { all: true })) {
+      if (r.ids.every((id) => blockedWordIds.has(id))) {
+        continue;
+      }
       candidates.push({
         id: `f-${r.ids[0]}`,
         kind: "filler",
+        category: "hedging",
         wordIds: r.ids,
         startSec: r.fromSec,
         endSec: r.toSec,
@@ -200,6 +433,9 @@ export function fillerCandidates(
         risk,
         estSavedSec: Math.max(0, r.toSec - r.fromSec),
       });
+      for (const id of r.ids) {
+        blockedWordIds.add(id);
+      }
     }
   }
 
@@ -293,6 +529,7 @@ export function deadAirCandidates(
       candidates.push({
         id: `da-${startSample}`,
         kind: "dead-air",
+        category: "dead-air",
         wordIds: [],
         startSec: candStart,
         endSec: candEnd,
@@ -342,6 +579,24 @@ function fillerOptsFromPhraseConfig(
   };
 }
 
+function finalizeCleanupReport(
+  candidates: CleanupCandidate[],
+  config: CleanupConfig,
+  warnings: string[]
+): CleanupReport {
+  const fillerCount = candidates.filter((c) => c.kind === "filler").length;
+  const deadAirCount = candidates.filter((c) => c.kind === "dead-air").length;
+  return {
+    candidates,
+    categoryCounts: countCategories(candidates),
+    config,
+    fillerCount,
+    deadAirCount,
+    estSavedSec: candidates.reduce((sum, c) => sum + c.estSavedSec, 0),
+    warnings,
+  };
+}
+
 function applyPhraseConfigToReport(
   project: Project,
   report: CleanupReport,
@@ -352,13 +607,7 @@ function applyPhraseConfigToReport(
   }
   const blocked = neverCutWordIds(project, phraseConfig.neverCut);
   const candidates = filterNeverCutCandidates(report.candidates, blocked);
-  return {
-    ...report,
-    candidates,
-    fillerCount: candidates.filter((c) => c.kind === "filler").length,
-    deadAirCount: candidates.filter((c) => c.kind === "dead-air").length,
-    estSavedSec: candidates.reduce((sum, c) => sum + c.estSavedSec, 0),
-  };
+  return finalizeCleanupReport(candidates, report.config, report.warnings);
 }
 
 // Full cleanup report: filler + dead-air candidates, merged and sorted, with
@@ -370,9 +619,13 @@ export function cleanupReport(
   silences: SilenceSpan[],
   opts: CleanupReportOpts = {}
 ): CleanupReport {
+  const config = opts.config ?? resolveCleanupConfig(project);
   const fillerOpts = fillerOptsFromPhraseConfig(opts.phraseConfig);
   const filler = fillerCandidates(project, fillerOpts ?? {});
-  const deadAir = deadAirCandidates(project, silences);
+  const deadAir = deadAirCandidates(project, silences, {
+    minSec: config.minSec,
+    keepPadSec: config.keepPadSec,
+  });
   const candidates = [...filler, ...deadAir].sort(
     (a, b) => a.startSec - b.startSec
   );
@@ -402,17 +655,9 @@ export function cleanupReport(
     );
   }
 
-  const estSavedSec = candidates.reduce((sum, c) => sum + c.estSavedSec, 0);
-
   return applyPhraseConfigToReport(
     project,
-    {
-      candidates,
-      fillerCount: filler.length,
-      deadAirCount: deadAir.length,
-      estSavedSec,
-      warnings,
-    },
+    finalizeCleanupReport(candidates, config, warnings),
     opts.phraseConfig
   );
 }
@@ -432,17 +677,12 @@ export function fillerOnlyCleanupReport(
   project: Project,
   opts: CleanupReportOpts = {}
 ): CleanupReport {
+  const config = opts.config ?? resolveCleanupConfig(project);
   const fillerOpts = fillerOptsFromPhraseConfig(opts.phraseConfig);
   const candidates = fillerCandidates(project, fillerOpts ?? {});
   return applyPhraseConfigToReport(
     project,
-    {
-      candidates,
-      fillerCount: candidates.length,
-      deadAirCount: 0,
-      estSavedSec: candidates.reduce((sum, c) => sum + c.estSavedSec, 0),
-      warnings: [CLEANUP_DEGRADED_WARNING],
-    },
+    finalizeCleanupReport(candidates, config, [CLEANUP_DEGRADED_WARNING]),
     opts.phraseConfig
   );
 }
@@ -452,13 +692,15 @@ export function buildCleanupReport(input: {
   project: Project;
   silences: SilenceSpan[] | null | undefined;
 }): CleanupReport {
+  const config = resolveCleanupConfig(input.project);
   const phraseConfig = resolveCleanupPhrases({
     project: input.project,
     briefText: input.briefText,
   });
+  const opts = { phraseConfig, config };
   return input.silences
-    ? cleanupReport(input.project, input.silences, { phraseConfig })
-    : fillerOnlyCleanupReport(input.project, { phraseConfig });
+    ? cleanupReport(input.project, input.silences, opts)
+    : fillerOnlyCleanupReport(input.project, opts);
 }
 
 // M2: partition a cleanup report's candidates into the two shapes the "apply
@@ -478,4 +720,118 @@ export function partitionSafeCandidates(candidates: CleanupCandidate[]): {
       .filter((c) => c.kind === "dead-air")
       .map((c) => ({ fromSec: c.startSec, toSec: c.endSec })),
   };
+}
+
+function categoryEnabled(
+  category: CleanupCandidateCategory,
+  config: CleanupConfig
+): boolean {
+  if (category === "dead-air") {
+    return true;
+  }
+  return config.categories[category];
+}
+
+export function partitionApplyCandidates(
+  candidates: CleanupCandidate[],
+  mode: "safe" | "enabled",
+  config: CleanupConfig
+): {
+  deadAirSpans: { fromSec: number; toSec: number }[];
+  fillerIds: string[];
+} {
+  if (mode === "safe") {
+    return partitionSafeCandidates(candidates);
+  }
+  const fillerIds = [
+    ...new Set(
+      candidates
+        .filter(
+          (c) =>
+            c.kind === "filler" &&
+            c.category !== "dead-air" &&
+            categoryEnabled(c.category, config)
+        )
+        .flatMap((c) => c.wordIds)
+    ),
+  ];
+  const deadAirSpans = candidates
+    .filter((c) => c.kind === "dead-air")
+    .map((c) => ({ fromSec: c.startSec, toSec: c.endSec }));
+  return { fillerIds, deadAirSpans };
+}
+
+// AI-pass classifier buckets for suggestCleanupCuts. Same labels as
+// CleanupCandidateCategory but different semantics by design: lone "like"/"so"
+// map to hedging (product choice), and "repeat" is a false-start/content
+// catch-all, not the engine's immediate n-gram detector.
+export interface AgentCutCategories {
+  hedging: string[];
+  hesitation: string[];
+  repeat: string[];
+}
+
+function hedgingPhraseList(project: Project): string[] {
+  const phraseConfig = resolveCleanupPhrases({ project });
+  const seen = new Set(
+    DEFAULT_FILLER_PHRASES.map((phrase) => normalizeText(phrase))
+  );
+  const phrases = [...DEFAULT_FILLER_PHRASES];
+  for (const raw of phraseConfig.alwaysCut) {
+    const norm = normalizeText(raw);
+    if (!norm || seen.has(norm)) {
+      continue;
+    }
+    seen.add(norm);
+    phrases.push(raw);
+  }
+  return phrases;
+}
+
+function hedgingPhraseWordIds(project: Project): Set<string> {
+  const ids = new Set<string>();
+  for (const phrase of hedgingPhraseList(project)) {
+    for (const run of findPhraseRuns(project, phrase, { all: true })) {
+      for (const id of run.ids) {
+        ids.add(id);
+      }
+    }
+  }
+  return ids;
+}
+
+// Classify agent-suggested cut ids into hesitation / hedging / repeat buckets
+// for the Cleanup tab AI pass. Unknown ids are dropped; ids are deduped while
+// preserving first-seen order within each bucket.
+export function categorizeAgentCutIds(
+  project: Project,
+  ids: string[]
+): AgentCutCategories {
+  const wordById = new Map(project.words.map((w) => [w.id, w]));
+  const hedgingIds = hedgingPhraseWordIds(project);
+  const hesitation: string[] = [];
+  const hedging: string[] = [];
+  const repeat: string[] = [];
+  const seen = new Set<string>();
+
+  for (const id of ids) {
+    if (seen.has(id)) {
+      continue;
+    }
+    const w = wordById.get(id);
+    if (!w) {
+      continue;
+    }
+    seen.add(id);
+    const norm = normalizeText(w.text);
+    if (CORE_FILLER_TOKENS.has(norm)) {
+      hesitation.push(id);
+    } else if (norm === "like" || norm === "so" || hedgingIds.has(id)) {
+      hedging.push(id);
+    } else {
+      repeat.push(id);
+    }
+  }
+
+  return { hesitation, hedging, repeat };
 }

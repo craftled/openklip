@@ -11,6 +11,7 @@ test("ConfigTabBar renders all config tabs", () => {
   assert.match(html, />Edit</);
   assert.match(html, />Look</);
   assert.match(html, />Project</);
+  assert.match(html, />Cleanup</);
   assert.match(html, />Tools</);
   assert.match(html, />History</);
 });

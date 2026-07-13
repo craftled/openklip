@@ -53,9 +53,11 @@ export function EditorColumn({
             <div className="flex min-h-0 flex-1 flex-col">
               <EditorTranscriptPanel
                 activeMatchRange={transcript.activeMatchRange}
+                cleanupPendingWordIds={transcript.cleanupPendingWordIds}
                 curSample={transcript.curSample}
                 inBroll={transcript.inBroll}
                 inZoom={transcript.inZoom}
+                keepMoment={transcript.keepMoment}
                 matchRanges={transcript.matchRanges}
                 onCutSelection={transcript.onCutSelection}
                 onRestoreSelection={transcript.onRestoreSelection}

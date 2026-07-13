@@ -110,6 +110,25 @@ export function transitionFallbackToast(
   };
 }
 
+export function momentKeptToast(
+  fromSec: number,
+  toSec: number,
+  restoredCount: number,
+  formatClock: (sec: number) => string
+): ToastPayload {
+  return {
+    kind: "success",
+    title: `Kept ${formatClock(fromSec)}-${formatClock(toSec)} - restored ${restoredCount} word${restoredCount === 1 ? "" : "s"}`,
+  };
+}
+
+export function momentAlreadyInEditToast(): ToastPayload {
+  return {
+    kind: "info",
+    title: "Already in the edit",
+  };
+}
+
 export function nothingToPlayToast(): ToastPayload {
   return {
     kind: "info",
@@ -367,6 +386,68 @@ export function findFillerPromiseMessages(providerLabel: string): {
     },
     error: (error) => {
       const payload = findFillerFailedToast((error as Error).message);
+      return {
+        message: payload.title,
+        description: payload.description,
+      };
+    },
+  };
+}
+
+export function suggestCleanupCutsLoadingMessage(
+  providerLabel: string
+): string {
+  return `${providerLabel} is scanning for false starts…`;
+}
+
+export function suggestCleanupCutsSuccessToast(result: {
+  words: Array<{ id: string; text: string }>;
+}): ToastPayload {
+  const count = result.words.length;
+  return {
+    kind: "success",
+    title:
+      count > 0
+        ? `Found ${count} AI suggestion${count === 1 ? "" : "s"}`
+        : "No false starts or mistakes found",
+    ...(count > 0
+      ? {
+          description: result.words
+            .slice(0, 6)
+            .map((word) => `${word.id} "${word.text}"`)
+            .join(", "),
+        }
+      : {}),
+  };
+}
+
+export function suggestCleanupCutsFailedToast(error: string): ToastPayload {
+  return {
+    kind: "error",
+    title: "AI cleanup scan failed",
+    description: error,
+  };
+}
+
+export function suggestCleanupCutsPromiseMessages(providerLabel: string): {
+  error: (error: unknown) => { description?: string; message: string };
+  loading: string;
+  success: (result: { words: Array<{ id: string; text: string }> }) => {
+    description?: string;
+    message: string;
+  };
+} {
+  return {
+    loading: suggestCleanupCutsLoadingMessage(providerLabel),
+    success: (result) => {
+      const payload = suggestCleanupCutsSuccessToast(result);
+      return {
+        message: payload.title,
+        description: payload.description,
+      };
+    },
+    error: (error) => {
+      const payload = suggestCleanupCutsFailedToast((error as Error).message);
       return {
         message: payload.title,
         description: payload.description,
