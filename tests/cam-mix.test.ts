@@ -581,3 +581,99 @@ test("buildCamMixVideoFilter pads missing footage so segment durations stay exac
     "fully covered cam1 span gets no pad"
   );
 });
+
+// ── Real-ffmpeg coverage for offset/short-cam padding (fresh-context review
+// follow-up). The existing integration test above uses two same-duration,
+// zero-offset cams, so it never exercises camTrimWindow's empty/pad branches
+// -- tpad's actual filter syntax was previously verified only by string
+// match (see "pads missing footage" above), never by really invoking
+// ffmpeg. This reproduces the exact scenario manually verified during
+// review: a full-length cam1 (12s) and a cam2 that starts 2s late and only
+// has 4s of footage, needing a lead pad then a tail pad across consecutive
+// plan spans -- and asserts the RENDERED output is exactly 12s, not merely
+// that the filter string contains the right substrings.
+
+test("camMix integration: offset/short cam padding renders exact duration via real ffmpeg", {
+  timeout: 180_000,
+}, async () => {
+  if (process.env.OPENKLIP_INTEGRATION !== "1") {
+    return;
+  }
+  if (typeof FFMPEG !== "string" || !existsSync(FFMPEG)) {
+    return;
+  }
+
+  await withTempProjectsRoot(async ({ slug }) => {
+    const dir = projectPaths(slug).dir;
+    const videoA = join(dir, "cam-a.mp4"); // full 12s, used as-is
+    const videoB = join(dir, "cam-b.mp4"); // only 4s of footage
+
+    await Bun.spawn([
+      FFMPEG,
+      "-y",
+      "-f",
+      "lavfi",
+      "-i",
+      "color=c=blue:s=320x240:r=30:d=12",
+      "-f",
+      "lavfi",
+      "-i",
+      "sine=frequency=440:sample_rate=48000:duration=12",
+      "-c:v",
+      "libx264",
+      "-pix_fmt",
+      "yuv420p",
+      "-c:a",
+      "aac",
+      "-shortest",
+      videoA,
+    ]).exited;
+
+    await Bun.spawn([
+      FFMPEG,
+      "-y",
+      "-f",
+      "lavfi",
+      "-i",
+      "color=c=red:s=320x240:r=30:d=4",
+      "-f",
+      "lavfi",
+      "-i",
+      "sine=frequency=880:sample_rate=48000:duration=4",
+      "-c:v",
+      "libx264",
+      "-pix_fmt",
+      "yuv420p",
+      "-c:a",
+      "aac",
+      "-shortest",
+      videoB,
+    ]).exited;
+
+    await ingestCam(slug, videoA, { id: "cam1", name: "A", force: true });
+    // Starts 2s into the project timeline; only 4s of real footage, so a
+    // 0-4s plan span needs a 2s lead pad and a 4-8s span needs a 2s tail pad.
+    await ingestCam(slug, videoB, {
+      id: "cam2",
+      name: "B",
+      offsetMs: 2000,
+      force: true,
+    });
+
+    const plan = [
+      { fromSample: 0, toSample: sec(4), shot: "cam2" },
+      { fromSample: sec(4), toSample: sec(8), shot: "cam2" },
+      { fromSample: sec(8), toSample: sec(12), shot: "cam1" },
+    ];
+
+    const result = await camMix(slug, { mode: "follow", plan });
+    const sourcePath = result.sourcePath;
+    assert.ok(existsSync(sourcePath));
+
+    const meta = await probe(sourcePath);
+    assert.ok(
+      Math.abs(meta.durationSec - 12) < 0.15,
+      `expected ~12s output (padding keeps segments exact), got ${meta.durationSec}s`
+    );
+  });
+});

@@ -5,6 +5,7 @@ import { join } from "node:path";
 import type { PlanSpan } from "../src/cam-plan.ts";
 import { DEFAULT_CAM_SWITCH_SETTINGS } from "../src/cam-plan.ts";
 import {
+  camMixOrRemix,
   camRemix,
   hasMulticamProvenance,
   resolveCamRemixPlan,
@@ -234,5 +235,119 @@ test("hasMulticamProvenance is true only for projects with a multicam block", as
 test("hasMulticamProvenance is false when no project exists", async () => {
   await withTempProjectsRoot(async ({ slug }) => {
     assert.equal(await hasMulticamProvenance(slug), false);
+  });
+});
+
+// ── camMixOrRemix dispatch coverage (fresh-context review follow-up) ────────
+// The dispatch router itself had zero direct test coverage: it's what fixed
+// the CLI/MCP lock-drop bug (all three surfaces now go through it instead of
+// calling camMix directly), so a regression here would silently reopen that
+// exact bug. Distinct, unmistakable error signatures from camMix ("at least
+// 2 speaker cams") vs camRemix ("no multicam mix") let this be verified
+// cheaply without running the full ffmpeg pipeline for the no-provenance case.
+
+test("camMixOrRemix calls camMix directly when no multicam provenance exists", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    seedCam(slug, mkCam({ id: "cam1" }));
+    // Only one cam: camMix's own guard throws a distinct error from
+    // camRemix's "no multicam mix" — proving this path reached camMix,
+    // not camRemix, without needing a real ffmpeg render.
+    await assert.rejects(() => camMixOrRemix(slug), /at least 2 speaker cams/i);
+  });
+});
+
+test("camMixOrRemix integration: routes to camRemix and preserves a locked override once provenance exists", {
+  timeout: 180_000,
+}, async () => {
+  if (process.env.OPENKLIP_INTEGRATION !== "1") {
+    return;
+  }
+  const { FFMPEG } = await import("../src/ffmpeg.ts");
+  const { existsSync } = await import("node:fs");
+  if (typeof FFMPEG !== "string" || !existsSync(FFMPEG)) {
+    return;
+  }
+  const { ingestCam } = await import("../src/cams.ts");
+  const { camMix } = await import("../src/cam-mix.ts");
+  const { projectPaths } = await import("../src/paths.ts");
+
+  await withTempProjectsRoot(async ({ slug }) => {
+    const dir = projectPaths(slug).dir;
+    const videoA = join(dir, "cam-a.mp4");
+    const videoB = join(dir, "cam-b.mp4");
+
+    const lavfiBase = ["-y", "-f", "lavfi", "-i"];
+
+    await Bun.spawn([
+      FFMPEG,
+      ...lavfiBase,
+      "color=c=red:s=320x240:r=30:d=6",
+      "-f",
+      "lavfi",
+      "-i",
+      "sine=frequency=440:sample_rate=48000:duration=6",
+      "-c:v",
+      "libx264",
+      "-pix_fmt",
+      "yuv420p",
+      "-c:a",
+      "aac",
+      "-shortest",
+      videoA,
+    ]).exited;
+
+    await Bun.spawn([
+      FFMPEG,
+      ...lavfiBase,
+      "color=c=blue:s=320x240:r=30:d=6",
+      "-f",
+      "lavfi",
+      "-i",
+      "sine=frequency=880:sample_rate=48000:duration=6",
+      "-c:v",
+      "libx264",
+      "-pix_fmt",
+      "yuv420p",
+      "-c:a",
+      "aac",
+      "-shortest",
+      videoB,
+    ]).exited;
+
+    await ingestCam(slug, videoA, { id: "cam1", name: "Red", force: true });
+    await ingestCam(slug, videoB, { id: "cam2", name: "Blue", force: true });
+
+    // First mix: no provenance exists yet, so this establishes it.
+    await camMix(slug, { mode: "follow" });
+
+    // Lock a span via camRemix directly (mirrors what `cam-override` does).
+    const withLock = await camRemix(slug, {
+      overrides: [{ fromSec: 1, toSec: 3, shot: "cam2" }],
+    });
+    const lockedSpan = withLock.plan.find(
+      (s) =>
+        s.shot === "cam2" &&
+        s.locked === true &&
+        s.fromSample === sec(1) &&
+        s.toSample === sec(3)
+    );
+    assert.ok(lockedSpan, "override is locked after the first camRemix call");
+
+    // Now call the SAME dispatch surface every CLI/MCP/GUI cam-mix call
+    // goes through. If this silently fell back to plain camMix (the exact
+    // bug this router fixes), the lock below would vanish.
+    const result = await camMixOrRemix(slug, { mode: "follow" });
+    const survived = result.plan.find(
+      (s) =>
+        s.shot === "cam2" &&
+        s.locked === true &&
+        s.fromSample === sec(1) &&
+        s.toSample === sec(3)
+    );
+    assert.ok(
+      survived,
+      "locked override survives a plain camMixOrRemix call once provenance exists"
+    );
   });
 });
