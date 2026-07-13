@@ -15,8 +15,59 @@ export interface CleanupPeaksResponse {
   toSec: number;
 }
 
+interface SilencesJobProgress {
+  message: string;
+  phase: "analyzing" | "reading" | "writing";
+  step: number;
+  total: number;
+}
+
+interface SilencesStartResponse {
+  jobId?: string;
+  progress?: SilencesJobProgress;
+  silences?: SilenceSpan[];
+  status?: "running";
+}
+
+interface SilencesJobResponse {
+  error?: string;
+  progress?: SilencesJobProgress;
+  silences?: SilenceSpan[];
+  status: "done" | "error" | "running";
+}
+
+const POLL_MS = 700;
+
 const silencesCache = new Map<string, SilenceSpan[] | null>();
 const peaksCache = new Map<string, CleanupPeaksResponse>();
+
+async function pollSilencesJob(
+  slug: string,
+  jobId: string,
+  onProgress?: (p: SilencesJobProgress) => void
+): Promise<SilenceSpan[] | null> {
+  for (;;) {
+    const res = await fetch(
+      `/api/projects/${encodeURIComponent(slug)}/silences/${encodeURIComponent(jobId)}`
+    );
+    if (!res.ok) {
+      return null;
+    }
+    const job = (await res.json()) as SilencesJobResponse;
+    if (job.progress) {
+      onProgress?.(job.progress);
+    }
+    if (job.status === "done") {
+      return job.silences ?? [];
+    }
+    if (job.status === "error") {
+      return null;
+    }
+    await new Promise((r) => {
+      setTimeout(r, POLL_MS);
+    });
+  }
+}
 
 export function useCleanupSilences({
   enabled,
@@ -38,10 +89,13 @@ export function useCleanupSilences({
     }
     return;
   });
+  const [silencesProgress, setSilencesProgress] =
+    useState<SilencesJobProgress | null>(null);
 
   useEffect(() => {
     if (projectSilences != null) {
       setHydrated(projectSilences);
+      setSilencesProgress(null);
       return;
     }
     if (!enabled) {
@@ -49,10 +103,12 @@ export function useCleanupSilences({
     }
     if (silencesCache.has(slug)) {
       setHydrated(silencesCache.get(slug) ?? []);
+      setSilencesProgress(null);
       return;
     }
     let cancelled = false;
     setHydrated("loading");
+    setSilencesProgress(null);
     (async () => {
       try {
         const res = await fetch(
@@ -62,18 +118,45 @@ export function useCleanupSilences({
           silencesCache.set(slug, null);
           if (!cancelled) {
             setHydrated(null);
+            setSilencesProgress(null);
           }
           return;
         }
-        const data = (await res.json()) as { silences: SilenceSpan[] };
-        silencesCache.set(slug, data.silences);
+        const data = (await res.json()) as SilencesStartResponse;
+        if (data.silences) {
+          silencesCache.set(slug, data.silences);
+          if (!cancelled) {
+            setHydrated(data.silences);
+            setSilencesProgress(null);
+          }
+          return;
+        }
+        if (!data.jobId) {
+          silencesCache.set(slug, null);
+          if (!cancelled) {
+            setHydrated(null);
+            setSilencesProgress(null);
+          }
+          return;
+        }
+        if (data.progress && !cancelled) {
+          setSilencesProgress(data.progress);
+        }
+        const silences = await pollSilencesJob(slug, data.jobId, (p) => {
+          if (!cancelled) {
+            setSilencesProgress(p);
+          }
+        });
+        silencesCache.set(slug, silences);
         if (!cancelled) {
-          setHydrated(data.silences);
+          setHydrated(silences);
+          setSilencesProgress(null);
         }
       } catch {
         silencesCache.set(slug, null);
         if (!cancelled) {
           setHydrated(null);
+          setSilencesProgress(null);
         }
       }
     })();
@@ -92,6 +175,7 @@ export function useCleanupSilences({
   return {
     silences: effectiveSilences,
     silencesLoading: hydrated === "loading",
+    silencesProgress,
   };
 }
 
