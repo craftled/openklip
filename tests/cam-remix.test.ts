@@ -1,7 +1,8 @@
 import { test } from "bun:test";
 import assert from "node:assert/strict";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { camMix } from "../src/cam-mix.ts";
 import type { PlanSpan } from "../src/cam-plan.ts";
 import { DEFAULT_CAM_SWITCH_SETTINGS } from "../src/cam-plan.ts";
 import {
@@ -10,10 +11,10 @@ import {
   hasMulticamProvenance,
   resolveCamRemixPlan,
 } from "../src/cam-remix.ts";
-import type { Cam } from "../src/cams.ts";
-import { CamSchema } from "../src/cams.ts";
+import { type Cam, CamSchema, ingestCam } from "../src/cams.ts";
 import { SAMPLE_RATE } from "../src/edl.ts";
-import { camDir, camFile } from "../src/paths.ts";
+import { FFMPEG } from "../src/ffmpeg.ts";
+import { camDir, camFile, projectPaths } from "../src/paths.ts";
 import {
   makeProject,
   withTempProjectsRoot,
@@ -238,21 +239,10 @@ test("hasMulticamProvenance is false when no project exists", async () => {
   });
 });
 
-// ── camMixOrRemix dispatch coverage (fresh-context review follow-up) ────────
-// The dispatch router itself had zero direct test coverage: it's what fixed
-// the CLI/MCP lock-drop bug (all three surfaces now go through it instead of
-// calling camMix directly), so a regression here would silently reopen that
-// exact bug. Distinct, unmistakable error signatures from camMix ("at least
-// 2 speaker cams") vs camRemix ("no multicam mix") let this be verified
-// cheaply without running the full ffmpeg pipeline for the no-provenance case.
-
 test("camMixOrRemix calls camMix directly when no multicam provenance exists", async () => {
   await withTempProjectsRoot(async ({ slug }) => {
     writeFixtureProject(slug, makeProject({ slug }));
     seedCam(slug, mkCam({ id: "cam1" }));
-    // Only one cam: camMix's own guard throws a distinct error from
-    // camRemix's "no multicam mix" — proving this path reached camMix,
-    // not camRemix, without needing a real ffmpeg render.
     await assert.rejects(() => camMixOrRemix(slug), /at least 2 speaker cams/i);
   });
 });
@@ -263,14 +253,9 @@ test("camMixOrRemix integration: routes to camRemix and preserves a locked overr
   if (process.env.OPENKLIP_INTEGRATION !== "1") {
     return;
   }
-  const { FFMPEG } = await import("../src/ffmpeg.ts");
-  const { existsSync } = await import("node:fs");
   if (typeof FFMPEG !== "string" || !existsSync(FFMPEG)) {
     return;
   }
-  const { ingestCam } = await import("../src/cams.ts");
-  const { camMix } = await import("../src/cam-mix.ts");
-  const { projectPaths } = await import("../src/paths.ts");
 
   await withTempProjectsRoot(async ({ slug }) => {
     const dir = projectPaths(slug).dir;
@@ -318,10 +303,8 @@ test("camMixOrRemix integration: routes to camRemix and preserves a locked overr
     await ingestCam(slug, videoA, { id: "cam1", name: "Red", force: true });
     await ingestCam(slug, videoB, { id: "cam2", name: "Blue", force: true });
 
-    // First mix: no provenance exists yet, so this establishes it.
     await camMix(slug, { mode: "follow" });
 
-    // Lock a span via camRemix directly (mirrors what `cam-override` does).
     const withLock = await camRemix(slug, {
       overrides: [{ fromSec: 1, toSec: 3, shot: "cam2" }],
     });
@@ -334,9 +317,6 @@ test("camMixOrRemix integration: routes to camRemix and preserves a locked overr
     );
     assert.ok(lockedSpan, "override is locked after the first camRemix call");
 
-    // Now call the SAME dispatch surface every CLI/MCP/GUI cam-mix call
-    // goes through. If this silently fell back to plain camMix (the exact
-    // bug this router fixes), the lock below would vanish.
     const result = await camMixOrRemix(slug, { mode: "follow" });
     const survived = result.plan.find(
       (s) =>

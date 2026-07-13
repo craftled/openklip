@@ -582,17 +582,6 @@ test("buildCamMixVideoFilter pads missing footage so segment durations stay exac
   );
 });
 
-// ── Real-ffmpeg coverage for offset/short-cam padding (fresh-context review
-// follow-up). The existing integration test above uses two same-duration,
-// zero-offset cams, so it never exercises camTrimWindow's empty/pad branches
-// -- tpad's actual filter syntax was previously verified only by string
-// match (see "pads missing footage" above), never by really invoking
-// ffmpeg. This reproduces the exact scenario manually verified during
-// review: a full-length cam1 (12s) and a cam2 that starts 2s late and only
-// has 4s of footage, needing a lead pad then a tail pad across consecutive
-// plan spans -- and asserts the RENDERED output is exactly 12s, not merely
-// that the filter string contains the right substrings.
-
 test("camMix integration: offset/short cam padding renders exact duration via real ffmpeg", {
   timeout: 180_000,
 }, async () => {
@@ -605,8 +594,8 @@ test("camMix integration: offset/short cam padding renders exact duration via re
 
   await withTempProjectsRoot(async ({ slug }) => {
     const dir = projectPaths(slug).dir;
-    const videoA = join(dir, "cam-a.mp4"); // full 12s, used as-is
-    const videoB = join(dir, "cam-b.mp4"); // only 4s of footage
+    const videoA = join(dir, "cam-a.mp4");
+    const videoB = join(dir, "cam-b.mp4");
 
     await Bun.spawn([
       FFMPEG,
@@ -651,8 +640,6 @@ test("camMix integration: offset/short cam padding renders exact duration via re
     ]).exited;
 
     await ingestCam(slug, videoA, { id: "cam1", name: "A", force: true });
-    // Starts 2s into the project timeline; only 4s of real footage, so a
-    // 0-4s plan span needs a 2s lead pad and a 4-8s span needs a 2s tail pad.
     await ingestCam(slug, videoB, {
       id: "cam2",
       name: "B",
