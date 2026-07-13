@@ -46,7 +46,7 @@ test("preview toggle button has an interruptible scale-on-press transform", () =
   const html = renderButton();
   const tag = tagWith(html, "aria-pressed");
   assert.match(tag, /active:scale-\[0\.98\]/);
-  assert.match(tag, /transition-\[background-color,transform\]/);
+  assert.match(tag, /transition-\[background-color,scale\]/);
 });
 
 test("preview toggle button reflects comparing state via aria-pressed and label", () => {

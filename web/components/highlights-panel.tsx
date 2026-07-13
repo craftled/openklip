@@ -30,7 +30,7 @@ function HighlightRow({
     <li>
       <button
         className={cn(
-          "flex w-full items-start gap-1.5 rounded-md border px-2 py-1 text-left transition-[color,background-color,transform] hover:bg-muted/50 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50",
+          "flex w-full items-start gap-1.5 rounded-md border px-2 py-1 text-left transition-[color,background-color,scale] hover:bg-muted/50 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50",
           active && "border-primary bg-muted/60"
         )}
         data-highlights-row

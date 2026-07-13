@@ -46,7 +46,7 @@ function TakeRow({
     <li>
       <button
         className={cn(
-          "flex w-full items-center gap-1.5 rounded-md border px-2 py-1 text-left transition-[color,background-color,transform] hover:bg-muted/50 active:scale-[0.98]",
+          "flex w-full items-center gap-1.5 rounded-md border px-2 py-1 text-left transition-[color,background-color,scale] hover:bg-muted/50 active:scale-[0.98]",
           active && "border-primary bg-muted/60"
         )}
         data-takes-row
@@ -280,7 +280,7 @@ export function TakesPanelView({
               {selectedWords.map((word) => (
                 <button
                   className={cn(
-                    "rounded px-1 py-0.5 text-xs transition-[background-color,transform] hover:bg-muted active:scale-[0.96]",
+                    "rounded px-1 py-0.5 text-xs transition-[background-color,scale] hover:bg-muted active:scale-[0.96]",
                     anchorWordId === word.id && "bg-primary/20"
                   )}
                   data-takes-word

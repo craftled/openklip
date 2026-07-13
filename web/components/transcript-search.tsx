@@ -102,7 +102,7 @@ export function TranscriptSearch({
                 >
                   <button
                     className={cn(
-                      "flex min-w-0 flex-1 items-center gap-2 rounded-sm px-1.5 py-1 text-left font-[450] text-[12px] leading-normal transition-[color,background-color,transform] hover:bg-muted active:scale-[0.98]",
+                      "flex min-w-0 flex-1 items-center gap-2 rounded-sm px-1.5 py-1 text-left font-[450] text-[12px] leading-normal transition-[color,background-color,scale] hover:bg-muted active:scale-[0.98]",
                       index === activeMatchIndex && "bg-accent"
                     )}
                     data-transcript-search-match

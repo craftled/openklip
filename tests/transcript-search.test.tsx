@@ -113,7 +113,7 @@ test("match row buttons have an interruptible scale-on-press transform", () => {
   // enclosing <ul data-transcript-search-matches> wrapper.
   const tag = buttonTag(html, 'data-transcript-search-match="true"');
   assert.match(tag, /active:scale-\[0\.98\]/);
-  assert.match(tag, /transition-\[color,background-color,transform\]/);
+  assert.match(tag, /transition-\[color,background-color,scale\]/);
 });
 
 test("Cut first and Cut all buttons align their Scissors icon inline-start", () => {

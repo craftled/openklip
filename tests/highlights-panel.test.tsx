@@ -102,5 +102,5 @@ test("clip row has an interruptible scale-on-press transform", () => {
   });
   const rowTag = tagWith(html, "data-highlights-row");
   assert.match(rowTag, /active:scale-\[0\.98\]/);
-  assert.match(rowTag, /transition-\[color,background-color,transform\]/);
+  assert.match(rowTag, /transition-\[color,background-color,scale\]/);
 });

@@ -197,7 +197,7 @@ test("take row has an interruptible scale-on-press transform", () => {
   const html = renderPanel({ takes: [take()] });
   const rowTag = tagWith(html, "data-takes-row");
   assert.match(rowTag, /active:scale-\[0\.98\]/);
-  assert.match(rowTag, /transition-\[color,background-color,transform\]/);
+  assert.match(rowTag, /transition-\[color,background-color,scale\]/);
 });
 
 test("transcript word chips have a scale-on-press transform", () => {
@@ -207,5 +207,5 @@ test("transcript word chips have a scale-on-press transform", () => {
   });
   const wordTag = tagWith(html, "data-takes-word");
   assert.match(wordTag, /active:scale-\[0\.96\]/);
-  assert.match(wordTag, /transition-\[background-color,transform\]/);
+  assert.match(wordTag, /transition-\[background-color,scale\]/);
 });

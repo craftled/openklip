@@ -130,7 +130,7 @@ export function PreviewToggleButton({
     <button
       aria-label={`Show ${comparing ? "after" : "before"} filter preview`}
       aria-pressed={comparing}
-      className="relative aspect-video overflow-hidden rounded-md border bg-muted text-left outline-none transition-[background-color,transform] hover:bg-muted/80 focus-visible:ring-3 focus-visible:ring-ring/50 active:scale-[0.98]"
+      className="relative aspect-video overflow-hidden rounded-md border bg-muted text-left outline-none transition-[background-color,scale] hover:bg-muted/80 focus-visible:ring-3 focus-visible:ring-ring/50 active:scale-[0.98]"
       onClick={onToggle}
       type="button"
     >
