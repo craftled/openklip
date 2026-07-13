@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { stat } from "node:fs/promises";
-import { readPcmRange } from "@engine/audio-analysis";
+import { missingAudioRawError, readPcmRange } from "@engine/audio-analysis";
 import {
   computePeakBuckets,
   DEFAULT_PEAK_BUCKETS,
@@ -87,9 +87,7 @@ export async function GET(req: Request, { params }: RouteParams) {
   const paths = projectPaths(slug);
   if (!existsSync(paths.audioRaw)) {
     return Response.json(
-      {
-        error: `missing ${paths.audioRaw}: this project needs re-ingest (audio16k.f32 is written at ingest time by extractAudio)`,
-      },
+      { error: missingAudioRawError().message },
       { status: 404 }
     );
   }
@@ -144,6 +142,13 @@ export async function GET(req: Request, { params }: RouteParams) {
     if (e instanceof PeakBucketsError) {
       return Response.json({ error: e.message }, { status: 400 });
     }
-    return Response.json({ error: (e as Error).message }, { status: 500 });
+    // Do not echo (e as Error).message here: an unexpected fs error (e.g.
+    // EACCES) formats as "EACCES: permission denied, open '<absolute
+    // path>'" in Node/Bun, which would leak the project's filesystem
+    // location to an unauthenticated caller.
+    return Response.json(
+      { error: "failed to read audio peaks" },
+      { status: 500 }
+    );
   }
 }

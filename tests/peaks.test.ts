@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, writeFileSync } from "node:fs";
 import { test } from "node:test";
 import { GET } from "../app/api/projects/[slug]/peaks/route.ts";
 import { readPcmRange } from "../src/audio-analysis.ts";
@@ -249,6 +249,39 @@ test("GET peaks: returns 404 when audio16k.f32 is missing", async () => {
     assert.equal(res.status, 404);
     const json = (await res.json()) as { error?: string };
     assert.match(json.error ?? "", /audio16k\.f32|re-ingest/i);
+    assert.equal(
+      json.error?.includes(projectPaths(slug).audioRaw),
+      false,
+      `404 response leaked the absolute path: ${json.error}`
+    );
+  });
+});
+
+test("GET peaks: a 500 from the PCM read never echoes the absolute filesystem path (info-disclosure guard)", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug }));
+    writeFileSync(projectPaths(slug).audioRaw, Buffer.alloc(SR * 4));
+    // A permission-denied audio16k.f32 forces a native fs error (EACCES) out
+    // of readPcmRange's open() call instead of the handled "missing" 404
+    // path. Node/Bun format EACCES as `EACCES: permission denied, open
+    // '<absolute path>'`, exercising the route's generic catch(e) -> 500
+    // branch with an error whose message genuinely contains the path.
+    chmodSync(projectPaths(slug).audioRaw, 0o000);
+    try {
+      const res = await GET(
+        peaksRequest(slug, { fromSec: "0", toSec: "1" }),
+        routeParams(slug)
+      );
+      assert.equal(res.status, 500);
+      const json = (await res.json()) as { error?: string };
+      assert.equal(
+        json.error?.includes(projectPaths(slug).audioRaw),
+        false,
+        `500 response leaked the absolute path: ${json.error}`
+      );
+    } finally {
+      chmodSync(projectPaths(slug).audioRaw, 0o644);
+    }
   });
 });
 

@@ -69,9 +69,14 @@ function audioAnalysisPath(slug: string): string {
   return join(projectPaths(slug).working, "audio-analysis.json");
 }
 
-function missingAudioRawError(audioRaw: string): Error {
+// Deliberately path-free: this message reaches unauthenticated API responses
+// (the peaks/silences routes), so it must never embed the project's absolute
+// filesystem location. Exported so those routes can reuse the exact same
+// copy instead of hand-rolling their own (and leaking the path) in their
+// explicit "missing" checks.
+export function missingAudioRawError(): Error {
   return new Error(
-    `missing ${audioRaw}: this project needs re-ingest (audio16k.f32 is written at ingest time by extractAudio)`
+    "missing audio16k.f32: this project needs re-ingest (audio16k.f32 is written at ingest time by extractAudio)"
   );
 }
 
@@ -81,7 +86,7 @@ function missingAudioRawError(audioRaw: string): Error {
 export async function readPcm(slug: string): Promise<Float32Array> {
   const audioRaw = projectPaths(slug).audioRaw;
   if (!existsSync(audioRaw)) {
-    throw missingAudioRawError(audioRaw);
+    throw missingAudioRawError();
   }
   const buf = await readFile(audioRaw);
   return new Float32Array(
@@ -102,7 +107,7 @@ export async function readPcmRange(
 ): Promise<Float32Array> {
   const audioRaw = projectPaths(slug).audioRaw;
   if (!existsSync(audioRaw)) {
-    throw missingAudioRawError(audioRaw);
+    throw missingAudioRawError();
   }
 
   const fileStat = await stat(audioRaw);
@@ -145,7 +150,7 @@ export async function loadAudioAnalysis(
 ): Promise<AudioAnalysis> {
   const paths = projectPaths(slug);
   if (!existsSync(paths.audioRaw)) {
-    throw missingAudioRawError(paths.audioRaw);
+    throw missingAudioRawError();
   }
   const sourceMtimeMs = (await stat(paths.audioRaw)).mtimeMs;
   const cachePath = audioAnalysisPath(slug);
