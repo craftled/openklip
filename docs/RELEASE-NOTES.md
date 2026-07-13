@@ -2,7 +2,25 @@
 
 Use these bodies when publishing releases. Each section matches a tag in `CHANGELOG.md` without duplicating the full changelog. **Known gaps:** always link to [TODO.md](../TODO.md#known-limitations); do not duplicate the list here.
 
-Publishing status checked on 2026-07-13: published through `v0.42.0.1` on GitHub. Multicam programmatic acceptance (`tests/multicam-acceptance.test.ts`, `tests/cam-devex-smoke.test.ts`) satisfies the machinery gate; human eyeball on real per-speaker footage remains deferred.
+Publishing status checked on 2026-07-13: published through `v0.42.0.1` on GitHub. Draft below for `v0.42.0.2` (Grok Voice integration docs release). Multicam programmatic acceptance (`tests/multicam-acceptance.test.ts`, `tests/cam-devex-smoke.test.ts`) satisfies the machinery gate; human eyeball on real per-speaker footage remains deferred.
+
+---
+
+## v0.42.0.2
+
+**Grok Voice settings integration (PR #104).**
+
+### Highlights
+- **Settings → Integrations → Grok Voice**: save, test, clear, and refresh an xAI API key alongside existing ElevenLabs and Reve rows.
+- **Local key storage**: repo-local `.openklip/integrations.json` (mode `0600`); masked preview only in the browser.
+- **Free validation**: test uses `GET /v1/tts/voices`; refresh details lists built-in and custom voices plus key metadata.
+- **Verification**: 21 integration tests (`tests/integrations-config.test.ts`, `tests/integrations-route.test.ts`).
+
+### Known gaps
+
+Settings integrations store and validate keys only. No in-app TTS generation or edit-loop consumption yet (`readXaiApiKey()` is unused outside settings). See [TODO.md](../TODO.md#known-limitations).
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#04202---2026-07-13)
 
 ---
 

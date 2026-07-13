@@ -75,7 +75,7 @@ Agent sidebar chats use `working/chats.json`, not `localStorage` (color scheme a
 
 ## What works today
 
-Verified against the current codebase (`VERSION` / `package.json` `0.42.0.0`, 2300 tests: 2292 pass, 8 skip without `OPENKLIP_INTEGRATION=1` and env-gated fixtures):
+Verified against the current codebase (`VERSION` / `package.json` `0.42.0.2`, 2360 tests: 2354 pass, 6 skip without `OPENKLIP_INTEGRATION=1` and env-gated fixtures):
 
 - **Ingest**: video → local transcript + preview proxy + `project.json` (`openklip ingest`; refuses re-ingest unless `--force`)
 - **Transcript editing**: click words to toggle `deleted`; `openklip cut` / `cut --text` / `restore` on CLI
@@ -111,7 +111,7 @@ Verified against the current codebase (`VERSION` / `package.json` `0.42.0.0`, 23
 - **Map motion graphics** (v0.41.1.0): a second json-render catalog (`map-motion`) for animated route reveals, arcs, globe flyovers, and markers via MapLibre GL (`openklip json-graphic-add <slug> map-motion`, MCP parity, `templates/map-motion/skill.md`); preview and headless export share `web/lib/map-motion-runtime.ts`
 - **B-roll suggest** (v0.41.1.0): `openklip broll-suggest <slug> --phrase "..."` or `--text "..."` and MCP `broll_suggest` rank registered assets using existing asset cards (`summary`, `tags`, `bestFor`); respects `mustUse` / `avoid`; labeled benchmark fixture at `fixtures/broll-suggest/` (`tests/broll-suggest-benchmark.test.ts`)
 - **Graphic template previews** (v0.41.1.0): hover and button previews in the Config → Graphics picker (`web/components/graphic-template-preview.tsx`), including live WebGL shader previews when params allow
-- **Config shell + responsive panels**: Config lives in the left sidebar with color temperature plus captions/timing controls; Settings → **Features** lists shipped capabilities (`src/features.ts`); Chat stays reachable below the desktop sidebar breakpoint via an overlay button
+- **Config shell + responsive panels**: Config lives in the left sidebar with color temperature plus captions/timing controls; Settings → **Features** lists shipped capabilities (`src/features.ts`); Settings → **Integrations** stores optional ElevenLabs, Grok Voice (xAI), and Reve API keys in repo-local `.openklip/integrations.json` with save/test/clear/refresh-details (keys never returned to the browser); Chat stays reachable below the desktop sidebar breakpoint via an overlay button
 - **Written rationale**: `--note "<why>"` on any `cut` or overlay records why a pick was made; metadata only, never reaches ffmpeg, surfaces in `overlays` / transcript / MCP (`--note ""` clears it)
 - **Phrase-anchored cues**: phrase-placed overlays remember the spoken phrase and re-resolve onto the current kept words after a re-cut (`openklip reanchor`); a deleted phrase flags `stale` and keeps the last good span
 - **Multi-take assembly**: `openklip take-add` / `takes` / `assemble` splice the best take per line into one single-source `project.json` the cut/overlay/export engine edits unchanged; a Takes section in the Config panel (between Highlights and Music) browses ingested takes and assembles a selection directly in the browser, and now also uploads a new take from the browser (file-picker "Add take" control, no drag-drop)
@@ -123,7 +123,7 @@ Verified against the current codebase (`VERSION` / `package.json` `0.42.0.0`, 23
 - **Make-a-draft, make-short, make-highlights, revise-draft, and viral-launch playbooks**: `templates/make-draft/skill.md` turns one prompt into a full first draft (respects asset must-use/avoid flags); `templates/make-short/skill.md` and `bun run agent-make-short` derive a vertical short; `templates/make-highlights/skill.md` finds clip candidates and trims each to a short; `templates/revise-draft/skill.md` applies targeted revisions or whole-task revert; `templates/viral-launch/skill.md` shapes launch edits for earned attention on social feeds; export skills call `brief_audit` before export when a brief exists
 - **Browser project creation**: upload a video in the New Project dialog, **Import folder…** (largest video ingests, other media lands in `assets/`), **Import from URL** (yt-dlp on PATH), or drop one or many files onto the empty workspace; uploads stream to disk with size caps (12 GB project, 4 GB asset); format-validated on client and server, source persisted into the project folder, explicit overwrite confirm on name collisions, ingest progress overlay, editor opens on completion
 - **Browser editor**: open `http://localhost:<port>/<slug>` or `/?slug=<slug>` after `openklip serve`; script-first transcript editing (select words, Delete to cut)
-- **Workspace**: macOS folder picker on empty landing; inline project create; projects root persisted in `.openklip/projects-root`
+- **Workspace**: macOS folder picker on empty landing; inline project create; projects root persisted in `.openklip/projects-root`; optional provider API keys in `.openklip/integrations.json`
 - **CLI**: full edit surface; `openklip actions --json` mutations manifest; `openklip tools --json` full agent tool list; `openklip features --json` capability catalog from `src/features.ts`; `openklip brief <slug> --audit` ship-readiness check against `brief.md`
 - **MCP server**: `openklip mcp` (stdio) exposes 98 tools across query, mutation, task progress, revert, and export surfaces; `.cursor/mcp.json` wired for Cursor
 - **Edit templates**: `templates/<id>/skill.md` playbooks; `openklip template set`; brand presets at ingest (`openklip brand`)
@@ -172,6 +172,7 @@ OPENKLIP_SLUG=<slug> bun run dev       # pin project when using serve-style env
 Settings:
 
 - Interface sounds is optional. Enable it in Settings, Appearance, Interface sounds.
+- **Integrations** (Settings → Integrations): optional ElevenLabs, Grok Voice (xAI), and Reve API keys. Keys save to `.openklip/integrations.json` in the OpenKlip repo checkout (mode `0600`). The UI shows a masked preview and last-updated time only. **Test** validates the key without billing where the provider allows (xAI lists voices; ElevenLabs reads the user endpoint; Reve uses a validation-order check). **Refresh details** fetches account or voice metadata when a key is saved. Nothing in the edit loop reads these keys yet; import generated audio or video through `assets/` and `openklip asset-add` as today.
 
 ---
 

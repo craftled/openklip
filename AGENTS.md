@@ -346,7 +346,7 @@ The tool-calling edit prompt (`buildEditPrompt` in `src/agent-driver.ts`) advert
 
 ## External generative media (optional)
 
-OpenKlip does **not** bundle cloud image/video/TTS APIs. Generate media with any external tool (Egaki, Runway, Kling, your own scripts), then import into the edit loop:
+OpenKlip does **not** bundle cloud image/video/TTS APIs. Generate media with any external tool (Egaki, Runway, Kling, xAI Grok Voice, ElevenLabs, your own scripts), then import into the edit loop:
 
 1. Save the file under `projects/<slug>/assets/` (or register from elsewhere).
 2. `openklip asset-add <slug> <file> --kind broll|music|still` or `openklip broll <slug> <file>`.
@@ -354,6 +354,26 @@ OpenKlip does **not** bundle cloud image/video/TTS APIs. Generate media with any
 4. Run `openklip bpm <slug> <musicAssetId>` when beat-syncing motion graphics (`--beats` on `graphic-add`).
 
 The EDL stays local; external tools are optional upstream suppliers, not dependencies.
+
+### Settings integrations (GUI)
+
+Settings → **Integrations** stores optional provider API keys in repo-local `.openklip/integrations.json` (POSIX mode `0600`, never returned to the client). Three providers ship today:
+
+| Provider | Settings label | Server module | Test endpoint | Details |
+| --- | --- | --- | --- | --- |
+| ElevenLabs | ElevenLabs | `setElevenLabsApiKey`, `testElevenLabsApiKey`, `fetchElevenLabsDetails` | `GET https://api.elevenlabs.io/v1/user` | Tier, character quota, model count, voice slots |
+| Reve | Reve | `setReveApiKey`, `testReveApiKey` | Validation-order POST (no credits) | Test only today |
+| xAI | Grok Voice | `setXaiApiKey`, `testXaiApiKey`, `fetchXaiVoiceDetails`, `readXaiApiKey` | `GET https://api.x.ai/v1/tts/voices` | Key name/flags, built-in voices, custom voices (403 tolerated) |
+
+HTTP surface (Next.js, same-origin from the settings panel):
+
+- `GET /api/integrations` → `{ elevenLabs, reve, xai }` status objects (`hasApiKey`, masked `keyPreview`, `updatedAt`)
+- `PUT /api/integrations` body `{ elevenLabsApiKey? | reveApiKey? | xaiApiKey? }` → updated status
+- `POST /api/integrations` body `{ provider?, …ApiKey? }` → `{ provider: IntegrationTestResult }`
+- `DELETE /api/integrations?provider=elevenLabs|reve|xai` → cleared status
+- `GET /api/integrations/details?provider=xai` → `{ xai: XaiVoiceDetails }` (default ElevenLabs when omitted)
+
+**Known gap:** keys are stored and validated only. No ingest, export, or MCP tool calls TTS or Reve image generation yet. Agents should still import generated files through `asset-add` / `broll`.
 
 ## Agent loop
 

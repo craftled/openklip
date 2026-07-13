@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.42.0.2 - 2026-07-13
+
+### Added
+- **Grok Voice settings integration** (PR #104): Settings → Integrations **Grok Voice** row alongside ElevenLabs and Reve. Save, test, clear, and refresh xAI API key details from the GUI. Keys persist in repo-local `.openklip/integrations.json` (mode `0600`); the browser never receives the raw key, only a masked preview. Test calls `GET https://api.x.ai/v1/tts/voices` (no TTS billing). Refresh details parallel-fetches key metadata (`GET /v1/api-key`), built-in voices (`GET /v1/tts/voices`), and custom voices (`GET /v1/custom-voices?limit=100`, 403 tolerated). Server helpers in `src/integrations-config.ts`; routes `GET|PUT|POST|DELETE /api/integrations` and `GET /api/integrations/details?provider=xai`; client helpers in `web/lib/integrations-client.ts`; UI in `web/components/settings/settings-integrations-panel.tsx`. Eight new tests in `tests/integrations-config.test.ts` and `tests/integrations-route.test.ts`.
+
+### Documentation
+- README, AGENTS.md, TODO.md, CLAUDE.md, `docs/RELEASE-NOTES.md`, and `docs/ship/grok-voice-integration.md` now document Settings integrations (ElevenLabs, Grok Voice, Reve) and the known gap that no edit-loop feature consumes stored keys yet.
+
 ## 0.42.0.1 - 2026-07-13
 
 ### Added
