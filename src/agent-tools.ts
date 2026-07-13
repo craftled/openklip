@@ -567,7 +567,7 @@ const queryTools: AgentToolDef[] = [
   defineQueryTool({
     name: "cleanup_report",
     summary:
-      "Filler-word and dead-air candidates with savings estimates and safe/review risk. Apply the safe ones with the cut action (filler wordIds) and the dead-air-add action (spans); leave review candidates to a human unless the brief says aggressive.",
+      "Filler-word and dead-air cleanup candidates grouped by category (hesitation, hedging, repeat, dead-air) with savings estimates, safe/review risk, and the effective project.cuts.cleanup config (minSec, keepPadSec, category toggles). Apply safe candidates with cleanup-apply mode safe, or enabled categories plus all dead-air at minSec with cleanup-apply mode enabled.",
     schema: z.object({ slug }),
     run: async ({ slug: projectSlug }) => {
       const project = await loadProject(projectSlug);

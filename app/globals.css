@@ -369,8 +369,8 @@
     cursor: not-allowed;
   }
   input:not([type="button"]):not([type="submit"]):not([type="reset"]):not(
-      [type="checkbox"]
-    ):not([type="radio"]):not([type="file"]):not([type="range"]),
+    [type="checkbox"]
+  ):not([type="radio"]):not([type="file"]):not([type="range"]),
   textarea {
     cursor: text;
   }

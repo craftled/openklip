@@ -10,7 +10,14 @@
 // a second import just to run the same analysis this module's cache uses.
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  open,
+  readFile,
+  rename,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
 import {
@@ -62,9 +69,14 @@ function audioAnalysisPath(slug: string): string {
   return join(projectPaths(slug).working, "audio-analysis.json");
 }
 
-function missingAudioRawError(audioRaw: string): Error {
+// Deliberately path-free: this message reaches unauthenticated API responses
+// (the peaks/silences routes), so it must never embed the project's absolute
+// filesystem location. Exported so those routes can reuse the exact same
+// copy instead of hand-rolling their own (and leaking the path) in their
+// explicit "missing" checks.
+export function missingAudioRawError(): Error {
   return new Error(
-    `missing ${audioRaw}: this project needs re-ingest (audio16k.f32 is written at ingest time by extractAudio)`
+    "missing audio16k.f32: this project needs re-ingest (audio16k.f32 is written at ingest time by extractAudio)"
   );
 }
 
@@ -74,7 +86,7 @@ function missingAudioRawError(audioRaw: string): Error {
 export async function readPcm(slug: string): Promise<Float32Array> {
   const audioRaw = projectPaths(slug).audioRaw;
   if (!existsSync(audioRaw)) {
-    throw missingAudioRawError(audioRaw);
+    throw missingAudioRawError();
   }
   const buf = await readFile(audioRaw);
   return new Float32Array(
@@ -82,6 +94,48 @@ export async function readPcm(slug: string): Promise<Float32Array> {
     buf.byteOffset,
     Math.floor(buf.byteLength / 4)
   );
+}
+
+// Read a time slice of the ingest-time mono f32le PCM without loading the
+// whole file. Clamps fromSec/toSec to the available audio span the same way
+// computePeakBuckets does before bucketing.
+export async function readPcmRange(
+  slug: string,
+  fromSec: number,
+  toSec: number,
+  sampleRate = DEFAULT_SAMPLE_RATE
+): Promise<Float32Array> {
+  const audioRaw = projectPaths(slug).audioRaw;
+  if (!existsSync(audioRaw)) {
+    throw missingAudioRawError();
+  }
+
+  const fileStat = await stat(audioRaw);
+  const totalSamples = Math.floor(fileStat.size / 4);
+  const totalSec = totalSamples / sampleRate;
+  const clampedFrom = Math.max(0, Math.min(fromSec, totalSec));
+  const clampedTo = Math.max(clampedFrom, Math.min(toSec, totalSec));
+
+  const startSample = Math.floor(clampedFrom * sampleRate);
+  const endSample = Math.floor(clampedTo * sampleRate);
+  const byteOffset = startSample * 4;
+  const byteLength = (endSample - startSample) * 4;
+  if (byteLength <= 0) {
+    return new Float32Array(0);
+  }
+
+  const fh = await open(audioRaw, "r");
+  try {
+    const buf = Buffer.alloc(byteLength);
+    const { bytesRead } = await fh.read(buf, 0, byteLength, byteOffset);
+    return new Float32Array(
+      buf.buffer,
+      buf.byteOffset,
+      Math.floor(bytesRead / 4)
+    );
+  } finally {
+    await fh.close();
+  }
 }
 
 // Load the cached silence analysis, recomputing when the cache is missing,
@@ -96,7 +150,7 @@ export async function loadAudioAnalysis(
 ): Promise<AudioAnalysis> {
   const paths = projectPaths(slug);
   if (!existsSync(paths.audioRaw)) {
-    throw missingAudioRawError(paths.audioRaw);
+    throw missingAudioRawError();
   }
   const sourceMtimeMs = (await stat(paths.audioRaw)).mtimeMs;
   const cachePath = audioAnalysisPath(slug);

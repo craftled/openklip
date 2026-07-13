@@ -15,6 +15,7 @@ import {
   type Dispatch,
   type SetStateAction,
   useCallback,
+  useEffect,
   useState,
 } from "react";
 import type { AudioMeasureView, AudioPatch } from "@/components/audio-controls";
@@ -31,7 +32,21 @@ import {
 import type { ExportPatch } from "@/components/reframe-controls";
 import type { ProjectSaves } from "@/hooks/use-project-saves";
 import { toastError } from "@/lib/app-toast";
-import { type DeadAirItem, reconcileDeadAirItems } from "@/lib/dead-air-state";
+import {
+  buildBulkSilenceUndoSnapshot,
+  chunkDeadAirSpans,
+  deadAirCandidatesFromReport,
+} from "@/lib/cleanup-silence";
+import type {
+  CleanupUndoSnapshot,
+  ToggleableCleanupCategory,
+} from "@/lib/cleanup-tab";
+import { reconcileDeadAirItems } from "@/lib/dead-air-state";
+import {
+  createdDeadAirIdsFromTouches,
+  type DeadAirTouch,
+  deadAirItemsFromTouches,
+} from "@/lib/dead-air-touch";
 import {
   DEAD_AIR_ADD_BATCH_SIZE,
   DEFAULT_CUT_SNAP,
@@ -104,6 +119,12 @@ export function useProjectConfigActions({
   const [audioMeasuring, setAudioMeasuring] = useState(false);
   const [applyingVision, setApplyingVision] = useState(false);
   const [detectingHighlights, setDetectingHighlights] = useState(false);
+  const [lastCleanupUndo, setLastCleanupUndo] =
+    useState<CleanupUndoSnapshot | null>(null);
+
+  useEffect(() => {
+    setLastCleanupUndo(null);
+  }, [project.slug]);
 
   const addGraphicPlacement = useCallback(() => {
     if (!chosenGraphicTemplate) {
@@ -365,6 +386,10 @@ export function useProjectConfigActions({
   const applyCleanupCandidate = useCallback(
     (candidate: CleanupCandidate) => {
       if (candidate.kind === "filler") {
+        setLastCleanupUndo({
+          wordIds: candidate.wordIds,
+          deadAirSpanIds: [],
+        });
         setProject(
           (prev) =>
             reanchoredWordUpdate(
@@ -402,7 +427,12 @@ export function useProjectConfigActions({
           spans: [{ fromSec: candidate.startSec, toSec: candidate.endSec }],
         });
         if (r.ok) {
-          const created = r.data.result as DeadAirItem[];
+          const touches = r.data.result as DeadAirTouch[];
+          const created = deadAirItemsFromTouches(touches);
+          setLastCleanupUndo({
+            wordIds: [],
+            deadAirSpanIds: createdDeadAirIdsFromTouches(touches),
+          });
           setProject((prev) => ({
             ...prev,
             cuts: {
@@ -421,6 +451,110 @@ export function useProjectConfigActions({
     [enqueueSave, project.slug, setProject]
   );
 
+  const applyAllSilences = useCallback(() => {
+    const deadAirSpans = deadAirCandidatesFromReport(
+      cleanupReport.candidates
+    ).map((candidate) => ({
+      fromSec: candidate.startSec,
+      toSec: candidate.endSec,
+    }));
+    if (deadAirSpans.length === 0) {
+      return;
+    }
+    const optimisticId = `da${Date.now()}`;
+    setProject((prev) => ({
+      ...prev,
+      cuts: {
+        ...prev.cuts,
+        deadAir: [
+          ...(prev.cuts?.deadAir ?? []),
+          ...deadAirSpans.map((span, index) => ({
+            id: `${optimisticId}-${index}`,
+            startSample: Math.round(span.fromSec * project.sampleRate),
+            endSample: Math.round(span.toSec * project.sampleRate),
+          })),
+        ],
+      },
+    }));
+    enqueueSave(async () => {
+      const touchBatches: DeadAirTouch[] = [];
+      for (const batch of chunkDeadAirSpans(
+        deadAirSpans,
+        DEAD_AIR_ADD_BATCH_SIZE
+      )) {
+        const r = await runGuiAction(project.slug, "dead-air-add", {
+          spans: batch,
+        });
+        if (!r.ok) {
+          router.refresh();
+          return r;
+        }
+        touchBatches.push(...(r.data.result as DeadAirTouch[]));
+      }
+      const created = deadAirItemsFromTouches(touchBatches);
+      setLastCleanupUndo(
+        buildBulkSilenceUndoSnapshot(createdDeadAirIdsFromTouches(touchBatches))
+      );
+      setProject((prev) => ({
+        ...prev,
+        cuts: {
+          ...prev.cuts,
+          deadAir: reconcileDeadAirItems(
+            prev.cuts?.deadAir ?? [],
+            created,
+            (id) => id.startsWith(optimisticId)
+          ),
+        },
+      }));
+      router.refresh();
+      return { ok: true } as const;
+    });
+  }, [
+    cleanupReport.candidates,
+    enqueueSave,
+    project.sampleRate,
+    project.slug,
+    router,
+    setProject,
+  ]);
+
+  const patchCleanupThreshold = useCallback(
+    (field: "keepPadSec" | "minSec", value: number) => {
+      setProject((prev) => ({
+        ...prev,
+        cuts: {
+          ...prev.cuts,
+          cleanup: {
+            minSec:
+              field === "minSec"
+                ? value
+                : (prev.cuts?.cleanup?.minSec ?? cleanupReport.config.minSec),
+            keepPadSec:
+              field === "keepPadSec"
+                ? value
+                : (prev.cuts?.cleanup?.keepPadSec ??
+                  cleanupReport.config.keepPadSec),
+            categories: {
+              hesitation:
+                prev.cuts?.cleanup?.categories?.hesitation ??
+                cleanupReport.config.categories.hesitation,
+              hedging:
+                prev.cuts?.cleanup?.categories?.hedging ??
+                cleanupReport.config.categories.hedging,
+              repeat:
+                prev.cuts?.cleanup?.categories?.repeat ??
+                cleanupReport.config.categories.repeat,
+            },
+          },
+        },
+      }));
+      enqueueSave(() =>
+        runGuiAction(project.slug, "cleanup-config", { [field]: value })
+      );
+    },
+    [cleanupReport.config, enqueueSave, project.slug, setProject]
+  );
+
   const applyAllSafeCleanup = useCallback(() => {
     const { fillerIds, deadAirSpans } = partitionSafeCandidates(
       cleanupReport.candidates
@@ -437,13 +571,20 @@ export function useProjectConfigActions({
             true
           ) as unknown as EditorProject
       );
-      enqueueSave(() =>
-        runGuiAction(project.slug, "cut", {
+      enqueueSave(async () => {
+        const r = await runGuiAction(project.slug, "cut", {
           ids: fillerIds,
           deleted: true,
           note: "cleanup: apply all safe",
-        })
-      );
+        });
+        if (r.ok) {
+          setLastCleanupUndo({
+            wordIds: fillerIds,
+            deadAirSpanIds: [],
+          });
+        }
+        return r;
+      });
     }
     if (deadAirSpans.length > 0) {
       const optimisticId = `da${Date.now()}`;
@@ -462,7 +603,7 @@ export function useProjectConfigActions({
         },
       }));
       enqueueSave(async () => {
-        const created: DeadAirItem[] = [];
+        const touchBatches: DeadAirTouch[] = [];
         for (let i = 0; i < deadAirSpans.length; i += DEAD_AIR_ADD_BATCH_SIZE) {
           const batch = deadAirSpans.slice(i, i + DEAD_AIR_ADD_BATCH_SIZE);
           const r = await runGuiAction(project.slug, "dead-air-add", {
@@ -472,8 +613,13 @@ export function useProjectConfigActions({
             router.refresh();
             return r;
           }
-          created.push(...(r.data.result as DeadAirItem[]));
+          touchBatches.push(...(r.data.result as DeadAirTouch[]));
         }
+        const created = deadAirItemsFromTouches(touchBatches);
+        setLastCleanupUndo({
+          wordIds: fillerIds,
+          deadAirSpanIds: createdDeadAirIdsFromTouches(touchBatches),
+        });
         setProject((prev) => ({
           ...prev,
           cuts: {
@@ -485,6 +631,7 @@ export function useProjectConfigActions({
             ),
           },
         }));
+        router.refresh();
         return { ok: true } as const;
       });
     }
@@ -496,6 +643,126 @@ export function useProjectConfigActions({
     router,
     setProject,
   ]);
+
+  const toggleCleanupCategory = useCallback(
+    (category: ToggleableCleanupCategory, enabled: boolean) => {
+      setProject((prev) => ({
+        ...prev,
+        cuts: {
+          ...prev.cuts,
+          cleanup: {
+            minSec: prev.cuts?.cleanup?.minSec ?? cleanupReport.config.minSec,
+            keepPadSec:
+              prev.cuts?.cleanup?.keepPadSec ?? cleanupReport.config.keepPadSec,
+            categories: {
+              hesitation:
+                prev.cuts?.cleanup?.categories?.hesitation ??
+                cleanupReport.config.categories.hesitation,
+              hedging:
+                prev.cuts?.cleanup?.categories?.hedging ??
+                cleanupReport.config.categories.hedging,
+              repeat:
+                prev.cuts?.cleanup?.categories?.repeat ??
+                cleanupReport.config.categories.repeat,
+              [category]: enabled,
+            },
+          },
+        },
+      }));
+      enqueueSave(async () => {
+        const r = await runGuiAction(project.slug, "cleanup-config", {
+          [category]: enabled,
+        });
+        if (r.ok) {
+          router.refresh();
+        }
+        return r;
+      });
+    },
+    [cleanupReport.config, enqueueSave, project.slug, router, setProject]
+  );
+
+  const applyEnabledCleanup = useCallback(() => {
+    enqueueSave(async () => {
+      const r = await runGuiAction(project.slug, "cleanup-apply", {
+        mode: "enabled",
+      });
+      if (!r.ok) {
+        return r;
+      }
+      const result = r.data.result as {
+        deadAirSpanIds: string[];
+        wordIds: string[];
+      };
+      setLastCleanupUndo(result);
+      if (result.wordIds.length > 0) {
+        setProject(
+          (prev) =>
+            reanchoredWordUpdate(
+              prev as unknown as EngineProject,
+              new Set(result.wordIds),
+              true
+            ) as unknown as EditorProject
+        );
+      }
+      router.refresh();
+      return r;
+    });
+  }, [enqueueSave, project.slug, router, setProject]);
+
+  const undoLastCleanup = useCallback(() => {
+    if (!lastCleanupUndo) {
+      return;
+    }
+    const undo = lastCleanupUndo;
+    if (undo.wordIds.length > 0) {
+      setProject(
+        (prev) =>
+          reanchoredWordUpdate(
+            prev as unknown as EngineProject,
+            new Set(undo.wordIds),
+            false
+          ) as unknown as EditorProject
+      );
+    }
+    if (undo.deadAirSpanIds.length > 0) {
+      setProject((prev) => ({
+        ...prev,
+        cuts: {
+          ...prev.cuts,
+          deadAir: (prev.cuts?.deadAir ?? []).filter(
+            (span) => !undo.deadAirSpanIds.includes(span.id)
+          ),
+        },
+      }));
+    }
+    enqueueSave(async () => {
+      if (undo.wordIds.length > 0) {
+        const cutResult = await runGuiAction(project.slug, "cut", {
+          ids: undo.wordIds,
+          deleted: false,
+        });
+        if (!cutResult.ok) {
+          toastError(cutResult.error ?? "Undo cleanup failed");
+          router.refresh();
+          return cutResult;
+        }
+      }
+      for (const id of undo.deadAirSpanIds) {
+        const rmResult = await runGuiAction(project.slug, "dead-air-rm", {
+          id,
+        });
+        if (!rmResult.ok) {
+          toastError(rmResult.error ?? "Undo cleanup failed");
+          router.refresh();
+          return rmResult;
+        }
+      }
+      setLastCleanupUndo(null);
+      router.refresh();
+      return { ok: true as const };
+    });
+  }, [enqueueSave, lastCleanupUndo, project.slug, router, setProject]);
 
   const removeDeadAirSpan = useCallback(
     (id: string) => {
@@ -742,7 +1009,9 @@ export function useProjectConfigActions({
     addGraphicPlacement,
     addMusicPlacement,
     applyAllSafeCleanup,
+    applyAllSilences,
     applyCleanupCandidate,
+    applyEnabledCleanup,
     applyingVision,
     audioMeasure,
     audioMeasuring,
@@ -750,16 +1019,20 @@ export function useProjectConfigActions({
     changeOrientation,
     detectMusicBpm,
     detectingHighlights,
+    lastCleanupUndo,
     measureAudioLoudness,
     onChooseGraphicTemplate,
     onDetectHighlights,
     onRunVisionFocus,
     onSaveBrief,
     patchAudio,
+    patchCleanupThreshold,
     patchExport,
     patchMusicPlacement,
     patchSnap,
     removeDeadAirSpan,
     removeMusicPlacement,
+    toggleCleanupCategory,
+    undoLastCleanup,
   };
 }

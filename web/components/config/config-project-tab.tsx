@@ -1,6 +1,5 @@
 "use client";
 
-import type { CleanupCandidate, CleanupReport } from "@engine/cleanup";
 import type {
   Audio,
   CutSnap,
@@ -14,7 +13,6 @@ import {
   type AudioPatch,
 } from "@/components/audio-controls";
 import { BriefEditor } from "@/components/brief-editor";
-import { CleanupPanel } from "@/components/cleanup-panel";
 import { Section } from "@/components/config/config-section";
 import { FrameBrowser } from "@/components/frame-browser";
 import {
@@ -45,8 +43,6 @@ export interface ConfigProjectTabProps {
   brief: string;
   chosenGraphicTemplate: string;
   chosenMusicAsset: string;
-  cleanupReport: CleanupReport;
-  deadAirSpans: { endSec: number; id: string; startSec: number }[];
   detectingHighlights: boolean;
   durationSec: number;
   graphicBeatCount: number;
@@ -60,8 +56,6 @@ export interface ConfigProjectTabProps {
   onAddGraphic: () => void;
   onAddGraphicAtCuts: () => void;
   onAddMusic: () => void;
-  onApplyAllSafeCleanup: () => void;
-  onApplyCleanup: (candidate: CleanupCandidate) => void;
   onAssembled: (project: EngineProject) => void;
   onBeatCountChange: (count: number) => void;
   onChooseGraphicMusicAsset: (assetId: string) => void;
@@ -76,7 +70,6 @@ export interface ConfigProjectTabProps {
   onPatchMusic: (id: string, patch: MusicPlacementPatch) => void;
   onPatchSnap: (patch: Partial<CutSnap>) => void;
   onReloadGraphicTemplates?: () => void;
-  onRemoveDeadAirSpan: (id: string) => void;
   onRemoveMusic: (id: string) => void;
   onSaveBrief: (
     text: string
@@ -99,8 +92,6 @@ export function ConfigProjectTab({
   bpmDetectingAssetId,
   chosenGraphicTemplate,
   chosenMusicAsset,
-  cleanupReport,
-  deadAirSpans,
   detectingHighlights,
   durationSec,
   graphicBeatCount,
@@ -114,8 +105,6 @@ export function ConfigProjectTab({
   onAddGraphic,
   onAddGraphicAtCuts,
   onAddMusic,
-  onApplyAllSafeCleanup,
-  onApplyCleanup,
   onAssembled,
   onBeatCountChange,
   onChooseGraphicMusicAsset,
@@ -130,7 +119,6 @@ export function ConfigProjectTab({
   onPatchMusic,
   onPatchSnap,
   onReloadGraphicTemplates,
-  onRemoveDeadAirSpan,
   onRemoveMusic,
   onSaveBrief,
   onSeekHighlight,
@@ -146,16 +134,6 @@ export function ConfigProjectTab({
       </Section>
       <Section title="Frames">
         <FrameBrowser slug={slug} />
-      </Section>
-      <Section title="Cleanup">
-        <CleanupPanel
-          applying={pendingSaves > 0}
-          onApply={onApplyCleanup}
-          onApplyAllSafe={onApplyAllSafeCleanup}
-          onRemoveSpan={onRemoveDeadAirSpan}
-          registeredSpans={deadAirSpans}
-          report={cleanupReport}
-        />
       </Section>
       <Section title="Highlights">
         <HighlightsPanel

@@ -4,8 +4,8 @@
     {
       "name": "openklip-dev",
       "runtimeExecutable": "bun",
-      "runtimeArgs": ["--bun", "next", "dev"],
-      "autoPort": true
+      "runtimeArgs": ["--bun", "next", "dev", "-p", "4399"],
+      "port": 4399
     }
   ]
 }

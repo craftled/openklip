@@ -75,7 +75,7 @@ Agent sidebar chats use `working/chats.json`, not `localStorage` (color scheme a
 
 ## What works today
 
-Verified against the current codebase (`VERSION` / `package.json` `0.41.1.3`, 1904 tests: 1901 pass, 3 skip without `OPENKLIP_INTEGRATION=1`):
+Verified against the current codebase (`VERSION` / `package.json` `0.41.1.3`, 2031 tests: 2026 pass, 5 skip without `OPENKLIP_INTEGRATION=1` and env-gated fixtures):
 
 - **Ingest**: video → local transcript + preview proxy + `project.json` (`openklip ingest`; refuses re-ingest unless `--force`)
 - **Transcript editing**: click words to toggle `deleted`; `openklip cut` / `cut --text` / `restore` on CLI
@@ -97,7 +97,8 @@ Verified against the current codebase (`VERSION` / `package.json` `0.41.1.3`, 19
 - **Vision reframe sidecar** (macOS): `tools/vision-focus.swift` detects face center, falls back to attention saliency, attaches on-frame OCR text; GUI **Vision focus** button in Reframe; enriches speaker `sceneLog` segments with `focusX`/`focusY`
 - **LLM highlight detection**: `openklip highlights-detect <slug>` finds short-form clip candidates; `openklip export-highlight <slug> all` renders each to `output/highlights/{id}.mp4`; GUI **Highlights** panel (detect, list, seek)
 - **Music placement**: place a registered music asset under the edit with gain (0-2 in preview via Web Audio), fades, source in-point, and trim/loop mode (`openklip music-add` / `music-set` / `music-rm`); Config panel Music section, placed-music timeline track with drag-trim handles (parity with b-roll clips), preview bed with a mute toggle, mixed into the export by ffmpeg
-- **Cleanup review**: deterministic filler-word detection (isolated disfluencies auto-safe; ambiguous words and phrases flagged review) plus dead-air detection from real audio analysis, with per-candidate risk and an "apply all safe" batch action; `brief.md` and `project.cuts.cleanupPhrases` support **Always cut** / **Never cut** lists; Cleanup section in the Config panel, `openklip cleanup <slug> [--json] [--apply-safe]`, MCP `cleanup_report`
+- **Cleanup review**: candidates categorized as hesitations / hedging / repeats / dead-air (Cutback-style), combining deterministic filler detection, a repeated-n-gram false-start detector (immediate repeats up to 6 words, ≤0.6s apart, cut-first-keep-last), and dead-air from real audio analysis; per-candidate safe/review risk; category toggles and silence thresholds persist in `project.cuts.cleanup` (`cleanup-config` action, null unsets); one-click applies via `cleanup-apply` (`safe` keeps the legacy semantics, `enabled` applies checked categories at any risk plus all dead-air at the configured threshold, returning undo-ready span ids); `brief.md` and `project.cuts.cleanupPhrases` support **Always cut** / **Never cut** lists; dedicated Cleanup tab in the Config panel with per-category cards, bulk apply, and one-click undo; `openklip cleanup <slug> [--json] [--apply-safe] [--apply-enabled]`, MCP `cleanup_report`
+- **Cleanup silence waveform**: silence waveform on the Cleanup tab plus categorized AI cleanup apply; dead-air from audio analysis and peaks API; batch `cleanup-apply` with undo-safe created-vs-extended span tracking; MCP `cleanup_report`, actions `cleanup-apply`, `cleanup-config`, `dead-air-add`, `dead-air-rm`
 - **VAD snap + seam crossfades**: cut boundaries optionally snap onto detected silence (`cuts.snap`) and export joins the resulting seams with equal-power crossfades that reuse a few ms of removed audio to avoid clicks; wired through the exporter, preview scheduler, and every CLI/MCP range/status query so they all agree; Config panel Audio section, GUI/MCP `cuts-snap` action, and CLI `openklip cuts-snap`
 - **Ducking, loudness, voice highpass, and de-essing**: export-only audio quality pass sidechain-ducks the music bed under speech, applies single-pass loudness normalization toward a target LUFS, can highpass the voice track, and can de-ess it (ffmpeg's `deesser` filter, intensity 0-1); `openklip audio <slug>` and the Config panel Audio section (preview audio stays unprocessed)
 - **Blank canvas projects**: create motion-from-scratch without camera footage (`openklip ingest --blank`, MCP `blank_ingest`, GUI New project → Blank canvas)
@@ -123,7 +124,7 @@ Verified against the current codebase (`VERSION` / `package.json` `0.41.1.3`, 19
 - **Browser editor**: open `http://localhost:<port>/<slug>` or `/?slug=<slug>` after `openklip serve`; script-first transcript editing (select words, Delete to cut)
 - **Workspace**: macOS folder picker on empty landing; inline project create; projects root persisted in `.openklip/projects-root`
 - **CLI**: full edit surface; `openklip actions --json` mutations manifest; `openklip tools --json` full agent tool list; `openklip features --json` capability catalog from `src/features.ts`; `openklip brief <slug> --audit` ship-readiness check against `brief.md`
-- **MCP server**: `openklip mcp` (stdio) exposes 90 tools across query, mutation, task progress, revert, and export surfaces; `.cursor/mcp.json` wired for Cursor
+- **MCP server**: `openklip mcp` (stdio) exposes 92 tools across query, mutation, task progress, revert, and export surfaces; `.cursor/mcp.json` wired for Cursor
 - **Edit templates**: `templates/<id>/skill.md` playbooks; `openklip template set`; brand presets at ingest (`openklip brand`)
 - **Agent selector**: drive filler cuts via Claude Code, Codex, Cursor, or Grok subscription CLIs
 - **Design system**: default shadcn/ui tokens with Base UI primitives (`app/globals.css`, `components.json`); light/dark via `.dark` class; icons via `web/lib/icon.tsx`
@@ -188,7 +189,7 @@ In Cursor, enable the bundled MCP server (`.cursor/mcp.json`) and call the same 
 
 | Agent / surface | Mutate `project.json` in chat | Typical workflow |
 | --- | --- | --- |
-| **Cursor** (MCP enabled) | Yes, via 90 MCP tools | Chat edits call `cut`, `broll-add`, `export`, etc. directly |
+| **Cursor** (MCP enabled) | Yes, via 92 MCP tools | Chat edits call `cut`, `broll-add`, `export`, etc. directly |
 | **Claude Code / Desktop** (MCP enabled) | Yes, via MCP | Same tool surface as Cursor |
 | **Codex** | CLI hints in chat | Run `openklip` commands the model suggests |
 | **Grok / other CLIs** | CLI hints in chat | Agent selector shells out for filler cuts; mutations via terminal |

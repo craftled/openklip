@@ -1,6 +1,7 @@
 import type { SilenceSpan } from "@engine/audio-analysis-core";
 import type {
   Audio,
+  CleanupSettings,
   ColorAdjust,
   CutSnap,
   CutTransition,
@@ -79,6 +80,7 @@ export interface EditorProject {
   broll: EditorBrollItem[];
   captions?: { enabled: boolean; maxWords?: number; style?: string };
   cuts?: {
+    cleanup?: CleanupSettings;
     deadAir?: DeadAirItem[];
     snap?: CutSnap;
   };

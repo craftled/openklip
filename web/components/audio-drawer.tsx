@@ -42,7 +42,9 @@ export function AudioDrawer({
       />
       <DrawerContent className="max-h-[85vh] overflow-hidden border-border bg-background text-foreground">
         <DrawerHeader className="border-border/60 border-b px-3 py-2">
-          <DrawerTitle className="font-medium text-xs">Improve sound</DrawerTitle>
+          <DrawerTitle className="font-medium text-xs">
+            Improve sound
+          </DrawerTitle>
         </DrawerHeader>
         <div className="overflow-y-auto px-3 py-3">
           <AudioControls {...audio} />

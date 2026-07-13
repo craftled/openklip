@@ -48,6 +48,7 @@ interface TranscriptWord {
 
 interface EditorTranscriptPanelProps {
   activeMatchRange?: readonly [number, number] | null;
+  cleanupPendingWordIds?: ReadonlySet<string>;
   curSample: number;
   inBroll: (word: TranscriptWord) => boolean;
   inZoom: (word: TranscriptWord) => boolean;
@@ -66,6 +67,7 @@ interface EditorTranscriptPanelProps {
 
 export function EditorTranscriptPanel({
   activeMatchRange,
+  cleanupPendingWordIds,
   curSample,
   inBroll,
   inZoom,
@@ -91,10 +93,45 @@ export function EditorTranscriptPanel({
   const activeMatchIndices = rangeIndexSet(
     activeMatchRange ? [activeMatchRange] : undefined
   );
+  const pendingScrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
 
   useEffect(() => {
     setEditorMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (pendingScrollTimerRef.current) {
+      clearTimeout(pendingScrollTimerRef.current);
+    }
+    if (!cleanupPendingWordIds || cleanupPendingWordIds.size === 0) {
+      return;
+    }
+    pendingScrollTimerRef.current = setTimeout(() => {
+      const viewport = scrollAreaRef.current?.querySelector<HTMLElement>(
+        "[data-slot='scroll-area-viewport']"
+      );
+      if (!viewport) {
+        return;
+      }
+      const firstIndex = words.findIndex((word) =>
+        cleanupPendingWordIds.has(word.id)
+      );
+      if (firstIndex < 0) {
+        return;
+      }
+      const target = viewport.querySelector<HTMLElement>(
+        `[data-word-index="${firstIndex}"]`
+      );
+      target?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }, 120);
+    return () => {
+      if (pendingScrollTimerRef.current) {
+        clearTimeout(pendingScrollTimerRef.current);
+      }
+    };
+  }, [cleanupPendingWordIds, words]);
 
   useEffect(() => {
     if (!selRange) {
@@ -266,6 +303,10 @@ export function EditorTranscriptPanel({
                       inZoom={inZoom(word)}
                       isActiveMatch={activeMatchIndices.has(index)}
                       isMatch={matchedWordIndices.has(index)}
+                      isPendingCut={
+                        !word.deleted &&
+                        (cleanupPendingWordIds?.has(word.id) ?? false)
+                      }
                       isSelected={
                         selRange != null &&
                         index >= selRange[0] &&
@@ -638,6 +679,7 @@ function TranscriptWordButton({
   index,
   isActiveMatch,
   isMatch,
+  isPendingCut,
   isSelected,
   onSelect,
   onViewInHistory,
@@ -650,6 +692,7 @@ function TranscriptWordButton({
   index: number;
   isActiveMatch: boolean;
   isMatch: boolean;
+  isPendingCut: boolean;
   isSelected: boolean;
   onSelect: () => void;
   onViewInHistory?: (revisionAfter: number) => void;
@@ -670,6 +713,8 @@ function TranscriptWordButton({
         "transcript-word cursor-text text-left leading-[inherit] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35",
         word.deleted &&
           "text-muted-foreground/65 line-through decoration-1 decoration-muted-foreground/45",
+        isPendingCut &&
+          "underline decoration-2 decoration-primary/55 decoration-dashed underline-offset-[0.2em]",
         active && !word.deleted && "text-foreground",
         inBroll &&
           "underline decoration-1 decoration-border/60 underline-offset-[0.2em] opacity-95",
@@ -682,6 +727,7 @@ function TranscriptWordButton({
       }
       data-word-active={active && !word.deleted ? "true" : undefined}
       data-word-index={index}
+      data-word-pending-cut={isPendingCut ? "true" : undefined}
       data-word-selected={isSelected ? "true" : undefined}
       onDoubleClick={onSelect}
       onMouseDown={(event) => {

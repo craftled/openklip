@@ -2,6 +2,7 @@ export const CONFIG_TABS = [
   "edit",
   "look",
   "project",
+  "cleanup",
   "tools",
   "history",
 ] as const;
@@ -12,6 +13,7 @@ export const CONFIG_TAB_LABELS: Record<ConfigTabId, string> = {
   edit: "Edit",
   look: "Look",
   project: "Project",
+  cleanup: "Cleanup",
   tools: "Tools",
   history: "History",
 };

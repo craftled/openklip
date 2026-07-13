@@ -17,12 +17,12 @@ export function ConfigTabBar({
 }) {
   return (
     <div
-      className="w-full shrink-0 border-border/80 border-b px-2 py-1.5"
+      className="w-full shrink-0 overflow-x-auto border-border/80 border-b px-1 py-1"
       data-config-tab-bar
     >
       <ToggleGroup
         aria-label="Config section"
-        className="grid w-full grid-cols-5"
+        className="inline-flex w-max min-w-full"
         onValueChange={(value) => {
           const nextTab = Array.isArray(value) ? value[0] : value;
           if (nextTab) {
@@ -38,7 +38,7 @@ export function ConfigTabBar({
         {CONFIG_TABS.map((tab, index) => (
           <ToggleGroupItem
             className={cn(
-              "h-7! w-full px-1! text-[0.7rem]",
+              "h-7! shrink-0 px-2! text-[0.65rem]",
               index === 0 && "rounded-r-none! rounded-l-md!",
               index === CONFIG_TABS.length - 1 &&
                 "rounded-r-md! rounded-l-none!",
