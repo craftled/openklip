@@ -10,6 +10,7 @@ import type { Project } from "@engine/edl";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { CamMixTimeline } from "@/components/cam-mix-timeline";
+import { CamOverrideForm } from "@/components/cam-override-form";
 import { CamRowView } from "@/components/cam-row";
 import { CONFIG_COMPACT_INPUT_CLASS } from "@/components/config/config-section";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,7 @@ import { selectDroppedVideo } from "@/lib/project-intake";
 import { cn } from "@/lib/utils";
 import {
   camMixAction,
+  camOverrideAction,
   camSetAction,
   listCamsAction,
 } from "../../app/actions.ts";
@@ -250,6 +252,7 @@ export interface CamSwitchPanelViewProps {
   onAddCamRoleChange: (role: CamRole) => void;
   onCamNameChange: (camId: string, name: string) => void;
   onCamOffsetChange: (camId: string, offsetMs: number) => void;
+  onCamOverride: (fromSec: number, toSec: number, shot: string) => void;
   onCamRoleChange: (camId: string, role: CamRole) => void;
   onModeChange: (mode: CamSwitchMode) => void;
   onRemix: () => void;
@@ -277,6 +280,7 @@ export function CamSwitchPanelView({
   onAddCamRoleChange,
   onCamNameChange,
   onCamOffsetChange,
+  onCamOverride,
   onCamRoleChange,
   onModeChange,
   onRemix,
@@ -287,7 +291,8 @@ export function CamSwitchPanelView({
   slug,
 }: CamSwitchPanelViewProps) {
   const canRemix = speakerCount(cams) >= 2;
-  const showTimeline = mode === "auto" && (multicam?.plan.length ?? 0) > 0;
+  const showTimeline = (multicam?.plan.length ?? 0) > 0;
+  const showOverride = Boolean(multicam) && cams.length > 0;
   const speakerCams = cams.filter((cam) => cam.role === "speaker");
   const atCamLimit = cams.length >= MAX_CAMS;
 
@@ -384,20 +389,28 @@ export function CamSwitchPanelView({
         role="radiogroup"
       >
         {MODE_OPTIONS.map((option) => (
-          <div className="flex flex-col gap-1.5" key={option.id}>
-            <ModeCard
-              active={mode === option.id}
-              description={option.description}
-              id={option.id}
-              label={option.label}
-              onSelect={onModeChange}
-            />
-            {option.id === "auto" && showTimeline && multicam ? (
-              <CamMixTimeline cams={cams} plan={multicam.plan} />
-            ) : null}
-          </div>
+          <ModeCard
+            active={mode === option.id}
+            description={option.description}
+            id={option.id}
+            key={option.id}
+            label={option.label}
+            onSelect={onModeChange}
+          />
         ))}
       </div>
+
+      {showTimeline && multicam ? (
+        <CamMixTimeline cams={cams} plan={multicam.plan} />
+      ) : null}
+
+      {showOverride ? (
+        <CamOverrideForm
+          cams={cams}
+          disabled={mixing}
+          onSubmit={onCamOverride}
+        />
+      ) : null}
 
       {loadingCams ? (
         <p className="text-muted-foreground text-xs">Loading cameras…</p>
@@ -645,6 +658,32 @@ export function CamSwitchPanel({
     }
   }, [mode, onRemixed, router, settings, slug]);
 
+  const onCamOverride = useCallback(
+    async (fromSec: number, toSec: number, shot: string) => {
+      setMixing(true);
+      setMixError(null);
+      try {
+        const result = await camOverrideAction(slug, { fromSec, toSec, shot });
+        if (!result.ok) {
+          setMixError(result.error);
+          return;
+        }
+        const remixed = result.data.project as Project & {
+          multicam?: MulticamProvenance | null;
+        };
+        setMulticam(remixed.multicam ?? null);
+        if (remixed.multicam?.settings) {
+          setSettings(remixed.multicam.settings);
+        }
+        onRemixed?.(remixed);
+        router.refresh();
+      } finally {
+        setMixing(false);
+      }
+    },
+    [onRemixed, router, slug]
+  );
+
   if (!(visible || loadingCams)) {
     return null;
   }
@@ -667,6 +706,9 @@ export function CamSwitchPanel({
       onAddCamRoleChange={setAddCamRole}
       onCamNameChange={onCamNameChange}
       onCamOffsetChange={onCamOffsetChange}
+      onCamOverride={(fromSec, toSec, shot) =>
+        void onCamOverride(fromSec, toSec, shot)
+      }
       onCamRoleChange={onCamRoleChange}
       onModeChange={setMode}
       onRemix={() => void onRemix()}

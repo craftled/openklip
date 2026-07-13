@@ -2,6 +2,7 @@
 
 import type { CleanupCandidate, CleanupReport } from "@engine/cleanup";
 import { CleanupPanel } from "@/components/cleanup-panel";
+import type { CleanupSilenceProgress } from "@/components/cleanup-silence-card";
 import { Section } from "@/components/config/config-section";
 import type {
   CleanupUndoSnapshot,
@@ -29,6 +30,8 @@ export interface ConfigCleanupTabProps {
   onUndoLast: () => void;
   registeredSpans: { endSec: number; id: string; startSec: number }[];
   report: CleanupReport;
+  silencesLoading?: boolean;
+  silencesProgress?: CleanupSilenceProgress | null;
   slug: string;
 }
 
@@ -47,6 +50,8 @@ export function ConfigCleanupTab({
   onUndoLast,
   registeredSpans,
   report,
+  silencesLoading,
+  silencesProgress,
   slug,
 }: ConfigCleanupTabProps) {
   return (
@@ -66,6 +71,8 @@ export function ConfigCleanupTab({
         onUndoLast={onUndoLast}
         registeredSpans={registeredSpans}
         report={report}
+        silencesLoading={silencesLoading}
+        silencesProgress={silencesProgress}
         slug={slug}
       />
     </Section>

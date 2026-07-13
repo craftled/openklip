@@ -82,6 +82,7 @@ function renderPanel(
       onAddCamRoleChange={noop}
       onCamNameChange={noop}
       onCamOffsetChange={noop}
+      onCamOverride={noop}
       onCamRoleChange={noop}
       onModeChange={noop}
       onRemix={noop}
@@ -233,4 +234,32 @@ test("empty state points users to add camera control", () => {
   const html = renderPanel({ cams: [], loadingCams: false });
   assert.match(html, /data-cam-empty/);
   assert.match(html, /Add a camera file above/);
+});
+
+test("mix timeline renders in follow mode when a plan exists", () => {
+  const html = renderPanel({
+    cams: [
+      cam({ id: "cam1", name: "Speaker 1" }),
+      cam({ id: "cam2", name: "Speaker 2" }),
+    ],
+    mode: "follow",
+    multicam: multicam({
+      mode: "follow",
+      plan: plan([
+        { fromSample: 0, toSample: sec(6), shot: "cam1" },
+        { fromSample: sec(6), toSample: sec(10), shot: "cam2" },
+      ]),
+    }),
+  });
+  assert.match(html, /data-cam-mix-timeline/);
+});
+
+test("cam override form renders when multicam provenance exists", () => {
+  const html = renderPanel({
+    cams: [cam({ id: "cam1" }), cam({ id: "cam2", name: "Speaker 2" })],
+    multicam: multicam({ mode: "follow" }),
+  });
+  assert.match(html, /data-cam-override-form/);
+  assert.match(html, /Lock shot span/);
+  assert.match(html, /data-cam-override-apply/);
 });

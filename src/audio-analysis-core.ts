@@ -116,6 +116,31 @@ export function analyzeSilences(
   return spans;
 }
 
+/** Merge adjacent or overlapping silence spans (used after chunked PCM analysis). */
+export function mergeSilenceSpans(
+  spans: SilenceSpan[],
+  mergeGapSec = 0.05
+): SilenceSpan[] {
+  if (spans.length === 0) {
+    return [];
+  }
+  const sorted = [...spans].sort((a, b) => a.startSec - b.startSec);
+  const merged: SilenceSpan[] = [{ ...sorted[0] }];
+  for (let i = 1; i < sorted.length; i++) {
+    const current = sorted[i];
+    const prev = merged.at(-1);
+    if (!prev) {
+      break;
+    }
+    if (current.startSec <= prev.endSec + mergeGapSec) {
+      prev.endSec = Math.max(prev.endSec, current.endSec);
+    } else {
+      merged.push({ ...current });
+    }
+  }
+  return merged;
+}
+
 // Min/max peak buckets over a PCM span: divide [fromSec, toSec) into equal
 // time slices (clamped to the available samples) and report each bucket's
 // sample extrema. Empty buckets (no samples in range) report {min:0, max:0}.

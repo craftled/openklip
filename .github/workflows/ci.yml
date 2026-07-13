@@ -36,6 +36,9 @@ jobs:
       - name: Agent loop smoke audit
         run: bun run agent-smoke-audit
 
+      - name: Cam devex smoke
+        run: bun run cam-devex-smoke
+
       - name: Build
         run: bun run build
 

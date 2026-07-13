@@ -9,7 +9,10 @@ import {
 import type { Project } from "@engine/edl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AgentModelSelect } from "@/components/agent-model-select";
-import { CleanupSilenceCard } from "@/components/cleanup-silence-card";
+import {
+  CleanupSilenceCard,
+  type CleanupSilenceProgress,
+} from "@/components/cleanup-silence-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -411,6 +414,8 @@ export interface CleanupPanelProps {
   peaksOverride?: CleanupPeaksResponse | null;
   registeredSpans?: RegisteredDeadAirSpan[];
   report: CleanupReport;
+  silencesLoading?: boolean;
+  silencesProgress?: CleanupSilenceProgress | null;
   slug: string;
 }
 
@@ -437,6 +442,8 @@ export function CleanupPanel({
   peaksOverride,
   registeredSpans,
   report,
+  silencesLoading,
+  silencesProgress,
   slug,
 }: CleanupPanelProps) {
   const [aiCandidates, setAiCandidates] =
@@ -550,6 +557,8 @@ export function CleanupPanel({
         peaksOverride={peaksOverride}
         report={report}
         selectedCandidate={selectedDeadAirCandidate}
+        silencesLoading={silencesLoading}
+        silencesProgress={silencesProgress}
         slug={slug}
       />
 

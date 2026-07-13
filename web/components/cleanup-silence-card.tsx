@@ -53,6 +53,13 @@ function ThresholdSlider({
   );
 }
 
+export interface CleanupSilenceProgress {
+  message: string;
+  phase: "analyzing" | "reading" | "writing";
+  step: number;
+  total: number;
+}
+
 export interface CleanupSilenceCardProps {
   applying?: boolean;
   onApplyAllSilences: () => void;
@@ -60,6 +67,8 @@ export interface CleanupSilenceCardProps {
   peaksOverride?: CleanupPeaksResponse | null;
   report: CleanupReport;
   selectedCandidate: CleanupCandidate | null;
+  silencesLoading?: boolean;
+  silencesProgress?: CleanupSilenceProgress | null;
   slug: string;
 }
 
@@ -70,6 +79,8 @@ export function CleanupSilenceCard({
   peaksOverride,
   report,
   selectedCandidate,
+  silencesLoading = false,
+  silencesProgress = null,
   slug,
 }: CleanupSilenceCardProps) {
   const deadAirCandidates = useMemo(
@@ -99,6 +110,18 @@ export function CleanupSilenceCard({
             report.config.keepPadSec
           )}
         </p>
+        {silencesLoading || silencesProgress ? (
+          <p
+            className="text-muted-foreground text-xs"
+            data-cleanup-silences-progress
+          >
+            {silencesProgress?.message ??
+              "Analyzing silences for dead-air detection…"}
+            {silencesProgress
+              ? ` (${silencesProgress.step}/${silencesProgress.total})`
+              : null}
+          </p>
+        ) : null}
       </div>
 
       <div className="flex flex-col gap-2">

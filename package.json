@@ -77,6 +77,7 @@
     "agent-make-highlights": "bun run scripts/agent-make-highlights.ts",
     "generate-multicam-fixture": "bun run scripts/generate-multicam-fixture.ts",
     "multicam-acceptance": "bun test --isolate tests/multicam-acceptance.test.ts",
+    "cam-devex-smoke": "bun run scripts/cam-devex-smoke.ts",
     "demo-gif": "bash scripts/record-demo-gif.sh",
     "test": "bun test --isolate",
     "test:integration": "OPENKLIP_INTEGRATION=1 bun test tests/transcript-diff-browser.test.ts tests/json-graphic-browser.test.ts",

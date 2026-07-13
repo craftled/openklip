@@ -6,7 +6,7 @@ import { loadBrief, saveBrief as saveBriefFile } from "@engine/brief";
 import { logBriefSet } from "@engine/brief-log";
 import type { camMix } from "@engine/cam-mix";
 import type { CamSwitchSettings } from "@engine/cam-plan";
-import { camMixOrRemix } from "@engine/cam-remix";
+import { camMixOrRemix, camRemix } from "@engine/cam-remix";
 import { type CamRole, listCams, setCam } from "@engine/cams";
 import type {
   ColorAdjust,
@@ -600,6 +600,32 @@ export async function camSetAction(
   try {
     const cam = await setCam(slug, camId, patch);
     return { ok: true, data: { cam } };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function camOverrideAction(
+  slug: string,
+  input: { fromSec: number; shot: string; toSec: number }
+): Promise<
+  ActionResult<{
+    mix: Awaited<ReturnType<typeof camRemix>>;
+    project: Project;
+  }>
+> {
+  try {
+    const mix = await camRemix(slug, {
+      overrides: [
+        {
+          fromSec: input.fromSec,
+          toSec: input.toSec,
+          shot: input.shot,
+        },
+      ],
+    });
+    const project = await loadProject(slug);
+    return { ok: true, data: { mix, project } };
   } catch (e) {
     return fail(e);
   }

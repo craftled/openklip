@@ -28,6 +28,7 @@ import {
   DEFAULT_SAMPLE_RATE,
   DEFAULT_THRESHOLD_DB,
   DEFAULT_WINDOW_MS,
+  mergeSilenceSpans,
   type SilenceSpan,
 } from "./audio-analysis-core.ts";
 import { projectPaths } from "./paths.ts";
@@ -154,6 +155,46 @@ function resolveAnalysisOpts(opts: AnalyzeSilencesOpts = {}) {
   };
 }
 
+const PCM_CHUNK_SEC = 120;
+
+async function analyzePcmChunked(
+  slug: string,
+  resolved: ReturnType<typeof resolveAnalysisOpts>,
+  onProgress?: (p: AudioAnalysisProgress) => void
+): Promise<SilenceSpan[]> {
+  const audioRaw = projectPaths(slug).audioRaw;
+  const fileStat = await stat(audioRaw);
+  const totalSec = Math.floor(fileStat.size / 4) / resolved.sampleRate;
+  const chunkCount = Math.max(1, Math.ceil(totalSec / PCM_CHUNK_SEC));
+  const totalSteps = chunkCount + 2;
+  const spans: SilenceSpan[] = [];
+
+  for (let i = 0; i < chunkCount; i++) {
+    const fromSec = i * PCM_CHUNK_SEC;
+    const toSec = Math.min(totalSec, (i + 1) * PCM_CHUNK_SEC);
+    onProgress?.({
+      phase: "reading",
+      message: `Reading audio chunk ${i + 1}/${chunkCount}`,
+      step: i + 1,
+      total: totalSteps,
+    });
+    const pcm = await readPcmRange(slug, fromSec, toSec, resolved.sampleRate);
+    const chunkSpans = analyzeSilencesPure(pcm, resolved).map((span) => ({
+      startSec: span.startSec + fromSec,
+      endSec: span.endSec + fromSec,
+    }));
+    spans.push(...chunkSpans);
+  }
+
+  onProgress?.({
+    phase: "analyzing",
+    message: "Merging silence spans",
+    step: chunkCount + 1,
+    total: totalSteps,
+  });
+  return mergeSilenceSpans(spans);
+}
+
 // Return a fresh cached analysis when the on-disk cache is valid for the
 // current audio source and requested options; null when a cold compute is
 // needed. Throws missingAudioRawError when audio16k.f32 is absent.
@@ -201,21 +242,7 @@ export async function computeAudioAnalysis(
   const cachePath = audioAnalysisPath(slug);
   const resolved = resolveAnalysisOpts(opts);
 
-  onProgress?.({
-    phase: "reading",
-    message: "Reading audio PCM",
-    step: 1,
-    total: 3,
-  });
-  const pcm = await readPcm(slug);
-
-  onProgress?.({
-    phase: "analyzing",
-    message: "Detecting silences",
-    step: 2,
-    total: 3,
-  });
-  const silences = analyzeSilences(pcm, resolved);
+  const silences = await analyzePcmChunked(slug, resolved, onProgress);
 
   const analysis: AudioAnalysis = {
     version: 1,
@@ -224,11 +251,14 @@ export async function computeAudioAnalysis(
     silences,
   };
 
+  const fileStat = await stat(paths.audioRaw);
+  const totalSec = Math.floor(fileStat.size / 4) / resolved.sampleRate;
+  const chunkCount = Math.max(1, Math.ceil(totalSec / PCM_CHUNK_SEC));
   onProgress?.({
     phase: "writing",
     message: "Writing cache",
-    step: 3,
-    total: 3,
+    step: chunkCount + 2,
+    total: chunkCount + 2,
   });
   await writeCache(paths.working, cachePath, analysis);
   return analysis;
