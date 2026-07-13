@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- **Multicam GUI parity** (PR #101): Config → Project **Cameras** ingests cams, edits name/role/offset, tunes mix guardrails, locks manual shot spans (`camOverrideAction`), and shows the mix timeline in follow and auto modes.
+- **Cam devex smoke**: `bun run cam-devex-smoke` and `tests/cam-devex-smoke.test.ts` exercise lavfi twin-cam mix plus override in the full test suite.
+
+### Changed
+- **Chunked silence analysis**: `computeAudioAnalysis` reads `audio16k.f32` in 120s PCM chunks with seam overlap and `mergeSilenceSpans`; the Cleanup silence card shows background-job progress while silences hydrate.
+
 ## 0.42.0.0 - 2026-07-12
 
 ### Added

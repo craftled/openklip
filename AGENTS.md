@@ -395,6 +395,12 @@ bun run agent-smoke-audit --revise
 bun run agent-smoke-audit --all
 ```
 
+`cam-devex-smoke`: deterministic lavfi twin-cam mix plus locked override (`tests/cam-devex-smoke.test.ts` in the suite).
+
+```bash
+bun run cam-devex-smoke
+```
+
 ## Editing guardrails
 
 - **Cut whole sentences, not single words.** Removing one word mid-sentence usually leaves an audible jump; cut the full thought.

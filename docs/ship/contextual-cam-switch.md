@@ -1,5 +1,7 @@
 # Ship Report — Contextual cam switch (multicam), 0.42.0.0
 
+> **Historical.** v0.42.0.0 shipped 2026-07-13. Post-release multicam GUI parity and cleanup hardening landed in PR #101 (`CHANGELOG.md` Unreleased, `docs/ship/pr-101-batch-ac-multicam-cleanup.md`).
+
 Date: 2026-07-12. Mode: Check (report-only). Target: branch `claude/feature-availability-check-f784a6` → `main`.
 
 ## Target

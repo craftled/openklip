@@ -2,7 +2,20 @@
 
 Use these bodies when publishing releases. Each section matches a tag in `CHANGELOG.md` without duplicating the full changelog. **Known gaps:** always link to [TODO.md](../TODO.md#known-limitations); do not duplicate the list here.
 
-Publishing status checked on 2026-07-13: published `v0.41.1.2`, `v0.41.1.3`, and `v0.42.0.0` on GitHub. Multicam programmatic acceptance (`tests/multicam-acceptance.test.ts`) satisfies the v0.42 machinery gate; human eyeball on real per-speaker footage remains deferred.
+Publishing status checked on 2026-07-13: published `v0.41.1.2`, `v0.41.1.3`, and `v0.42.0.0` on GitHub. `main` also includes PR #101 (multicam GUI parity, chunked silence analysis, `cam-devex-smoke`); see `CHANGELOG.md` Unreleased. Multicam programmatic acceptance (`tests/multicam-acceptance.test.ts`, `tests/cam-devex-smoke.test.ts`) satisfies the machinery gate; human eyeball on real per-speaker footage remains deferred.
+
+---
+
+## Unreleased (on `main`, post-v0.42.0.0)
+
+Follow-up from PR #101. Publish when version is bumped.
+
+### Highlights
+- **Multicam GUI parity**: Config → Project **Cameras** ingests cams, edits offset/guardrails, locks manual shot spans, and shows the mix timeline in follow and auto modes (CLI/MCP parity unchanged).
+- **Cleanup hardening**: chunked PCM silence analysis (120s chunks with seam overlap) and silences-job progress on the Remove silence card.
+- **Verification**: `bun run cam-devex-smoke`, `tests/cam-devex-smoke.test.ts`, seam regression in `tests/audio-analysis.test.ts`; `bun test --isolate` (2360 tests: 2354 pass, 6 skip).
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#unreleased)
 
 ---
 
@@ -14,7 +27,7 @@ Publishing status checked on 2026-07-13: published `v0.41.1.2`, `v0.41.1.3`, and
 - **Contextual cam switch (multicam)**: ingest per-speaker cam files (`openklip cam-add`, up to 8 cams, `speaker`/`wide` roles, manual `--offset`), automatic speaker ID from per-track audio energy (no ML or cloud diarization), and mix down to a switched program with follow-speaker or LLM auto scene modes (`openklip cam-mix`), a synthetic wide shot when no physical wide cam exists, and locked manual overrides (`openklip cam-override`) that survive re-mix. CLI `cam-add` / `cams` / `cam-set` / `cam-mix` / `cam-override`; MCP `cam_add` / `list_cams` / `cam_set` / `cam_mix` / `cam_override`; GUI Config → Project **Cameras** section; `templates/cam-mix/skill.md`. Transcript words gain an optional `speaker` field (the attributed cam id) once a project has been through `cam-mix`.
 - **Moment search: text + scene**: find moments in the source footage by transcript text or visual content. Ingest indexes sample frames with a local CLIP model into `working/moment-index.json` (lazy backfill on older projects, or `openklip index`); a fourth left-rail **Search** tab (Mod+Shift+F) shows text and scene results as thumbnail cards, click seeks, and dragging a card (or its hover **Keep** button) restores any cut words in that span. Same engine on `openklip search <slug> "query"` and the MCP `moment_search` tool.
 - **Categorized cleanup (Cutback parity)**: cleanup candidates now carry a category (hesitation, hedging, repeat, dead-air) via a new deterministic repeated-n-gram detector for immediate repeats and false starts; `cleanup-config` persists category toggles and thresholds to `project.cuts.cleanup`; `cleanup-apply` (CLI `--apply-enabled`) applies enabled categories at any risk plus all dead-air at the configured threshold. A dedicated Cleanup tab in the Config panel adds a real waveform silence card, per-category cards with bulk apply and undo, and an "AI false-start pass" through the subscription agent CLI.
-- **Verification**: `bun run typecheck`, `bun run check`, `bun test --isolate` (2342 pass, 8 skip); 98 MCP tools; 54 capabilities; 46 registry actions; `bun run multicam-acceptance`.
+- **Verification**: `bun run typecheck`, `bun run check`, `bun test --isolate` (2300 tests: 2292 pass, 8 skip at tag); 98 MCP tools; 54 capabilities; 46 registry actions; `bun run multicam-acceptance`.
 
 ### Known gaps
 
