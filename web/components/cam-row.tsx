@@ -23,6 +23,7 @@ export interface CamRowViewProps {
   cams: Cam[];
   index: number;
   onNameChange: (camId: string, name: string) => void;
+  onOffsetChange: (camId: string, offsetMs: number) => void;
   onRoleChange: (camId: string, role: CamRole) => void;
   onToggleAudio: (camId: string) => void;
   playing: boolean;
@@ -34,6 +35,7 @@ export function CamRowView({
   cams,
   index,
   onNameChange,
+  onOffsetChange,
   onRoleChange,
   onToggleAudio,
   playing,
@@ -41,11 +43,16 @@ export function CamRowView({
 }: CamRowViewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [nameDraft, setNameDraft] = useState(cam.name);
+  const [offsetDraft, setOffsetDraft] = useState(String(cam.offsetMs));
   const proxyUrl = camProxyUrl(slug, cam.id);
 
   useEffect(() => {
     setNameDraft(cam.name);
   }, [cam.name]);
+
+  useEffect(() => {
+    setOffsetDraft(String(cam.offsetMs));
+  }, [cam.offsetMs]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -147,7 +154,7 @@ export function CamRowView({
           />
         </div>
       </td>
-      <td className="py-1 align-middle">
+      <td className="py-1 pr-1 align-middle">
         <Select
           onValueChange={(value) => onRoleChange(cam.id, value as CamRole)}
           value={cam.role}
@@ -163,6 +170,27 @@ export function CamRowView({
             <SelectItem value="wide">Wide</SelectItem>
           </SelectContent>
         </Select>
+      </td>
+      <td className="py-1 align-middle">
+        <Input
+          className={cn(CONFIG_COMPACT_INPUT_CLASS, "w-[4.5rem] tabular-nums")}
+          data-cam-offset={cam.id}
+          inputMode="numeric"
+          onBlur={() => {
+            const parsed = Number.parseInt(offsetDraft, 10);
+            if (Number.isFinite(parsed) && parsed !== cam.offsetMs) {
+              onOffsetChange(cam.id, parsed);
+            } else {
+              setOffsetDraft(String(cam.offsetMs));
+            }
+          }}
+          onChange={(e) => {
+            setOffsetDraft(e.target.value);
+          }}
+          title="Sync offset in milliseconds (negative values allowed)"
+          type="text"
+          value={offsetDraft}
+        />
       </td>
     </tr>
   );

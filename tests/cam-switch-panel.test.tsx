@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { MulticamProvenance } from "@engine/cam-mix";
-import type { PlanSpan } from "@engine/cam-plan";
+import { DEFAULT_CAM_SWITCH_SETTINGS, type PlanSpan } from "@engine/cam-plan";
 import type { Cam } from "@engine/cams";
 import { SAMPLE_RATE } from "@engine/edl";
 import type { ComponentProps } from "react";
@@ -66,18 +66,29 @@ function renderPanel(
 ): string {
   return renderToStaticMarkup(
     <CamSwitchPanelView
+      addCamBusy={false}
+      addCamError={null}
+      addCamName=""
+      addCamProgress={null}
+      addCamRole="speaker"
       cams={[]}
       loadingCams={false}
       mixError={null}
       mixing={false}
       mode="follow"
       multicam={null}
+      onAddCamFile={noop}
+      onAddCamNameChange={noop}
+      onAddCamRoleChange={noop}
       onCamNameChange={noop}
+      onCamOffsetChange={noop}
       onCamRoleChange={noop}
       onModeChange={noop}
       onRemix={noop}
+      onSettingsChange={noop}
       onToggleCamAudio={noop}
       playingCamId={null}
+      settings={DEFAULT_CAM_SWITCH_SETTINGS}
       slug="demo"
       {...overrides}
     />
@@ -192,4 +203,34 @@ test("re-mix button is enabled when not mixing and at least two speaker cams exi
   });
   const tag = tagWith(html, "data-cam-remix");
   assert.ok(!tag.includes('disabled=""'));
+});
+
+test("add camera control renders upload affordance", () => {
+  const html = renderPanel();
+  assert.match(html, /data-cam-add/);
+  assert.match(html, /Add camera/);
+  assert.match(html, /data-cam-add-file/);
+});
+
+test("guardrail settings render mix controls with defaults", () => {
+  const html = renderPanel({
+    settings: DEFAULT_CAM_SWITCH_SETTINGS,
+  });
+  assert.match(html, /data-cam-guardrails/);
+  assert.match(html, /Mix guardrails/);
+  assert.match(html, /data-cam-wide/);
+});
+
+test("cam row renders editable offset field wired for updates", () => {
+  const html = renderPanel({
+    cams: [cam({ id: "cam1", name: "Alice", offsetMs: -120 })],
+  });
+  assert.match(html, /data-cam-offset="cam1"/);
+  assert.match(html, /value="-120"/);
+});
+
+test("empty state points users to add camera control", () => {
+  const html = renderPanel({ cams: [], loadingCams: false });
+  assert.match(html, /data-cam-empty/);
+  assert.match(html, /Add a camera file above/);
 });

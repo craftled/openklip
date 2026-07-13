@@ -39,7 +39,7 @@ function assertCamId(camId: string): string {
   return camId;
 }
 
-function nextCamId(existing: Cam[]): string {
+export function nextCamId(existing: Cam[]): string {
   for (let n = 1; n <= MAX_CAMS; n++) {
     const id = `cam${n}`;
     if (!existing.some((cam) => cam.id === id)) {
