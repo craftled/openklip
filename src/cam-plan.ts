@@ -718,16 +718,26 @@ function enforceMinShot(
         continue;
       }
 
-      changed = true;
+      // A locked span's exact boundary is never moved to satisfy minShotMs:
+      // only extend into a neighbor that isn't itself locked, trying the
+      // other side if the first choice is unavailable. If both neighbors are
+      // locked (or absent), leave the short span as-is rather than violate
+      // a lock.
       const prev = next.at(-1);
-      if (prev) {
+      const canExtendPrev = Boolean(prev) && !prev?.locked;
+      const nextSpan = result[i + 1];
+      const canExtendNext = Boolean(nextSpan) && !nextSpan?.locked;
+
+      if (canExtendPrev && prev) {
+        changed = true;
         next[next.length - 1] = {
           ...prev,
           toSample: span.toSample,
         };
-      } else if (i + 1 < result.length) {
+      } else if (canExtendNext && nextSpan) {
+        changed = true;
         result[i + 1] = {
-          ...result[i + 1],
+          ...nextSpan,
           fromSample: span.fromSample,
         };
       } else {
@@ -967,6 +977,11 @@ export function validatePlan(
   }
 
   plan = ensureFullCoverage(plan, opts.durationSamples, fallbackShot);
+  // The validator's own contract (docs/specs/contextual-cam-switch-v1.md:78-79)
+  // includes clamping max shot length, not just min: enforce it here so every
+  // caller gets the guarantee, not only the ones that separately call
+  // enforceMaxShotVariety. Locked spans are exempt (see applyMaxShotVariety).
+  plan = applyMaxShotVariety(plan, opts.cams, settings);
   plan = enforceMinShot(plan, minShotSamples, opts.durationSamples);
   plan = mergeAdjacent(plan);
 

@@ -718,3 +718,86 @@ test("validatePlan without explicit locked opts still respects locked flags in t
     "locked end stable without opts.locked"
   );
 });
+
+// ── Third-party review regressions (grok+codex verify-the-fix round) ────────
+
+test("validatePlan: enforceMinShot never extends a locked neighbor to absorb a short unlocked remnant", () => {
+  const cams = [
+    { id: "cam-a", role: "speaker" as const },
+    { id: "cam-b", role: "speaker" as const },
+  ];
+  // Two cam-override calls placed close together: a 0.5s unlocked gap
+  // (shorter than the default 2s minShotMs) sits between them.
+  const base = [{ fromSample: 0, toSample: sec(30), shot: "cam-a" }];
+  const locked = [
+    { fromSample: sec(10), toSample: sec(15), shot: "cam-b", locked: true },
+    { fromSample: sec(15.5), toSample: sec(20), shot: "cam-a", locked: true },
+  ];
+  const out = validatePlan(base, {
+    cams,
+    durationSamples: sec(30),
+    locked,
+  });
+  const lockB = out.find((s) => s.shot === "cam-b" && s.locked);
+  const lockA2 = out.find(
+    (s) => s.shot === "cam-a" && s.locked && s.fromSample >= sec(15)
+  );
+  assert.ok(lockB, "first lock present");
+  assert.equal(lockB?.fromSample, sec(10), "first lock start unmoved");
+  assert.equal(
+    lockB?.toSample,
+    sec(15),
+    "first lock end NOT extended into the short unlocked gap"
+  );
+  assert.ok(lockA2, "second lock present");
+  assert.equal(
+    lockA2?.fromSample,
+    sec(15.5),
+    "second lock start NOT pulled backward into the short unlocked gap"
+  );
+  assertFullCoverage(out, sec(30), ["cam-a", "cam-b", "wide"]);
+});
+
+test("validatePlan enforces maxShotMs on an arbitrary unlocked plan, not only via ruleBasedAutoPlan/autoMixPlan", () => {
+  const cams = [
+    { id: "cam-a", role: "speaker" as const },
+    { id: "cam-b", role: "speaker" as const },
+  ];
+  const raw = [{ fromSample: 0, toSample: sec(60), shot: "cam-a" }];
+  const out = validatePlan(raw, {
+    cams,
+    durationSamples: sec(60),
+    settings: { maxShotMs: 10_000, minShotMs: 2000, wide: "auto" },
+  });
+  const maxShotSamples = ms(10_000);
+  for (const span of out) {
+    if (!span.locked) {
+      assert.ok(
+        span.toSample - span.fromSample <= maxShotSamples,
+        `unlocked span ${span.fromSample}-${span.toSample} (${span.shot}) exceeds maxShotMs`
+      );
+    }
+  }
+  assertFullCoverage(out, sec(60), ["cam-a", "cam-b", "wide"]);
+});
+
+test("validatePlan's maxShotMs enforcement never splits a locked span", () => {
+  const cams = [
+    { id: "cam-a", role: "speaker" as const },
+    { id: "cam-b", role: "speaker" as const },
+  ];
+  const raw = [{ fromSample: 0, toSample: sec(60), shot: "cam-a" }];
+  const locked = [
+    { fromSample: sec(0), toSample: sec(60), shot: "cam-a", locked: true },
+  ];
+  const out = validatePlan(raw, {
+    cams,
+    durationSamples: sec(60),
+    settings: { maxShotMs: 10_000 },
+    locked,
+  });
+  assert.equal(out.length, 1, "locked 60s span survives whole, not split");
+  assert.equal(out[0]?.fromSample, 0);
+  assert.equal(out[0]?.toSample, sec(60));
+  assert.equal(out[0]?.locked, true);
+});
