@@ -19,23 +19,30 @@ interface RouteParams {
 // In-memory, per-process build tracker (this server owns the single
 // projects root, same assumption src/ingest-jobs.ts makes). "building"
 // while a buildMomentIndex() run is in flight; "error" for exactly one GET
-// after a run fails, then cleared so the client's Retry button starts
-// clean. No entry at all means "never attempted, or last attempt
-// succeeded" - GET tells those apart via isMomentIndexCurrent.
-type BuildStatus = "building" | "error";
+// after a run fails (carrying the real failure message, mirroring how
+// src/ingest-jobs.ts's job status keeps `error?: string`), then cleared so
+// the client's Retry button starts clean. No entry at all means "never
+// attempted, or last attempt succeeded" - GET tells those apart via
+// isMomentIndexCurrent.
+type BuildStatus =
+  | { status: "building" }
+  | { status: "error"; message: string };
 const buildStatus = new Map<string, BuildStatus>();
 
 function startBuildIfNeeded(slug: string): void {
-  if (buildStatus.get(slug) === "building") {
+  if (buildStatus.get(slug)?.status === "building") {
     return;
   }
-  buildStatus.set(slug, "building");
+  buildStatus.set(slug, { status: "building" });
   void buildMomentIndex(slug, { force: false })
     .then(() => {
       buildStatus.delete(slug);
     })
-    .catch(() => {
-      buildStatus.set(slug, "error");
+    .catch((e) => {
+      buildStatus.set(slug, {
+        status: "error",
+        message: e instanceof Error ? e.message : "moment index build failed",
+      });
     });
 }
 
@@ -73,7 +80,7 @@ export async function GET(req: Request, { params }: RouteParams) {
   }
 
   const status = buildStatus.get(slug);
-  if (status === "error") {
+  if (status?.status === "error") {
     // One-shot: the next poll after this reverts to the plain "not indexed,
     // not building" shape, ready for another auto-retry or an explicit
     // Retry click to start a fresh build.
@@ -81,11 +88,11 @@ export async function GET(req: Request, { params }: RouteParams) {
     return Response.json({
       indexed: false,
       building: false,
-      error: true,
+      error: status.message,
       results: [],
     });
   }
-  const building = status === "building";
+  const building = status?.status === "building";
 
   const url = new URL(req.url);
   const { error: limitError, limit } = parseLimit(

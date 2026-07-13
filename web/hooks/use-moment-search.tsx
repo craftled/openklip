@@ -34,7 +34,7 @@ export interface MomentSceneResult {
 
 interface MomentSearchApiResponse {
   building: boolean;
-  error?: boolean;
+  error?: string;
   indexed: boolean;
   results: MomentSceneResult[];
 }
@@ -58,7 +58,9 @@ export function useMomentSearch({ slug, words }: UseMomentSearchParams) {
   const [sceneLoading, setSceneLoading] = useState(false);
   const [indexed, setIndexed] = useState(false);
   const [building, setBuilding] = useState(false);
-  const [buildErrored, setBuildErrored] = useState(false);
+  const [buildErrorMessage, setBuildErrorMessage] = useState<string | null>(
+    null
+  );
   const [statusChecked, setStatusChecked] = useState(false);
   const queryInputRef = useRef<HTMLInputElement>(null);
   const requestedBuildRef = useRef(false);
@@ -96,7 +98,7 @@ export function useMomentSearch({ slug, words }: UseMomentSearchParams) {
     }
     setIndexed(data.indexed);
     setBuilding(data.building);
-    setBuildErrored(Boolean(data.error));
+    setBuildErrorMessage(data.error ?? null);
   }, []);
 
   const checkStatus = useCallback(async () => {
@@ -125,7 +127,7 @@ export function useMomentSearch({ slug, words }: UseMomentSearchParams) {
       const data = (await res.json()) as { building: boolean };
       if (mountedRef.current) {
         setBuilding(data.building);
-        setBuildErrored(false);
+        setBuildErrorMessage(null);
       }
     } catch {
       // best-effort; the status poll below keeps checking
@@ -133,7 +135,7 @@ export function useMomentSearch({ slug, words }: UseMomentSearchParams) {
   }, [slug]);
 
   const retryBuild = useCallback(() => {
-    setBuildErrored(false);
+    setBuildErrorMessage(null);
     requestedBuildRef.current = false;
     void startBuild();
   }, [startBuild]);
@@ -155,13 +157,13 @@ export function useMomentSearch({ slug, words }: UseMomentSearchParams) {
       !statusChecked ||
       indexed ||
       building ||
-      buildErrored ||
+      buildErrorMessage !== null ||
       requestedBuildRef.current
     ) {
       return;
     }
     void startBuild();
-  }, [statusChecked, indexed, building, buildErrored, startBuild]);
+  }, [statusChecked, indexed, building, buildErrorMessage, startBuild]);
 
   // Poll status every 2s while a build is confirmed running.
   useEffect(() => {
@@ -173,37 +175,39 @@ export function useMomentSearch({ slug, words }: UseMomentSearchParams) {
   }, [building, checkStatus]);
 
   // Scene fetch on the debounced query, once the index is known current.
+  // Aborts the previous request on every re-run (a fresh query, or slug
+  // change): the embed worker processes one request at a time, so a
+  // superseded fetch left running would still occupy its turn and push
+  // later, still-relevant queries toward the server's request timeout.
   useEffect(() => {
     const trimmed = debouncedQuery.trim();
     if (!indexed || trimmed.length < 2) {
       setSceneResults([]);
       return;
     }
-    let alive = true;
+    const controller = new AbortController();
     setSceneLoading(true);
     fetch(
-      `/api/projects/${encodeURIComponent(slug)}/moment-search?q=${encodeURIComponent(trimmed)}&limit=${MOMENT_SEARCH_RESULT_LIMIT}`
+      `/api/projects/${encodeURIComponent(slug)}/moment-search?q=${encodeURIComponent(trimmed)}&limit=${MOMENT_SEARCH_RESULT_LIMIT}`,
+      { signal: controller.signal }
     )
       .then((res) => res.json() as Promise<MomentSearchApiResponse>)
       .then((data) => {
-        if (!alive) {
-          return;
-        }
         applyStatus(data);
         setSceneResults(data.results);
       })
-      .catch(() => {
-        if (alive) {
+      .catch((e) => {
+        if ((e as { name?: string }).name !== "AbortError") {
           setSceneResults([]);
         }
       })
       .finally(() => {
-        if (alive) {
+        if (!controller.signal.aborted) {
           setSceneLoading(false);
         }
       });
     return () => {
-      alive = false;
+      controller.abort();
     };
   }, [applyStatus, debouncedQuery, indexed, slug]);
 
@@ -228,7 +232,7 @@ export function useMomentSearch({ slug, words }: UseMomentSearchParams) {
 
   return {
     activeTab,
-    buildErrored,
+    buildErrorMessage,
     building,
     clearQuery,
     hasWords: words.length > 0,

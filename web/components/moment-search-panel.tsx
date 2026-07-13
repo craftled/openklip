@@ -29,6 +29,7 @@ import {
   formatClock,
   MOMENT_SEARCH_RESULT_LIMIT,
   momentFrameThumbnailUrl,
+  momentIndexBanner,
 } from "@/lib/moment-search-display";
 import { cn } from "@/lib/utils";
 
@@ -43,7 +44,13 @@ interface MomentSearchPanelProps {
 // shared by both tabs. Each card carries its own span (fromSec/toSec) as
 // data attributes: slice 3 turns these into drag sources, so the span data
 // needs to already live on the card rather than being threaded in later.
-function MomentResultCard({
+// Exported (alongside its siblings below) so tests can render each state
+// directly with controlled props, the same pattern TaskList in
+// web/components/task-progress-panel.tsx uses - MomentSearchPanel itself
+// pulls all of its state from the stateful useMomentSearch hook (real
+// fetch calls), so only these presentational pieces are meaningfully
+// testable via renderToStaticMarkup without a network dependency.
+export function MomentResultCard({
   children,
   fromSec,
   keepMoment,
@@ -119,7 +126,7 @@ function MomentResultCard({
   );
 }
 
-function TextResultCard({
+export function TextResultCard({
   keepMoment,
   match,
   onSeek,
@@ -161,7 +168,7 @@ function TextResultCard({
   );
 }
 
-function SceneResultCard({
+export function SceneResultCard({
   keepMoment,
   onSeek,
   result,
@@ -191,7 +198,7 @@ function SceneResultCard({
   );
 }
 
-function HintBlock({ children }: { children: ReactNode }) {
+export function HintBlock({ children }: { children: ReactNode }) {
   return (
     <div className="rounded-md border border-border bg-foreground/3 px-3 py-6 text-center text-muted-foreground text-xs">
       {children}
@@ -199,7 +206,7 @@ function HintBlock({ children }: { children: ReactNode }) {
   );
 }
 
-function IndexingRow() {
+export function IndexingRow() {
   return (
     <div
       className="flex items-center gap-2 rounded-md border border-border bg-foreground/3 px-3 py-2.5 text-muted-foreground text-xs"
@@ -211,13 +218,22 @@ function IndexingRow() {
   );
 }
 
-function ErrorRow({ onRetry }: { onRetry: () => void }) {
+export function ErrorRow({
+  message,
+  onRetry,
+}: {
+  message: string | null;
+  onRetry: () => void;
+}) {
   return (
     <div
       className="flex flex-col items-center gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-4 text-center text-xs"
       data-moment-error
     >
-      <p className="text-destructive">Couldn't build the visual index.</p>
+      <p className="text-destructive">
+        Couldn't build the visual index.
+        {message ? <span className="block opacity-80">{message}</span> : null}
+      </p>
       <Button onClick={onRetry} size="sm" type="button" variant="outline">
         Retry
       </Button>
@@ -234,7 +250,7 @@ export function MomentSearchPanel({
   const search = useMomentSearch({ slug, words });
   const {
     activeTab,
-    buildErrored,
+    buildErrorMessage,
     clearQuery,
     hasWords,
     indexed,
@@ -281,10 +297,12 @@ export function MomentSearchPanel({
     );
   }
 
+  const indexBanner = momentIndexBanner(indexed, buildErrorMessage !== null);
+
   let sceneBody: ReactNode;
-  if (buildErrored) {
-    sceneBody = <ErrorRow onRetry={retryBuild} />;
-  } else if (!indexed) {
+  if (indexBanner === "error") {
+    sceneBody = <ErrorRow message={buildErrorMessage} onRetry={retryBuild} />;
+  } else if (indexBanner === "building") {
     sceneBody = <IndexingRow />;
   } else if (queryEmpty || queryTooShortForScene) {
     sceneBody = <HintBlock>Find moments: try &apos;laughing&apos;</HintBlock>;
