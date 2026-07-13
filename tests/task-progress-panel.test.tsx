@@ -366,6 +366,26 @@ test("shouldPoll is false when both running and anyRunning are false", () => {
   assert.equal(shouldPoll(false, false), false);
 });
 
+test("step status icons animate through the IconSwap primitive", () => {
+  const tasks: AgentTask[] = [
+    {
+      id: "t1",
+      slug: "s1",
+      request: "task",
+      status: "running",
+      steps: [
+        { id: "s0", title: "done step", status: "done" },
+        { id: "s1", title: "running step", status: "running" },
+      ],
+      startedAt: 1000,
+      updatedAt: 1000,
+    },
+  ];
+
+  const html = renderToStaticMarkup(<TaskList tasks={tasks} />);
+  assert.match(html, /data-slot="icon-swap"/);
+});
+
 test("TaskList includes data-task-row attributes", () => {
   const tasks: AgentTask[] = [
     {

@@ -91,7 +91,7 @@ export function MomentResultCard({
       onDragStart={onDragStart}
     >
       <button
-        className="block w-full overflow-hidden rounded-md text-left focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+        className="block w-full overflow-hidden rounded-md text-left transition-transform focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.98]"
         onClick={() => onSeek(fromSec)}
         type="button"
       >
@@ -99,7 +99,7 @@ export function MomentResultCard({
           {/* biome-ignore lint/performance/noImgElement: local project frame thumbnail */}
           <img
             alt=""
-            className="h-full w-full object-cover"
+            className="h-full w-full object-cover outline outline-1 outline-black/10 -outline-offset-1 dark:outline-white/10"
             draggable={false}
             height={108}
             src={momentFrameThumbnailUrl(slug, thumbnailName)}
@@ -331,7 +331,7 @@ export function MomentSearchPanel({
           <Search className="pointer-events-none absolute top-1/2 left-2 size-4 -translate-y-1/2 text-muted-foreground" />
           <input
             aria-label="Search moments"
-            className="h-9 w-full rounded-md border border-transparent bg-foreground/7 pr-8 pl-8 text-sm outline-none transition placeholder:text-muted-foreground focus:border-ring focus:bg-background"
+            className="h-9 w-full rounded-md border border-transparent bg-foreground/7 pr-8 pl-8 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-ring focus:bg-background"
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={onInputKeyDown}
             placeholder="Search moments"
@@ -341,7 +341,7 @@ export function MomentSearchPanel({
           {query ? (
             <button
               aria-label="Clear search"
-              className="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              className="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground after:absolute after:-inset-3 hover:text-foreground"
               onClick={clearQuery}
               type="button"
             >

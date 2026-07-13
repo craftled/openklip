@@ -195,8 +195,15 @@ function AgentChatTrail({
                 aria-current={isCurrent ? "location" : undefined}
                 aria-label={`Jump to ${label}`}
                 className={cn(
-                  "group/marker flex shrink-0 origin-left items-center justify-start rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                  dense ? "min-h-1 flex-1" : "h-2"
+                  "group/marker relative flex shrink-0 origin-left items-center justify-start rounded-sm outline-none after:absolute after:inset-x-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                  // Markers stack vertically with only a 4px gap (gap-1)
+                  // between them: a large vertical pseudo-element inset would
+                  // overlap the neighboring marker's hit area, so dense stacks
+                  // (many messages, flex-1 markers with less room) get a
+                  // smaller slop than the fixed-height h-2 case.
+                  dense
+                    ? "min-h-1 flex-1 after:-inset-y-1"
+                    : "h-2 after:-inset-y-2"
                 )}
                 data-slot="agent-chat-trail-marker"
                 key={message.id}

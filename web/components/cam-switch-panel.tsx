@@ -167,7 +167,7 @@ function AddCamControl({
 }) {
   return (
     <div
-      className="flex flex-col gap-1.5 rounded-md border border-dashed p-1.5"
+      className="flex flex-col gap-1.5 rounded-xl border border-dashed p-1.5"
       data-cam-add
     >
       <div className="flex items-center gap-1.5">

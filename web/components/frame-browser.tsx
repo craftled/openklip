@@ -132,7 +132,7 @@ export function FrameBrowser({ slug }: { slug: string }) {
           >
             <Image
               alt={`Ingest frame at ${frame.atSec.toFixed(1)}s`}
-              className="block aspect-video w-full object-cover transition duration-200 group-hover:scale-[1.01]"
+              className="block aspect-video w-full object-cover transition-transform duration-200 group-hover:scale-[1.01]"
               height={90}
               loading="lazy"
               src={frame.url}

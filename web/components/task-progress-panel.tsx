@@ -11,6 +11,7 @@ import {
 } from "@engine/agent-task-types";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { IconSwap } from "@/components/ui/icon-swap";
 import { Check, IconLoader, X } from "@/lib/icon";
 import { relativeTimeAgo } from "@/lib/relative-time";
 
@@ -113,22 +114,24 @@ function TaskStepRow({ step }: { step: AgentTaskStep }) {
       data-task-step={step.id}
     >
       <div className="flex items-center gap-1.5 text-xs">
-        {done ? (
-          <Check aria-hidden className="size-3 shrink-0 text-foreground" />
-        ) : null}
-        {running ? (
-          <IconLoader
-            aria-hidden
-            className="size-3 shrink-0 animate-spin text-primary"
-          />
-        ) : null}
-        {step.status === "pending" ? (
-          <span
-            aria-hidden
-            className="size-3 shrink-0 rounded-full border border-border"
-          />
-        ) : null}
-        {failed ? <X aria-hidden className="size-3 shrink-0" /> : null}
+        <IconSwap activeKey={step.status} className="size-3 shrink-0">
+          {done ? (
+            <Check aria-hidden className="size-3 shrink-0 text-foreground" />
+          ) : null}
+          {running ? (
+            <IconLoader
+              aria-hidden
+              className="size-3 shrink-0 animate-spin text-primary"
+            />
+          ) : null}
+          {step.status === "pending" ? (
+            <span
+              aria-hidden
+              className="size-3 shrink-0 rounded-full border border-border"
+            />
+          ) : null}
+          {failed ? <X aria-hidden className="size-3 shrink-0" /> : null}
+        </IconSwap>
         <span
           className={
             running

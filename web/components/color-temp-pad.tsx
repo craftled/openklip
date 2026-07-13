@@ -154,7 +154,7 @@ export function ColorTempPad({
         </div>
         <Button
           aria-label="Reset color temperature"
-          className="size-6! text-muted-foreground"
+          className="text-muted-foreground"
           onClick={reset}
           size="icon-sm"
           title="Reset color temperature"

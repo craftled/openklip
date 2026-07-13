@@ -153,7 +153,7 @@ function TimelineToolbar({
       </Button>
       <Button
         aria-label="Zoom out"
-        className="size-6 rounded text-muted-foreground"
+        className="rounded text-muted-foreground"
         disabled={zoom <= MIN_TIMELINE_ZOOM}
         onClick={onZoomOut}
         size="icon-sm"
@@ -166,7 +166,7 @@ function TimelineToolbar({
       </span>
       <Button
         aria-label="Zoom in"
-        className="size-6 rounded text-muted-foreground"
+        className="rounded text-muted-foreground"
         disabled={zoom >= MAX_TIMELINE_ZOOM}
         onClick={onZoomIn}
         size="icon-sm"
@@ -403,7 +403,7 @@ function EditableClipBlock({
     >
       <button
         aria-label={`Resize start: ${clip.label}`}
-        className="absolute top-0 bottom-0 left-0 z-30 cursor-ew-resize rounded-l bg-foreground/20 opacity-0 hover:opacity-100"
+        className="absolute top-0 bottom-0 left-0 z-30 cursor-ew-resize rounded-l bg-foreground/20 opacity-0 after:absolute after:-inset-x-1.5 after:inset-y-0 hover:opacity-100"
         data-handle="start"
         onPointerDown={(e) => beginDrag(e, "resize-start")}
         style={{ width: HANDLE_W }}
@@ -421,7 +421,7 @@ function EditableClipBlock({
         return (
           <button
             aria-label={`Keyframe ${kf.property} at ${Math.round(fraction * 100)}%`}
-            className="absolute bottom-0.5 z-40 size-1.5 rotate-45 border border-background/70 bg-foreground/80 shadow-sm hover:bg-foreground"
+            className="absolute bottom-0.5 z-40 size-1.5 rotate-45 border border-background/70 bg-foreground/80 shadow-sm after:absolute after:-inset-2.5 hover:bg-foreground"
             key={`${kf.sampleOffset}-${kf.property}-${index}`}
             onPointerDown={(e) => {
               e.preventDefault();
@@ -437,7 +437,7 @@ function EditableClipBlock({
       })}
       <button
         aria-label={`Resize end: ${clip.label}`}
-        className="absolute top-0 right-0 bottom-0 z-30 cursor-ew-resize rounded-r bg-foreground/20 opacity-0 hover:opacity-100"
+        className="absolute top-0 right-0 bottom-0 z-30 cursor-ew-resize rounded-r bg-foreground/20 opacity-0 after:absolute after:-inset-x-1.5 after:inset-y-0 hover:opacity-100"
         data-handle="end"
         onPointerDown={(e) => beginDrag(e, "resize-end")}
         style={{ width: HANDLE_W }}

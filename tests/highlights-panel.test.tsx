@@ -95,3 +95,12 @@ test("detect button is omitted without onDetect", () => {
   const html = renderPanel();
   assert.doesNotMatch(html, /data-highlights-detect/);
 });
+
+test("clip row has an interruptible scale-on-press transform", () => {
+  const html = renderPanel({
+    highlights: highlights({ clips: [clip()] }),
+  });
+  const rowTag = tagWith(html, "data-highlights-row");
+  assert.match(rowTag, /active:scale-\[0\.98\]/);
+  assert.match(rowTag, /transition-\[color,background-color,scale\]/);
+});
