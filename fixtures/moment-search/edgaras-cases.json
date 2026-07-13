@@ -1,0 +1,39 @@
+{
+  "slug": "edgaras-raw",
+  "description": "Labeled moment-search cases for edgaras-raw when present locally. Text cases need only project.json; scene cases need a current moment index (openklip index edgaras-raw).",
+  "cases": [
+    {
+      "id": "text-design-feedback",
+      "kind": "text",
+      "query": "design feedback",
+      "minMatches": 1
+    },
+    {
+      "id": "text-canvas-design",
+      "kind": "text",
+      "query": "canvas design",
+      "minMatches": 1
+    },
+    {
+      "id": "text-filler-cut",
+      "kind": "text",
+      "query": "you know",
+      "note": "Expect at least one [cut] match when filler words remain in the transcript."
+    },
+    {
+      "id": "scene-absurd-car",
+      "kind": "scene",
+      "query": "a red sports car on a highway",
+      "expectedCount": 0,
+      "note": "Wrong-topic visual query on talking-head footage should return no scene hits."
+    },
+    {
+      "id": "scene-talking-head",
+      "kind": "scene",
+      "query": "person talking to camera indoors",
+      "minMatches": 1,
+      "toleranceSec": 30,
+      "note": "Broad visual query; top hit should land within the first 30s when indexed."
+    }
+  ]
+}

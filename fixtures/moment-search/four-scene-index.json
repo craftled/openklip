@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "model": "Xenova/clip-vit-base-patch32",
+  "dim": 2,
+  "frameStepSec": 3,
+  "frames": [
+    { "name": "0001.jpg", "atSec": 0 },
+    { "name": "0002.jpg", "atSec": 18 },
+    { "name": "0003.jpg", "atSec": 36 },
+    { "name": "0004.jpg", "atSec": 54 }
+  ],
+  "vectorsB64": "AACAPwAAAAAAAAAAAACAP6uwbT/2Jr4+9ia+PquwbT8="
+}
