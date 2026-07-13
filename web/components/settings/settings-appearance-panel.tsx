@@ -13,6 +13,11 @@ import {
   writeProvenanceDisplayEnabled,
 } from "@/lib/provenance-preferences";
 import {
+  readInterfaceSoundsEnabled,
+  subscribeInterfaceSoundsEnabled,
+  writeInterfaceSoundsEnabled,
+} from "@/lib/sound-preferences";
+import {
   applyColorScheme,
   type ColorScheme,
   getColorScheme,
@@ -24,6 +29,7 @@ import { firstToggleValue } from "@/lib/toggle-value";
 export function SettingsAppearancePanel() {
   const [colorScheme, setColorSchemeState] = useState<ColorScheme>("light");
   const [provenanceDisplay, setProvenanceDisplay] = useState(false);
+  const [interfaceSounds, setInterfaceSounds] = useState(false);
 
   useEffect(() => {
     const storedColorScheme = getColorScheme();
@@ -35,6 +41,11 @@ export function SettingsAppearancePanel() {
   useEffect(() => {
     setProvenanceDisplay(readProvenanceDisplayEnabled());
     return subscribeProvenanceDisplay(setProvenanceDisplay);
+  }, []);
+
+  useEffect(() => {
+    setInterfaceSounds(readInterfaceSoundsEnabled());
+    return subscribeInterfaceSoundsEnabled(setInterfaceSounds);
   }, []);
 
   return (
@@ -77,6 +88,19 @@ export function SettingsAppearancePanel() {
         }
         description="Show who changed each word or overlay in the script, history, and b-roll list."
         title="Show edit attribution"
+      />
+      <SettingsRow
+        control={
+          <Switch
+            aria-label="Interface sounds"
+            checked={interfaceSounds}
+            onCheckedChange={(checked) =>
+              writeInterfaceSoundsEnabled(checked === true)
+            }
+          />
+        }
+        description="Play subtle interaction sounds for toggles, sliders, and buttons."
+        title="Interface sounds"
       />
     </SettingsSection>
   );

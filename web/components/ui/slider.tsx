@@ -30,6 +30,9 @@ function Slider({
       <SliderPrimitive.Control className="relative flex w-full cursor-pointer touch-none select-none items-center data-vertical:h-full data-vertical:min-h-40 data-vertical:w-auto data-disabled:cursor-not-allowed data-vertical:flex-col data-disabled:opacity-50">
         <SliderPrimitive.Track
           className="relative grow select-none overflow-hidden rounded-full bg-muted data-horizontal:h-1 data-vertical:h-full data-horizontal:w-full data-vertical:w-1"
+          data-cuelume-hover="tick"
+          data-cuelume-press=""
+          data-cuelume-release=""
           data-slot="slider-track"
         >
           <SliderPrimitive.Indicator

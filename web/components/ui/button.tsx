@@ -49,6 +49,8 @@ function Button({
   return (
     <ButtonPrimitive
       className={cn(buttonVariants({ variant, size, className }))}
+      data-cuelume-press=""
+      data-cuelume-release=""
       data-slot="button"
       {...props}
     />

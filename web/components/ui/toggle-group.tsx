@@ -181,6 +181,7 @@ function ToggleGroupItem({
         }),
         className
       )}
+      data-cuelume-toggle=""
       data-size={context.size || size}
       data-slot="toggle-group-item"
       data-spacing={context.spacing}

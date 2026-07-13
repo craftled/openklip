@@ -17,6 +17,7 @@ import {
   shouldApplyReframe,
 } from "@engine/export-aspect";
 import type { Keyframe } from "@engine/keyframes";
+import { bind, setEnabled as setCuelumeEnabled } from "cuelume";
 import {
   type CSSProperties,
   type ReactNode,
@@ -70,6 +71,10 @@ import { formatEditorTime } from "@/lib/format-time";
 import type { Orientation } from "@/lib/preview-layout";
 import { buildProjectHoverContext } from "@/lib/project-context";
 import type { ProjectListing } from "@/lib/project-list";
+import {
+  readInterfaceSoundsEnabled,
+  subscribeInterfaceSoundsEnabled,
+} from "@/lib/sound-preferences";
 import type { EditorChatsSnapshot } from "../app/lib/editor-chats.ts";
 import { type CaptionWord, groupCaptions } from "../src/captions.ts";
 import { sourceSecForOutputPosition } from "../src/schedulerLogic.ts";
@@ -145,6 +150,13 @@ export function App({
       ExportSettingsSchema.parse(initialProject.export ?? {}).aspect
     )
   );
+
+  useEffect(() => {
+    bind();
+    const apply = (enabled: boolean) => setCuelumeEnabled(enabled);
+    apply(readInterfaceSoundsEnabled());
+    return subscribeInterfaceSoundsEnabled(apply);
+  }, []);
 
   const {
     cinema,

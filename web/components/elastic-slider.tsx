@@ -508,6 +508,9 @@ export function ElasticSlider({
           "data-[focus-visible=true]:ring-2 data-[focus-visible=true]:ring-ring/50 data-[focus-visible=true]:ring-offset-1 data-[focus-visible=true]:ring-offset-background"
         )}
         data-active={isActive}
+        data-cuelume-hover="tick"
+        data-cuelume-press=""
+        data-cuelume-release=""
         data-disabled={disabled}
         data-focus-visible={keyboardFocusRing}
         data-slot="elastic-slider-track"
