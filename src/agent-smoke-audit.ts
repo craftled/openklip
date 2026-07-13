@@ -310,6 +310,22 @@ export async function runAgentSmokeAudit(input?: {
   }
 }
 
+/** Placeholder for a future live-agent revise-draft smoke (LLM + MCP). */
+export function runReviseDraftLiveSmokeAudit(): SmokeAuditResult {
+  return {
+    ok: false,
+    slug: SMOKE_SLUG,
+    steps: [
+      {
+        name: "revise-live",
+        ok: false,
+        detail:
+          "not implemented; use runReviseDraftSmokeAudit for the deterministic fixture loop",
+      },
+    ],
+  };
+}
+
 /**
  * Deterministic revise-draft loop on the lavfi fixture: cut filler, add a
  * title overlay, revert the title, confirm the cut survived.

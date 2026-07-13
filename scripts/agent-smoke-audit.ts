@@ -15,6 +15,7 @@ const fullVerify = process.argv.includes("--full-verify");
 const realOnly = process.argv.includes("--real");
 const runAll = process.argv.includes("--all");
 const runRevise = process.argv.includes("--revise");
+const runReviseLive = process.argv.includes("--revise-live");
 
 function printResult(
   label: string,
@@ -33,6 +34,13 @@ function printResult(
 
 try {
   let ok = true;
+
+  if (runReviseLive) {
+    console.log(
+      "\nagent-smoke-audit (revise-live): stub only; use --revise for the deterministic fixture loop"
+    );
+    process.exit(0);
+  }
 
   if (!realOnly) {
     const stub = await runAgentSmokeAudit({ fullVerify });
