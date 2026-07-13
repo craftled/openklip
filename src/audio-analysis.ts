@@ -157,6 +157,13 @@ function resolveAnalysisOpts(opts: AnalyzeSilencesOpts = {}) {
 
 const PCM_CHUNK_SEC = 120;
 
+function chunkOverlapSec(
+  resolved: ReturnType<typeof resolveAnalysisOpts>
+): number {
+  // Overlap must cover at least one min-silence window across chunk seams.
+  return Math.max(0.5, resolved.minSilenceMs / 1000 + resolved.windowMs / 1000);
+}
+
 async function analyzePcmChunked(
   slug: string,
   resolved: ReturnType<typeof resolveAnalysisOpts>,
@@ -167,21 +174,29 @@ async function analyzePcmChunked(
   const totalSec = Math.floor(fileStat.size / 4) / resolved.sampleRate;
   const chunkCount = Math.max(1, Math.ceil(totalSec / PCM_CHUNK_SEC));
   const totalSteps = chunkCount + 2;
+  const overlapSec = chunkOverlapSec(resolved);
   const spans: SilenceSpan[] = [];
 
   for (let i = 0; i < chunkCount; i++) {
-    const fromSec = i * PCM_CHUNK_SEC;
-    const toSec = Math.min(totalSec, (i + 1) * PCM_CHUNK_SEC);
+    const chunkStart = i * PCM_CHUNK_SEC;
+    const chunkEnd = Math.min(totalSec, (i + 1) * PCM_CHUNK_SEC);
+    const readFrom =
+      i === 0 ? chunkStart : Math.max(0, chunkStart - overlapSec);
     onProgress?.({
       phase: "reading",
       message: `Reading audio chunk ${i + 1}/${chunkCount}`,
       step: i + 1,
       total: totalSteps,
     });
-    const pcm = await readPcmRange(slug, fromSec, toSec, resolved.sampleRate);
+    const pcm = await readPcmRange(
+      slug,
+      readFrom,
+      chunkEnd,
+      resolved.sampleRate
+    );
     const chunkSpans = analyzeSilencesPure(pcm, resolved).map((span) => ({
-      startSec: span.startSec + fromSec,
-      endSec: span.endSec + fromSec,
+      startSec: span.startSec + readFrom,
+      endSec: span.endSec + readFrom,
     }));
     spans.push(...chunkSpans);
   }

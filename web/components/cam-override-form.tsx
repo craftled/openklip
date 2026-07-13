@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { validateCamOverrideSpan } from "@/lib/cam-override";
 
 export function CamOverrideForm({
   cams,
@@ -24,6 +25,7 @@ export function CamOverrideForm({
   const [fromSec, setFromSec] = useState("");
   const [toSec, setToSec] = useState("");
   const [shot, setShot] = useState(cams[0]?.id ?? "wide");
+  const [error, setError] = useState<string | null>(null);
 
   const shots = [
     ...cams.map((cam) => ({ id: cam.id, label: cam.name || cam.id })),
@@ -36,15 +38,17 @@ export function CamOverrideForm({
       data-cam-override-form
       onSubmit={(event) => {
         event.preventDefault();
-        const from = Number(fromSec);
-        const to = Number(toSec);
-        if (!(Number.isFinite(from) && Number.isFinite(to) && to > from)) {
+        const validationError = validateCamOverrideSpan(fromSec, toSec);
+        if (validationError) {
+          setError(validationError);
           return;
         }
         if (!shot) {
+          setError("Choose a shot to lock.");
           return;
         }
-        onSubmit(from, to, shot);
+        setError(null);
+        onSubmit(Number(fromSec), Number(toSec), shot);
       }}
     >
       <span className="font-medium text-xs">Lock shot span</span>
@@ -56,7 +60,10 @@ export function CamOverrideForm({
             data-cam-override-from
             disabled={disabled}
             inputMode="decimal"
-            onChange={(e) => setFromSec(e.target.value)}
+            onChange={(e) => {
+              setFromSec(e.target.value);
+              setError(null);
+            }}
             placeholder="0.0"
             value={fromSec}
           />
@@ -68,7 +75,10 @@ export function CamOverrideForm({
             data-cam-override-to
             disabled={disabled}
             inputMode="decimal"
-            onChange={(e) => setToSec(e.target.value)}
+            onChange={(e) => {
+              setToSec(e.target.value);
+              setError(null);
+            }}
             placeholder="2.0"
             value={toSec}
           />
@@ -80,6 +90,7 @@ export function CamOverrideForm({
             onValueChange={(value) => {
               if (value) {
                 setShot(value);
+                setError(null);
               }
             }}
             value={shot}
@@ -101,6 +112,11 @@ export function CamOverrideForm({
           </Select>
         </label>
       </div>
+      {error ? (
+        <p className="text-destructive text-xs" data-cam-override-error>
+          {error}
+        </p>
+      ) : null}
       <Button
         data-cam-override-apply
         disabled={disabled}

@@ -337,3 +337,30 @@ test("computeAudioAnalysis: reports chunked progress for multi-step analysis", a
     assert.ok(progress.at(-1)?.step === progress.at(-1)?.total);
   });
 });
+
+test("computeAudioAnalysis: chunked path matches full-file silences at chunk seams", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject());
+    const pcm = concatPcm([tonePcm(118), new Float32Array(SR * 2), tonePcm(5)]);
+    writeFileSync(
+      projectPaths(slug).audioRaw,
+      Buffer.from(pcm.buffer, pcm.byteOffset, pcm.byteLength)
+    );
+
+    const fullSpans = analyzeSilences(pcm);
+    const chunked = await computeAudioAnalysis(slug);
+    assert.equal(chunked.silences.length, fullSpans.length);
+    const tolerance = 0.08;
+    for (let i = 0; i < fullSpans.length; i++) {
+      assert.ok(
+        Math.abs(chunked.silences[i].startSec - fullSpans[i].startSec) <=
+          tolerance,
+        `start drift at ${i}: full=${fullSpans[i].startSec} chunked=${chunked.silences[i].startSec}`
+      );
+      assert.ok(
+        Math.abs(chunked.silences[i].endSec - fullSpans[i].endSec) <= tolerance,
+        `end drift at ${i}: full=${fullSpans[i].endSec} chunked=${chunked.silences[i].endSec}`
+      );
+    }
+  });
+});
