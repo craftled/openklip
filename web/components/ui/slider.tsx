@@ -5,11 +5,12 @@ import { cn } from "@/lib/utils";
 function Slider({
   className,
   defaultValue,
+  "data-cuelume-disable": cuelumeDisable,
   value,
   min = 0,
   max = 100,
   ...props
-}: SliderPrimitive.Root.Props) {
+}: SliderPrimitive.Root.Props & { "data-cuelume-disable"?: boolean }) {
   const _values = Array.isArray(value)
     ? value
     : Array.isArray(defaultValue)
@@ -30,6 +31,9 @@ function Slider({
       <SliderPrimitive.Control className="relative flex w-full cursor-pointer touch-none select-none items-center data-vertical:h-full data-vertical:min-h-40 data-vertical:w-auto data-disabled:cursor-not-allowed data-vertical:flex-col data-disabled:opacity-50">
         <SliderPrimitive.Track
           className="relative grow select-none overflow-hidden rounded-full bg-muted data-horizontal:h-1 data-vertical:h-full data-horizontal:w-full data-vertical:w-1"
+          data-cuelume-hover={cuelumeDisable ? undefined : "tick"}
+          data-cuelume-press={cuelumeDisable ? undefined : ""}
+          data-cuelume-release={cuelumeDisable ? undefined : ""}
           data-slot="slider-track"
         >
           <SliderPrimitive.Indicator

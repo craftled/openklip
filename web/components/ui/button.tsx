@@ -42,13 +42,19 @@ const buttonVariants = cva(
 
 function Button({
   className,
+  "data-cuelume-disable": cuelumeDisable,
   variant = "default",
   size = "default",
   ...props
-}: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
+}: ButtonPrimitive.Props &
+  VariantProps<typeof buttonVariants> & {
+    "data-cuelume-disable"?: boolean;
+  }) {
   return (
     <ButtonPrimitive
       className={cn(buttonVariants({ variant, size, className }))}
+      data-cuelume-press={cuelumeDisable ? undefined : ""}
+      data-cuelume-release={cuelumeDisable ? undefined : ""}
       data-slot="button"
       {...props}
     />

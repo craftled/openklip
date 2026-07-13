@@ -169,6 +169,10 @@ bun run dev                            # latest project, or ?slug= in URL
 OPENKLIP_SLUG=<slug> bun run dev       # pin project when using serve-style env
 ```
 
+Settings:
+
+- Interface sounds is optional. Enable it in Settings, Appearance, Interface sounds.
+
 ---
 
 ## Agent loop
