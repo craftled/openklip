@@ -58,11 +58,15 @@ Time is integer audio samples at 48 kHz. The CLI takes seconds where a human num
 | Read / write the project brief | `openklip brief <slug> [--set <text...> \| --file <path> \| --audit]` |
 | Read transcript (full) | `openklip transcript <slug>` |
 | Grep transcript | `openklip transcript grep`, `span`, `phrase` |
+| Search moments by transcript text or visual scene | `openklip search <slug> "query" [--json] [--limit N]` (MCP: `moment_search`) |
+| Rebuild the visual moment search index | `openklip index <slug> [--force]` |
 | Review edit (JSON) | `openklip status <slug> --json`, `ranges`, `overlays` |
 | Cut / restore words | `openklip cut`, `openklip restore` |
 | Correct one word's transcript text | `openklip word-text <slug> <wordId> <text...>` |
-| Read filler/dead-air cleanup candidates | `openklip cleanup <slug> [--json]` |
+| Read filler/dead-air cleanup candidates by category | `openklip cleanup <slug> [--json]` |
 | Apply safe cleanup candidates | `openklip cleanup <slug> --apply-safe` |
+| Apply enabled-category cleanup candidates (any risk) plus all dead-air | `openklip cleanup <slug> --apply-enabled` |
+| Persist cleanup category toggles and thresholds (`minSec`, `keepPadSec`) | MCP/GUI `cleanup-config` (no dedicated CLI verb; GUI: Cleanup tab) |
 | Remove a registered dead-air span | `openklip dead-air-rm <slug> <id>` |
 | Register b-roll file | `openklip broll <slug> <file>` |
 | Register a still or music asset | `openklip asset-add <slug> <file> --kind still\|music` |
@@ -237,6 +241,17 @@ Turn per-speaker camera files into one professionally switched program: ingest e
 
 Workflow: `cam-add` each speaker's file (and an optional `wide` cam), `cam-set` to fix names/roles/offsets, then `cam-mix` to render. Speaker ID compares per-track RMS energy across each cam's own audio (no ML or cloud diarization); one Whisper pass transcribes the mixed program audio and each word is attributed to a cam by energy vote, landing as an optional `speaker` field on the word. The mix-down is one ffmpeg pass that writes `source.mp4` and `proxy.mp4` like any other project, so cuts, captions, reframe, and export work unchanged; re-running `cam-mix` or `cam-override` re-encodes. The GUI Config → Project **Cameras** section manages already-ingested cams (name, role, audio audition, follow/auto mode, re-mix) with a read-only mix timeline; ingesting a new cam, tuning guardrail settings, per-cam offset, and locking span overrides are CLI/MCP only today.
 
+### Moment search
+
+Find moments in the source footage by transcript text or on-screen visual content, then seek to or restore them.
+
+| Command | What it does |
+| --- | --- |
+| `openklip search <slug> "<query>" [--json] [--limit N]` | Search transcript text and visual scenes in one call. Text matches include cut words (marked `[cut]`); scene matches blend CLIP frame embeddings with scene-log summaries, gated by a measured score floor plus peak-relative pruning so wrong-topic queries return nothing instead of noise. `--limit` caps result count (1-100, default 24; MCP: `moment_search`, same input shape). |
+| `openklip index <slug> [--force]` | Build or rebuild the visual moment index (`working/moment-index.json`) by embedding existing ingest sample frames with a local CLIP model (`Xenova/clip-vit-base-patch32`, downloaded once like Whisper). `search` and `moment_search` build a missing or stale index automatically on first call; run this to force a rebuild or pre-warm it. |
+
+Workflow: ingest runs indexing as a non-fatal phase (a failed or missing index degrades to text-only results, never blocks ingest); older projects backfill lazily on first search. GUI: the fourth left-rail sidebar tab, **Search** (`Mod+Shift+F`), shows text and scene results as thumbnail cards with timestamps. Click a card to seek; drag it onto the preview, transcript, or open timeline drawer, or use its hover **Keep** button, to restore any cut words in that span (a logged, revertible `cut` action).
+
 ### Look & captions
 
 | Command | What it does |
@@ -267,8 +282,9 @@ Workflow: `cam-add` each speaker's file (and an optional `wide` cam), `cam-set` 
 | `openklip status <slug> --json` | Same data as compact JSON (preferred for agents). |
 | `openklip ranges <slug> [--json]` | Kept source-time segments after cuts and pad. |
 | `openklip overlays <slug> [--json]` | All b-roll, titles, zooms, stills with ids and spans. |
-| `openklip cleanup <slug> [--json]` | Filler-word and dead-air cleanup candidates with risk (`safe`/`review`), reason, and estimated seconds saved. Honors brief **Always cut:** / **Never cut:** lines and optional `project.cuts.cleanupPhrases`. Degrades to filler-only (with a warning) when no audio analysis is available yet. |
+| `openklip cleanup <slug> [--json]` | Filler-word and dead-air cleanup candidates, categorized (`hesitation`/`hedging`/`repeat`/`dead-air`) with risk (`safe`/`review`), reason, and estimated seconds saved. Honors brief **Always cut:** / **Never cut:** lines and optional `project.cuts.cleanupPhrases`. Degrades to filler-only (with a warning) when no audio analysis is available yet. |
 | `openklip cleanup <slug> --apply-safe` | Apply every `safe` candidate (cuts filler words, registers dead-air spans) and print what changed. `review` candidates are never auto-applied; apply them individually via `cut`/`dead-air-add` after a human or agent judgment call. |
+| `openklip cleanup <slug> --apply-enabled` | Apply every candidate in the enabled categories (`project.cuts.cleanup.categories`) at any risk, plus every dead-air candidate at the configured `minSec` threshold; prints created vs. extended dead-air spans for undo. Iterative by design: a cut can expose new adjacent repeat candidates, so re-running may find more (converges to a fixed point). Category toggles and thresholds (`minSec`, `keepPadSec`) are set via the MCP/GUI-only `cleanup-config` action (no CLI verb yet); the CLI reads them (`cleanup --json`) and applies from them but cannot change them itself. |
 | `openklip dead-air-rm <slug> <id>` | Remove a registered dead-air span by id. Also exposed in the GUI Cleanup panel. |
 | `openklip export-set <slug>` | Set export aspect ratio and reframe crop on `project.export` (preview/export parity). `--aspect source\|16:9\|9:16\|1:1`, `--crop-mode manual\|scene\|vision`, `--crop-focus-x`, `--crop-focus-y`, `--crop-scale`, `--layout fill\|split-vertical`, `--split-ratio`, `--split-speaker top\|bottom`. |
 | `openklip asset-flags <slug> <assetId>` | Set `mustUse` or `avoid` on a registered asset (`--must-use`, `--avoid`, or `--clear`). Avoid wins if both are set. |
@@ -312,8 +328,8 @@ The tool-calling edit prompt (`buildEditPrompt` in `src/agent-driver.ts`) advert
 
 | Layer | MCP tool names | Same as CLI |
 | --- | --- | --- |
-| Query | `list_projects`, `blank_ingest`, `transcript_grep`, `transcript_phrase`, `scene_log`, `highlights_list`, `highlights_detect`, `project_status`, `project_overlays`, `cleanup_report`, `history_list`, `task_list`, `template_list`, `features_list`, `graphic_list`, `graphic_show`, `load_skill`, `music_bpm`, `audio_measure`, `doctor`, `broll_suggest`, `list_cams`, … | `openklip transcript grep`, `status --json`, `overlays --json`, `highlights`, `highlights-detect`, `cleanup --json`, `openklip history`, `openklip tasks`, `openklip template list`, `openklip features`, `openklip ingest --blank`, `openklip graphic list`, `openklip bpm`, `openklip audio measure`, `openklip doctor`, `openklip broll-suggest`, `openklip cams` |
-| Mutate | `cut`, `cut-text`, `broll-add`, `title-set`, `word-text`, `dead-air-add`, `dead-air-rm`, `audio`, `captions-style`, `captions-inset`, `take_add`, `cam_add`, `cam_set`, `cam_mix`, `cam_override`, … | `openklip cut`, `broll-add`, `word-text`, `dead-air-rm`, `audio`, `captions-style`, `captions-inset`, `openklip take-add`, `openklip cam-add`, `openklip cam-set`, `openklip cam-mix`, `openklip cam-override`, … |
+| Query | `list_projects`, `blank_ingest`, `transcript_grep`, `transcript_phrase`, `scene_log`, `highlights_list`, `highlights_detect`, `project_status`, `project_overlays`, `cleanup_report`, `moment_search`, `history_list`, `task_list`, `template_list`, `features_list`, `graphic_list`, `graphic_show`, `load_skill`, `music_bpm`, `audio_measure`, `doctor`, `broll_suggest`, `list_cams`, … | `openklip transcript grep`, `status --json`, `overlays --json`, `highlights`, `highlights-detect`, `cleanup --json`, `openklip search`, `openklip history`, `openklip tasks`, `openklip template list`, `openklip features`, `openklip ingest --blank`, `openklip graphic list`, `openklip bpm`, `openklip audio measure`, `openklip doctor`, `openklip broll-suggest`, `openklip cams` |
+| Mutate | `cut`, `cut-text`, `broll-add`, `title-set`, `word-text`, `dead-air-add`, `dead-air-rm`, `audio`, `captions-style`, `captions-inset`, `cleanup-config` (no CLI equivalent), `cleanup-apply`, `take_add`, `cam_add`, `cam_set`, `cam_mix`, `cam_override`, … | `openklip cut`, `broll-add`, `word-text`, `dead-air-rm`, `audio`, `captions-style`, `captions-inset`, `openklip cleanup --apply-safe`/`--apply-enabled`, `openklip take-add`, `openklip cam-add`, `openklip cam-set`, `openklip cam-mix`, `openklip cam-override`, … |
 | Phrase compose | `title-add-phrase`, `zoom-add-phrase`, `broll-add-phrase`, `graphic-add-phrase` | `openklip title-add-phrase`, … |
 | Brief | `brief_get`, `brief_set`, `brief_audit` | `openklip brief`, `openklip brief --set`, `openklip brief --audit` |
 | Agent task progress | `task_step`, `task_complete` | no CLI equivalent: scoped to the running agent's own task via `OPENKLIP_TASK_ID` |
