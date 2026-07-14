@@ -57,6 +57,7 @@
     "openklip-mcp": "./src/mcp-server.ts"
   },
   "description": "Agent-native video editor: CLI edit loop, browser review, plain files on disk.",
+  "homepage": "https://openklip.com",
   "engines": {
     "bun": ">=1.3.14",
     "node": ">=24"

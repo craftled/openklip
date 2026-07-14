@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { isMarketingSite } from "@/lib/site-mode";
 import { THEME_NO_FLASH_SCRIPT } from "../web/lib/theme-preferences";
 import { geistMono } from "./fonts";
 import "./globals.css";
@@ -15,9 +16,26 @@ const inter = Inter({
   variable: "--font-sans",
 });
 
+const marketing = isMarketingSite();
+
 export const metadata: Metadata = {
-  title: "OpenKlip",
-  description: "Agent-native video editing : CLI edit loop, browser review.",
+  metadataBase: marketing ? new URL("https://openklip.com") : undefined,
+  title: marketing
+    ? "OpenKlip | Agent-native video toolchain"
+    : "OpenKlip",
+  description: marketing
+    ? "Local-first video editing for agents and humans. CLI edit loop, browser review, plain files on disk."
+    : "Agent-native video editing : CLI edit loop, browser review.",
+  openGraph: marketing
+    ? {
+        title: "OpenKlip",
+        description:
+          "Local-first video editing for agents and humans. CLI edit loop, browser review, plain files on disk.",
+        url: "https://openklip.com",
+        siteName: "OpenKlip",
+        type: "website",
+      }
+    : undefined,
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

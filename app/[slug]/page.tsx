@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { assertValidSlug, projectPaths } from "@engine/paths";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { isMarketingSite } from "@/lib/site-mode";
 import { EditorHome } from "../lib/editor-home";
 
 export const dynamic = "force-dynamic";
@@ -10,6 +11,10 @@ interface Props {
 }
 
 export default async function ProjectSlugPage({ params }: Props) {
+  if (isMarketingSite()) {
+    redirect("/");
+  }
+
   const { slug } = await params;
   try {
     assertValidSlug(slug);
