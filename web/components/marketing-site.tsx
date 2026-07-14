@@ -46,11 +46,7 @@ export async function MarketingSite() {
           <Button
             nativeButton={false}
             render={
-              <a
-                href={openklipGitHubUrl()}
-                rel="noopener"
-                target="_blank"
-              >
+              <a href={openklipGitHubUrl()} rel="noopener" target="_blank">
                 GitHub
                 <Link2 data-icon="inline-end" />
               </a>
@@ -61,7 +57,7 @@ export async function MarketingSite() {
         </div>
       </header>
 
-      <main className="mx-auto flex w-full max-w-5xl flex-col gap-16 px-6 pb-20 pt-8">
+      <main className="mx-auto flex w-full max-w-5xl flex-col gap-16 px-6 pt-8 pb-20">
         <section className="grid items-center gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
           <div className="space-y-6">
             <p className="font-medium text-primary text-sm uppercase tracking-[0.2em]">
@@ -139,13 +135,15 @@ export async function MarketingSite() {
 
         <section className="rounded-xl border border-border bg-muted/20 p-6 sm:p-8">
           <div className="space-y-2">
-            <h2 className="font-semibold text-xl tracking-tight">Quick start</h2>
+            <h2 className="font-semibold text-xl tracking-tight">
+              Quick start
+            </h2>
             <p className="text-muted-foreground text-sm">
               macOS, Bun 1.3.14+, Node 24+. Full pipeline details live in the
               README.
             </p>
           </div>
-          <pre className="mt-5 overflow-x-auto rounded-lg border border-border bg-background p-4 font-mono text-[0.8125rem] leading-relaxed text-foreground">
+          <pre className="mt-5 overflow-x-auto rounded-lg border border-border bg-background p-4 font-mono text-[0.8125rem] text-foreground leading-relaxed">
             {`git clone https://github.com/craftled/openklip.git
 cd openklip
 bun install
@@ -158,7 +156,10 @@ bun run export <slug>`}
 
       <footer className="border-border border-t">
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-2 px-6 py-8 text-muted-foreground text-sm sm:flex-row sm:items-center sm:justify-between">
-          <p>MIT License. Built for agents that edit by reading and writing files.</p>
+          <p>
+            MIT License. Built for agents that edit by reading and writing
+            files.
+          </p>
           <a
             className="hover:text-foreground"
             href={openklipGitHubUrl()}

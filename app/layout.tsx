@@ -3,8 +3,8 @@ import Script from "next/script";
 import type { ReactNode } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
 import { isMarketingSite } from "@/lib/site-mode";
+import { cn } from "@/lib/utils";
 import { THEME_NO_FLASH_SCRIPT } from "../web/lib/theme-preferences";
 import { geistMono } from "./fonts";
 import "./globals.css";
@@ -20,9 +20,7 @@ const marketing = isMarketingSite();
 
 export const metadata: Metadata = {
   metadataBase: marketing ? new URL("https://openklip.com") : undefined,
-  title: marketing
-    ? "OpenKlip | Agent-native video toolchain"
-    : "OpenKlip",
+  title: marketing ? "OpenKlip | Agent-native video toolchain" : "OpenKlip",
   description: marketing
     ? "Local-first video editing for agents and humans. CLI edit loop, browser review, plain files on disk."
     : "Agent-native video editing : CLI edit loop, browser review.",
