@@ -1,0 +1,43 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "src/cli.ts",
+    "src/mcp-server.ts",
+    "app/**/*.ts",
+    "app/**/*.tsx",
+    "web/app.tsx",
+    "scripts/**/*.ts",
+    "next.config.ts",
+    "postcss.config.mjs"
+  ],
+  "project": [
+    "src/**/*.ts",
+    "web/**/*.ts",
+    "web/**/*.tsx",
+    "app/**/*.ts",
+    "app/**/*.tsx"
+  ],
+  "ignore": [
+    "tests/**",
+    "fixtures/**",
+    "graphics/**",
+    "templates/**",
+    "luts/**",
+    "brands/**",
+    "ingesters/**",
+    "skills/**",
+    "docs/**"
+  ],
+  "ignoreBinaries": ["openklip", "openklip-mcp", "hyperframes", "puppeteer"],
+  "ignoreDependencies": [
+    "@types/bun",
+    "@types/react",
+    "@types/react-dom",
+    "@types/culori",
+    "@types/geojson",
+    "tw-animate-css",
+    "tailwindcss",
+    "@tailwindcss/postcss",
+    "@tailwindcss/typography"
+  ]
+}

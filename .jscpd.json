@@ -1,0 +1,25 @@
+{
+  "threshold": 5,
+  "reporters": ["console", "html"],
+  "output": "./tmp/jscpd-report",
+  "format": ["typescript", "javascript", "tsx", "jsx"],
+  "ignore": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/.next/**",
+    "**/tmp/**",
+    "**/tests/**",
+    "**/fixtures/**",
+    "**/graphics/**",
+    "**/templates/**",
+    "**/docs/**",
+    "**/skills/**",
+    "**/*.json",
+    "**/*.css",
+    "**/*.md",
+    "**/bun.lock",
+    "**/tsconfig.tsbuildinfo"
+  ],
+  "min-lines": 5,
+  "min-tokens": 35
+}
