@@ -346,6 +346,8 @@ The tool-calling edit prompt (`buildEditPrompt` in `src/agent-driver.ts`) advert
 
 **Editor code-splitting (CRAFT-6172):** heavy client stacks load on demand via `next/dynamic` (`ssr: false`): graphic overlays + Paper shaders (`preview-overlays`), map-motion / maplibre (`json-render-graphic-overlay` → `map-motion-frame`), template hover previews, and media audio visualizers (wave shader split out of LiveKit agent visualizer). Prefer dynamic import for new niche panel deps rather than static imports from the editor shell.
 
+**Install footprint (CRAFT-6173):** ffprobe uses platform-specific `@ffprobe-installer/ffprobe` (not multi-arch `ffprobe-static`). Browser `onnxruntime-web` is replaced with a local stub so Transformers.js installs only `onnxruntime-node` for Whisper/CLIP.
+
 **Segment export + b-roll (CRAFT-6171):** `shouldUseSegmentExport` allows b-roll (and music/stills) on sparse short cuts; only rich/json-render graphics force full-source decode. Cut transitions still block when b-roll or rich graphics are present (`blocksCutTransition`), because xfade/dip change output length and would desync overlay windows.
 
 **Parity rule:** every registry action with `surfaces` including `mcp` is an MCP tool with `{ slug, … }` input. Query tools use snake_case names; mutations keep registry kebab-case names (`broll-add`).
@@ -635,7 +637,7 @@ Durable, non-obvious notes for cloud agents. The startup update script already r
 
 ### Media pipeline / first ingest
 
-- `ffmpeg`/`ffprobe` come from the npm deps `ffmpeg-static`/`ffprobe-static` (no system install needed); `openklip doctor` verifies them.
+- `ffmpeg`/`ffprobe` come from the npm deps `ffmpeg-static`/`@ffprobe-installer/ffprobe` (no system install needed); `openklip doctor` verifies them.
 - The first `openklip ingest` downloads the Whisper model `Xenova/whisper-base.en` from Hugging Face (one-time network fetch), then caches it. Ingesting a clip with no real speech yields a near-empty transcript, and `openklip verify` will report "drift"; that is expected content behavior, not an environment failure.
 
 ### Known test flake (not environment-related)

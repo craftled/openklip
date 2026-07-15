@@ -6,6 +6,7 @@
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
+    "@ffprobe-installer/ffprobe": "^2.1.2",
     "@huggingface/transformers": "4.2.0",
     "@json-render/core": "0.19.0",
     "@json-render/react": "0.19.0",
@@ -21,7 +22,6 @@
     "cuelume": "^0.1.0",
     "culori": "^4.0.2",
     "ffmpeg-static": "^5.2.0",
-    "ffprobe-static": "^3.1.0",
     "glimm": "0.1.4",
     "livekit-client": "^2.0.0",
     "lucide-react": "^1.23.0",
@@ -37,7 +37,8 @@
     "shadcn": "^4.12.0",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.6.0",
-    "zod": "4.4.3"
+    "zod": "4.4.3",
+    "onnxruntime-web": "file:./vendor/onnxruntime-web-stub"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.1",
@@ -101,5 +102,8 @@
     "protobufjs",
     "sharp"
   ],
-  "type": "module"
+  "type": "module",
+  "overrides": {
+    "onnxruntime-web": "file:./vendor/onnxruntime-web-stub"
+  }
 }

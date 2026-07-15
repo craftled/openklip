@@ -23,18 +23,17 @@ export const FFMPEG =
   localBinary("ffmpeg-static", "ffmpeg") ??
   "ffmpeg";
 
-// ffprobe-static resolves through createRequire so Turbopack does not hash the
-// package path. On Apple Silicon the published darwin/arm64 binary is still
-// x86_64-only; posix_spawn then returns EBADARCH. spawnFfprobe below falls back
-// to a system ffprobe on PATH when that happens.
+// Platform-specific installer (CRAFT-6173): only the current OS/arch binary is
+// installed (~17MB) instead of multi-platform ffprobe-static (~345MB). Resolves
+// through createRequire so Turbopack does not hash the package path. On Apple
+// Silicon, if the published binary is still the wrong arch, spawnFfprobe falls
+// back to a system ffprobe on PATH.
 export const FFPROBE =
-  optionalRequire<{ path?: string }>("ffprobe-static")?.path ??
+  optionalRequire<{ path?: string }>("@ffprobe-installer/ffprobe")?.path ??
   process.env.FFPROBE ??
   localBinary(
-    "ffprobe-static",
-    "bin",
-    process.platform,
-    process.arch,
+    "@ffprobe-installer",
+    `${process.platform}-${process.arch}`,
     "ffprobe"
   ) ??
   "ffprobe";
