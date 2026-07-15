@@ -90,7 +90,7 @@
     "typecheck": "tsc --noEmit",
     "check": "ultracite check",
     "fix": "ultracite fix",
-    "analyze": "ANALYZE=true bun --bun next build",
+    "analyze": "ANALYZE=true bun --bun next build --webpack",
     "knip": "knip --production",
     "jscpd": "jscpd",
     "ci": "bun run check && bun run typecheck && bun run test && bun run build"

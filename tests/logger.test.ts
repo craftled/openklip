@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { once } from "node:events";
 import { PassThrough } from "node:stream";
 import { test } from "node:test";
-import { createLogger, logger } from "../src/logger.ts";
+import { createLogger, logger, resolveLogLevel } from "../src/logger.ts";
 
 async function logToStream(
   logFn: (log: ReturnType<typeof createLogger>) => void
@@ -50,4 +50,13 @@ test("logger supports context object as first argument (pino API)", async () => 
   assert.equal(parsed.msg, "with context");
   assert.equal(parsed.slug, "demo", "slug should be in output");
   assert.equal(parsed.action, "cut", "action should be in output");
+});
+
+test("resolveLogLevel falls back for empty, blank, and unknown values", () => {
+  assert.equal(resolveLogLevel(undefined), "info");
+  assert.equal(resolveLogLevel(""), "info");
+  assert.equal(resolveLogLevel("   "), "info");
+  assert.equal(resolveLogLevel("verbose"), "info");
+  assert.equal(resolveLogLevel("debug"), "debug");
+  assert.equal(resolveLogLevel("WARN"), "warn");
 });
