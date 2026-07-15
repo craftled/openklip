@@ -15,6 +15,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import type { ZodRawShapeCompat } from "@modelcontextprotocol/sdk/server/zod-compat.js";
 import { z } from "zod";
 import { agentTools, callAgentTool, getAgentTool } from "./agent-tools.ts";
+import { logger } from "./logger.ts";
 import {
   buildToolsCatalog,
   filterToolsCatalog,
@@ -242,6 +243,7 @@ export function createOpenKlipMcpServer(
 }
 
 export async function startMcpServer(): Promise<void> {
+  logger.info({ surface: "mcp" }, "openklip mcp server starting");
   const { server } = createOpenKlipMcpServer();
   const transport = new StdioServerTransport();
   await server.connect(transport);
@@ -249,7 +251,7 @@ export async function startMcpServer(): Promise<void> {
 
 if (import.meta.main) {
   startMcpServer().catch((err) => {
-    console.error(err);
+    logger.error(err);
     process.exit(1);
   });
 }

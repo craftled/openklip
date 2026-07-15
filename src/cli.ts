@@ -107,6 +107,7 @@ import {
   jsonRenderCatalogIdsLabel,
 } from "./json-render-catalogs.ts";
 import { type Keyframe, KeyframeSchema } from "./keyframes.ts";
+import { logger } from "./logger.ts";
 import { listLuts, lutPath } from "./lut.ts";
 import { startMcpServer } from "./mcp-server.ts";
 import {
@@ -3959,6 +3960,8 @@ try {
       help();
   }
 } catch (e) {
-  console.error(`\nerror: ${(e as Error).message}\n`);
+  const message = (e as Error).message;
+  logger.error({ err: e }, message);
+  console.error(`\nerror: ${message}\n`);
   process.exit(1);
 }
