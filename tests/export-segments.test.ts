@@ -2,9 +2,12 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Range } from "../src/edl.ts";
 import {
+  blocksCutTransition,
   buildSegmentAudioConcatFilter,
   buildSegmentInputArgs,
   buildSegmentVideoConcatFilter,
+  overlayInputBase,
+  requiresFullSourceDecode,
   SEGMENT_EXPORT_KEPT_RATIO,
   shouldUseSegmentExport,
 } from "../src/export-segments.ts";
@@ -28,7 +31,7 @@ test("shouldUseSegmentExport when kept duration is a small fraction of source", 
   );
 });
 
-test("shouldUseSegmentExport rejects b-roll and rich graphics", () => {
+test("shouldUseSegmentExport allows b-roll on sparse timelines (CRAFT-6171)", () => {
   assert.equal(
     shouldUseSegmentExport({
       ranges,
@@ -38,16 +41,30 @@ test("shouldUseSegmentExport rejects b-roll and rich graphics", () => {
       hasRichGraphics: false,
       hasMusic: false,
     }),
-    false
+    true
   );
 });
 
-test("shouldUseSegmentExport allows music and stills on overlay-light timelines", () => {
+test("shouldUseSegmentExport still rejects rich graphics", () => {
   assert.equal(
     shouldUseSegmentExport({
       ranges,
       sourceDurationSec: 600,
       hasBroll: false,
+      hasStills: false,
+      hasRichGraphics: true,
+      hasMusic: false,
+    }),
+    false
+  );
+});
+
+test("shouldUseSegmentExport allows music, stills, and b-roll together", () => {
+  assert.equal(
+    shouldUseSegmentExport({
+      ranges,
+      sourceDurationSec: 600,
+      hasBroll: true,
       hasStills: true,
       hasRichGraphics: false,
       hasMusic: true,
@@ -108,4 +125,29 @@ test("buildSegmentAudioConcatFilter applies highpass and afftdn suffixes", () =>
 
 test("SEGMENT_EXPORT_KEPT_RATIO is documented at 0.5", () => {
   assert.equal(SEGMENT_EXPORT_KEPT_RATIO, 0.5);
+});
+
+test("requiresFullSourceDecode is rich-graphics only (b-roll is composable)", () => {
+  assert.equal(requiresFullSourceDecode({ hasRichGraphics: false }), false);
+  assert.equal(requiresFullSourceDecode({ hasRichGraphics: true }), true);
+});
+
+test("blocksCutTransition when b-roll or rich graphics are present", () => {
+  assert.equal(
+    blocksCutTransition({ hasBroll: true, hasRichGraphics: false }),
+    true
+  );
+  assert.equal(
+    blocksCutTransition({ hasBroll: false, hasRichGraphics: true }),
+    true
+  );
+  assert.equal(
+    blocksCutTransition({ hasBroll: false, hasRichGraphics: false }),
+    false
+  );
+});
+
+test("overlayInputBase places b-roll after all segment source inputs", () => {
+  assert.equal(overlayInputBase(true, 3), 3);
+  assert.equal(overlayInputBase(false, 3), 1);
 });

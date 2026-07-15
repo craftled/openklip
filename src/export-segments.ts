@@ -22,8 +22,23 @@ export interface SegmentExportGate {
   sourceDurationSec: number;
 }
 
-/** Overlays that force full-source decode (per-range seeking cannot compose these). */
+/**
+ * Overlays that force full-source decode (cannot compose on a segment-seeked
+ * base). Rich / json-render graphics still need the select path; plain b-roll
+ * composites on the output timeline after segment concat (CRAFT-6171).
+ */
 export function requiresFullSourceDecode(gate: {
+  hasRichGraphics: boolean;
+}): boolean {
+  return gate.hasRichGraphics;
+}
+
+/**
+ * Overlays that block cut transitions. B-roll and rich graphics are timed on
+ * the hard-concat output timeline; crossfade/dip change that length and would
+ * desync overlay windows.
+ */
+export function blocksCutTransition(gate: {
   hasBroll: boolean;
   hasRichGraphics: boolean;
 }): boolean {
@@ -148,9 +163,9 @@ export function shouldApplyCutTransition(
   if (gate.ranges.length < 2) {
     return false;
   }
-  // Transitions are incompatible with b-roll and rich graphics: those paths
-  // require full-source decode, so the segment transition chain is unavailable.
-  if (requiresFullSourceDecode(gate)) {
+  // Transitions are incompatible with b-roll and rich graphics: those overlays
+  // assume hard-concat output timing (see blocksCutTransition).
+  if (blocksCutTransition(gate)) {
     return false;
   }
   if (gate.ranges.length > SEGMENT_EXPORT_MAX_RANGES) {
@@ -177,7 +192,7 @@ export function cutTransitionFallbackReason(
   if (gate.ranges.length < 2) {
     return "too-few-ranges";
   }
-  if (requiresFullSourceDecode(gate)) {
+  if (blocksCutTransition(gate)) {
     return "overlays-present";
   }
   if (gate.ranges.length > SEGMENT_EXPORT_MAX_RANGES) {
