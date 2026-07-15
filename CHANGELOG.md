@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+Landed on `main` after the v0.42.0.3 GitHub release was cut; not yet in a tagged version.
+
+### Added
+- **Segment export + b-roll** (PR #116, CRAFT-6171): `shouldUseSegmentExport` now allows b-roll (alongside music/stills) on sparse short cuts; only rich/json-render graphics still force full-source decode (`requiresFullSourceDecode`, `src/export-segments.ts`). Cut transitions still block whenever b-roll or rich graphics are present (`blocksCutTransition`), since crossfade/dip change output length and would desync overlay windows.
+- **Editor code-splitting** (PR #115, PR #119, CRAFT-6172): heavy client stacks (Paper shaders, maplibre/map-motion, template hover previews, media audio visualizers) load on demand via `next/dynamic` (`ssr: false`) instead of the editor's static import graph; the WaveShader is split out of the LiveKit agent visualizer so cam/asset audio peeks stay LiveKit-free. Follow-up fix (#119) stopped a residual static import of `graphic-template-preview` that was still pulling `@paper-design/shaders` into the initial editor bundle, and moved `GraphicItem` into a light type-only module (`web/components/graphic-item.ts`).
+- **Gzipped history snapshots** (PR #117, CRAFT-6174): pre-mutation history snapshots now write gzipped (`working/history/rev-<n>.json.gz`, atomic tmp+rename, `src/projectStore.ts`); legacy plain `.json` snapshots still load, and list/prune treat both suffixes as one revision.
+- **Trimmed install footprint** (PR #118, CRAFT-6173): ffprobe installs via platform-specific `@ffprobe-installer/ffprobe` (~17MB) instead of multi-platform `ffprobe-static` (~345MB); browser `onnxruntime-web` is replaced with a local stub (`vendor/onnxruntime-web-stub/`) so Transformers.js installs only `onnxruntime-node` for local Whisper/CLIP inference. `ensureExecutableBinary` chmods the bundled ffprobe binary and falls back to a direct spawn on `EACCES` (seen on Linux CI unpacks).
+
+### Documentation
+- AGENTS.md documents all four changes inline (each PR updated it in the same commit). TODO.md's Known Limitations and Completed checklist, and README.md's verified counts, are updated in the same pass that added this section.
+
 ## 0.42.0.3 - 2026-07-15
 
 ### Added

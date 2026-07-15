@@ -2,7 +2,7 @@
 
 Use these bodies when publishing releases. Each section matches a tag in `CHANGELOG.md` without duplicating the full changelog. **Known gaps:** always link to [TODO.md](../TODO.md#known-limitations); do not duplicate the list here.
 
-Publishing status checked on 2026-07-15: published through `v0.42.0.1` on GitHub. Bodies below for `v0.42.0.3` and `v0.42.0.2`. Multicam programmatic acceptance (`tests/multicam-acceptance.test.ts`, `tests/cam-devex-smoke.test.ts`) satisfies the machinery gate; human eyeball on real per-speaker footage remains deferred.
+Publishing status checked on 2026-07-16 (`gh release list`): published through `v0.42.0.3` on GitHub. CRAFT-6171 through CRAFT-6174 (PRs #115-#119) landed on `main` after the `v0.42.0.3` tag and have no release body yet; see the `Unreleased` section in [CHANGELOG.md](../CHANGELOG.md). Multicam programmatic acceptance (`tests/multicam-acceptance.test.ts`, `tests/cam-devex-smoke.test.ts`) satisfies the machinery gate; human eyeball on real per-speaker footage remains deferred.
 
 ---
 
