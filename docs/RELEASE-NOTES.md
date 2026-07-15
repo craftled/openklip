@@ -2,18 +2,20 @@
 
 Use these bodies when publishing releases. Each section matches a tag in `CHANGELOG.md` without duplicating the full changelog. **Known gaps:** always link to [TODO.md](../TODO.md#known-limitations); do not duplicate the list here.
 
-Publishing status checked on 2026-07-15: published through `v0.42.0.1` on GitHub. Drafts below for `v0.42.0.3` (live sync + deferred MCP surface) and `v0.42.0.2` (Grok Voice). Multicam programmatic acceptance (`tests/multicam-acceptance.test.ts`, `tests/cam-devex-smoke.test.ts`) satisfies the machinery gate; human eyeball on real per-speaker footage remains deferred.
+Publishing status checked on 2026-07-15: published through `v0.42.0.1` on GitHub. Bodies below for `v0.42.0.3` and `v0.42.0.2`. Multicam programmatic acceptance (`tests/multicam-acceptance.test.ts`, `tests/cam-devex-smoke.test.ts`) satisfies the machinery gate; human eyeball on real per-speaker footage remains deferred.
 
 ---
 
 ## v0.42.0.3
 
-**Editor live sync and deferred MCP tool surface (PRs #107, #108).**
+**Agent loop and ingest performance (PRs #107–#113).**
 
 ### Highlights
-- **Live sync (CRAFT-6167)**: external CLI/MCP edits to `project.json` refresh the open editor via a 2s revision poll (and focus). External advances toast **Edit updated**; local save-drain reseeds stay silent.
-- **Deferred MCP surface (CRAFT-6169)**: connect pays schemas for a core edit-loop set plus `tools_catalog` / `tools_load` / `tools_invoke` (~74% smaller payload). Full surface with `OPENKLIP_MCP_SURFACE=all` (in-app agent default).
-- **Verification**: unit tests for live-sync decision/merge, revision routes, MCP surface enablement, and tools_load/catalog query parity.
+- **Live sync (CRAFT-6167, #107)**: external CLI/MCP edits to `project.json` refresh the open editor via a 2s revision poll (and focus). External advances toast **Edit updated**; local save-drain reseeds stay silent.
+- **Deferred MCP surface (CRAFT-6169, #108/#109)**: connect pays schemas for a core edit-loop set plus `tools_catalog` / `tools_load` / `tools_invoke` (~74% smaller payload). Full surface with `OPENKLIP_MCP_SURFACE=all` (in-app agent default).
+- **Schema-driven CLI (CRAFT-6168, #112)**: registry Zod schemas drive flag and positional parsing for most mutations (including nested audio and export-set).
+- **Parallel ingest (CRAFT-6170, #113)**: after probe, proxy→frames→index runs in parallel with audio→Whisper; multi-take ingest parallels proxy ∥ audio.
+- **Verification**: unit tests for live-sync, MCP surface, CLI flag parser, and parallel ingest orchestration.
 
 ### Known gaps
 
