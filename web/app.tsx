@@ -53,6 +53,7 @@ import { useMomentKeep } from "@/hooks/use-moment-keep";
 import { useOverlayEditors } from "@/hooks/use-overlay-editors";
 import { usePreviewPlayback } from "@/hooks/use-preview-playback";
 import { useProjectConfigActions } from "@/hooks/use-project-config-actions";
+import { useProjectLiveSync } from "@/hooks/use-project-live-sync";
 import { useProjectSaves } from "@/hooks/use-project-saves";
 import { useTranscriptEdits } from "@/hooks/use-transcript-edits";
 import {
@@ -193,6 +194,13 @@ export function App({
     setOrientation,
     setProject,
     setVignetteOn,
+  });
+
+  useProjectLiveSync({
+    slug: project.slug,
+    revision: project.revision,
+    pendingSaves,
+    onExternalProject: onHistoryReverted,
   });
 
   const {

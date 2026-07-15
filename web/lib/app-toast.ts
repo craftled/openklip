@@ -13,6 +13,7 @@ import {
   chatSendFailedToast,
   chatUnarchiveFailedToast,
   type ExportTransitionResultData,
+  externalEditSyncedToast,
   ingestPartialSuccessToast,
   momentAlreadyInEditToast,
   momentKeptToast,
@@ -244,6 +245,10 @@ export function toastAssetsSynced(count: number): void {
   if (payload) {
     show(payload);
   }
+}
+
+export function toastExternalEditSynced(revision: number): void {
+  show(externalEditSyncedToast(revision));
 }
 
 export function toastProjectCreateFailed(error: string): void {
