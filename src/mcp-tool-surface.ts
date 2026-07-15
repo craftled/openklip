@@ -228,7 +228,10 @@ export interface ToolsLoadRequest {
   group?: string;
   /** Exact tool names. */
   names?: readonly string[];
-  /** Substring match against name (and optional catalog summaries). */
+  /**
+   * Same match rules as tools_catalog: name, summary, or group hint
+   * (substring, case-insensitive).
+   */
   query?: string;
 }
 
@@ -241,12 +244,14 @@ export interface ToolsLoadPlan {
 
 /**
  * Resolve which tool names to enable from a tools_load request.
- * `knownNames` is the full agent tool list (not including meta tools).
+ * `knownTools` is the full agent tool list (not including meta tools).
+ * Query matching uses the same name/summary/group rules as tools_catalog.
  */
 export function planToolsLoad(
   request: ToolsLoadRequest,
-  knownNames: readonly string[]
+  knownTools: ReadonlyArray<{ name: string; summary: string }>
 ): ToolsLoadPlan {
+  const knownNames = knownTools.map((t) => t.name);
   const known = new Set(knownNames);
   const want = new Set<string>();
   const unknownNames: string[] = [];
@@ -282,11 +287,10 @@ export function planToolsLoad(
   }
 
   if (request.query?.trim()) {
-    const q = request.query.trim().toLowerCase();
-    for (const n of knownNames) {
-      if (n.toLowerCase().includes(q)) {
-        want.add(n);
-      }
+    // Parity with tools_catalog: name, summary, and groupHints.
+    const catalog = buildToolsCatalog(knownTools, "all");
+    for (const entry of filterToolsCatalog(catalog, request.query)) {
+      want.add(entry.name);
     }
   }
 

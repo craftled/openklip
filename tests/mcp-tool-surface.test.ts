@@ -63,7 +63,10 @@ test("filterToolsCatalog matches name and summary", () => {
 });
 
 test("planToolsLoad resolves names, groups, query, and all", () => {
-  const known = agentTools("mcp").map((t) => t.name);
+  const known = agentTools("mcp").map((t) => ({
+    name: t.name,
+    summary: t.summary,
+  }));
 
   const byName = planToolsLoad({ names: ["broll-add", "nope"] }, known);
   assert.deepEqual(byName.toEnable, ["broll-add"]);
@@ -79,6 +82,12 @@ test("planToolsLoad resolves names, groups, query, and all", () => {
 
   const byQuery = planToolsLoad({ query: "cam_" }, known);
   assert.ok(byQuery.toEnable.some((n) => n.startsWith("cam_")));
+
+  // Query matches summary / group hints the same way tools_catalog does.
+  const bySummary = planToolsLoad({ query: "deleted" }, known);
+  assert.ok(bySummary.toEnable.includes("cut"));
+  const byGroupHint = planToolsLoad({ query: "overlays" }, known);
+  assert.ok(byGroupHint.toEnable.includes("broll-add"));
 
   const all = planToolsLoad({ all: true }, known);
   assert.equal(all.toEnable.length, known.length);
