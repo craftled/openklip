@@ -122,3 +122,11 @@ test("every group member exists on the mcp surface", () => {
     }
   }
 });
+
+test("every mcp tool is in core or at least one load group", () => {
+  const grouped = new Set(Object.values(MCP_TOOL_GROUPS).flat());
+  const orphans = agentTools("mcp")
+    .map((t) => t.name)
+    .filter((name) => !grouped.has(name));
+  assert.deepEqual(orphans, [], `ungrouped mcp tools: ${orphans.join(", ")}`);
+});

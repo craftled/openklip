@@ -32,6 +32,7 @@ export const MCP_CORE_TOOL_NAMES = [
   "load_skill",
   "template_list",
   "template_show",
+  "template_set",
   "features_list",
   "brief_get",
   "brief_set",
@@ -40,6 +41,7 @@ export const MCP_CORE_TOOL_NAMES = [
   "task_complete",
   "history_list",
   "task_list",
+  "revert",
 ] as const;
 
 export type McpCoreToolName = (typeof MCP_CORE_TOOL_NAMES)[number];
