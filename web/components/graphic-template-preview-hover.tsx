@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import type { ReactNode } from "react";
 import {
   HoverCard,
@@ -7,10 +8,16 @@ import {
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
 import type { GraphicTemplateOption } from "./graphic-picker-controls";
-import {
-  GraphicTemplatePreview,
-  GraphicTemplatePreviewCaption,
-} from "./graphic-template-preview";
+import { GraphicTemplatePreviewCaption } from "./graphic-template-preview";
+
+// Shader/runtime preview mounts only when a template hover opens (CRAFT-6172).
+const GraphicTemplatePreview = dynamic(
+  () =>
+    import("./graphic-template-preview").then((mod) => ({
+      default: mod.GraphicTemplatePreview,
+    })),
+  { ssr: false }
+);
 
 const HIDE_DELAY_MS = 120;
 

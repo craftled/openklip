@@ -1,8 +1,18 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { BinAsset } from "@/components/asset-bin";
-import { MediaAudioVisualizerWave } from "@/components/media-audio-visualizer-wave";
+
+// LiveKit-free wave shader chunk; loads when audio preview plays (CRAFT-6172).
+const MediaAudioVisualizerWave = dynamic(
+  () =>
+    import("@/components/media-audio-visualizer-wave").then((mod) => ({
+      default: mod.MediaAudioVisualizerWave,
+    })),
+  { ssr: false }
+);
+
 import {
   HoverCard,
   HoverCardContent,
