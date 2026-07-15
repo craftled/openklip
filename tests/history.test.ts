@@ -197,7 +197,7 @@ test("meta actor falls back to OPENKLIP_ACTOR when unset on the meta", async () 
 
 // ── HISTORY SNAPSHOTS: mutateProject writes a pre-mutation snapshot ─────────
 
-test("a logged mutation writes rev-<revisionBefore>.json with the pre-mutation project", async () => {
+test("a logged mutation writes rev-<revisionBefore>.json.gz with the pre-mutation project", async () => {
   await withTempProjectsRoot(async ({ slug }) => {
     writeFixtureProject(slug, makeProject({ slug }));
     // loadProject runs the fixture through ProjectSchema.parse (adds field
@@ -211,9 +211,12 @@ test("a logged mutation writes rev-<revisionBefore>.json with the pre-mutation p
       },
       { action: "pad", actor: "human", input: { padMs: 999 } }
     );
-    const snapshotPath = join(projectPaths(slug).historyDir, "rev-0.json");
-    assert.ok(existsSync(snapshotPath), "expected a rev-0.json snapshot");
-    const snapshot = JSON.parse(readFileSync(snapshotPath, "utf8"));
+    const snapshotPath = join(projectPaths(slug).historyDir, "rev-0.json.gz");
+    assert.ok(existsSync(snapshotPath), "expected a rev-0.json.gz snapshot");
+    const { gunzipSync } = await import("node:zlib");
+    const snapshot = JSON.parse(
+      gunzipSync(readFileSync(snapshotPath)).toString("utf8")
+    );
     assert.deepEqual(snapshot, before);
     // The live project moved on; the snapshot must not have.
     const loaded = await loadProject(slug);
@@ -222,7 +225,7 @@ test("a logged mutation writes rev-<revisionBefore>.json with the pre-mutation p
   });
 });
 
-test("a second logged mutation writes rev-1.json capturing the state after the first", async () => {
+test("a second logged mutation writes rev-1.json.gz capturing the state after the first", async () => {
   await withTempProjectsRoot(async ({ slug }) => {
     writeFixtureProject(slug, makeProject({ slug }));
     await mutateProject(
@@ -240,9 +243,10 @@ test("a second logged mutation writes rev-1.json capturing the state after the f
       { action: "pad", actor: "human" }
     );
     const dir = projectPaths(slug).historyDir;
-    assert.ok(existsSync(join(dir, "rev-0.json")));
-    assert.ok(existsSync(join(dir, "rev-1.json")));
-    const rev1 = JSON.parse(readFileSync(join(dir, "rev-1.json"), "utf8"));
+    assert.ok(existsSync(join(dir, "rev-0.json.gz")));
+    assert.ok(existsSync(join(dir, "rev-1.json.gz")));
+    const { loadHistorySnapshot } = await import("../src/projectStore.ts");
+    const rev1 = await loadHistorySnapshot(slug, 1);
     assert.equal(rev1.padMs, 10);
   });
 });
@@ -263,11 +267,13 @@ test("pruneHistorySnapshots keeps only the newest N by revision number", async (
     const dir = projectPaths(slug).historyDir;
     mkdirSync(dir, { recursive: true });
     for (const rev of [0, 1, 2, 3, 4]) {
-      writeFileSync(join(dir, `rev-${rev}.json`), JSON.stringify({ rev }));
+      writeFileSync(join(dir, `rev-${rev}.json.gz`), JSON.stringify({ rev }));
     }
+    // Legacy plain file for rev 2 should prune with that revision group.
+    writeFileSync(join(dir, "rev-2.json"), JSON.stringify({ rev: 2 }));
     await pruneHistorySnapshots(slug, 2);
     const remaining = readdirSync(dir).sort();
-    assert.deepEqual(remaining, ["rev-3.json", "rev-4.json"]);
+    assert.deepEqual(remaining, ["rev-3.json.gz", "rev-4.json.gz"]);
   });
 });
 
@@ -321,4 +327,28 @@ test("a failing snapshot write never fails the edit (best-effort, mirrors the lo
     assert.equal(project.padMs, 10);
     assert.equal(project.revision, 1);
   });
+});
+
+test("loadHistorySnapshot reads legacy uncompressed rev-N.json", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    writeFixtureProject(slug, makeProject({ slug, padMs: 42 }));
+    const before = await loadProject(slug);
+    const dir = projectPaths(slug).historyDir;
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "rev-7.json"), JSON.stringify(before, null, 2));
+    const { loadHistorySnapshot } = await import("../src/projectStore.ts");
+    const loaded = await loadHistorySnapshot(slug, 7);
+    assert.equal(loaded.padMs, before.padMs);
+    assert.equal(loaded.slug, before.slug);
+  });
+});
+
+test("snapshotRevisionFromFilename accepts .json and .json.gz", async () => {
+  const { snapshotRevisionFromFilename } = await import(
+    "../src/projectStore.ts"
+  );
+  assert.equal(snapshotRevisionFromFilename("rev-12.json"), 12);
+  assert.equal(snapshotRevisionFromFilename("rev-12.json.gz"), 12);
+  assert.equal(snapshotRevisionFromFilename("rev-12.json.tmp"), undefined);
+  assert.equal(snapshotRevisionFromFilename("notes.txt"), undefined);
 });
