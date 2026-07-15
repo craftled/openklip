@@ -342,6 +342,8 @@ The tool-calling edit prompt (`buildEditPrompt` in `src/agent-driver.ts`) advert
 
 **Schema-driven CLI flags (CRAFT-6168):** registry Zod schemas drive CLI flag parsing via `src/cli-flags-from-zod.ts` (nested objects flatten to leaf flags; positionals map onto schema keys). Prefer extending the schema + renames/positionals over hand-validating enums in `cli.ts`. Remaining custom CLI paths are intentional: cut token expansion, graphic `--param` / beats, json-render `--spec-file`, phrase helpers, and asset-flags `--clear`.
 
+**Parallel ingest (CRAFT-6170):** after probe, media work runs as two tracks: proxy → frames → CLIP index in parallel with audio extract → Whisper (`runIngestMediaPhases`). Multi-take ingest parallels proxy ∥ audio then transcribes (`runTakeMediaPhases`). Progress still emits fixed phase/step ids; phases from both tracks can interleave.
+
 **Parity rule:** every registry action with `surfaces` including `mcp` is an MCP tool with `{ slug, … }` input. Query tools use snake_case names; mutations keep registry kebab-case names (`broll-add`).
 
 **Optional skills package:** `skills/` ships `SKILL.md` playbooks installable via `npx skills add <owner>/openklip --skill openklip-motion-canvas` (see `skills/README.md`). Same content as `templates/<id>/skill.md`; MCP `load_skill` works without installing.

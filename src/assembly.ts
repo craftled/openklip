@@ -20,7 +20,7 @@ import {
   TakeSchema,
 } from "./edl.ts";
 import { FFMPEG, probe, run } from "./ffmpeg.ts";
-import { buildProxy, extractAudio, transcribeToWords } from "./ingest.ts";
+import { extractAudio, runTakeMediaPhases } from "./ingest.ts";
 import { assertProjectCanBeIngested } from "./ingest-guard.ts";
 import type { IngestPhase, IngestProgress } from "./ingest-types.ts";
 import { projectPaths, slugify, takeDir, takeFile } from "./paths.ts";
@@ -94,12 +94,16 @@ export async function ingestTake(
   console.log(`[take] ${takeId} <- ${source}`);
   emit("probe");
   const meta = await probe(source);
-  emit("proxy");
-  await buildProxy(source, proxyPath);
-  emit("audio");
-  await extractAudio(source, audioRaw);
-  emit("transcribe");
-  const words = await transcribeToWords(audioRaw, rawJson);
+  // proxy ∥ audio, then Whisper (CRAFT-6170).
+  const words = await runTakeMediaPhases({
+    source,
+    paths: {
+      proxy: proxyPath,
+      audioRaw,
+      transcriptRawJson: rawJson,
+    },
+    emit,
+  });
 
   const take: Take = TakeSchema.parse({
     id: takeId,

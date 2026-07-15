@@ -84,6 +84,27 @@ export function extractAudio(source: string, outAudio: string): Promise<void> {
   );
 }
 
+/** Sample frames from the proxy for moment search / agent cards (non-fatal). */
+export function extractSampleFrames(
+  proxyPath: string,
+  framesDir: string
+): Promise<void> {
+  return run(
+    FFMPEG,
+    [
+      "-y",
+      "-i",
+      proxyPath,
+      "-vf",
+      "fps=1/3",
+      "-q:v",
+      "4",
+      `${framesDir}/%04d.jpg`,
+    ],
+    "ffmpeg(frames)"
+  );
+}
+
 /** Map Whisper chunks into the canonical Word list (one shared mapping). */
 export function wordsFromRawChunks(raw: RawChunk[]): Word[] {
   const words: Word[] = [];
@@ -123,6 +144,8 @@ export async function transcribeToWords(
 }
 
 // The ordered work phases, so progress is a stable step/total the UI can show.
+// Parallel tracks still emit these phases as they start; step indexes stay
+// fixed (proxy=2, audio=3, …) even when tracks overlap in wall time.
 const INGEST_STEPS: Array<{ message: string; phase: IngestPhase }> = [
   { phase: "probe", message: "Reading video" },
   { phase: "proxy", message: "Building 720p preview" },
@@ -133,23 +156,165 @@ const INGEST_STEPS: Array<{ message: string; phase: IngestPhase }> = [
   { phase: "finalize", message: "Finishing" },
 ];
 
+export function ingestProgressForPhase(
+  phase: IngestPhase
+): IngestProgress | null {
+  const i = INGEST_STEPS.findIndex((s) => s.phase === phase);
+  if (i < 0) {
+    return null;
+  }
+  return {
+    phase,
+    message: INGEST_STEPS[i].message,
+    step: i + 1,
+    total: INGEST_STEPS.length,
+  };
+}
+
+/**
+ * Injectable media-phase runners for tests and parallel orchestration.
+ * Defaults match production ffmpeg / Whisper / CLIP paths.
+ */
+export interface IngestMediaDeps {
+  buildMomentIndex: (slug: string) => Promise<unknown>;
+  buildProxy: (source: string, outProxy: string) => Promise<void>;
+  extractAudio: (source: string, outAudio: string) => Promise<void>;
+  extractSampleFrames: (proxyPath: string, framesDir: string) => Promise<void>;
+  log?: (line: string) => void;
+  transcribeToWords: (audioRaw: string, rawJson: string) => Promise<Word[]>;
+}
+
+const defaultMediaDeps: IngestMediaDeps = {
+  buildProxy,
+  extractAudio,
+  extractSampleFrames,
+  buildMomentIndex,
+  transcribeToWords,
+  log: (line) => console.log(line),
+};
+
+export interface IngestMediaPaths {
+  audioRaw: string;
+  frames: string;
+  proxy: string;
+  transcriptRawJson: string;
+}
+
+/**
+ * After probe: run independent media tracks in parallel.
+ *
+ *   Track A: proxy → frames → CLIP index (frames need the proxy)
+ *   Track B: audio extract → Whisper (needs only the source)
+ *
+ * Returns the transcript words once both tracks finish.
+ */
+export async function runIngestMediaPhases(opts: {
+  deps?: Partial<IngestMediaDeps>;
+  emit?: (phase: IngestPhase) => void;
+  paths: IngestMediaPaths;
+  slug: string;
+  source: string;
+}): Promise<Word[]> {
+  const deps: IngestMediaDeps = { ...defaultMediaDeps, ...opts.deps };
+  const log = deps.log ?? (() => undefined);
+  const emit = opts.emit ?? (() => undefined);
+  const { source, slug, paths } = opts;
+
+  const videoTrack = (async () => {
+    emit("proxy");
+    log("[ingest] building all-intra 720p proxy (fast seeks) + 48k audio...");
+    await deps.buildProxy(source, paths.proxy);
+
+    emit("frames");
+    log("[ingest] extracting sample frames (for the agent layer later)...");
+    try {
+      await deps.extractSampleFrames(paths.proxy, paths.frames);
+    } catch (e) {
+      log(`[ingest]   frames skipped: ${(e as Error).message}`);
+    }
+
+    emit("index");
+    log(
+      "[ingest] indexing frames for visual search (first run downloads the CLIP model)..."
+    );
+    // Non-fatal: embedding/model-download failure must not block a project.
+    try {
+      await deps.buildMomentIndex(slug);
+    } catch (e) {
+      log(`[ingest]   moment index skipped: ${(e as Error).message}`);
+    }
+  })();
+
+  const audioTrack = (async () => {
+    emit("audio");
+    log("[ingest] extracting 16k mono PCM for transcription...");
+    await deps.extractAudio(source, paths.audioRaw);
+
+    emit("transcribe");
+    log("[ingest] transcribing (first run downloads the Whisper model)...");
+    return await deps.transcribeToWords(
+      paths.audioRaw,
+      paths.transcriptRawJson
+    );
+  })();
+
+  const [, words] = await Promise.all([videoTrack, audioTrack]);
+  return words;
+}
+
+/**
+ * Parallel proxy ∥ audio for multi-take ingest (no frames/index on takes).
+ * Transcription still waits for audio extraction.
+ */
+export async function runTakeMediaPhases(opts: {
+  deps?: Partial<
+    Pick<
+      IngestMediaDeps,
+      "buildProxy" | "extractAudio" | "transcribeToWords" | "log"
+    >
+  >;
+  emit?: (phase: IngestPhase) => void;
+  paths: { audioRaw: string; proxy: string; transcriptRawJson: string };
+  source: string;
+}): Promise<Word[]> {
+  const deps = {
+    buildProxy: opts.deps?.buildProxy ?? buildProxy,
+    extractAudio: opts.deps?.extractAudio ?? extractAudio,
+    transcribeToWords: opts.deps?.transcribeToWords ?? transcribeToWords,
+    log: opts.deps?.log ?? ((line: string) => console.log(line)),
+  };
+  const emit = opts.emit ?? (() => undefined);
+  const { source, paths } = opts;
+
+  await Promise.all([
+    (async () => {
+      emit("proxy");
+      deps.log("[take] building proxy...");
+      await deps.buildProxy(source, paths.proxy);
+    })(),
+    (async () => {
+      emit("audio");
+      deps.log("[take] extracting audio...");
+      await deps.extractAudio(source, paths.audioRaw);
+    })(),
+  ]);
+
+  emit("transcribe");
+  deps.log("[take] transcribing...");
+  return await deps.transcribeToWords(paths.audioRaw, paths.transcriptRawJson);
+}
+
 export async function ingest(
   videoArg: string,
   opts?: { force?: boolean; onProgress?: (p: IngestProgress) => void }
 ): Promise<string> {
-  const total = INGEST_STEPS.length;
   const emit = (phase: IngestPhase) => {
     if (!opts?.onProgress) {
       return;
     }
-    const i = INGEST_STEPS.findIndex((s) => s.phase === phase);
-    if (i >= 0) {
-      opts.onProgress({
-        phase,
-        message: INGEST_STEPS[i].message,
-        step: i + 1,
-        total,
-      });
+    const progress = ingestProgressForPhase(phase);
+    if (progress) {
+      opts.onProgress(progress);
     }
   };
   const source = isAbsolute(videoArg) ? videoArg : cwdPath(videoArg);
@@ -175,58 +340,17 @@ export async function ingest(
     `[ingest] ${meta.width}x${meta.height} ${meta.fps}fps ${meta.durationSec.toFixed(1)}s`
   );
 
-  emit("proxy");
-  console.log(
-    "[ingest] building all-intra 720p proxy (fast seeks) + 48k audio..."
-  );
-  await buildProxy(source, p.proxy);
-
-  emit("audio");
-  console.log("[ingest] extracting 16k mono PCM for transcription...");
-  await extractAudio(source, p.audioRaw);
-
-  emit("frames");
-  console.log(
-    "[ingest] extracting sample frames (for the agent layer later)..."
-  );
-  await run(
-    FFMPEG,
-    [
-      "-y",
-      "-i",
-      p.proxy,
-      "-vf",
-      "fps=1/3",
-      "-q:v",
-      "4",
-      `${p.frames}/%04d.jpg`,
-    ],
-    "ffmpeg(frames)"
-  ).catch((e: Error) =>
-    console.warn(`[ingest]   frames skipped: ${e.message}`)
-  );
-
-  emit("index");
-  console.log(
-    "[ingest] indexing frames for visual search (first run downloads the CLIP model)..."
-  );
-  // Non-fatal, unlike transcribe below: an embedding/model-download failure
-  // should not block getting a project. Search lazy-builds the index later
-  // (openklip search / openklip index) if this step is skipped or fails.
-  try {
-    await buildMomentIndex(slug);
-  } catch (e) {
-    console.warn(`[ingest]   moment index skipped: ${(e as Error).message}`);
-  }
-
-  emit("transcribe");
-  console.log(
-    "[ingest] transcribing (first run downloads the Whisper model)..."
-  );
-  const words = await transcribeToWords(
-    p.audioRaw,
-    `${p.working}/transcript.raw.json`
-  );
+  const words = await runIngestMediaPhases({
+    source,
+    slug,
+    paths: {
+      proxy: p.proxy,
+      audioRaw: p.audioRaw,
+      frames: p.frames,
+      transcriptRawJson: `${p.working}/transcript.raw.json`,
+    },
+    emit,
+  });
 
   emit("finalize");
   const project: Project = ProjectSchema.parse({
