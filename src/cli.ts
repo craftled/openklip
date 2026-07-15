@@ -39,7 +39,9 @@ import {
   resolveCleanupConfig,
 } from "./cleanup.ts";
 import {
+  AUDIO_CLI_FLAG_OPTS,
   asZodObject,
+  EXPORT_SET_CLI_FLAG_OPTS,
   flagSpecsFromZodObject,
   parseFlagsWithZodSchema,
   parseRegistryActionFlags,
@@ -2062,115 +2064,16 @@ try {
         break;
       }
       const slug = rest[0];
-      const duck = flagValue(rest, "--duck");
-      const duckAmount = flagNumber(rest, "--duck-amount");
-      const duckAttack = flagNumber(rest, "--duck-attack");
-      const duckRelease = flagNumber(rest, "--duck-release");
-      const loudness = flagValue(rest, "--loudness");
-      const loudnessTarget = flagNumber(rest, "--loudness-target");
-      const loudnessMode = flagValue(rest, "--loudness-mode");
-      const noiseReduction = flagValue(rest, "--noise-reduction");
-      const noiseStrength = flagNumber(rest, "--noise-strength");
-      const highpass = flagValue(rest, "--highpass");
-      const highpassHz = flagNumber(rest, "--highpass-hz");
-      const deess = flagValue(rest, "--deess");
-      const deessIntensity = flagNumber(rest, "--deess-intensity");
-
-      const input: {
-        ducking?: {
-          enabled?: boolean;
-          amountDb?: number;
-          attackMs?: number;
-          releaseMs?: number;
-        };
-        loudness?: {
-          enabled?: boolean;
-          targetLufs?: number;
-          mode?: "single" | "two-pass";
-        };
-        noiseReduction?: { enabled?: boolean; nr?: number };
-        voiceHighpass?: { enabled?: boolean; hz?: number };
-        deEsser?: { enabled?: boolean; intensity?: number };
-      } = {};
-      if (
-        duck !== undefined ||
-        duckAmount !== undefined ||
-        duckAttack !== undefined ||
-        duckRelease !== undefined
-      ) {
-        input.ducking = {};
-        if (duck !== undefined) {
-          input.ducking.enabled = parseOnOff(
-            duck,
-            "openklip audio <slug> --duck"
-          );
-        }
-        if (duckAmount !== undefined) {
-          input.ducking.amountDb = duckAmount;
-        }
-        if (duckAttack !== undefined) {
-          input.ducking.attackMs = duckAttack;
-        }
-        if (duckRelease !== undefined) {
-          input.ducking.releaseMs = duckRelease;
-        }
+      const audioAction = getAction("audio");
+      if (!audioAction) {
+        throw new Error("audio action missing from registry");
       }
-      if (loudness !== undefined || loudnessTarget !== undefined) {
-        input.loudness = {};
-        if (loudness !== undefined) {
-          input.loudness.enabled = parseOnOff(
-            loudness,
-            "openklip audio <slug> --loudness"
-          );
-        }
-        if (loudnessTarget !== undefined) {
-          input.loudness.targetLufs = loudnessTarget;
-        }
-        if (loudnessMode !== undefined) {
-          if (loudnessMode !== "single" && loudnessMode !== "two-pass") {
-            throw new Error(
-              "openklip audio <slug> --loudness-mode must be single or two-pass"
-            );
-          }
-          input.loudness.mode = loudnessMode;
-        }
-      }
-      if (noiseReduction !== undefined || noiseStrength !== undefined) {
-        input.noiseReduction = {};
-        if (noiseReduction !== undefined) {
-          input.noiseReduction.enabled = parseOnOff(
-            noiseReduction,
-            "openklip audio <slug> --noise-reduction"
-          );
-        }
-        if (noiseStrength !== undefined) {
-          input.noiseReduction.nr = noiseStrength;
-        }
-      }
-      if (highpass !== undefined || highpassHz !== undefined) {
-        input.voiceHighpass = {};
-        if (highpass !== undefined) {
-          input.voiceHighpass.enabled = parseOnOff(
-            highpass,
-            "openklip audio <slug> --highpass"
-          );
-        }
-        if (highpassHz !== undefined) {
-          input.voiceHighpass.hz = highpassHz;
-        }
-      }
-      if (deess !== undefined || deessIntensity !== undefined) {
-        input.deEsser = {};
-        if (deess !== undefined) {
-          input.deEsser.enabled = parseOnOff(
-            deess,
-            "openklip audio <slug> --deess"
-          );
-        }
-        if (deessIntensity !== undefined) {
-          input.deEsser.intensity = deessIntensity;
-        }
-      }
+      // Nested registry shape → flat CLI flags via AUDIO_CLI_FLAG_OPTS.
+      const input = parseRegistryActionFlags(
+        audioAction,
+        rest.slice(1),
+        AUDIO_CLI_FLAG_OPTS
+      );
 
       const project =
         Object.keys(input).length === 0
@@ -2766,22 +2669,24 @@ try {
       break;
     }
     case "export-set": {
+      const exportSetAction = getAction("export-set");
+      if (!exportSetAction) {
+        throw new Error("export-set action missing from registry");
+      }
+      const exportSetSchema = asZodObject(exportSetAction.schema, "export-set");
+      const exportSetUsage = usageFlagsFromSpecs(
+        flagSpecsFromZodObject(exportSetSchema, EXPORT_SET_CLI_FLAG_OPTS)
+      );
       if (!rest[0]) {
-        throw new Error(
-          "usage: openklip export-set <slug> [--aspect <id>] [--crop-mode manual|scene|vision] [--crop-focus-x <0-1>] [--crop-focus-y <0-1>] [--crop-scale <1-3>] [--layout fill|split-vertical] [--split-ratio <0.25-0.75>] [--split-speaker top|bottom]"
-        );
+        throw new Error(`usage: openklip export-set <slug> ${exportSetUsage}`);
       }
       const slug = rest[0];
-      const aspectRaw = flagValue(rest, "--aspect");
-      const cropModeRaw = flagValue(rest, "--crop-mode");
-      const layoutRaw = flagValue(rest, "--layout");
-      const splitRatio = flagNumber(rest, "--split-ratio");
-      const splitSpeakerRaw = flagValue(rest, "--split-speaker");
-      const focusX = flagNumber(rest, "--crop-focus-x");
-      const focusY = flagNumber(rest, "--crop-focus-y");
-      const scale = flagNumber(rest, "--crop-scale");
-      const input: {
-        aspect?: ReturnType<typeof parseExportAspectFlag>;
+      const input = parseRegistryActionFlags(
+        exportSetAction,
+        rest.slice(1),
+        EXPORT_SET_CLI_FLAG_OPTS
+      ) as {
+        aspect?: string;
         crop?: { focusX?: number; focusY?: number; scale?: number };
         cropMode?: "manual" | "scene" | "vision";
         layout?: "fill" | "split-vertical";
@@ -2789,54 +2694,16 @@ try {
           ratio?: number;
           speakerPosition?: "top" | "bottom";
         };
-      } = {};
-      if (aspectRaw !== undefined) {
-        input.aspect = parseExportAspectFlag(aspectRaw);
-      }
-      if (cropModeRaw !== undefined) {
-        if (
-          cropModeRaw !== "manual" &&
-          cropModeRaw !== "scene" &&
-          cropModeRaw !== "vision"
-        ) {
-          throw new Error('--crop-mode must be "manual", "scene", or "vision"');
-        }
-        input.cropMode = cropModeRaw;
-      }
-      if (layoutRaw !== undefined) {
-        if (layoutRaw !== "fill" && layoutRaw !== "split-vertical") {
-          throw new Error('--layout must be "fill" or "split-vertical"');
-        }
-        input.layout = layoutRaw;
-      }
-      if (splitRatio !== undefined || splitSpeakerRaw !== undefined) {
-        input.splitVertical = {};
-        if (splitRatio !== undefined) {
-          input.splitVertical.ratio = splitRatio;
-        }
-        if (splitSpeakerRaw !== undefined) {
-          if (splitSpeakerRaw !== "top" && splitSpeakerRaw !== "bottom") {
-            throw new Error('--split-speaker must be "top" or "bottom"');
-          }
-          input.splitVertical.speakerPosition = splitSpeakerRaw;
-        }
-      }
-      if (focusX !== undefined || focusY !== undefined || scale !== undefined) {
-        input.crop = {};
-        if (focusX !== undefined) {
-          input.crop.focusX = focusX;
-        }
-        if (focusY !== undefined) {
-          input.crop.focusY = focusY;
-        }
-        if (scale !== undefined) {
-          input.crop.scale = scale;
-        }
-      }
+      };
+      // Vision crop still needs a disk read + Vision helper after flags parse.
       if (input.cropMode === "vision") {
         const project = await loadProject(slug);
         const aspect =
-          input.aspect ?? project.export?.aspect ?? ("9:16" as const);
+          (input.aspect as
+            | ReturnType<typeof parseExportAspectFlag>
+            | undefined) ??
+          project.export?.aspect ??
+          ("9:16" as const);
         if (aspect === "source") {
           throw new Error(
             'vision crop requires a fixed aspect (not "source"); pass --aspect 9:16'

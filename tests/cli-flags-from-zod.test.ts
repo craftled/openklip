@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { z } from "zod";
 import {
+  AUDIO_CLI_FLAG_OPTS,
   camelToKebab,
+  EXPORT_SET_CLI_FLAG_OPTS,
   flagSpecsFromZodObject,
   parseFlagsWithZodSchema,
   usageFlagsFromSpecs,
@@ -142,6 +144,79 @@ test("parseFlagsWithZodSchema look-color aliases and reset", () => {
       opts
     ),
     { reset: true }
+  );
+});
+
+test("parseFlagsWithZodSchema nests audio flags under ducking/deEsser", () => {
+  const action = getAction("audio");
+  assert.ok(action);
+  assert.deepEqual(
+    parseFlagsWithZodSchema(
+      action.schema as z.ZodObject<z.ZodRawShape>,
+      [
+        "--duck",
+        "on",
+        "--duck-amount",
+        "8",
+        "--deess",
+        "on",
+        "--deess-intensity",
+        "0.7",
+        "--loudness-mode",
+        "two-pass",
+      ],
+      AUDIO_CLI_FLAG_OPTS
+    ),
+    {
+      ducking: { enabled: true, amountDb: 8 },
+      deEsser: { enabled: true, intensity: 0.7 },
+      loudness: { mode: "two-pass" },
+    }
+  );
+  assert.throws(
+    () =>
+      parseFlagsWithZodSchema(
+        action.schema as z.ZodObject<z.ZodRawShape>,
+        ["--deess", "maybe"],
+        AUDIO_CLI_FLAG_OPTS
+      ),
+    /on or off/
+  );
+});
+
+test("parseFlagsWithZodSchema nests export-set crop and split flags", () => {
+  const action = getAction("export-set");
+  assert.ok(action);
+  assert.deepEqual(
+    parseFlagsWithZodSchema(
+      action.schema as z.ZodObject<z.ZodRawShape>,
+      [
+        "--aspect",
+        "9:16",
+        "--crop-mode",
+        "manual",
+        "--crop-focus-x",
+        "0.4",
+        "--crop-focus-y",
+        "0.6",
+        "--crop-scale",
+        "1.2",
+        "--layout",
+        "split-vertical",
+        "--split-ratio",
+        "0.5",
+        "--split-speaker",
+        "top",
+      ],
+      EXPORT_SET_CLI_FLAG_OPTS
+    ),
+    {
+      aspect: "9:16",
+      cropMode: "manual",
+      crop: { focusX: 0.4, focusY: 0.6, scale: 1.2 },
+      layout: "split-vertical",
+      splitVertical: { ratio: 0.5, speakerPosition: "top" },
+    }
   );
 });
 

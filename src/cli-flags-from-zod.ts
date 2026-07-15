@@ -1,6 +1,7 @@
 /**
  * Derive CLI flag parsing from registry Zod object schemas (CRAFT-6168).
  * MCP already uses the same schemas; this closes CLI/MCP drift for flag shapes.
+ * Nested objects flatten to leaf flags (e.g. ducking.enabled → --duck).
  */
 import { z } from "zod";
 
@@ -12,7 +13,10 @@ export interface CliFlagSpec {
   enumValues?: string[];
   /** Primary flag without leading dashes (e.g. max-shift). */
   flag: string;
-  /** CamelCase schema key (e.g. maxShiftMs). */
+  /**
+   * Dotted path used for renames/aliases lookup
+   * (e.g. "ducking.enabled", "maxShiftMs").
+   */
   key: string;
   kind: CliFlagKind;
   /** Null is allowed (optional nullable fields). */
@@ -23,25 +27,26 @@ export interface CliFlagSpec {
    */
   onOff?: boolean;
   optional: boolean;
+  /** Nested path segments into the action input object. */
+  path: string[];
   /**
    * Boolean takes an explicit value: on|off, or on|off|inherit when nullable.
-   * Used by cleanup-config category toggles.
+   * Used by cleanup-config category toggles and audio --duck on|off.
    */
   valueBoolean?: boolean;
 }
 
 export interface ParseFlagsFromSchemaOptions {
   /**
-   * Extra flag names per schema key (without --).
-   * Example: { temperature: ["temperature"], brightness: ["brightness"] }
-   * when primary renames are temp / bright.
+   * Extra flag names per schema key (dotted path or top-level key).
+   * Example: { temperature: ["temperature"] } or { "ducking.enabled": [] }
    */
   aliases?: Record<string, readonly string[]>;
-  /** Schema keys that use --on/--off for boolean true/false. */
+  /** Schema keys (dotted) that use --on/--off for boolean true/false. */
   booleanOnOffKeys?: readonly string[];
   /**
-   * Boolean keys that take an explicit on|off (or on|off|inherit if nullable)
-   * value instead of presence flags.
+   * Boolean keys (dotted) that take an explicit on|off (or on|off|inherit if
+   * nullable) value instead of presence flags.
    */
   booleanValueKeys?: readonly string[];
   /**
@@ -50,8 +55,8 @@ export interface ParseFlagsFromSchemaOptions {
    */
   ignoreFlags?: readonly string[];
   /**
-   * Map schema keys to flag names (without --).
-   * Example: { maxShiftMs: "max-shift", crossfadeMs: "crossfade" }
+   * Map schema keys (dotted path or leaf name) to flag names (without --).
+   * Example: { maxShiftMs: "max-shift", "ducking.enabled": "duck" }
    */
   renames?: Record<string, string>;
 }
@@ -92,7 +97,27 @@ function unwrapZod(type: z.ZodType): {
   return { base, optional, nullable };
 }
 
-function classifyZod(type: z.ZodType): {
+function isZodObject(type: z.ZodType): type is z.ZodObject<z.ZodRawShape> {
+  const { base } = unwrapZod(type);
+  return (
+    base instanceof z.ZodObject ||
+    (base as { def?: { type?: string } }).def?.type === "object"
+  );
+}
+
+function objectShape(type: z.ZodType): z.ZodRawShape {
+  const { base } = unwrapZod(type);
+  if (base instanceof z.ZodObject) {
+    return base.shape;
+  }
+  const shape = (base as { shape?: z.ZodRawShape }).shape;
+  if (shape) {
+    return shape;
+  }
+  throw new Error("expected Zod object shape");
+}
+
+function classifyLeaf(type: z.ZodType): {
   kind: CliFlagKind;
   enumValues?: string[];
   nullable: boolean;
@@ -120,8 +145,17 @@ function classifyZod(type: z.ZodType): {
   return { kind: "string", optional, nullable };
 }
 
+function resolveFlagName(
+  pathKey: string,
+  leaf: string,
+  renames: Record<string, string>
+): string {
+  return renames[pathKey] ?? renames[leaf] ?? camelToKebab(leaf);
+}
+
 /**
  * Build flag specs from a Zod object schema (registry action input).
+ * Nested objects are flattened to leaf flags.
  */
 export function flagSpecsFromZodObject(
   schema: z.ZodObject<z.ZodRawShape>,
@@ -132,25 +166,41 @@ export function flagSpecsFromZodObject(
   const onOff = new Set(options.booleanOnOffKeys ?? []);
   const valueBools = new Set(options.booleanValueKeys ?? []);
   const specs: CliFlagSpec[] = [];
-  for (const [key, field] of Object.entries(schema.shape)) {
-    const { kind, enumValues, optional, nullable } = classifyZod(
-      field as z.ZodType
-    );
-    const flag = renames[key] ?? camelToKebab(key);
-    const extra = aliases[key] ?? [];
-    const isValueBool = kind === "boolean" && (valueBools.has(key) || nullable);
-    specs.push({
-      key,
-      flag,
-      kind,
-      optional,
-      nullable,
-      ...(enumValues ? { enumValues } : {}),
-      ...(kind === "boolean" && onOff.has(key) ? { onOff: true } : {}),
-      ...(isValueBool && !onOff.has(key) ? { valueBoolean: true } : {}),
-      ...(extra.length > 0 ? { aliases: [...extra] } : {}),
-    });
-  }
+
+  const walk = (shape: z.ZodRawShape, path: string[]) => {
+    for (const [leaf, field] of Object.entries(shape)) {
+      const nextPath = [...path, leaf];
+      const pathKey = nextPath.join(".");
+      if (isZodObject(field as z.ZodType)) {
+        walk(objectShape(field as z.ZodType), nextPath);
+        continue;
+      }
+      const { kind, enumValues, optional, nullable } = classifyLeaf(
+        field as z.ZodType
+      );
+      const flag = resolveFlagName(pathKey, leaf, renames);
+      const extra = aliases[pathKey] ?? aliases[leaf] ?? [];
+      const isValueBool =
+        kind === "boolean" &&
+        (valueBools.has(pathKey) || valueBools.has(leaf) || nullable);
+      const isOnOff =
+        kind === "boolean" && (onOff.has(pathKey) || onOff.has(leaf));
+      specs.push({
+        key: pathKey,
+        path: nextPath,
+        flag,
+        kind,
+        optional,
+        nullable,
+        ...(enumValues ? { enumValues } : {}),
+        ...(isOnOff ? { onOff: true } : {}),
+        ...(isValueBool && !isOnOff ? { valueBoolean: true } : {}),
+        ...(extra.length > 0 ? { aliases: [...extra] } : {}),
+      });
+    }
+  };
+
+  walk(schema.shape, []);
   return specs;
 }
 
@@ -194,6 +244,23 @@ function indexSpecsByFlag(
     }
   }
   return byFlag;
+}
+
+function setPath(
+  obj: Record<string, unknown>,
+  path: readonly string[],
+  value: unknown
+): void {
+  let cur: Record<string, unknown> = obj;
+  for (let i = 0; i < path.length - 1; i++) {
+    const p = path[i];
+    const next = cur[p];
+    if (next === undefined || next === null || typeof next !== "object") {
+      cur[p] = {};
+    }
+    cur = cur[p] as Record<string, unknown>;
+  }
+  cur[path[path.length - 1]] = value;
 }
 
 function parseBooleanValue(
@@ -244,7 +311,7 @@ export function parseFlagsWithZodSchema(
       if (!onOffSpec) {
         throw new Error(`unexpected flag ${tok}`);
       }
-      raw[onOffSpec.key] = tok === "--on";
+      setPath(raw, onOffSpec.path, tok === "--on");
       i += 1;
       continue;
     }
@@ -258,7 +325,7 @@ export function parseFlagsWithZodSchema(
       if (spec?.kind !== "boolean" || spec.onOff || spec.valueBoolean) {
         throw new Error(`unknown flag ${tok}`);
       }
-      raw[spec.key] = false;
+      setPath(raw, spec.path, false);
       i += 1;
       continue;
     }
@@ -267,7 +334,7 @@ export function parseFlagsWithZodSchema(
       throw new Error(`unknown flag ${tok}`);
     }
     if (spec.kind === "boolean" && !spec.valueBoolean) {
-      raw[spec.key] = true;
+      setPath(raw, spec.path, true);
       i += 1;
       continue;
     }
@@ -276,10 +343,10 @@ export function parseFlagsWithZodSchema(
       throw new Error(`${tok} requires a value`);
     }
     if (spec.kind === "boolean" && spec.valueBoolean) {
-      raw[spec.key] = parseBooleanValue(value, tok, spec.nullable);
+      setPath(raw, spec.path, parseBooleanValue(value, tok, spec.nullable));
     } else if (spec.kind === "number") {
       if (spec.nullable && value.toLowerCase() === "inherit") {
-        raw[spec.key] = null;
+        setPath(raw, spec.path, null);
       } else {
         const n = Number(value);
         if (!Number.isFinite(n)) {
@@ -289,7 +356,7 @@ export function parseFlagsWithZodSchema(
               : `${tok} must be a number`
           );
         }
-        raw[spec.key] = n;
+        setPath(raw, spec.path, n);
       }
     } else if (spec.kind === "enum") {
       if (spec.enumValues && !spec.enumValues.includes(value)) {
@@ -297,13 +364,16 @@ export function parseFlagsWithZodSchema(
           `${tok} must be one of ${spec.enumValues.join(", ")} (got ${value})`
         );
       }
-      raw[spec.key] = value;
+      setPath(raw, spec.path, value);
     } else {
-      raw[spec.key] = value;
+      setPath(raw, spec.path, value);
     }
     i += 2;
   }
 
+  // Deep-partial: top-level .partial() keeps nested objects strict about
+  // unknown keys but leaves nested fields optional when the nested schema
+  // marks them optional (registry shapes do).
   const partial = schema.partial();
   const parsed = partial.safeParse(raw);
   if (!parsed.success) {
@@ -352,3 +422,41 @@ export function parseRegistryActionFlags(
     options
   );
 }
+
+/** Shared renames for openklip audio <slug> flags. */
+export const AUDIO_CLI_FLAG_OPTS: ParseFlagsFromSchemaOptions = {
+  renames: {
+    "ducking.enabled": "duck",
+    "ducking.amountDb": "duck-amount",
+    "ducking.attackMs": "duck-attack",
+    "ducking.releaseMs": "duck-release",
+    "loudness.enabled": "loudness",
+    "loudness.targetLufs": "loudness-target",
+    "loudness.mode": "loudness-mode",
+    "noiseReduction.enabled": "noise-reduction",
+    "noiseReduction.nr": "noise-strength",
+    "voiceHighpass.enabled": "highpass",
+    "voiceHighpass.hz": "highpass-hz",
+    "deEsser.enabled": "deess",
+    "deEsser.intensity": "deess-intensity",
+  },
+  booleanValueKeys: [
+    "ducking.enabled",
+    "loudness.enabled",
+    "noiseReduction.enabled",
+    "voiceHighpass.enabled",
+    "deEsser.enabled",
+  ],
+};
+
+/** Shared renames for openklip export-set flags. */
+export const EXPORT_SET_CLI_FLAG_OPTS: ParseFlagsFromSchemaOptions = {
+  renames: {
+    cropMode: "crop-mode",
+    "crop.focusX": "crop-focus-x",
+    "crop.focusY": "crop-focus-y",
+    "crop.scale": "crop-scale",
+    "splitVertical.ratio": "split-ratio",
+    "splitVertical.speakerPosition": "split-speaker",
+  },
+};
