@@ -20,7 +20,7 @@ import type {
   ExportDialogOptions,
   ExportResolution,
 } from "@/components/export-dialog";
-import type { GraphicItem } from "@/components/graphic-overlay";
+import type { GraphicItem } from "@/components/graphic-item";
 import { PlayerControls } from "@/components/player-controls";
 import { PreviewOverlays } from "@/components/preview-overlays";
 import { PreviewTransitionNotice } from "@/components/preview-transition-notice";

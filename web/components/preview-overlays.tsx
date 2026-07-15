@@ -6,7 +6,7 @@ import type { CaptionGroup } from "../../src/captions.ts";
 import { formatDividerLabel } from "../../src/titles.ts";
 import { cn } from "../lib/utils";
 import { CaptionLine } from "./caption-line";
-import type { GraphicItem } from "./graphic-overlay";
+import type { GraphicItem } from "./graphic-item";
 import { HeroTitleOverlay } from "./hero-title-overlay";
 
 // Heavy graphic stacks (Paper shaders, maplibre) load only when a graphic is

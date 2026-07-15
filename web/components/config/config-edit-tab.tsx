@@ -13,7 +13,7 @@ import {
   ZOOM_PRESETS,
 } from "@/components/config/config-section";
 import type { TimelineClipKind } from "@/components/edit-timeline";
-import type { GraphicItem } from "@/components/graphic-overlay";
+import type { GraphicItem } from "@/components/graphic-item";
 import { OverlaySortable } from "@/components/overlay-sortable";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
