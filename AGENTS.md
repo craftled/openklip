@@ -346,6 +346,8 @@ The tool-calling edit prompt (`buildEditPrompt` in `src/agent-driver.ts`) advert
 
 **Editor code-splitting (CRAFT-6172):** heavy client stacks load on demand via `next/dynamic` (`ssr: false`): graphic overlays + Paper shaders (`preview-overlays`), map-motion / maplibre (`json-render-graphic-overlay` → `map-motion-frame`), template hover previews, and media audio visualizers (wave shader split out of LiveKit agent visualizer). Prefer dynamic import for new niche panel deps rather than static imports from the editor shell.
 
+**Segment export + b-roll (CRAFT-6171):** `shouldUseSegmentExport` allows b-roll (and music/stills) on sparse short cuts; only rich/json-render graphics force full-source decode. Cut transitions still block when b-roll or rich graphics are present (`blocksCutTransition`), because xfade/dip change output length and would desync overlay windows.
+
 **Parity rule:** every registry action with `surfaces` including `mcp` is an MCP tool with `{ slug, … }` input. Query tools use snake_case names; mutations keep registry kebab-case names (`broll-add`).
 
 **Optional skills package:** `skills/` ships `SKILL.md` playbooks installable via `npx skills add <owner>/openklip --skill openklip-motion-canvas` (see `skills/README.md`). Same content as `templates/<id>/skill.md`; MCP `load_skill` works without installing.
