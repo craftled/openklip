@@ -13,7 +13,7 @@ import type {
 import { AudioSchema, CutSnapSchema } from "@engine/edl";
 import type { AudioPatch } from "@/components/audio-controls";
 import type { TimelineClipKind } from "@/components/edit-timeline";
-import type { GraphicItem } from "@/components/graphic-overlay";
+import type { GraphicItem } from "@/components/graphic-item";
 import type { MusicPlacementView } from "@/components/music-controls";
 import type { DeadAirItem } from "@/lib/dead-air-state";
 

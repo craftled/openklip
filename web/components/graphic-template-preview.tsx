@@ -188,15 +188,3 @@ export function GraphicTemplatePreview({
     </div>
   );
 }
-
-export function GraphicTemplatePreviewCaption({
-  template,
-}: {
-  template: GraphicTemplateOption;
-}) {
-  return (
-    <p className="truncate px-2 py-1.5 text-muted-foreground text-xs">
-      {template.name}
-    </p>
-  );
-}

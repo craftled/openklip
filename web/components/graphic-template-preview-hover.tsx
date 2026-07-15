@@ -8,9 +8,10 @@ import {
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
 import type { GraphicTemplateOption } from "./graphic-picker-controls";
-import { GraphicTemplatePreviewCaption } from "./graphic-template-preview";
 
 // Shader/runtime preview mounts only when a template hover opens (CRAFT-6172).
+// Caption stays local so this module never static-imports graphic-template-preview
+// (that file pulls paper shaders via graphic-runtime).
 const GraphicTemplatePreview = dynamic(
   () =>
     import("./graphic-template-preview").then((mod) => ({
@@ -62,7 +63,9 @@ export function GraphicTemplatePreviewHover({
           slug={slug}
           template={template}
         />
-        <GraphicTemplatePreviewCaption template={template} />
+        <p className="truncate px-2 py-1.5 text-muted-foreground text-xs">
+          {template.name}
+        </p>
       </HoverCardContent>
     </HoverCard>
   );

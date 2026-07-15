@@ -1,6 +1,5 @@
 "use client";
 
-import type { Keyframe } from "@engine/keyframes";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   type GraphicComposition,
@@ -14,24 +13,15 @@ import {
   graphicFrameAt,
 } from "@/lib/graphic-runtime";
 import { graphicRequiresImageAsset } from "../../src/graphic-image-shader-ids.ts";
+import type { GraphicItem } from "./graphic-item";
+
+export type { GraphicItem } from "./graphic-item";
 
 // One active graphic overlay rendered live over the <video>, driven by the SAME
 // scheduler-derived sample position the export rasterizer uses. The composition
 // fragment is authored at its intrinsic width/height (e.g. 1920x1080); we mount
 // it at that intrinsic size and CSS-scale it to fill the preview box, so font
 // sizes and slide distances match export pixel-for-pixel rather than reflowing.
-export interface GraphicItem {
-  catalog?: string;
-  endSample: number;
-  id: string;
-  keyframes?: Keyframe[];
-  params: Record<string, string | number | boolean>;
-  spec?: unknown;
-  startSample: number;
-  template: string;
-  track: string;
-  type?: "template" | "json-render";
-}
 
 function previewParams(
   slug: string,
