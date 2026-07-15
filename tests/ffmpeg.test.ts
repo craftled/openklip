@@ -21,6 +21,13 @@ test("isFfprobeArchMismatchError recognizes EBADARCH spawn failures", () => {
   assert.equal(isFfprobeArchMismatchError(null), false);
 });
 
+test("isFfprobePermissionError recognizes EACCES spawn failures", async () => {
+  const { isFfprobePermissionError } = await import("../src/ffmpeg.ts");
+  assert.equal(isFfprobePermissionError({ code: "EACCES", errno: -13 }), true);
+  assert.equal(isFfprobePermissionError({ errno: -13 }), true);
+  assert.equal(isFfprobePermissionError({ code: "ENOENT" }), false);
+});
+
 test("probe falls back to a system ffprobe when the bundled binary is the wrong arch", {
   skip:
     process.platform === "darwin" &&

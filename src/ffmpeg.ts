@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { chmodSync, existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
 
@@ -17,6 +17,41 @@ function localBinary(...parts: string[]): string | null {
   return existsSync(fp) ? fp : null;
 }
 
+/**
+ * npm/bun unpack sometimes drops the execute bit on optional binary packages
+ * (seen on Linux CI with @ffprobe-installer/*). Best-effort chmod so the first
+ * spawn does not fail with EACCES.
+ */
+export function ensureExecutableBinary(binPath: string): void {
+  if (!(binPath.includes("node_modules") || binPath.startsWith("/"))) {
+    return;
+  }
+  if (!existsSync(binPath)) {
+    return;
+  }
+  try {
+    chmodSync(binPath, 0o755);
+  } catch {
+    // Non-fatal: spawn will fall through to system candidates.
+  }
+}
+
+function resolveBundledFfprobe(): string | null {
+  const fromPkg =
+    optionalRequire<{ path?: string }>("@ffprobe-installer/ffprobe")?.path ??
+    null;
+  const fromLocal = localBinary(
+    "@ffprobe-installer",
+    `${process.platform}-${process.arch}`,
+    "ffprobe"
+  );
+  const path = fromPkg ?? fromLocal;
+  if (path) {
+    ensureExecutableBinary(path);
+  }
+  return path;
+}
+
 export const FFMPEG =
   optionalRequire<string>("ffmpeg-static") ??
   process.env.FFMPEG ??
@@ -29,14 +64,7 @@ export const FFMPEG =
 // Silicon, if the published binary is still the wrong arch, spawnFfprobe falls
 // back to a system ffprobe on PATH.
 export const FFPROBE =
-  optionalRequire<{ path?: string }>("@ffprobe-installer/ffprobe")?.path ??
-  process.env.FFPROBE ??
-  localBinary(
-    "@ffprobe-installer",
-    `${process.platform}-${process.arch}`,
-    "ffprobe"
-  ) ??
-  "ffprobe";
+  resolveBundledFfprobe() ?? process.env.FFPROBE ?? "ffprobe";
 
 const SYSTEM_FFPROBE_CANDIDATES = [
   "/opt/homebrew/bin/ffprobe",
@@ -50,6 +78,18 @@ export function isFfprobeArchMismatchError(error: unknown): boolean {
   }
   const record = error as { code?: string; errno?: number };
   return record.code === "EBADARCH" || record.errno === -86;
+}
+
+export function isFfprobePermissionError(error: unknown): boolean {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+  const record = error as { code?: string; errno?: number };
+  return record.code === "EACCES" || record.errno === -13;
+}
+
+function shouldTryNextFfprobe(error: unknown): boolean {
+  return isFfprobeArchMismatchError(error) || isFfprobePermissionError(error);
 }
 
 function ffprobeSpawnCandidates(): string[] {
@@ -70,10 +110,13 @@ function spawnFfprobe(args: string[]) {
   let lastError: unknown;
   for (const bin of candidates) {
     try {
+      if (bin.includes("node_modules") || bin.startsWith("/")) {
+        ensureExecutableBinary(bin);
+      }
       return Bun.spawn([bin, ...args], { stdout: "pipe", stderr: "pipe" });
     } catch (error) {
       lastError = error;
-      if (!isFfprobeArchMismatchError(error)) {
+      if (!shouldTryNextFfprobe(error)) {
         throw error;
       }
     }

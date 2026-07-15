@@ -30,7 +30,7 @@ test("ffmpeg module resolves @ffprobe-installer/ffprobe", () => {
   assert.doesNotMatch(src, /localBinary\(\s*"ffprobe-static"/);
 });
 
-test("platform ffprobe binary exists and is executable after install", () => {
+test("platform ffprobe binary can be made executable (CI often drops +x on unpack)", async () => {
   const platformPkg = join(
     root,
     "node_modules",
@@ -41,9 +41,11 @@ test("platform ffprobe binary exists and is executable after install", () => {
   if (!existsSync(platformPkg)) {
     return;
   }
+  const { ensureExecutableBinary } = await import("../src/ffmpeg.ts");
+  ensureExecutableBinary(platformPkg);
   const mode = statSync(platformPkg).mode;
   assert.ok(
     mode & 0o111,
-    `ffprobe should be executable, mode=${mode.toString(8)}`
+    `ffprobe should be executable after ensureExecutableBinary, mode=${mode.toString(8)}`
   );
 });
