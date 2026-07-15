@@ -3,6 +3,7 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { gunzipSync, gzipSync } from "node:zlib";
 import {
   type Actor,
   actorFromEnv,
@@ -94,15 +95,27 @@ export interface MutateMeta {
 }
 
 // One pre-mutation project.json snapshot per logged revision, named after the
-// revision it captures (rev-<revisionBefore>.json). src/revert.ts reads these
-// back to restore an earlier state; see the writer in mutateProject below.
-const SNAPSHOT_NAME_PATTERN = /^rev-(\d+)\.json$/;
+// revision it captures. New writes use gzip (`rev-<n>.json.gz`); plain
+// `rev-<n>.json` is still readable for older projects (CRAFT-6174).
+// src/revert.ts loads these via loadHistorySnapshot; see writeHistorySnapshot.
+const SNAPSHOT_NAME_PATTERN = /^rev-(\d+)\.json(?:\.gz)?$/;
 
 /** Revision number encoded in a history snapshot filename, or undefined for
  * anything else in the directory (stray files, tmp leftovers). */
 export function snapshotRevisionFromFilename(name: string): number | undefined {
   const match = SNAPSHOT_NAME_PATTERN.exec(name);
   return match ? Number(match[1]) : undefined;
+}
+
+function historySnapshotPaths(
+  slug: string,
+  revision: number
+): { gz: string; plain: string } {
+  const dir = projectPaths(slug).historyDir;
+  return {
+    gz: join(dir, `rev-${revision}.json.gz`),
+    plain: join(dir, `rev-${revision}.json`),
+  };
 }
 
 /** Revisions that currently have a snapshot on disk, ascending. Sync (like
@@ -113,10 +126,13 @@ export function listHistorySnapshotRevisions(slug: string): number[] {
   if (!existsSync(dir)) {
     return [];
   }
-  return readdirSync(dir)
-    .map(snapshotRevisionFromFilename)
-    .filter((r): r is number => r !== undefined)
-    .sort((a, b) => a - b);
+  return [
+    ...new Set(
+      readdirSync(dir)
+        .map(snapshotRevisionFromFilename)
+        .filter((r): r is number => r !== undefined)
+    ),
+  ].sort((a, b) => a - b);
 }
 
 export const MAX_HISTORY_SNAPSHOTS = 100;
@@ -131,21 +147,32 @@ export async function pruneHistorySnapshots(
   if (!existsSync(dir)) {
     return;
   }
-  const named = readdirSync(dir)
-    .map((name) => ({ name, revision: snapshotRevisionFromFilename(name) }))
-    .filter(
-      (e): e is { name: string; revision: number } => e.revision !== undefined
-    )
-    .sort((a, b) => b.revision - a.revision);
-  const stale = named.slice(keep);
+  // Group by revision so a rev with both .json and .json.gz counts once, and
+  // pruning removes every file for that revision together.
+  const byRevision = new Map<number, string[]>();
+  for (const name of readdirSync(dir)) {
+    const revision = snapshotRevisionFromFilename(name);
+    if (revision === undefined) {
+      continue;
+    }
+    const files = byRevision.get(revision) ?? [];
+    files.push(name);
+    byRevision.set(revision, files);
+  }
+  const revisions = [...byRevision.keys()].sort((a, b) => b - a);
+  const staleRevs = revisions.slice(keep);
   await Promise.all(
-    stale.map((e) => unlink(join(dir, e.name)).catch(() => undefined))
+    staleRevs.flatMap((rev) =>
+      (byRevision.get(rev) ?? []).map((name) =>
+        unlink(join(dir, name)).catch(() => undefined)
+      )
+    )
   );
 }
 
 // Atomic tmp+rename write, matching src/chats.ts and src/audio-analysis.ts:
 // a crash mid-write leaves the old snapshot (or none) instead of a truncated
-// rev-<n>.json that revert would fail to parse.
+// file that revert would fail to parse. Gzip: long transcripts compress well.
 async function writeHistorySnapshot(
   slug: string,
   revisionBefore: number,
@@ -153,10 +180,17 @@ async function writeHistorySnapshot(
 ): Promise<void> {
   const dir = projectPaths(slug).historyDir;
   await mkdir(dir, { recursive: true });
-  const target = join(dir, `rev-${revisionBefore}.json`);
+  const { gz: target, plain: legacy } = historySnapshotPaths(
+    slug,
+    revisionBefore
+  );
   const tmp = `${target}.tmp-${process.pid}`;
-  await writeFile(tmp, json);
+  await writeFile(tmp, gzipSync(Buffer.from(json, "utf8")));
   await rename(tmp, target);
+  // Prefer the new compressed file; drop a same-revision plain sibling if any.
+  if (existsSync(legacy)) {
+    await unlink(legacy).catch(() => undefined);
+  }
 }
 
 // Load → mutate → save inside the per-slug project lock, so concurrent server
@@ -254,8 +288,14 @@ export async function loadHistorySnapshot(
   slug: string,
   revision: number
 ): Promise<Project> {
-  const fp = join(projectPaths(slug).historyDir, `rev-${revision}.json`);
-  if (!existsSync(fp)) {
+  const { gz, plain } = historySnapshotPaths(slug, revision);
+  let raw: string | undefined;
+  if (existsSync(gz)) {
+    raw = gunzipSync(await readFile(gz)).toString("utf8");
+  } else if (existsSync(plain)) {
+    raw = await readFile(plain, "utf8");
+  }
+  if (raw === undefined) {
     const available = listHistorySnapshotRevisions(slug);
     throw new Error(
       `${slug}: no snapshot for revision ${revision}` +
@@ -264,5 +304,5 @@ export async function loadHistorySnapshot(
           : " (no snapshots exist yet)")
     );
   }
-  return ProjectSchema.parse(JSON.parse(await readFile(fp, "utf8")));
+  return ProjectSchema.parse(JSON.parse(raw));
 }
