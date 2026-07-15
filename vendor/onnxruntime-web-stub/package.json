@@ -1,0 +1,9 @@
+{
+  "name": "onnxruntime-web",
+  "version": "0.0.0-openklip-stub",
+  "description": "Install-size stub: OpenKlip runs Transformers.js on Node via onnxruntime-node only (CRAFT-6173).",
+  "main": "index.js",
+  "module": "index.js",
+  "types": "index.d.ts",
+  "license": "MIT"
+}

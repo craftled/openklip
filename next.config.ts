@@ -29,7 +29,7 @@ const nextConfig: NextConfig = {
   // resolve at runtime instead of being traced/bundled by Turbopack.
   serverExternalPackages: [
     "ffmpeg-static",
-    "ffprobe-static",
+    "@ffprobe-installer/ffprobe",
     "@huggingface/transformers",
     // The rich-graphics renderer (src/headless-render.ts) drives headless Chrome
     // via puppeteer-core. It is imported lazily and must never be traced into a

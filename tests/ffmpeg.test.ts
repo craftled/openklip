@@ -21,7 +21,14 @@ test("isFfprobeArchMismatchError recognizes EBADARCH spawn failures", () => {
   assert.equal(isFfprobeArchMismatchError(null), false);
 });
 
-test("probe falls back to a system ffprobe when ffprobe-static is the wrong arch", {
+test("isFfprobePermissionError recognizes EACCES spawn failures", async () => {
+  const { isFfprobePermissionError } = await import("../src/ffmpeg.ts");
+  assert.equal(isFfprobePermissionError({ code: "EACCES", errno: -13 }), true);
+  assert.equal(isFfprobePermissionError({ errno: -13 }), true);
+  assert.equal(isFfprobePermissionError({ code: "ENOENT" }), false);
+});
+
+test("probe falls back to a system ffprobe when the bundled binary is the wrong arch", {
   skip:
     process.platform === "darwin" &&
     process.arch === "arm64" &&
@@ -29,7 +36,7 @@ test("probe falls back to a system ffprobe when ffprobe-static is the wrong arch
     existsSync(FFMPEG) &&
     !process.env.FFPROBE
       ? false
-      : "arm64 ffprobe-static arch mismatch scenario only",
+      : "arm64 bundled-ffprobe arch mismatch scenario only",
 }, async () => {
   const dir = mkdtempSync(join(tmpdir(), "openklip-ffprobe-fallback-"));
   const clip = join(dir, "clip.mp4");
