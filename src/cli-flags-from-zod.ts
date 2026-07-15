@@ -1,0 +1,250 @@
+/**
+ * Derive CLI flag parsing from registry Zod object schemas (CRAFT-6168).
+ * MCP already uses the same schemas; this closes CLI/MCP drift for flag shapes.
+ */
+import { z } from "zod";
+
+export type CliFlagKind = "boolean" | "number" | "string" | "enum";
+
+export interface CliFlagSpec {
+  enumValues?: string[];
+  /** Primary flag without leading dashes (e.g. max-shift). */
+  flag: string;
+  /** CamelCase schema key (e.g. maxShiftMs). */
+  key: string;
+  kind: CliFlagKind;
+  /**
+   * When true, booleans accept --on / --off instead of --flag / --no-flag
+   * (used by cuts-snap `enabled`).
+   */
+  onOff?: boolean;
+  optional: boolean;
+}
+
+export interface ParseFlagsFromSchemaOptions {
+  /** Schema keys that use --on/--off for boolean true/false. */
+  booleanOnOffKeys?: readonly string[];
+  /**
+   * Map schema keys to flag names (without --).
+   * Example: { maxShiftMs: "max-shift", crossfadeMs: "crossfade" }
+   */
+  renames?: Record<string, string>;
+}
+
+export function camelToKebab(name: string): string {
+  return name
+    .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
+    .replace(/_/g, "-")
+    .toLowerCase();
+}
+
+function unwrapZod(type: z.ZodType): {
+  base: z.ZodType;
+  optional: boolean;
+  nullable: boolean;
+} {
+  let base: z.ZodType = type;
+  let optional = false;
+  let nullable = false;
+  // Zod 4: walk optional/nullable wrappers via def.type
+  for (let i = 0; i < 6; i++) {
+    const def = (base as { def?: { type?: string; innerType?: z.ZodType } })
+      .def;
+    if (!def?.type) {
+      break;
+    }
+    if (def.type === "optional") {
+      optional = true;
+      base = def.innerType as z.ZodType;
+      continue;
+    }
+    if (def.type === "nullable") {
+      nullable = true;
+      base = def.innerType as z.ZodType;
+      continue;
+    }
+    break;
+  }
+  return { base, optional, nullable };
+}
+
+function classifyZod(type: z.ZodType): {
+  kind: CliFlagKind;
+  enumValues?: string[];
+} {
+  const { base } = unwrapZod(type);
+  const def = (
+    base as { def?: { type?: string; entries?: Record<string, string> } }
+  ).def;
+  const t = def?.type ?? (base as { type?: string }).type;
+  if (t === "boolean") {
+    return { kind: "boolean" };
+  }
+  if (t === "number") {
+    return { kind: "number" };
+  }
+  if (t === "enum") {
+    const entries = def?.entries ?? {};
+    const enumValues = Object.values(entries).map(String);
+    return { kind: "enum", enumValues };
+  }
+  if (t === "string") {
+    return { kind: "string" };
+  }
+  // Fallback: treat as string (rare for registry actions).
+  return { kind: "string" };
+}
+
+/**
+ * Build flag specs from a Zod object schema (registry action input).
+ */
+export function flagSpecsFromZodObject(
+  schema: z.ZodObject<z.ZodRawShape>,
+  options: ParseFlagsFromSchemaOptions = {}
+): CliFlagSpec[] {
+  const renames = options.renames ?? {};
+  const onOff = new Set(options.booleanOnOffKeys ?? []);
+  const specs: CliFlagSpec[] = [];
+  for (const [key, field] of Object.entries(schema.shape)) {
+    const { optional } = unwrapZod(field as z.ZodType);
+    const { kind, enumValues } = classifyZod(field as z.ZodType);
+    const flag = renames[key] ?? camelToKebab(key);
+    specs.push({
+      key,
+      flag,
+      kind,
+      optional,
+      ...(enumValues ? { enumValues } : {}),
+      ...(kind === "boolean" && onOff.has(key) ? { onOff: true } : {}),
+    });
+  }
+  return specs;
+}
+
+export function usageFlagsFromSpecs(specs: readonly CliFlagSpec[]): string {
+  const parts: string[] = [];
+  for (const s of specs) {
+    if (s.kind === "boolean" && s.onOff) {
+      parts.push("[--on|--off]");
+      continue;
+    }
+    if (s.kind === "boolean") {
+      parts.push(`[--${s.flag}|--no-${s.flag}]`);
+      continue;
+    }
+    if (s.kind === "enum" && s.enumValues) {
+      parts.push(`[--${s.flag} ${s.enumValues.join("|")}]`);
+      continue;
+    }
+    parts.push(`[--${s.flag} <${s.kind === "number" ? "n" : "value"}>]`);
+  }
+  return parts.join(" ");
+}
+
+/**
+ * Parse argv flag tokens (no positional args) into a partial input object,
+ * then validate with the Zod schema (partial/strip unknown not applied:
+ * only keys present in flags are set, then schema.partial().parse).
+ */
+export function parseFlagsWithZodSchema(
+  schema: z.ZodObject<z.ZodRawShape>,
+  flags: readonly string[],
+  options: ParseFlagsFromSchemaOptions = {}
+): Record<string, unknown> {
+  const specs = flagSpecsFromZodObject(schema, options);
+  const byFlag = new Map(specs.map((s) => [s.flag, s]));
+  const raw: Record<string, unknown> = {};
+
+  let i = 0;
+  while (i < flags.length) {
+    const tok = flags[i];
+    if (tok === "--on" || tok === "--off") {
+      const onOffSpec = specs.find((s) => s.onOff);
+      if (!onOffSpec) {
+        throw new Error(`unexpected flag ${tok}`);
+      }
+      raw[onOffSpec.key] = tok === "--on";
+      i += 1;
+      continue;
+    }
+    if (!tok.startsWith("--")) {
+      throw new Error(`unexpected argument ${tok} (expected a --flag)`);
+    }
+    const body = tok.slice(2);
+    if (body.startsWith("no-")) {
+      const flag = body.slice(3);
+      const spec = byFlag.get(flag);
+      if (spec?.kind !== "boolean" || spec.onOff) {
+        throw new Error(`unknown flag ${tok}`);
+      }
+      raw[spec.key] = false;
+      i += 1;
+      continue;
+    }
+    const spec = byFlag.get(body);
+    if (!spec) {
+      throw new Error(`unknown flag ${tok}`);
+    }
+    if (spec.kind === "boolean") {
+      raw[spec.key] = true;
+      i += 1;
+      continue;
+    }
+    const value = flags[i + 1];
+    if (value === undefined || value.startsWith("--")) {
+      throw new Error(`${tok} requires a value`);
+    }
+    if (spec.kind === "number") {
+      const n = Number(value);
+      if (!Number.isFinite(n)) {
+        throw new Error(`${tok} must be a number`);
+      }
+      raw[spec.key] = n;
+    } else if (spec.kind === "enum") {
+      if (spec.enumValues && !spec.enumValues.includes(value)) {
+        throw new Error(
+          `${tok} must be one of ${spec.enumValues.join(", ")} (got ${value})`
+        );
+      }
+      raw[spec.key] = value;
+    } else {
+      raw[spec.key] = value;
+    }
+    i += 2;
+  }
+
+  // Validate only provided keys against a partial schema so empty flag sets
+  // yield {} (print-only CLI modes).
+  const partial = schema.partial();
+  const parsed = partial.safeParse(raw);
+  if (!parsed.success) {
+    const detail = parsed.error.issues
+      .map((iss) => {
+        const path = iss.path.join(".");
+        return path ? `${path}: ${iss.message}` : iss.message;
+      })
+      .join("; ");
+    throw new Error(detail || "invalid flags");
+  }
+  // Drop undefined keys so Object.keys(input).length === 0 works for print-only.
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(parsed.data as Record<string, unknown>)) {
+    if (v !== undefined) {
+      out[k] = v;
+    }
+  }
+  return out;
+}
+
+/** Assert registry action schema is a Zod object (flag derivation requires .shape). */
+export function asZodObject(
+  schema: z.ZodType,
+  actionName: string
+): z.ZodObject<z.ZodRawShape> {
+  if (!(schema instanceof z.ZodObject)) {
+    throw new Error(
+      `action "${actionName}" schema is not a Zod object; cannot derive CLI flags`
+    );
+  }
+  return schema as z.ZodObject<z.ZodRawShape>;
+}

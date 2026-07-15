@@ -39,6 +39,12 @@ import {
   resolveCleanupConfig,
 } from "./cleanup.ts";
 import {
+  asZodObject,
+  flagSpecsFromZodObject,
+  parseFlagsWithZodSchema,
+  usageFlagsFromSpecs,
+} from "./cli-flags-from-zod.ts";
+import {
   executeMomentSearch,
   runMomentSearch,
   runOverlays,
@@ -138,6 +144,7 @@ import { placeFromPhrase } from "./reanchor.ts";
 import {
   actionManifest,
   actionTable,
+  getAction,
   runAction,
   type Surface,
 } from "./registry.ts";
@@ -2237,40 +2244,33 @@ try {
       break;
     }
     case "cuts-snap": {
+      // Flags + validation derived from registry Zod (CRAFT-6168 pilot).
+      const cutsSnapAction = getAction("cuts-snap");
+      if (!cutsSnapAction) {
+        throw new Error("cuts-snap action missing from registry");
+      }
+      const cutsSnapSchema = asZodObject(cutsSnapAction.schema, "cuts-snap");
+      const cutsSnapFlagOpts = {
+        renames: { maxShiftMs: "max-shift", crossfadeMs: "crossfade" },
+        booleanOnOffKeys: ["enabled"] as const,
+      };
+      const cutsSnapUsage = usageFlagsFromSpecs(
+        flagSpecsFromZodObject(cutsSnapSchema, cutsSnapFlagOpts)
+      );
       if (!rest[0]) {
-        throw new Error(
-          "usage: openklip cuts-snap <slug> [--on|--off] [--mode off|vad] [--max-shift <ms>] [--crossfade <ms>]"
-        );
+        throw new Error(`usage: openklip cuts-snap <slug> ${cutsSnapUsage}`);
       }
       const slug = rest[0];
-      const flags = rest.slice(1);
-      const onOff = flags.find((f) => f === "--on" || f === "--off");
-      const mode = flagValue(flags, "--mode");
-      const maxShift = flagNumber(flags, "--max-shift");
-      const crossfade = flagNumber(flags, "--crossfade");
-      const input: {
+      const input = parseFlagsWithZodSchema(
+        cutsSnapSchema,
+        rest.slice(1),
+        cutsSnapFlagOpts
+      ) as {
         enabled?: boolean;
         mode?: "off" | "vad";
         maxShiftMs?: number;
         crossfadeMs?: number;
-      } = {};
-      if (onOff === "--on") {
-        input.enabled = true;
-      } else if (onOff === "--off") {
-        input.enabled = false;
-      }
-      if (mode !== undefined) {
-        if (mode !== "off" && mode !== "vad") {
-          throw new Error("openklip cuts-snap --mode must be off or vad");
-        }
-        input.mode = mode;
-      }
-      if (maxShift !== undefined) {
-        input.maxShiftMs = maxShift;
-      }
-      if (crossfade !== undefined) {
-        input.crossfadeMs = crossfade;
-      }
+      };
       const project =
         Object.keys(input).length === 0
           ? await loadProject(slug)
