@@ -2,7 +2,7 @@
 
 Use these bodies when publishing releases. Each section matches a tag in `CHANGELOG.md` without duplicating the full changelog. **Known gaps:** always link to [TODO.md](../TODO.md#known-limitations); do not duplicate the list here.
 
-Publishing status checked on 2026-07-16 (`gh release list`): published through `v0.42.0.3` on GitHub before this tag. Body below for `v0.42.0.4` (CRAFT-6171 through CRAFT-6174, PRs #115-#119). Multicam programmatic acceptance (`tests/multicam-acceptance.test.ts`, `tests/cam-devex-smoke.test.ts`) satisfies the machinery gate; human eyeball on real per-speaker footage remains deferred.
+Publishing status checked on 2026-07-16 (`gh release list`): published through `v0.42.0.4` on GitHub. Multicam programmatic acceptance (`tests/multicam-acceptance.test.ts`, `tests/cam-devex-smoke.test.ts`) satisfies the machinery gate; human eyeball on real per-speaker footage remains deferred.
 
 ---
 
