@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.42.0.3 - 2026-07-15
+
+### Added
+- **Editor live sync** (PR #107, CRAFT-6167): the open editor polls `GET /api/projects/:slug/revision` every 2s (and on window focus). When CLI/MCP advances `project.json`, the client reseeds from disk without a manual reload. GUI saves drain reseed silently; external advances toast **Edit updated** with the loaded revision. Shared reseed path with History revert (`mergeExternalEditorProject`).
+- **Deferred MCP tool surface** (PR #108, CRAFT-6169): connect enables a core edit-loop set (~28 tools) plus `tools_catalog`, `tools_load`, and `tools_invoke`. Remaining tools stay registered but disabled until loaded by name, group, query, or `all`. Default connect payload drops ~74% vs enabling all 98 tool schemas. In-app tool-calling agent sets `OPENKLIP_MCP_SURFACE=all`. Query match on `tools_load` matches `tools_catalog` (name, summary, group hints).
+
+### Documentation
+- README, AGENTS.md, and TODO.md document live sync and the deferred MCP connect surface.
+
 ## 0.42.0.2 - 2026-07-13
 
 ### Added

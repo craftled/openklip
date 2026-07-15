@@ -59,7 +59,10 @@ export function createOpenKlipMcpServer(
   });
 
   const mcpAgentTools = agentTools("mcp");
-  const knownNames = mcpAgentTools.map((t) => t.name);
+  const knownTools = mcpAgentTools.map((t) => ({
+    name: t.name,
+    summary: t.summary,
+  }));
   const registered = new Map<string, RegisteredTool>();
 
   const catalogBase = buildToolsCatalog(
@@ -121,7 +124,9 @@ export function createOpenKlipMcpServer(
           query: z
             .string()
             .optional()
-            .describe("Enable tools whose name contains this substring"),
+            .describe(
+              "Same as tools_catalog: match name, summary, or group hint"
+            ),
           all: z
             .boolean()
             .optional()
@@ -139,7 +144,7 @@ export function createOpenKlipMcpServer(
               query: typeof input.query === "string" ? input.query : undefined,
               all: input.all === true,
             },
-            knownNames
+            knownTools
           );
           const newlyEnabled: string[] = [];
           const alreadyEnabled: string[] = [];
