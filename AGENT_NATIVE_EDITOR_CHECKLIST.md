@@ -809,7 +809,7 @@ Goal: match the core jobs people expect from a modern transcript-first editor.
   - [x] Compression setting.
   - [x] Frame rate setting.
   - [x] Social presets. Verified 2026-07-03: youtube/youtube-4k/x/linkedin/shorts (`src/export-platforms.ts`).
-  - [x] Fast long-source export (partial). Verified 2026-07-03: segment mode for voice-only sparse cuts (`src/export-segments.ts`).
+  - [x] Fast long-source export (partial). Verified 2026-07-03 for voice-only sparse cuts; CRAFT-6171 (v0.42.0.4) also allows b-roll/music/stills on segment mode. Only rich/json-render graphics still force full-source decode (`requiresFullSourceDecode`, `src/export-segments.ts`).
 - [ ] Collaboration and trust.
   - [x] Action history.
   - [ ] Undo and redo.
@@ -1048,7 +1048,7 @@ These tracks can run in parallel as long as each PR keeps `project.json` migrati
 
 - Owners can work mostly in export settings, ffmpeg graph, verify, and export UI.
 - First shippable slice: compression and frame rate settings actually affect export. **Shipped v0.11.0.0.**
-- Next slice: fast long-source export. **Partial v0.28.0.0 (voice-only segment seeking).**
+- Next slice: fast long-source export. **Partial v0.28.0.0; CRAFT-6171 (v0.42.0.4) added b-roll/music/stills. Rich/json-render graphics still force full-source decode.**
 - Acceptance: export is configurable, faster, and self-checking.
 
 ### Track H: Trust and history

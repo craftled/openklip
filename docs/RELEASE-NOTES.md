@@ -2,7 +2,26 @@
 
 Use these bodies when publishing releases. Each section matches a tag in `CHANGELOG.md` without duplicating the full changelog. **Known gaps:** always link to [TODO.md](../TODO.md#known-limitations); do not duplicate the list here.
 
-Publishing status checked on 2026-07-16 (`gh release list`): published through `v0.42.0.3` on GitHub. CRAFT-6171 through CRAFT-6174 (PRs #115-#119) landed on `main` after the `v0.42.0.3` tag and have no release body yet; see the `Unreleased` section in [CHANGELOG.md](../CHANGELOG.md). Multicam programmatic acceptance (`tests/multicam-acceptance.test.ts`, `tests/cam-devex-smoke.test.ts`) satisfies the machinery gate; human eyeball on real per-speaker footage remains deferred.
+Publishing status checked on 2026-07-16 (`gh release list`): published through `v0.42.0.3` on GitHub before this tag. Body below for `v0.42.0.4` (CRAFT-6171 through CRAFT-6174, PRs #115-#119). Multicam programmatic acceptance (`tests/multicam-acceptance.test.ts`, `tests/cam-devex-smoke.test.ts`) satisfies the machinery gate; human eyeball on real per-speaker footage remains deferred.
+
+---
+
+## v0.42.0.4
+
+**Export, editor bundle, history, and install footprint (PRs #115–#119).**
+
+### Highlights
+- **Segment export + b-roll (CRAFT-6171, #116)**: sparse short cuts with b-roll (and music/stills) can use per-range seeking; only rich/json-render graphics force full-source decode.
+- **Editor code-splitting (CRAFT-6172, #115/#119)**: Paper shaders, map-motion, template previews, and media visualizers load on demand so the initial editor graph stays lighter.
+- **Gzipped history snapshots (CRAFT-6174, #117)**: revert snapshots write `working/history/rev-<n>.json.gz`; legacy plain `.json` still loads.
+- **Trimmed install footprint (CRAFT-6173, #118)**: platform `@ffprobe-installer/ffprobe` replaces multi-arch `ffprobe-static`; browser `onnxruntime-web` is a local stub so Transformers.js keeps `onnxruntime-node` only.
+- **Verification**: `bun test --isolate` (2473 tests: 2467 pass, 6 skip); segment and install-footprint unit coverage from the feature PRs.
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues.
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#04204---2026-07-16)
 
 ---
 

@@ -1,8 +1,6 @@
 # Changelog
 
-## Unreleased
-
-Landed on `main` after the v0.42.0.3 GitHub release was cut; not yet in a tagged version.
+## 0.42.0.4 - 2026-07-16
 
 ### Added
 - **Segment export + b-roll** (PR #116, CRAFT-6171): `shouldUseSegmentExport` now allows b-roll (alongside music/stills) on sparse short cuts; only rich/json-render graphics still force full-source decode (`requiresFullSourceDecode`, `src/export-segments.ts`). Cut transitions still block whenever b-roll or rich graphics are present (`blocksCutTransition`), since crossfade/dip change output length and would desync overlay windows.
@@ -11,7 +9,7 @@ Landed on `main` after the v0.42.0.3 GitHub release was cut; not yet in a tagged
 - **Trimmed install footprint** (PR #118, CRAFT-6173): ffprobe installs via platform-specific `@ffprobe-installer/ffprobe` (~17MB) instead of multi-platform `ffprobe-static` (~345MB); browser `onnxruntime-web` is replaced with a local stub (`vendor/onnxruntime-web-stub/`) so Transformers.js installs only `onnxruntime-node` for local Whisper/CLIP inference. `ensureExecutableBinary` chmods the bundled ffprobe binary and falls back to a direct spawn on `EACCES` (seen on Linux CI unpacks).
 
 ### Documentation
-- AGENTS.md documents all four changes inline (each PR updated it in the same commit). TODO.md's Known Limitations and Completed checklist, and README.md's verified counts, are updated in the same pass that added this section.
+- AGENTS.md documents all four changes inline (each PR updated it in the same commit). TODO.md Known Limitations and Completed checklist, README verified counts, CLAUDE.md release memory, and `docs/RELEASE-NOTES.md` are synced for this tag. Post-ship `docs/ship`, `docs/progress`, and `docs/qa` archives that duplicated CHANGELOG were removed; specs, solutions, and acceptance notes stay.
 
 ## 0.42.0.3 - 2026-07-15
 
