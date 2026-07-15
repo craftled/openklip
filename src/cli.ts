@@ -42,6 +42,7 @@ import {
   asZodObject,
   flagSpecsFromZodObject,
   parseFlagsWithZodSchema,
+  parseRegistryActionFlags,
   usageFlagsFromSpecs,
 } from "./cli-flags-from-zod.ts";
 import {
@@ -480,35 +481,6 @@ function parseOnOff(value: string, label: string): boolean {
     return false;
   }
   throw new Error(`usage: ${label} <on|off>`);
-}
-
-function parseNullableNumberFlag(value: string, flag: string): number | null {
-  if (value.toLowerCase() === "inherit") {
-    return null;
-  }
-  const n = Number(value);
-  if (!Number.isFinite(n)) {
-    throw new Error(
-      `openklip cleanup-config ${flag} must be a number or inherit`
-    );
-  }
-  return n;
-}
-
-function parseCategoryToggle(value: string, flag: string): boolean | null {
-  const mode = value.toLowerCase();
-  if (mode === "on") {
-    return true;
-  }
-  if (mode === "off") {
-    return false;
-  }
-  if (mode === "inherit") {
-    return null;
-  }
-  throw new Error(
-    `openklip cleanup-config ${flag} must be on, off, or inherit`
-  );
 }
 
 function formatCleanupConfigLine(project: Project): string {
@@ -1942,57 +1914,51 @@ try {
         break;
       }
       if (rest[1] === "color") {
-        const colorNum = (...flags: string[]) => {
-          for (const flag of flags) {
-            const v = flagValue(rest, flag);
-            if (v === undefined) {
-              continue;
-            }
-            const n = Number(v);
-            if (!Number.isFinite(n)) {
-              throw new Error(`${flag} must be a number`);
-            }
-            return n;
-          }
-          return;
+        const lookColor = getAction("look-color");
+        if (!lookColor) {
+          throw new Error("look-color action missing from registry");
+        }
+        const colorFlagOpts = {
+          renames: {
+            temperature: "temp",
+            brightness: "bright",
+            saturation: "sat",
+          },
+          aliases: {
+            temperature: ["temperature"],
+            brightness: ["brightness"],
+            saturation: ["saturation"],
+          },
         };
-        const input: Record<string, number | boolean> = {};
-        if (rest.includes("--reset")) {
-          input.reset = true;
-        } else {
-          const temperature = colorNum("--temp", "--temperature");
-          const tint = colorNum("--tint");
-          const brightness = colorNum("--bright", "--brightness");
-          const contrast = colorNum("--contrast");
-          const saturation = colorNum("--sat", "--saturation");
-          if (temperature !== undefined) {
-            input.temperature = temperature;
-          }
-          if (tint !== undefined) {
-            input.tint = tint;
-          }
-          if (brightness !== undefined) {
-            input.brightness = brightness;
-          }
-          if (contrast !== undefined) {
-            input.contrast = contrast;
-          }
-          if (saturation !== undefined) {
-            input.saturation = saturation;
-          }
-          if (Object.keys(input).length === 0) {
-            throw new Error(
-              "usage: openklip look <slug> color [--temp n] [--tint n] [--bright n] [--contrast n] [--sat n] | --reset"
-            );
-          }
+        const colorFlags = rest.slice(2);
+        const input = parseRegistryActionFlags(
+          lookColor,
+          colorFlags,
+          colorFlagOpts
+        );
+        if (Object.keys(input).length === 0) {
+          const colorUsage = usageFlagsFromSpecs(
+            flagSpecsFromZodObject(
+              asZodObject(lookColor.schema, "look-color"),
+              colorFlagOpts
+            )
+          );
+          throw new Error(`usage: openklip look <slug> color ${colorUsage}`);
         }
         const { project } = await runLoggedAction(rest[0], "look-color", input);
         console.log(`color: ${colorAdjustSummary(project.look.color)}`);
         break;
       }
       if (rest[1] === "transition") {
-        const transitionUsage = `openklip look <slug> transition <${CUT_TRANSITION_TYPES.join("|")}> [--duration ms]`;
+        const lookTransition = getAction("look-transition");
+        if (!lookTransition) {
+          throw new Error("look-transition action missing from registry");
+        }
+        const transitionFlagOpts = {
+          renames: { durationMs: "duration" },
+        };
         const typeArg = rest[2];
+        const transitionUsage = `openklip look <slug> transition <${CUT_TRANSITION_TYPES.join("|")}> ${usageFlagsFromSpecs(flagSpecsFromZodObject(asZodObject(lookTransition.schema, "look-transition"), transitionFlagOpts))}`;
         if (
           !(
             typeArg &&
@@ -2003,17 +1969,13 @@ try {
         ) {
           throw new Error(`usage: ${transitionUsage}`);
         }
-        const durationStr = flagValue(rest, "--duration");
-        const input: Record<string, string | number> = { type: typeArg };
-        if (durationStr !== undefined) {
-          const ms = Number(durationStr);
-          if (!Number.isInteger(ms) || ms < 50 || ms > 2000) {
-            throw new Error(
-              "--duration must be an integer between 50 and 2000 ms"
-            );
-          }
-          input.durationMs = ms;
-        }
+        // Positional type + optional schema-derived flags after it.
+        const flagInput = parseRegistryActionFlags(
+          lookTransition,
+          rest.slice(3),
+          transitionFlagOpts
+        );
+        const input = { type: typeArg, ...flagInput };
         const { project } = await runLoggedAction(
           rest[0],
           "look-transition",
@@ -2034,40 +1996,30 @@ try {
       break;
     }
     case "motion": {
+      const motionAction = getAction("motion");
+      if (!motionAction) {
+        throw new Error("motion action missing from registry");
+      }
+      const motionFlagOpts = {
+        renames: {
+          fadeMs: "fade",
+          heroFadeMs: "hero-fade",
+          slideFrac: "slide",
+        },
+      };
+      const motionSchema = asZodObject(motionAction.schema, "motion");
+      const motionUsage = usageFlagsFromSpecs(
+        flagSpecsFromZodObject(motionSchema, motionFlagOpts)
+      );
       if (!rest[0]) {
-        throw new Error(
-          "usage: openklip motion <slug> [--speed n] [--fade ms] [--hero-fade ms] [--slide frac]"
-        );
+        throw new Error(`usage: openklip motion <slug> ${motionUsage}`);
       }
       const slug = rest[0];
-      const num = (flag: string) => {
-        const v = flagValue(rest, flag);
-        if (v === undefined) {
-          return;
-        }
-        const n = Number(v);
-        if (!Number.isFinite(n)) {
-          throw new Error(`${flag} must be a number`);
-        }
-        return n;
-      };
-      const input: Record<string, number> = {};
-      const speed = num("--speed");
-      const fadeMs = num("--fade");
-      const heroFadeMs = num("--hero-fade");
-      const slideFrac = num("--slide");
-      if (speed !== undefined) {
-        input.speed = speed;
-      }
-      if (fadeMs !== undefined) {
-        input.fadeMs = fadeMs;
-      }
-      if (heroFadeMs !== undefined) {
-        input.heroFadeMs = heroFadeMs;
-      }
-      if (slideFrac !== undefined) {
-        input.slideFrac = slideFrac;
-      }
+      const input = parseRegistryActionFlags(
+        motionAction,
+        rest.slice(1),
+        motionFlagOpts
+      );
       const { project } = await runLoggedAction(slug, "motion", input);
       const m = project.motion;
       console.log(
@@ -2375,43 +2327,39 @@ try {
       break;
     }
     case "cleanup-config": {
+      const cleanupConfigAction = getAction("cleanup-config");
+      if (!cleanupConfigAction) {
+        throw new Error("cleanup-config action missing from registry");
+      }
+      const cleanupFlagOpts = {
+        renames: { minSec: "min-sec", keepPadSec: "keep-pad-sec" },
+        ignoreFlags: ["--json"],
+      };
+      const cleanupSchema = asZodObject(
+        cleanupConfigAction.schema,
+        "cleanup-config"
+      );
+      const cleanupUsage = usageFlagsFromSpecs(
+        flagSpecsFromZodObject(cleanupSchema, cleanupFlagOpts)
+      );
       if (!rest[0]) {
         throw new Error(
-          "usage: openklip cleanup-config <slug> [--json] [--min-sec <n>] [--keep-pad-sec <n>] [--hesitation on|off|inherit] [--hedging on|off|inherit] [--repeat on|off|inherit]"
+          `usage: openklip cleanup-config <slug> [--json] ${cleanupUsage}`
         );
       }
       const slug = rest[0];
       const flags = rest.slice(1);
-      const minSecRaw = flagValue(flags, "--min-sec");
-      const keepPadSecRaw = flagValue(flags, "--keep-pad-sec");
-      const hesitation = flagValue(flags, "--hesitation");
-      const hedging = flagValue(flags, "--hedging");
-      const repeat = flagValue(flags, "--repeat");
-      const input: {
+      const input = parseRegistryActionFlags(
+        cleanupConfigAction,
+        flags,
+        cleanupFlagOpts
+      ) as {
         hedging?: boolean | null;
         hesitation?: boolean | null;
         keepPadSec?: number | null;
         minSec?: number | null;
         repeat?: boolean | null;
-      } = {};
-      if (minSecRaw !== undefined) {
-        input.minSec = parseNullableNumberFlag(minSecRaw, "--min-sec");
-      }
-      if (keepPadSecRaw !== undefined) {
-        input.keepPadSec = parseNullableNumberFlag(
-          keepPadSecRaw,
-          "--keep-pad-sec"
-        );
-      }
-      if (hesitation !== undefined) {
-        input.hesitation = parseCategoryToggle(hesitation, "--hesitation");
-      }
-      if (hedging !== undefined) {
-        input.hedging = parseCategoryToggle(hedging, "--hedging");
-      }
-      if (repeat !== undefined) {
-        input.repeat = parseCategoryToggle(repeat, "--repeat");
-      }
+      };
       const project =
         Object.keys(input).length === 0
           ? await loadProject(slug)
