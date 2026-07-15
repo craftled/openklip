@@ -318,7 +318,7 @@ Workflow: ingest runs indexing as a non-fatal phase (a failed or missing index d
 
 ## MCP (Cursor, Claude Desktop, Codex)
 
-All MCP tools route through `src/agent-tools.ts` → `mutateProject` / `runAction` / query helpers. The browser GUI writes the same `project.json`; reload the editor after MCP edits.
+All MCP tools route through `src/agent-tools.ts` → `mutateProject` / `runAction` / query helpers. The browser GUI writes the same `project.json` and live-syncs external MCP edits via revision poll.
 
 The tool-calling edit prompt (`buildEditPrompt` in `src/agent-driver.ts`) advertises a skill index built from `listTemplates()`: each entry's id and description (capped at 20, with a "more skills are listed by template_list" note beyond that), so the model can spot a matching skill and call `load_skill` with its id to read the full procedure, instead of needing a human to have already run `template set`. `templates/<id>/skill.md` files may carry optional YAML frontmatter (`description:`, `label:`/`name:`) to control what shows up in that index and in `template_list`/`openklip template list`; without frontmatter, the description falls back to the first non-heading body line and the label to the H1.
 
@@ -337,6 +337,8 @@ The tool-calling edit prompt (`buildEditPrompt` in `src/agent-driver.ts`) advert
 | Render | `export` (accepts `format`, `gifMaxWidth`, `platform`, `loudnessTargetLufs`, and `loudnessNormalize`), `export_highlight` | `openklip export --format --gif-max-width --platform --loudness`, `openklip export-highlight` |
 
 **Inspect the manifest:** `openklip tools --json --surface mcp`
+
+**Deferred MCP surface (default):** at connect the server enables a **core** edit-loop set (~28 tools: status, transcript, cut, export, brief, tasks, revert, …) plus three meta tools: `tools_catalog` (name/summary search), `tools_load` (enable deferred tools / groups so full schemas appear), and `tools_invoke` (call any tool by name without loading its schema). Overlay/look/multicam/cleanup tools stay registered but disabled until loaded. Set `OPENKLIP_MCP_SURFACE=all` to enable every tool at connect (the in-app tool-calling agent does this automatically). Groups for `tools_load`: `overlays`, `look`, `cleanup`, `assets`, `multicam`, `export`, `search`, `core`.
 
 **Parity rule:** every registry action with `surfaces` including `mcp` is an MCP tool with `{ slug, … }` input. Query tools use snake_case names; mutations keep registry kebab-case names (`broll-add`).
 

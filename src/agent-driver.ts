@@ -627,6 +627,9 @@ export async function runClaudeEdit(
             OPENKLIP_AUTHOR_ID: provenance.authorId,
             OPENKLIP_AGENT_MODEL: opts.agent,
             OPENKLIP_AGENT_SURFACE: "claude-code",
+            // In-app edit agent needs the full tool list at connect; Cursor/external
+            // hosts use the default deferred core surface (CRAFT-6169).
+            OPENKLIP_MCP_SURFACE: "all",
             ...(opts.taskId ? { OPENKLIP_TASK_ID: opts.taskId } : {}),
           },
         },
