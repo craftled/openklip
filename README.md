@@ -75,7 +75,7 @@ Agent sidebar chats use `working/chats.json`, not `localStorage` (color scheme a
 
 ## What works today
 
-Verified against the current codebase (`VERSION` / `package.json` `0.42.0.2`, 2360 tests: 2354 pass, 6 skip without `OPENKLIP_INTEGRATION=1` and env-gated fixtures):
+Verified against the current codebase (`VERSION` / `package.json` `0.42.0.4`, 2473 tests: 2467 pass, 6 skip without `OPENKLIP_INTEGRATION=1` and env-gated fixtures):
 
 - **Ingest**: video → local transcript + preview proxy + `project.json` (`openklip ingest`; refuses re-ingest unless `--force`)
 - **Transcript editing**: click words to toggle `deleted`; `openklip cut` / `cut --text` / `restore` on CLI
