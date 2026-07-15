@@ -340,6 +340,8 @@ The tool-calling edit prompt (`buildEditPrompt` in `src/agent-driver.ts`) advert
 
 **Deferred MCP surface (default):** at connect the server enables a **core** edit-loop set (~28 tools: status, transcript, cut, export, brief, tasks, revert, …) plus three meta tools: `tools_catalog` (name/summary search), `tools_load` (enable deferred tools / groups so full schemas appear), and `tools_invoke` (call any tool by name without loading its schema). Overlay/look/multicam/cleanup tools stay registered but disabled until loaded. Set `OPENKLIP_MCP_SURFACE=all` to enable every tool at connect (the in-app tool-calling agent does this automatically). Groups for `tools_load`: `overlays`, `look`, `cleanup`, `assets`, `multicam`, `export`, `search`, `core`.
 
+**Schema-driven CLI flags (CRAFT-6168):** registry Zod schemas drive CLI flag parsing via `src/cli-flags-from-zod.ts` (nested objects flatten to leaf flags; positionals map onto schema keys). Prefer extending the schema + renames/positionals over hand-validating enums in `cli.ts`. Remaining custom CLI paths are intentional: cut token expansion, graphic `--param` / beats, json-render `--spec-file`, phrase helpers, and asset-flags `--clear`.
+
 **Parity rule:** every registry action with `surfaces` including `mcp` is an MCP tool with `{ slug, … }` input. Query tools use snake_case names; mutations keep registry kebab-case names (`broll-add`).
 
 **Optional skills package:** `skills/` ships `SKILL.md` playbooks installable via `npx skills add <owner>/openklip --skill openklip-motion-canvas` (see `skills/README.md`). Same content as `templates/<id>/skill.md`; MCP `load_skill` works without installing.

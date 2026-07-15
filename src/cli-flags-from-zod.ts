@@ -36,6 +36,19 @@ export interface CliFlagSpec {
   valueBoolean?: boolean;
 }
 
+export interface CliPositionalSpec {
+  /** Schema key (top-level) this positional fills. */
+  key: string;
+  kind?: "string" | "number" | "on-off";
+  /** When true (default), missing positional throws. */
+  required?: boolean;
+  /**
+   * When true, this positional consumes all remaining non-flag args
+   * joined with spaces (word-text body).
+   */
+  rest?: boolean;
+}
+
 export interface ParseFlagsFromSchemaOptions {
   /**
    * Extra flag names per schema key (dotted path or top-level key).
@@ -54,6 +67,11 @@ export interface ParseFlagsFromSchemaOptions {
    * Matched as full tokens including the -- prefix.
    */
   ignoreFlags?: readonly string[];
+  /**
+   * Leading non-flag args mapped onto schema keys in order, before flags.
+   * Example broll-set: [{ key: "id" }] then --from / --to flags.
+   */
+  positionals?: readonly CliPositionalSpec[];
   /**
    * Map schema keys (dotted path or leaf name) to flag names (without --).
    * Example: { maxShiftMs: "max-shift", "ducking.enabled": "duck" }
@@ -286,22 +304,99 @@ function parseBooleanValue(
 }
 
 /**
- * Parse argv flag tokens (no positional args) into a partial input object,
- * then validate with the Zod schema.
+ * Split argv into leading positionals and trailing flags (first -- token
+ * starts the flag section).
+ */
+export function splitPositionalsAndFlags(args: readonly string[]): {
+  flags: string[];
+  positionals: string[];
+} {
+  const idx = args.findIndex((a) => a.startsWith("--"));
+  if (idx === -1) {
+    return { positionals: [...args], flags: [] };
+  }
+  return {
+    positionals: args.slice(0, idx),
+    flags: args.slice(idx),
+  };
+}
+
+function applyPositionals(
+  raw: Record<string, unknown>,
+  leading: readonly string[],
+  specs: readonly CliPositionalSpec[] | undefined
+): void {
+  if (!specs || specs.length === 0) {
+    if (leading.length > 0) {
+      throw new Error(`unexpected argument ${leading[0]} (expected a --flag)`);
+    }
+    return;
+  }
+  let li = 0;
+  for (const spec of specs) {
+    const required = spec.required !== false;
+    if (spec.rest) {
+      if (li >= leading.length) {
+        if (required) {
+          throw new Error(`missing positional <${spec.key}>`);
+        }
+        break;
+      }
+      raw[spec.key] = leading.slice(li).join(" ");
+      li = leading.length;
+      break;
+    }
+    const tok = leading[li];
+    if (tok === undefined) {
+      if (required) {
+        throw new Error(`missing positional <${spec.key}>`);
+      }
+      continue;
+    }
+    li += 1;
+    const kind = spec.kind ?? "string";
+    if (kind === "number") {
+      const n = Number(tok);
+      if (!Number.isFinite(n)) {
+        throw new Error(`<${spec.key}> must be a number`);
+      }
+      raw[spec.key] = n;
+    } else if (kind === "on-off") {
+      raw[spec.key] = parseBooleanValue(tok, `<${spec.key}>`, false);
+    } else {
+      raw[spec.key] = tok;
+    }
+  }
+  if (li < leading.length) {
+    throw new Error(`unexpected argument ${leading[li]} (extra positional)`);
+  }
+}
+
+/**
+ * Parse argv flag tokens (and optional leading positionals) into a partial
+ * input object, then validate with the Zod schema.
  */
 export function parseFlagsWithZodSchema(
   schema: z.ZodObject<z.ZodRawShape>,
   flags: readonly string[],
   options: ParseFlagsFromSchemaOptions = {}
 ): Record<string, unknown> {
+  // When positionals are configured, `flags` may still contain leading
+  // non-flag args (full rest after slug). Split them first.
+  const split = options.positionals
+    ? splitPositionalsAndFlags(flags)
+    : { positionals: [] as string[], flags: [...flags] };
+
   const specs = flagSpecsFromZodObject(schema, options);
   const byFlag = indexSpecsByFlag(specs);
   const ignore = new Set(options.ignoreFlags ?? []);
   const raw: Record<string, unknown> = {};
+  applyPositionals(raw, split.positionals, options.positionals);
 
   let i = 0;
-  while (i < flags.length) {
-    const tok = flags[i];
+  const flagTokens = split.flags;
+  while (i < flagTokens.length) {
+    const tok = flagTokens[i];
     if (ignore.has(tok)) {
       i += 1;
       continue;
@@ -338,7 +433,7 @@ export function parseFlagsWithZodSchema(
       i += 1;
       continue;
     }
-    const value = flags[i + 1];
+    const value = flagTokens[i + 1];
     if (value === undefined || value.startsWith("--")) {
       throw new Error(`${tok} requires a value`);
     }
@@ -421,6 +516,48 @@ export function parseRegistryActionFlags(
     flags,
     options
   );
+}
+
+/** Common overlay flag renames (fromSec → --from, etc.). */
+export const OVERLAY_CLI_FLAG_RENAMES: Record<string, string> = {
+  assetId: "asset",
+  fromSec: "from",
+  toSec: "to",
+  srcInSec: "src-in",
+  fadeInSec: "fade-in",
+  fadeOutSec: "fade-out",
+  focusX: "focus-x",
+  focusY: "focus-y",
+  rampSec: "ramp",
+  audioMode: "audio-mode",
+  maxWords: "max-words",
+};
+
+export function overlaySetFlagOpts(
+  extras?: ParseFlagsFromSchemaOptions
+): ParseFlagsFromSchemaOptions {
+  return {
+    renames: { ...OVERLAY_CLI_FLAG_RENAMES, ...extras?.renames },
+    aliases: extras?.aliases,
+    booleanOnOffKeys: extras?.booleanOnOffKeys,
+    booleanValueKeys: extras?.booleanValueKeys,
+    ignoreFlags: extras?.ignoreFlags,
+    positionals: extras?.positionals ?? [{ key: "id" }],
+  };
+}
+
+export function overlayAddFlagOpts(
+  positionals: readonly CliPositionalSpec[],
+  extras?: ParseFlagsFromSchemaOptions
+): ParseFlagsFromSchemaOptions {
+  return {
+    renames: { ...OVERLAY_CLI_FLAG_RENAMES, ...extras?.renames },
+    aliases: extras?.aliases,
+    booleanOnOffKeys: extras?.booleanOnOffKeys,
+    booleanValueKeys: extras?.booleanValueKeys,
+    ignoreFlags: extras?.ignoreFlags,
+    positionals,
+  };
 }
 
 /** Shared renames for openklip audio <slug> flags. */

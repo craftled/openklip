@@ -6,6 +6,8 @@ import {
   camelToKebab,
   EXPORT_SET_CLI_FLAG_OPTS,
   flagSpecsFromZodObject,
+  overlayAddFlagOpts,
+  overlaySetFlagOpts,
   parseFlagsWithZodSchema,
   usageFlagsFromSpecs,
 } from "../src/cli-flags-from-zod.ts";
@@ -217,6 +219,66 @@ test("parseFlagsWithZodSchema nests export-set crop and split flags", () => {
       layout: "split-vertical",
       splitVertical: { ratio: 0.5, speakerPosition: "top" },
     }
+  );
+});
+
+test("parseFlagsWithZodSchema positionals for broll-set and music-add", () => {
+  const setAction = getAction("broll-set");
+  assert.ok(setAction);
+  assert.deepEqual(
+    parseFlagsWithZodSchema(
+      setAction.schema as z.ZodObject<z.ZodRawShape>,
+      ["b1", "--from", "1.5", "--to", "3", "--display", "pip"],
+      overlaySetFlagOpts()
+    ),
+    { id: "b1", fromSec: 1.5, toSec: 3, display: "pip" }
+  );
+
+  const addAction = getAction("music-add");
+  assert.ok(addAction);
+  assert.deepEqual(
+    parseFlagsWithZodSchema(
+      addAction.schema as z.ZodObject<z.ZodRawShape>,
+      ["m1", "0", "10", "--gain", "0.3", "--mode", "loop"],
+      overlayAddFlagOpts([
+        { key: "assetId" },
+        { key: "fromSec", kind: "number" },
+        { key: "toSec", kind: "number" },
+      ])
+    ),
+    {
+      assetId: "m1",
+      fromSec: 0,
+      toSec: 10,
+      gain: 0.3,
+      mode: "loop",
+    }
+  );
+});
+
+test("parseFlagsWithZodSchema positionals on-off and rest text", () => {
+  const captions = getAction("captions");
+  assert.ok(captions);
+  assert.deepEqual(
+    parseFlagsWithZodSchema(
+      captions.schema as z.ZodObject<z.ZodRawShape>,
+      ["off"],
+      { positionals: [{ key: "enabled", kind: "on-off" }] }
+    ),
+    { enabled: false }
+  );
+
+  const wordText = getAction("word-text");
+  assert.ok(wordText);
+  assert.deepEqual(
+    parseFlagsWithZodSchema(
+      wordText.schema as z.ZodObject<z.ZodRawShape>,
+      ["w3", "hello", "world"],
+      {
+        positionals: [{ key: "id" }, { key: "text", rest: true }],
+      }
+    ),
+    { id: "w3", text: "hello world" }
   );
 });
 

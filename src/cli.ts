@@ -22,8 +22,6 @@ import { measureMusicBpm } from "./bpm.ts";
 import { applyBrand, loadBrand } from "./brands.ts";
 import { loadBrief, saveBrief } from "./brief.ts";
 import { logBriefSet } from "./brief-log.ts";
-import { BROLL_AUDIO_MODE_IDS } from "./broll-audio.ts";
-import { BROLL_DISPLAY_IDS } from "./broll-display.ts";
 import {
   formatBrollSuggestHuman,
   formatBrollSuggestJson,
@@ -32,7 +30,7 @@ import {
 import { planTimelineSummary } from "./cam-mix.ts";
 import { camMixOrRemix, camRemix } from "./cam-remix.ts";
 import { type CamRole, ingestCam, listCams, setCam } from "./cams.ts";
-import { isCaptionStyleId, listCaptionStyles } from "./caption-styles.ts";
+import { listCaptionStyles } from "./caption-styles.ts";
 import {
   buildCleanupReport,
   CLEANUP_CATEGORY_DISPLAY_ORDER,
@@ -43,6 +41,8 @@ import {
   asZodObject,
   EXPORT_SET_CLI_FLAG_OPTS,
   flagSpecsFromZodObject,
+  overlayAddFlagOpts,
+  overlaySetFlagOpts,
   parseFlagsWithZodSchema,
   parseRegistryActionFlags,
   usageFlagsFromSpecs,
@@ -62,7 +62,6 @@ import { transitionExportPreview } from "./cut-transition-gate.ts";
 import { runDoctor } from "./doctor.ts";
 import {
   type Broll,
-  type BrollDisplay,
   CUT_TRANSITION_TYPES,
   type Graphic,
   type MusicPlacement,
@@ -438,6 +437,19 @@ async function loadSilencesForCli(
     .catch(() => undefined);
 }
 
+/** Parse rest-after-slug into a registry action input via Zod schema flags. */
+function parseActionCliInput(
+  actionName: string,
+  restAfterSlug: readonly string[],
+  opts: Parameters<typeof parseRegistryActionFlags>[2] = {}
+): Record<string, unknown> {
+  const action = getAction(actionName);
+  if (!action) {
+    throw new Error(`${actionName} action missing from registry`);
+  }
+  return parseRegistryActionFlags(action, restAfterSlug, opts);
+}
+
 // Run a registry action through the shared store: the mutation happens inside
 // the per-slug lock, bumps the project revision, and appends one entry to
 // working/actions.jsonl with actor "cli". Returns the action result plus the
@@ -474,17 +486,6 @@ function secSpan(startSample: number, endSample: number): string {
   return `${samplesToSec(startSample).toFixed(1)}s-${samplesToSec(endSample).toFixed(1)}s`;
 }
 
-function parseOnOff(value: string, label: string): boolean {
-  const mode = value.toLowerCase();
-  if (mode === "on") {
-    return true;
-  }
-  if (mode === "off") {
-    return false;
-  }
-  throw new Error(`usage: ${label} <on|off>`);
-}
-
 function formatCleanupConfigLine(project: Project): string {
   const config = resolveCleanupConfig(project);
   const parts = [
@@ -505,20 +506,6 @@ function flagValue(args: string[], flag: string): string | undefined {
   return args[idx + 1];
 }
 
-function parseBrollDisplayFlag(
-  raw: string | undefined
-): BrollDisplay | undefined {
-  if (raw === undefined) {
-    return;
-  }
-  if (raw === "cover" || raw === "pip" || raw === "split") {
-    return raw;
-  }
-  throw new Error(
-    `unknown b-roll display "${raw}" (expected one of: ${BROLL_DISPLAY_IDS.join(", ")})`
-  );
-}
-
 function parseTitlePositionFlag(
   raw: string | undefined
 ): Title["position"] | undefined {
@@ -531,20 +518,6 @@ function parseTitlePositionFlag(
   }
   throw new Error(
     `unknown title position "${raw}" (expected one of: ${TITLE_POSITION_IDS.join(", ")})`
-  );
-}
-
-function parseBrollAudioModeFlag(
-  raw: string | undefined
-): Broll["audioMode"] | undefined {
-  if (raw === undefined) {
-    return;
-  }
-  if ((BROLL_AUDIO_MODE_IDS as readonly string[]).includes(raw)) {
-    return raw as Broll["audioMode"];
-  }
-  throw new Error(
-    `unknown b-roll audio mode "${raw}" (expected one of: ${BROLL_AUDIO_MODE_IDS.join(", ")})`
   );
 }
 
@@ -626,18 +599,6 @@ function trackFlag(args: string[]): "broll" | "title" | "zoom" | undefined {
     throw new Error("--track must be broll, title, or zoom");
   }
   return t;
-}
-
-// Parse the optional --mode flag for music placements (trim|loop).
-function musicModeFlag(args: string[]): "trim" | "loop" | undefined {
-  const mode = flagValue(args, "--mode");
-  if (mode === undefined) {
-    return;
-  }
-  if (mode !== "trim" && mode !== "loop") {
-    throw new Error("--mode must be trim or loop");
-  }
-  return mode;
 }
 
 // Expand cut tokens (word ids "w12" and inclusive ranges "w12-w20") into the
@@ -1200,123 +1161,109 @@ try {
       break;
     }
     case "word-text": {
-      if (!(rest[0] && rest[1] && rest.length > 2)) {
+      if (!rest[0]) {
         throw new Error("usage: openklip word-text <slug> <wordId> <text...>");
       }
-      const slug = rest[0];
-      const id = rest[1];
-      const text = rest.slice(2).join(" ");
+      const input = parseActionCliInput("word-text", rest.slice(1), {
+        positionals: [{ key: "id" }, { key: "text", rest: true }],
+      });
       const { result } = await runLoggedAction<{
         id: string;
         text: string;
         originalText?: string;
-      }>(slug, "word-text", { id, text });
+      }>(rest[0], "word-text", input);
       console.log(`word ${result.id}: "${result.text}"`);
       break;
     }
     case "broll-add": {
-      if (!(rest[0] && rest[1] && rest[2] && rest[3])) {
+      if (!rest[0]) {
         throw new Error(
-          "usage: openklip broll-add <slug> <assetId> <fromSec> <toSec> [--display cover|pip] [--audio-mode silent|broll|mix|duck-voice|duck-broll]"
+          "usage: openklip broll-add <slug> <assetId> <fromSec> <toSec> [--display cover|pip|split] [--audio-mode silent|broll|mix|duck-voice|duck-broll]"
         );
       }
-      const slug = rest[0];
-      const args = rest.slice(4);
-      const fromSec = Number(rest[2]);
-      const toSec = Number(rest[3]);
-      if (!(Number.isFinite(fromSec) && Number.isFinite(toSec))) {
-        throw new Error("fromSec and toSec must be numbers (seconds)");
-      }
-      const display = parseBrollDisplayFlag(flagValue(args, "--display"));
-      const audioMode = parseBrollAudioModeFlag(
-        flagValue(args, "--audio-mode")
+      const input = parseActionCliInput(
+        "broll-add",
+        rest.slice(1),
+        overlayAddFlagOpts([
+          { key: "assetId" },
+          { key: "fromSec", kind: "number" },
+          { key: "toSec", kind: "number" },
+        ])
       );
-      const { result: item } = await runLoggedAction<Broll>(slug, "broll-add", {
-        assetId: rest[1],
-        fromSec,
-        toSec,
-        ...(display === undefined ? {} : { display }),
-        ...(audioMode === undefined ? {} : { audioMode }),
-      });
+      const { result: item } = await runLoggedAction<Broll>(
+        rest[0],
+        "broll-add",
+        input
+      );
       const modeNote = item.display === "pip" ? ", pip inset" : "";
       const audioNote =
         item.audioMode && item.audioMode !== "silent"
           ? `, audio ${item.audioMode}`
           : "";
       console.log(
-        `added b-roll ${item.id} (asset "${item.assetId}", ${fromSec}s-${toSec}s${modeNote}${audioNote})`
+        `added b-roll ${item.id} (asset "${item.assetId}", ${samplesToSec(item.startSample)}s-${samplesToSec(item.endSample)}s${modeNote}${audioNote})`
       );
       break;
     }
     case "broll-rm": {
-      if (!(rest[0] && rest[1])) {
+      if (!rest[0]) {
         throw new Error("usage: openklip broll-rm <slug> <brollId>");
       }
+      const input = parseActionCliInput("broll-rm", rest.slice(1), {
+        positionals: [{ key: "id" }],
+      });
       const { result } = await runLoggedAction<{ removed: boolean }>(
         rest[0],
         "broll-rm",
-        { id: rest[1] }
+        input
       );
       if (!result.removed) {
-        console.log(`no b-roll clip with id "${rest[1]}"`);
+        console.log(`no b-roll clip with id "${input.id}"`);
         break;
       }
-      console.log(`removed b-roll ${rest[1]}`);
+      console.log(`removed b-roll ${input.id}`);
       break;
     }
     case "broll-set": {
-      if (!(rest[0] && rest[1])) {
+      if (!rest[0]) {
         throw new Error(
-          "usage: openklip broll-set <slug> <brollId> [--asset id] [--from N] [--to N] [--src-in N] [--display cover|pip] [--audio-mode silent|broll|mix|duck-voice|duck-broll]"
+          "usage: openklip broll-set <slug> <brollId> [--asset id] [--from N] [--to N] [--src-in N] [--display cover|pip|split] [--audio-mode silent|broll|mix|duck-voice|duck-broll]"
         );
       }
-      const slug = rest[0];
-      const args = rest.slice(2);
-      const display = parseBrollDisplayFlag(flagValue(args, "--display"));
-      const audioMode = parseBrollAudioModeFlag(
-        flagValue(args, "--audio-mode")
+      const input = parseActionCliInput(
+        "broll-set",
+        rest.slice(1),
+        overlaySetFlagOpts()
       );
-      const { result: item } = await runLoggedAction<Broll>(slug, "broll-set", {
-        id: rest[1],
-        assetId: flagValue(args, "--asset"),
-        fromSec: flagNumber(args, "--from"),
-        toSec: flagNumber(args, "--to"),
-        srcInSec: flagNumber(args, "--src-in"),
-        ...(display === undefined ? {} : { display }),
-        ...(audioMode === undefined ? {} : { audioMode }),
-      });
+      const { result: item } = await runLoggedAction<Broll>(
+        rest[0],
+        "broll-set",
+        input
+      );
       console.log(
         `updated b-roll ${item.id} (asset "${item.assetId}", ${secSpan(item.startSample, item.endSample)})`
       );
       break;
     }
     case "music-add": {
-      if (!(rest[0] && rest[1] && rest[2] && rest[3])) {
+      if (!rest[0]) {
         throw new Error(
           "usage: openklip music-add <slug> <assetId> <fromSec> <toSec> [--gain N] [--fade-in s] [--fade-out s] [--src-in s] [--mode trim|loop] [--note text]"
         );
       }
-      const slug = rest[0];
-      const args = rest.slice(4);
-      const fromSec = Number(rest[2]);
-      const toSec = Number(rest[3]);
-      if (!(Number.isFinite(fromSec) && Number.isFinite(toSec))) {
-        throw new Error("fromSec and toSec must be numbers (seconds)");
-      }
-      const { result: item } = await runLoggedAction<MusicPlacement>(
-        slug,
+      const input = parseActionCliInput(
         "music-add",
-        {
-          assetId: rest[1],
-          fromSec,
-          toSec,
-          gain: flagNumber(args, "--gain"),
-          fadeInSec: flagNumber(args, "--fade-in"),
-          fadeOutSec: flagNumber(args, "--fade-out"),
-          srcInSec: flagNumber(args, "--src-in"),
-          mode: musicModeFlag(args),
-          note: flagValue(args, "--note"),
-        }
+        rest.slice(1),
+        overlayAddFlagOpts([
+          { key: "assetId" },
+          { key: "fromSec", kind: "number" },
+          { key: "toSec", kind: "number" },
+        ])
+      );
+      const { result: item } = await runLoggedAction<MusicPlacement>(
+        rest[0],
+        "music-add",
+        input
       );
       console.log(
         `added music ${item.id} (asset "${item.assetId}", ${secSpan(item.startSample, item.endSample)}, gain ${item.gain}, ${item.mode})`
@@ -1324,28 +1271,20 @@ try {
       break;
     }
     case "music-set": {
-      if (!(rest[0] && rest[1])) {
+      if (!rest[0]) {
         throw new Error(
           "usage: openklip music-set <slug> <musicId> [--asset id] [--gain N] [--fade-in s] [--fade-out s] [--from N] [--to N] [--src-in s] [--mode trim|loop] [--note text]"
         );
       }
-      const slug = rest[0];
-      const args = rest.slice(2);
-      const { result: item } = await runLoggedAction<MusicPlacement>(
-        slug,
+      const input = parseActionCliInput(
         "music-set",
-        {
-          id: rest[1],
-          assetId: flagValue(args, "--asset"),
-          fromSec: flagNumber(args, "--from"),
-          toSec: flagNumber(args, "--to"),
-          gain: flagNumber(args, "--gain"),
-          fadeInSec: flagNumber(args, "--fade-in"),
-          fadeOutSec: flagNumber(args, "--fade-out"),
-          srcInSec: flagNumber(args, "--src-in"),
-          mode: musicModeFlag(args),
-          note: flagValue(args, "--note"),
-        }
+        rest.slice(1),
+        overlaySetFlagOpts()
+      );
+      const { result: item } = await runLoggedAction<MusicPlacement>(
+        rest[0],
+        "music-set",
+        input
       );
       console.log(
         `updated music ${item.id} (asset "${item.assetId}", ${secSpan(item.startSample, item.endSample)}, gain ${item.gain}, ${item.mode})`
@@ -1353,83 +1292,87 @@ try {
       break;
     }
     case "music-rm": {
-      if (!(rest[0] && rest[1])) {
+      if (!rest[0]) {
         throw new Error("usage: openklip music-rm <slug> <musicId>");
       }
+      const input = parseActionCliInput("music-rm", rest.slice(1), {
+        positionals: [{ key: "id" }],
+      });
       const { result } = await runLoggedAction<{ removed: boolean }>(
         rest[0],
         "music-rm",
-        { id: rest[1] }
+        input
       );
       if (!result.removed) {
-        console.log(`no music placement with id "${rest[1]}"`);
+        console.log(`no music placement with id "${input.id}"`);
         break;
       }
-      console.log(`removed music ${rest[1]}`);
+      console.log(`removed music ${input.id}`);
       break;
     }
     case "still-add": {
-      if (!(rest[0] && rest[1] && rest[2] && rest[3])) {
+      if (!rest[0]) {
         throw new Error(
           "usage: openklip still-add <slug> <assetId> <fromSec> <toSec> [--scale N] [--focus-x N] [--focus-y N]"
         );
       }
-      const slug = rest[0];
-      const args = rest.slice(1);
-      const fromSec = Number(rest[2]);
-      const toSec = Number(rest[3]);
-      if (!(Number.isFinite(fromSec) && Number.isFinite(toSec))) {
-        throw new Error("fromSec and toSec must be numbers (seconds)");
-      }
-      const { result: item } = await runLoggedAction<Still>(slug, "still-add", {
-        assetId: rest[1],
-        fromSec,
-        toSec,
-        scale: flagNumber(args, "--scale"),
-        focusX: flagNumber(args, "--focus-x"),
-        focusY: flagNumber(args, "--focus-y"),
-      });
+      const input = parseActionCliInput(
+        "still-add",
+        rest.slice(1),
+        overlayAddFlagOpts([
+          { key: "assetId" },
+          { key: "fromSec", kind: "number" },
+          { key: "toSec", kind: "number" },
+        ])
+      );
+      const { result: item } = await runLoggedAction<Still>(
+        rest[0],
+        "still-add",
+        input
+      );
       console.log(
-        `added still ${item.id} (asset "${item.assetId}", ${fromSec}s-${toSec}s, ${item.scale}x focus ${item.focusX},${item.focusY})`
+        `added still ${item.id} (asset "${item.assetId}", ${samplesToSec(item.startSample)}s-${samplesToSec(item.endSample)}s, ${item.scale}x focus ${item.focusX},${item.focusY})`
       );
       break;
     }
     case "still-set": {
-      if (!(rest[0] && rest[1])) {
+      if (!rest[0]) {
         throw new Error(
           "usage: openklip still-set <slug> <stillId> [--asset id] [--from N] [--to N] [--scale N] [--focus-x N] [--focus-y N]"
         );
       }
-      const slug = rest[0];
-      const args = rest.slice(2);
-      const { result: item } = await runLoggedAction<Still>(slug, "still-set", {
-        id: rest[1],
-        assetId: flagValue(args, "--asset"),
-        fromSec: flagNumber(args, "--from"),
-        toSec: flagNumber(args, "--to"),
-        scale: flagNumber(args, "--scale"),
-        focusX: flagNumber(args, "--focus-x"),
-        focusY: flagNumber(args, "--focus-y"),
-      });
+      const input = parseActionCliInput(
+        "still-set",
+        rest.slice(1),
+        overlaySetFlagOpts()
+      );
+      const { result: item } = await runLoggedAction<Still>(
+        rest[0],
+        "still-set",
+        input
+      );
       console.log(
         `updated still ${item.id} (asset "${item.assetId}", ${secSpan(item.startSample, item.endSample)}, ${item.scale}x)`
       );
       break;
     }
     case "still-rm": {
-      if (!(rest[0] && rest[1])) {
+      if (!rest[0]) {
         throw new Error("usage: openklip still-rm <slug> <stillId>");
       }
+      const input = parseActionCliInput("still-rm", rest.slice(1), {
+        positionals: [{ key: "id" }],
+      });
       const { result } = await runLoggedAction<{ removed: boolean }>(
         rest[0],
         "still-rm",
-        { id: rest[1] }
+        input
       );
       if (!result.removed) {
-        console.log(`no still overlay with id "${rest[1]}"`);
+        console.log(`no still overlay with id "${input.id}"`);
         break;
       }
-      console.log(`removed still ${rest[1]}`);
+      console.log(`removed still ${input.id}`);
       break;
     }
     case "graphic": {
@@ -1657,72 +1600,66 @@ try {
           "usage: openklip title-add <slug> <fromSec> <toSec> <text> [--position lower|center|hero|quote|divider|callout]"
         );
       }
-      const slug = rest[0];
-      const args = rest.slice(1);
-      const posIdx = args.indexOf("--position");
-      let position: Title["position"] = "lower";
-      if (posIdx !== -1) {
-        position = parseTitlePositionFlag(args[posIdx + 1]) ?? position;
+      const input = parseActionCliInput(
+        "title-add",
+        rest.slice(1),
+        overlayAddFlagOpts([
+          { key: "fromSec", kind: "number" },
+          { key: "toSec", kind: "number" },
+          { key: "text", rest: true },
+        ])
+      );
+      if (typeof input.text === "string") {
+        input.text = input.text.replace(/\\n/g, "\n");
       }
-      const timingAndText =
-        posIdx === -1
-          ? args
-          : args.filter((_, i) => i !== posIdx && i !== posIdx + 1);
-      if (timingAndText.length < 3) {
-        throw new Error(
-          "usage: openklip title-add <slug> <fromSec> <toSec> <text> [--position lower|center|hero|quote|divider|callout]"
-        );
-      }
-      const fromSec = Number(timingAndText[0]);
-      const toSec = Number(timingAndText[1]);
-      if (!(Number.isFinite(fromSec) && Number.isFinite(toSec))) {
-        throw new Error("fromSec and toSec must be numbers (seconds)");
-      }
-      const text = timingAndText.slice(2).join(" ").replace(/\\n/g, "\n");
-      const { result: item } = await runLoggedAction<Title>(slug, "title-add", {
-        fromSec,
-        toSec,
-        text,
-        position,
-      });
+      const { result: item } = await runLoggedAction<Title>(
+        rest[0],
+        "title-add",
+        input
+      );
       console.log(
-        `added title ${item.id} (${fromSec}s-${toSec}s, ${position}): "${item.text}"`
+        `added title ${item.id} (${samplesToSec(item.startSample)}s-${samplesToSec(item.endSample)}s, ${item.position}): "${item.text}"`
       );
       break;
     }
     case "title-rm": {
-      if (!(rest[0] && rest[1])) {
+      if (!rest[0]) {
         throw new Error("usage: openklip title-rm <slug> <titleId>");
       }
+      const input = parseActionCliInput("title-rm", rest.slice(1), {
+        positionals: [{ key: "id" }],
+      });
       const { result } = await runLoggedAction<{ removed: boolean }>(
         rest[0],
         "title-rm",
-        { id: rest[1] }
+        input
       );
       if (!result.removed) {
-        console.log(`no title card with id "${rest[1]}"`);
+        console.log(`no title card with id "${input.id}"`);
         break;
       }
-      console.log(`removed title ${rest[1]}`);
+      console.log(`removed title ${input.id}`);
       break;
     }
     case "title-set": {
-      if (!(rest[0] && rest[1])) {
+      if (!rest[0]) {
         throw new Error(
           'usage: openklip title-set <slug> <titleId> [--text "..."] [--position lower|center|hero|quote|divider|callout] [--from N] [--to N]'
         );
       }
-      const slug = rest[0];
-      const args = rest.slice(2);
-      const pos = parseTitlePositionFlag(flagValue(args, "--position"));
-      const textRaw = flagValue(args, "--text");
-      const { result: item } = await runLoggedAction<Title>(slug, "title-set", {
-        id: rest[1],
-        text: textRaw?.replace(/\\n/g, "\n"),
-        position: pos,
-        fromSec: flagNumber(args, "--from"),
-        toSec: flagNumber(args, "--to"),
-      });
+      const input = parseActionCliInput(
+        "title-set",
+        rest.slice(1),
+        overlaySetFlagOpts()
+      );
+      if (typeof input.text === "string") {
+        input.text = input.text.replace(/\\n/g, "\n");
+      }
+      const { result: item } = await runLoggedAction<Title>(
+        rest[0],
+        "title-set",
+        input
+      );
       console.log(
         `updated title ${item.id} (${item.position}): "${item.text.replace(/\n/g, "\\n")}"`
       );
@@ -1734,108 +1671,83 @@ try {
           "usage: openklip zoom-add <slug> <fromSec> <toSec> [--scale N] [--ramp N]"
         );
       }
-      const slug = rest[0];
-      const args = rest.slice(1);
-      const scaleIdx = args.indexOf("--scale");
-      const rampIdx = args.indexOf("--ramp");
-      let scale: number | undefined;
-      let rampSec: number | undefined;
-      if (scaleIdx !== -1) {
-        scale = Number(args[scaleIdx + 1]);
-        if (!Number.isFinite(scale)) {
-          throw new Error("--scale must be a number between 1 and 3");
-        }
-      }
-      if (rampIdx !== -1) {
-        rampSec = Number(args[rampIdx + 1]);
-        if (!Number.isFinite(rampSec)) {
-          throw new Error("--ramp must be a number between 0 and 5");
-        }
-      }
-      const timing = args.filter(
-        (_, i) =>
-          i !== scaleIdx &&
-          i !== scaleIdx + 1 &&
-          i !== rampIdx &&
-          i !== rampIdx + 1
+      const input = parseActionCliInput(
+        "zoom-add",
+        rest.slice(1),
+        overlayAddFlagOpts([
+          { key: "fromSec", kind: "number" },
+          { key: "toSec", kind: "number" },
+        ])
       );
-      if (timing.length < 2) {
-        throw new Error(
-          "usage: openklip zoom-add <slug> <fromSec> <toSec> [--scale N] [--ramp N]"
-        );
-      }
-      const fromSec = Number(timing[0]);
-      const toSec = Number(timing[1]);
-      if (!(Number.isFinite(fromSec) && Number.isFinite(toSec))) {
-        throw new Error("fromSec and toSec must be numbers (seconds)");
-      }
-      const { result: item } = await runLoggedAction<Zoom>(slug, "zoom-add", {
-        fromSec,
-        toSec,
-        scale,
-        rampSec,
-      });
+      const { result: item } = await runLoggedAction<Zoom>(
+        rest[0],
+        "zoom-add",
+        input
+      );
       console.log(
-        `added zoom ${item.id} (${fromSec}s-${toSec}s, ${item.scale}x, ramp ${item.rampSec}s)`
+        `added zoom ${item.id} (${samplesToSec(item.startSample)}s-${samplesToSec(item.endSample)}s, ${item.scale}x, ramp ${item.rampSec}s)`
       );
       break;
     }
     case "zoom-rm": {
-      if (!(rest[0] && rest[1])) {
+      if (!rest[0]) {
         throw new Error("usage: openklip zoom-rm <slug> <zoomId>");
       }
+      const input = parseActionCliInput("zoom-rm", rest.slice(1), {
+        positionals: [{ key: "id" }],
+      });
       const { result } = await runLoggedAction<{ removed: boolean }>(
         rest[0],
         "zoom-rm",
-        { id: rest[1] }
+        input
       );
       if (!result.removed) {
-        console.log(`no zoom with id "${rest[1]}"`);
+        console.log(`no zoom with id "${input.id}"`);
         break;
       }
-      console.log(`removed zoom ${rest[1]}`);
+      console.log(`removed zoom ${input.id}`);
       break;
     }
     case "zoom-set": {
-      if (!(rest[0] && rest[1])) {
+      if (!rest[0]) {
         throw new Error(
           "usage: openklip zoom-set <slug> <zoomId> [--scale N] [--ramp N] [--from N] [--to N]"
         );
       }
-      const slug = rest[0];
-      const args = rest.slice(2);
-      const { result: item } = await runLoggedAction<Zoom>(slug, "zoom-set", {
-        id: rest[1],
-        scale: flagNumber(args, "--scale"),
-        rampSec: flagNumber(args, "--ramp"),
-        fromSec: flagNumber(args, "--from"),
-        toSec: flagNumber(args, "--to"),
-      });
+      const input = parseActionCliInput(
+        "zoom-set",
+        rest.slice(1),
+        overlaySetFlagOpts()
+      );
+      const { result: item } = await runLoggedAction<Zoom>(
+        rest[0],
+        "zoom-set",
+        input
+      );
       console.log(
         `updated zoom ${item.id} (${item.scale}x, ramp ${item.rampSec}s, ${secSpan(item.startSample, item.endSample)})`
       );
       break;
     }
     case "captions": {
-      if (!(rest[0] && rest[1])) {
+      if (!rest[0]) {
         throw new Error("usage: openklip captions <slug> <on|off>");
       }
-      const enabled = parseOnOff(rest[1], "openklip captions <slug>");
-      await runLoggedAction(rest[0], "captions", { enabled });
-      console.log(`captions ${enabled ? "on" : "off"}`);
+      const input = parseActionCliInput("captions", rest.slice(1), {
+        positionals: [{ key: "enabled", kind: "on-off" }],
+      });
+      await runLoggedAction(rest[0], "captions", input);
+      console.log(`captions ${input.enabled ? "on" : "off"}`);
       break;
     }
     case "captions-max": {
-      if (!(rest[0] && rest[1])) {
+      if (!rest[0]) {
         throw new Error("usage: openklip captions-max <slug> <n>");
       }
-      const n = Number(rest[1]);
-      if (!Number.isFinite(n)) {
-        throw new Error("n must be a number between 1 and 12");
-      }
-      const { project } = await runLoggedAction(rest[0], "captions-max", {
-        maxWords: n,
+      const input = parseActionCliInput("captions-max", rest.slice(1), {
+        positionals: [{ key: "maxWords", kind: "number" }],
       });
+      const { project } = await runLoggedAction(rest[0], "captions-max", input);
       console.log(`captions max words: ${project.captions.maxWords}`);
       break;
     }
@@ -1843,43 +1755,47 @@ try {
       const validIds = listCaptionStyles()
         .map((s) => s.id)
         .join(", ");
-      const usage = `usage: openklip captions-style <slug> <style>\nvalid styles: ${validIds}`;
-      if (!(rest[0] && rest[1])) {
-        throw new Error(usage);
+      if (!rest[0]) {
+        throw new Error(
+          `usage: openklip captions-style <slug> <style>\nvalid styles: ${validIds}`
+        );
       }
-      if (!isCaptionStyleId(rest[1])) {
-        throw new Error(`unknown style "${rest[1]}"\n${usage}`);
+      try {
+        const input = parseActionCliInput("captions-style", rest.slice(1), {
+          positionals: [{ key: "style" }],
+        });
+        const { project } = await runLoggedAction(
+          rest[0],
+          "captions-style",
+          input
+        );
+        console.log(`captions style: ${project.captions.style}`);
+      } catch (e) {
+        const msg = (e as Error).message;
+        if (msg.includes("style") || msg.includes("Invalid")) {
+          throw new Error(
+            `unknown style "${rest[1] ?? ""}"\nusage: openklip captions-style <slug> <style>\nvalid styles: ${validIds}`
+          );
+        }
+        throw e;
       }
-      const { project } = await runLoggedAction(rest[0], "captions-style", {
-        style: rest[1],
-      });
-      console.log(`captions style: ${project.captions.style}`);
       break;
     }
     case "captions-inset": {
       const validPlatforms = CAPTION_INSET_PLATFORMS.join(", ");
-      const usage = `usage: openklip captions-inset <slug> on|off [--platform ${validPlatforms}]`;
-      if (!(rest[0] && rest[1])) {
-        throw new Error(usage);
+      if (!rest[0]) {
+        throw new Error(
+          `usage: openklip captions-inset <slug> on|off [--platform ${validPlatforms}]`
+        );
       }
-      const enabled = rest[1] === "on";
-      if (rest[1] !== "on" && rest[1] !== "off") {
-        throw new Error(usage);
-      }
-      let platform: string | undefined;
-      const platformIdx = rest.indexOf("--platform");
-      if (platformIdx !== -1) {
-        platform = rest[platformIdx + 1];
-        if (!platform) {
-          throw new Error(usage);
-        }
-      }
-      const { project } = await runLoggedAction(rest[0], "captions-inset", {
-        enabled,
-        platform: platform as
-          | (typeof CAPTION_INSET_PLATFORMS)[number]
-          | undefined,
+      const input = parseActionCliInput("captions-inset", rest.slice(1), {
+        positionals: [{ key: "enabled", kind: "on-off" }],
       });
+      const { project } = await runLoggedAction(
+        rest[0],
+        "captions-inset",
+        input
+      );
       console.log(`captions inset: ${project.captions.insetPlatform ?? "off"}`);
       break;
     }
@@ -1894,9 +1810,14 @@ try {
         if (!isFilter(rest[2])) {
           throw new Error(`usage: ${filterUsage}`);
         }
-        const { project } = await runLoggedAction(rest[0], "look-filter", {
-          filter: rest[2],
+        const input = parseActionCliInput("look-filter", [rest[2]], {
+          positionals: [{ key: "filter" }],
         });
+        const { project } = await runLoggedAction(
+          rest[0],
+          "look-filter",
+          input
+        );
         console.log(`filter: ${project.look.filter}`);
         break;
       }
@@ -1909,9 +1830,12 @@ try {
             : "no LUTs in luts/ (drop a name.cube there)";
           throw new Error(`LUT not found: ${rest[2]} (${hint})`);
         }
-        const { project } = await runLoggedAction(rest[0], "look-lut", {
-          lut: clearing ? "" : rest[2],
-        });
+        const input = parseActionCliInput(
+          "look-lut",
+          [clearing ? "" : rest[2]],
+          { positionals: [{ key: "lut" }] }
+        );
+        const { project } = await runLoggedAction(rest[0], "look-lut", input);
         console.log(`lut: ${project.look.lut ?? "none"}`);
         break;
       }
@@ -1992,9 +1916,11 @@ try {
           `usage: openklip look <slug> vignette <on|off>\n       ${filterUsage}\n       openklip look <slug> lut <name|none>\n       openklip look <slug> color [--temp n] [--tint n] [--bright n] [--contrast n] [--sat n] | --reset\n       openklip look <slug> transition <${CUT_TRANSITION_TYPES.join("|")}> [--duration ms]`
         );
       }
-      const vignette = parseOnOff(rest[2], "openklip look <slug> vignette");
-      await runLoggedAction(rest[0], "look-vignette", { vignette });
-      console.log(`vignette ${vignette ? "on" : "off"}`);
+      const vignetteInput = parseActionCliInput("look-vignette", [rest[2]], {
+        positionals: [{ key: "vignette", kind: "on-off" }],
+      });
+      await runLoggedAction(rest[0], "look-vignette", vignetteInput);
+      console.log(`vignette ${vignetteInput.vignette ? "on" : "off"}`);
       break;
     }
     case "motion": {
@@ -2086,14 +2012,13 @@ try {
       break;
     }
     case "pad": {
-      if (!(rest[0] && rest[1])) {
+      if (!rest[0]) {
         throw new Error("usage: openklip pad <slug> <ms>");
       }
-      const ms = Number(rest[1]);
-      if (!Number.isFinite(ms)) {
-        throw new Error("ms must be a number between 0 and 500");
-      }
-      const { project } = await runLoggedAction(rest[0], "pad", { padMs: ms });
+      const input = parseActionCliInput("pad", rest.slice(1), {
+        positionals: [{ key: "padMs", kind: "number" }],
+      });
+      const { project } = await runLoggedAction(rest[0], "pad", input);
       console.log(`pad: ${project.padMs}ms`);
       break;
     }
@@ -2367,18 +2292,21 @@ try {
       break;
     }
     case "dead-air-rm": {
-      if (!(rest[0] && rest[1])) {
+      if (!rest[0]) {
         throw new Error("usage: openklip dead-air-rm <slug> <id>");
       }
+      const input = parseActionCliInput("dead-air-rm", rest.slice(1), {
+        positionals: [{ key: "id" }],
+      });
       const { result } = await runLoggedAction<{ removed: boolean }>(
         rest[0],
         "dead-air-rm",
-        { id: rest[1] }
+        input
       );
       console.log(
         result.removed
-          ? `dead-air-rm: removed ${rest[1]}`
-          : `dead-air-rm: no span with id ${rest[1]}`
+          ? `dead-air-rm: removed ${input.id}`
+          : `dead-air-rm: no span with id ${input.id}`
       );
       break;
     }
@@ -3550,18 +3478,22 @@ try {
       break;
     }
     case "reorder": {
-      if (!(rest[0] && rest[1] && rest[2] && rest[3] !== undefined)) {
+      if (!rest[0]) {
         throw new Error(
           "usage: openklip reorder <slug> <broll|title|zoom> <id> <toIndex>"
         );
       }
-      const [slug, kind, id] = rest;
-      const toIndex = Number(rest[3]);
-      if (!Number.isFinite(toIndex)) {
-        throw new Error("toIndex must be a number");
-      }
-      await runLoggedAction(slug, "reorder", { track: kind, id, toIndex });
-      console.log(`reordered ${kind} ${id} -> index ${toIndex}`);
+      const input = parseActionCliInput("reorder", rest.slice(1), {
+        positionals: [
+          { key: "track" },
+          { key: "id" },
+          { key: "toIndex", kind: "number" },
+        ],
+      });
+      await runLoggedAction(rest[0], "reorder", input);
+      console.log(
+        `reordered ${input.track} ${input.id} -> index ${input.toIndex}`
+      );
       break;
     }
     case "reanchor": {
@@ -3569,10 +3501,12 @@ try {
         throw new Error("usage: openklip reanchor <slug> [overlayId]");
       }
       const slug = rest[0];
-      const overlayId = rest[1];
+      const input = parseActionCliInput("reanchor", rest.slice(1), {
+        positionals: [{ key: "id", required: false }],
+      });
       const { result: results } = await runLoggedAction<
         Array<{ id: string; kind: string; status: string }>
-      >(slug, "reanchor", overlayId ? { id: overlayId } : {});
+      >(slug, "reanchor", input);
       if (results.length === 0) {
         console.log("no phrase-anchored overlays to re-resolve");
         break;
