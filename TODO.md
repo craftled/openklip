@@ -265,6 +265,7 @@ Single list of current gaps (code is truth). README and release notes point here
 - Revert only touches `project.json`, not the files an edit created or removed. Reverting an `asset-add` while the file is still in the `assets/` folder does not stick: the next folder sync re-registers it (folder contents win; delete the file too if you want the revert to hold). Reverting an `asset-rm` cannot bring back a deleted file; the restored registration itself gets pruned by the next folder sync (logged as `asset-prune`).
 - Batch phrase cuts persist the phrase (`cut-text`), not the resolved word ids: if an external agent edits the transcript between render and save, the server can cut different words than the optimistic UI showed. The serialized save chain makes this unlikely; the editor live-sync poll picks up external CLI/MCP edits without a manual reload.
 - ~~Reload the browser after CLI edits to see changes in the editor.~~ Done: revision poll + reseed (`useProjectLiveSync`, CRAFT-6167).
+- ~~MCP connects with the full ~98-tool schema surface (~23k tokens).~~ Done: deferred core surface + `tools_catalog` / `tools_load` / `tools_invoke` (CRAFT-6169); `OPENKLIP_MCP_SURFACE=all` for full connect.
 - A local `.openklip/projects-root` affects `projectsRoot()` for CLI and server started from that cwd (intentional; isolate tests with a clean temp cwd).
 
 ### Not implemented (see Roadmap / Pending)
