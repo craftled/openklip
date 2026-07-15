@@ -19,6 +19,7 @@ import {
 import type { ConfigTabId } from "@/lib/config-tabs";
 import type { EditorProject } from "@/lib/editor-types";
 import type { Orientation } from "@/lib/preview-layout";
+import { mergeExternalEditorProject } from "@/lib/project-live-sync";
 import {
   readProvenanceDisplayEnabled,
   subscribeProvenanceDisplay,
@@ -108,17 +109,12 @@ export function useEditorChrome({
 
   const onHistoryReverted = useCallback(
     (restored: EngineProject) => {
-      // G1: HistoryPanel onReverted is the only server path that rewrites an
-      // already-open project revision. Reseed project plus client state derived
-      // at mount; leave brief/dirPath/mediaVersion/silences untouched.
-      setProject((prev) => ({
-        ...prev,
-        ...(restored as unknown as EditorProject),
-        brief: prev.brief,
-        dirPath: prev.dirPath,
-        mediaVersion: prev.mediaVersion,
-        silences: prev.silences,
-      }));
+      // Shared reseed for History revert, cam-mix, and live-sync external edits.
+      // Reseed project plus client state derived at mount; leave
+      // brief/dirPath/mediaVersion/silences untouched.
+      setProject((prev) =>
+        mergeExternalEditorProject(prev, restored as unknown as EditorProject)
+      );
       setCaptionsOn(restored.captions?.enabled ?? true);
       setVignetteOn(restored.look?.vignette ?? false);
       setFilterState(restored.look?.filter ?? "none");

@@ -17,6 +17,7 @@ import {
   exportFailedToast,
   exportPromiseMessages,
   exportSuccessToast,
+  externalEditSyncedToast,
   findFillerFailedToast,
   findFillerLoadingMessage,
   findFillerPromiseMessages,
@@ -381,5 +382,13 @@ test("revertFailedToast", () => {
     kind: "error",
     title: "Could not revert",
     description: "nothing to revert",
+  });
+});
+
+test("externalEditSyncedToast names the loaded revision", () => {
+  assert.deepEqual(externalEditSyncedToast(9), {
+    kind: "info",
+    title: "Edit updated",
+    description: "Loaded revision 9 from disk",
   });
 });

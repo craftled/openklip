@@ -429,7 +429,7 @@ bun run cam-devex-smoke
 - **Never hand-edit `project.json`** when a command exists for the change. The commands validate the schema and keep the GUI in sync; manual edits can desync or corrupt the file.
 - After cutting, run `openklip status` before `openklip export` so you don't render an empty or near-empty cut.
 - Run `openklip assets <slug>` before `broll-add` so you have valid asset ids.
-- Reload the browser after CLI edits to see changes in the editor.
+- The editor live-syncs external CLI/MCP edits via a 2s revision poll (and on focus). Prefer one writer at a time (CLI or GUI server) to avoid concurrent-process races on `project.json`.
 - Server-side `project.json` writes serialize per-slug in-process (`mutateProject`). Concurrent **processes** (CLI + running server) can still race; prefer one writer at a time.
 
 ## Context at session start

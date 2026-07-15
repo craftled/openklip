@@ -203,6 +203,15 @@ export function revertFailedToast(error: string): ToastPayload {
   };
 }
 
+/** Shown when CLI/MCP advanced project.json and the open editor reseeds. */
+export function externalEditSyncedToast(revision: number): ToastPayload {
+  return {
+    kind: "info",
+    title: "Edit updated",
+    description: `Loaded revision ${revision} from disk`,
+  };
+}
+
 export function countNewAssetIds(
   knownIds: ReadonlySet<string>,
   assets: ReadonlyArray<AssetIdRef>

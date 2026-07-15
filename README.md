@@ -29,7 +29,7 @@ These follow from how the repo is actually built:
 
 **One edit, one file.** `project.json` holds the edit: words, cuts, asset registry, overlays, captions, look flags. `brief.md` is adjacent project context. Paths under `working/` and `output/` are derived (proxy, transcript, ffmpeg asset proxies, `chats.json`, `actions.jsonl`, `tasks.json`, exports).
 
-**Same file, two surfaces.** The CLI applies edits through `runAction()` in `src/registry.ts`. The GUI applies edits through Next.js server actions in `app/actions.ts` (via `mutateProject()` for serialized read-modify-write). Both persist to the same `project.json`. Reload the browser after external CLI edits.
+**Same file, two surfaces.** The CLI applies edits through `runAction()` in `src/registry.ts`. The GUI applies edits through Next.js server actions in `app/actions.ts` (via `mutateProject()` for serialized read-modify-write). Both persist to the same `project.json`. The editor polls the project revision every 2s (and on window focus) and reseeds when CLI/MCP advances it.
 
 **Agent-native, not agent-bundled.** No in-app LLM for the core loop. With Claude selected, chat loads the openklip MCP server and applies edits directly (cut, zoom, b-roll, title, export). Other agents get live CLI answers or skill-router hints. "Find filler" and "Describe assets" shell out to the selected agent CLI (`src/agent-driver.ts`). Or run `bun run agent-demo`.
 
@@ -212,7 +212,7 @@ OPENKLIP_INTEGRATION=1 bun test tests/mobile-overlays-browser.test.ts
 
 Set `OPENKLIP_CHROME_PATH` when Chrome is not at the default macOS path. CI runs these in the `integration` job.
 
-GUI human edits and CLI/MCP mutations all write the same `project.json`. Reload the browser after external edits.
+GUI human edits and CLI/MCP mutations all write the same `project.json`. The open editor auto-refreshes when the on-disk revision advances (poll + focus).
 
 **Agent provenance (optional env):** set these when spawning agent edits so action history records who changed what. The GUI shows attribution only when Settings → Appearance → **Show edit attribution** is enabled (default off).
 
