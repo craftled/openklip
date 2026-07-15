@@ -73,6 +73,14 @@ import type { Orientation } from "@/lib/preview-layout";
 import { buildProjectHoverContext } from "@/lib/project-context";
 import type { ProjectListing } from "@/lib/project-list";
 import {
+  decideAfterGuiSave,
+  revisionFromProject,
+} from "@/lib/project-live-sync";
+import {
+  fetchProjectRevision,
+  fetchProjectState,
+} from "@/lib/project-live-sync-client";
+import {
   readInterfaceSoundsEnabled,
   subscribeInterfaceSoundsEnabled,
 } from "@/lib/sound-preferences";
@@ -94,6 +102,16 @@ export function App({
   projects: ProjectListing[];
   visionFocusAvailable?: boolean;
 }) {
+  const [project, setProject] = useState<Project>(initialProject);
+  const projectRef = useRef<Project>(initialProject);
+  projectRef.current = project;
+  const onGuiSaveSucceededRef = useRef<(() => Promise<void>) | null>(null);
+  const onHistoryRevertedRef = useRef<(project: EngineProject) => void>(
+    () => undefined
+  );
+  const onSaveSuccess = useCallback(async () => {
+    await onGuiSaveSucceededRef.current?.();
+  }, []);
   const {
     enqueueSave,
     pendingSaves,
@@ -101,8 +119,7 @@ export function App({
     saveError,
     saveErrorRef,
     setSaveError,
-  } = useProjectSaves();
-  const [project, setProject] = useState<Project>(initialProject);
+  } = useProjectSaves(onSaveSuccess);
   const [newKeyframeProperty, setNewKeyframeProperty] =
     useState<Keyframe["property"]>("opacity");
   const [captionsOn, setCaptionsOn] = useState(
@@ -196,6 +213,26 @@ export function App({
     setVignetteOn,
   });
 
+  onHistoryRevertedRef.current = onHistoryReverted;
+  onGuiSaveSucceededRef.current = async () => {
+    const current = projectRef.current;
+    if (!current?.slug) {
+      return;
+    }
+    const clientRevision = revisionFromProject(current);
+    const remoteRevision = await fetchProjectRevision(current.slug);
+    const decision = decideAfterGuiSave(clientRevision, remoteRevision);
+    if (decision.action === "noop") {
+      return;
+    }
+    if (decision.action === "bump-revision") {
+      setProject((prev) => ({ ...prev, revision: decision.revision }));
+      return;
+    }
+    const { project: remote } = await fetchProjectState(current.slug);
+    onHistoryRevertedRef.current(remote);
+  };
+
   useProjectLiveSync({
     slug: project.slug,
     revision: project.revision,
@@ -232,8 +269,6 @@ export function App({
   const [titlePos, setTitlePos] = useState<"lower" | "center" | "hero">(
     "lower"
   );
-  const projectRef = useRef<Project | null>(null);
-  projectRef.current = project;
 
   // F5: ranges feeds both the render path below and the CutScheduler's 60Hz
   // getRanges tick right after. rangesRef mirrors this memo so the scheduler

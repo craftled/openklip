@@ -14,7 +14,9 @@ export interface ProjectSaves {
   setSaveError: (message: string | null) => void;
 }
 
-export function useProjectSaves(): ProjectSaves {
+export function useProjectSaves(
+  onSaveSuccess?: () => void | Promise<void>
+): ProjectSaves {
   const [pendingSaves, setPendingSaves] = useState(0);
   const [saveError, setSaveError] = useState<string | null>(null);
   const saveChainRef = useRef<Promise<void>>(Promise.resolve());
@@ -34,6 +36,9 @@ export function useProjectSaves(): ProjectSaves {
           if (!data.ok) {
             throw new Error(data.error ?? "save failed");
           }
+          if (onSaveSuccess) {
+            await onSaveSuccess();
+          }
         } catch (e) {
           const message = (e as Error).message;
           saveErrorRef.current = message;
@@ -47,7 +52,7 @@ export function useProjectSaves(): ProjectSaves {
     saveChainRef.current = run.catch(() => {
       // The visible error state above is the user-facing failure path.
     });
-  }, []);
+  }, [onSaveSuccess]);
 
   return {
     enqueueSave,

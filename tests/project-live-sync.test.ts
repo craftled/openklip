@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  decideAfterGuiSave,
   decideLiveSync,
   mergeExternalEditorProject,
   revisionFromProject,
@@ -92,4 +93,23 @@ test("revisionFromProject defaults missing/invalid to 0", () => {
   assert.equal(revisionFromProject({}), 0);
   assert.equal(revisionFromProject({ revision: null }), 0);
   assert.equal(revisionFromProject({ revision: 7 }), 7);
+});
+
+test("decideAfterGuiSave noops when disk matches client", () => {
+  assert.deepEqual(decideAfterGuiSave(5, 5), { action: "noop" });
+  assert.deepEqual(decideAfterGuiSave(5, 4), { action: "noop" });
+});
+
+test("decideAfterGuiSave bumps revision after a single-step GUI save", () => {
+  assert.deepEqual(decideAfterGuiSave(5, 6), {
+    action: "bump-revision",
+    revision: 6,
+  });
+});
+
+test("decideAfterGuiSave reseeds when disk jumped more than one revision", () => {
+  assert.deepEqual(decideAfterGuiSave(5, 7), {
+    action: "reseed",
+    revision: 7,
+  });
 });

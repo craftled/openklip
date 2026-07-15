@@ -75,3 +75,27 @@ export function revisionFromProject(project: {
     ? project.revision
     : 0;
 }
+
+export type AfterGuiSaveDecision =
+  | { action: "noop" }
+  | { action: "bump-revision"; revision: number }
+  | { action: "reseed"; revision: number };
+
+/**
+ * After a GUI save completes, compare the editor's last known revision to the
+ * revision on disk. A single-step advance is usually our own write (bump the
+ * client counter only). A larger jump means another writer advanced the EDL
+ * during the save and the editor should reseed.
+ */
+export function decideAfterGuiSave(
+  clientRevision: number,
+  remoteRevision: number
+): AfterGuiSaveDecision {
+  if (remoteRevision <= clientRevision) {
+    return { action: "noop" };
+  }
+  if (remoteRevision > clientRevision + 1) {
+    return { action: "reseed", revision: remoteRevision };
+  }
+  return { action: "bump-revision", revision: remoteRevision };
+}
