@@ -4,7 +4,7 @@ import { type ComponentProps, useMemo } from "react";
 import {
   AgentAudioVisualizerWaveVariants,
   WaveShader,
-} from "@/components/agents-ui/agent-audio-visualizer-wave";
+} from "@/components/agents-ui/wave-shader";
 import { useMediaAudioVisualizerWave } from "@/hooks/use-media-audio-visualizer-wave";
 import { useMediaElementVolume } from "@/hooks/use-media-element-volume";
 import { useThemeColorHex } from "@/hooks/use-theme-color-hex";

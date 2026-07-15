@@ -23,7 +23,7 @@ import {
   actionTable,
   runAction,
 } from "../src/registry.ts";
-import { PreviewOverlays } from "../web/components/preview-overlays";
+import { JsonRenderGraphicOverlay } from "../web/components/json-render-graphic-overlay";
 import {
   makeProject,
   withTempProjectsRoot,
@@ -353,27 +353,22 @@ test("json-graphic action schema applies product announcement validation", () =>
   assert.equal(result.success, false);
 });
 
-test("preview overlays branch to the json-render renderer", () => {
+// PreviewOverlays loads this via next/dynamic (ssr: false); render the overlay
+// directly so static markup still exercises the product-announcement path.
+test("json-render overlay renders product-announcement markup", () => {
   const html = renderToStaticMarkup(
-    <PreviewOverlays
-      captionGroups={[]}
-      captionsOn={false}
+    <JsonRenderGraphicOverlay
       curSample={SAMPLE_RATE * 2}
-      graphics={[
-        {
-          id: "g-json",
-          type: "json-render",
-          template: PRODUCT_ANNOUNCEMENT_CATALOG,
-          catalog: PRODUCT_ANNOUNCEMENT_CATALOG,
-          params: {},
-          spec: sampleProductAnnouncementSpec,
-          startSample: SAMPLE_RATE,
-          endSample: SAMPLE_RATE * 5,
-          track: "title",
-        },
-      ]}
+      graphic={{
+        id: "g-json",
+        type: "json-render",
+        catalog: PRODUCT_ANNOUNCEMENT_CATALOG,
+        spec: sampleProductAnnouncementSpec,
+        startSample: SAMPLE_RATE,
+        endSample: SAMPLE_RATE * 5,
+        track: "title",
+      }}
       sampleRate={SAMPLE_RATE}
-      titles={[]}
     />
   );
 
@@ -381,30 +376,23 @@ test("preview overlays branch to the json-render renderer", () => {
   assert.match(html, /Announcement graphic|JSON specs become export-ready/);
 });
 
-test("preview overlays show invalid json-render graphic errors", () => {
+test("json-render overlay shows invalid graphic errors", () => {
   const invalidSpec = structuredClone(sampleProductAnnouncementSpec);
   invalidSpec.elements.hero.type = "MagicDemoWidget";
 
   const html = renderToStaticMarkup(
-    <PreviewOverlays
-      captionGroups={[]}
-      captionsOn={false}
+    <JsonRenderGraphicOverlay
       curSample={SAMPLE_RATE * 2}
-      graphics={[
-        {
-          id: "g-json",
-          type: "json-render",
-          template: PRODUCT_ANNOUNCEMENT_CATALOG,
-          catalog: PRODUCT_ANNOUNCEMENT_CATALOG,
-          params: {},
-          spec: invalidSpec,
-          startSample: SAMPLE_RATE,
-          endSample: SAMPLE_RATE * 5,
-          track: "title",
-        },
-      ]}
+      graphic={{
+        id: "g-json",
+        type: "json-render",
+        catalog: PRODUCT_ANNOUNCEMENT_CATALOG,
+        spec: invalidSpec,
+        startSample: SAMPLE_RATE,
+        endSample: SAMPLE_RATE * 5,
+        track: "title",
+      }}
       sampleRate={SAMPLE_RATE}
-      titles={[]}
     />
   );
 

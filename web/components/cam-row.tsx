@@ -1,8 +1,18 @@
 "use client";
 
 import type { Cam, CamRole } from "@engine/cams";
+import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
-import { MediaAudioVisualizerWave } from "@/components/media-audio-visualizer-wave";
+
+// LiveKit-free wave shader chunk; loads when audio preview plays (CRAFT-6172).
+const MediaAudioVisualizerWave = dynamic(
+  () =>
+    import("@/components/media-audio-visualizer-wave").then((mod) => ({
+      default: mod.MediaAudioVisualizerWave,
+    })),
+  { ssr: false }
+);
+
 import { Button } from "@/components/ui/button";
 import { IconSwap } from "@/components/ui/icon-swap";
 import { Input } from "@/components/ui/input";

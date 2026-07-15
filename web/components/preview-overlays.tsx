@@ -1,13 +1,31 @@
 "use client";
 
 import { captionStyle } from "@engine/caption-styles";
+import dynamic from "next/dynamic";
 import type { CaptionGroup } from "../../src/captions.ts";
 import { formatDividerLabel } from "../../src/titles.ts";
 import { cn } from "../lib/utils";
 import { CaptionLine } from "./caption-line";
-import { type GraphicItem, GraphicOverlay } from "./graphic-overlay";
+import type { GraphicItem } from "./graphic-overlay";
 import { HeroTitleOverlay } from "./hero-title-overlay";
-import { JsonRenderGraphicOverlay } from "./json-render-graphic-overlay";
+
+// Heavy graphic stacks (Paper shaders, maplibre) load only when a graphic is
+// active on the timeline (CRAFT-6172).
+const GraphicOverlay = dynamic(
+  () =>
+    import("./graphic-overlay").then((mod) => ({
+      default: mod.GraphicOverlay,
+    })),
+  { ssr: false }
+);
+
+const JsonRenderGraphicOverlay = dynamic(
+  () =>
+    import("./json-render-graphic-overlay").then((mod) => ({
+      default: mod.JsonRenderGraphicOverlay,
+    })),
+  { ssr: false }
+);
 
 export interface OverlayTitleItem {
   endSample: number;

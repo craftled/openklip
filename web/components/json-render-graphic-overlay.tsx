@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { applyGraphicFrame, graphicFrameAt } from "@/lib/graphic-runtime";
 import {
@@ -10,8 +11,16 @@ import {
 } from "../../src/json-render-catalogs.ts";
 import type { MapMotionSpec } from "../../src/map-motion.ts";
 import type { ProductAnnouncementSpec } from "../../src/product-announcement.ts";
-import { MapMotionFrame } from "./map-motion-frame";
 import { ProductAnnouncementFrame } from "./product-announcement-frame";
+
+// maplibre-gl only loads when a map-motion graphic is on screen (CRAFT-6172).
+const MapMotionFrame = dynamic(
+  () =>
+    import("./map-motion-frame").then((mod) => ({
+      default: mod.MapMotionFrame,
+    })),
+  { ssr: false }
+);
 
 export interface JsonRenderGraphicItem {
   catalog?: string;
