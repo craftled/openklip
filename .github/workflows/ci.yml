@@ -18,8 +18,28 @@ jobs:
         with:
           bun-version: 1.3.14
 
+      # Persist the Transformers.js download cache and warm it once (below) so
+      # the transcription/embedding tests run offline instead of re-fetching
+      # Whisper & CLIP from huggingface.co every run — a live HF outage used to
+      # fail unrelated PRs. See src/model-env.mjs and scripts/warm-models.mjs.
+      # The cache lives under runner.temp (OUTSIDE the checkout) so `bun run
+      # check`/typecheck/build never scan the ~885MB of model files.
+      - name: Cache Transformers.js models
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/hf-model-cache
+          key: hf-models-v1-whisper-base-en-clip-vit-b32
+
       - name: Install dependencies
         run: bun install --frozen-lockfile
+
+      # Only network step that touches huggingface.co. On a cache hit this is a
+      # fast offline no-op; on a miss it downloads with retries. Kept online
+      # (no TRANSFORMERS_OFFLINE) so it can populate a cold cache.
+      - name: Warm model cache
+        run: node scripts/warm-models.mjs
+        env:
+          OPENKLIP_MODEL_CACHE: ${{ runner.temp }}/hf-model-cache
 
       - name: Lint and format check
         run: bun run check
@@ -29,12 +49,21 @@ jobs:
 
       - name: Unit tests
         run: bun run test
+        env:
+          OPENKLIP_MODEL_CACHE: ${{ runner.temp }}/hf-model-cache
+          TRANSFORMERS_OFFLINE: "1"
 
       - name: Multicam ffmpeg integration tests
         run: OPENKLIP_INTEGRATION=1 bun test --isolate tests/cam-mix.test.ts tests/cam-remix.test.ts -t integration
+        env:
+          OPENKLIP_MODEL_CACHE: ${{ runner.temp }}/hf-model-cache
+          TRANSFORMERS_OFFLINE: "1"
 
       - name: Agent loop smoke audit
         run: bun run agent-smoke-audit
+        env:
+          OPENKLIP_MODEL_CACHE: ${{ runner.temp }}/hf-model-cache
+          TRANSFORMERS_OFFLINE: "1"
 
       - name: Build
         run: bun run build
