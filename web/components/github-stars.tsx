@@ -1,11 +1,11 @@
 import type { CSSProperties } from "react";
 import { buttonVariants } from "@/components/ui/button";
+import { GithubIcon } from "@/components/ui/svgs/githubIcon";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { GithubIcon } from "@/components/ui/svgs/githubIcon";
 import { cn } from "@/lib/utils";
 
 export interface GitHubStarsProps {

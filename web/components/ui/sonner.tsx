@@ -1,6 +1,6 @@
 "use client";
 
-import { useTheme } from "next-themes";
+import { useEffect, useState } from "react";
 import { Toaster as Sonner, type ToasterProps } from "sonner";
 import {
   IconAlertOctagon,
@@ -9,9 +9,19 @@ import {
   IconInfoCircle,
   IconLoader,
 } from "@/lib/icon";
+import {
+  type ColorScheme,
+  getColorScheme,
+  subscribeColorScheme,
+} from "@/lib/theme-preferences";
 
 const Toaster = ({ ...props }: ToasterProps) => {
-  const { theme = "system" } = useTheme();
+  const [colorScheme, setColorScheme] = useState<ColorScheme>("light");
+
+  useEffect(() => {
+    setColorScheme(getColorScheme());
+    return subscribeColorScheme(setColorScheme);
+  }, []);
 
   return (
     <Sonner
@@ -31,7 +41,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
           "--border-radius": "var(--radius)",
         } as React.CSSProperties
       }
-      theme={theme as ToasterProps["theme"]}
+      theme={colorScheme}
       toastOptions={{
         classNames: {
           toast: "cn-toast",

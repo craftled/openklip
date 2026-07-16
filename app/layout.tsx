@@ -1,4 +1,3 @@
-import { RootProvider } from "fumadocs-ui/provider/next";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import Script from "next/script";
@@ -63,10 +62,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         </Script>
       </head>
       <body className="flex min-h-screen flex-col">
-        <RootProvider>
-          <TooltipProvider>{children}</TooltipProvider>
-          <Toaster />
-        </RootProvider>
+        <TooltipProvider>{children}</TooltipProvider>
+        <Toaster />
       </body>
     </html>
   );

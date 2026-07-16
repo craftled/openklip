@@ -9,7 +9,7 @@ import { ClaudeAiIcon } from "@/components/ui/svgs/claudeAiIcon";
 import { CursorLight } from "@/components/ui/svgs/cursorLight";
 import { Openai } from "@/components/ui/svgs/openai";
 import { fetchGitHubStars, openklipGitHubUrl } from "@/lib/github-repo";
-import { Book, BrandApple, BrandGithub, PlugConnected } from "@/lib/icon";
+import { Book, BrandGithub, PlugConnected } from "@/lib/icon";
 import { cn } from "@/lib/utils";
 
 const SUPPORTS: {
@@ -121,13 +121,9 @@ export async function MarketingSite() {
             <Button
               nativeButton={false}
               render={
-                <a
-                  href={openklipGitHubUrl("releases/latest")}
-                  rel="noopener"
-                  target="_blank"
-                >
-                  <BrandApple data-icon="inline-start" />
-                  Download for Mac
+                <a href="/docs/getting-started">
+                  <BrandGithub data-icon="inline-start" />
+                  Get started
                 </a>
               }
               size="lg"
@@ -135,11 +131,7 @@ export async function MarketingSite() {
             <Button
               nativeButton={false}
               render={
-                <a
-                  href={openklipGitHubUrl("blob/main/README.md")}
-                  rel="noopener"
-                  target="_blank"
-                >
+                <a href="/docs">
                   <Book data-icon="inline-start" />
                   Read Docs
                 </a>
@@ -237,19 +229,15 @@ bun run export <slug>`}
           </h2>
           <div className="mt-8 flex justify-center">
             <Button
-              className="h-9 gap-1.5 overflow-visible rounded-full bg-neutral-200 px-4 font-medium text-[13px] leading-none tracking-tight text-neutral-950 hover:bg-white sm:h-9 [&_svg]:overflow-visible"
+              className="h-9 gap-1.5 overflow-visible rounded-full bg-neutral-200 px-4 font-medium text-[13px] text-neutral-950 leading-none tracking-tight hover:bg-white sm:h-9 [&_svg]:overflow-visible"
               nativeButton={false}
               render={
-                <a
-                  href={openklipGitHubUrl("releases/latest")}
-                  rel="noopener"
-                  target="_blank"
-                >
-                  <BrandApple
+                <a href="/docs/getting-started">
+                  <BrandGithub
                     aria-hidden
                     className="size-4 shrink-0 overflow-visible"
                   />
-                  Download for Mac
+                  Get started
                 </a>
               }
               size="lg"
