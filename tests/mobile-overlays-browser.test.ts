@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import puppeteer from "puppeteer-core";
 import { prepareIntegrationEditorFixture } from "./helpers/integration-editor-fixture.ts";
-import { chromeAvailable } from "./helpers/integration-gate.ts";
+import {
+  chromeAvailable,
+  launchIntegrationBrowser,
+} from "./helpers/integration-gate.ts";
 import { spawnIntegrationServer } from "./helpers/integration-server.ts";
 
 const CHROME_PATH =
@@ -32,10 +34,7 @@ test("mobile viewport exposes chat and config overlay toggles", {
     fixture.cleanup();
   });
 
-  const browser = await puppeteer.launch({
-    executablePath: CHROME_PATH,
-    headless: true,
-  });
+  const browser = await launchIntegrationBrowser();
   t.after(async () => {
     await browser.close();
   });
