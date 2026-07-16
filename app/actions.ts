@@ -209,20 +209,54 @@ export async function loadBriefAction(
   }
 }
 
+// CRAFT-6177: these four whole-track saves stay available for callers that
+// genuinely need to replace an entire overlay track (currently: b-roll
+// paint-order reorder in web/hooks/use-overlay-editors.ts), but a browser
+// snapshot can go stale the moment the CLI or an MCP agent edits the same
+// project. `expectedRevision`, when provided, is a compare-and-swap guard:
+// the save is rejected outright (no write, no history entry, no revision
+// bump) if the live project.revision has moved on since the caller's
+// snapshot. Every other overlay add/update/remove goes through ID-scoped
+// registry actions instead (zoom-add/-set/-rm, broll-add/-set/-rm,
+// title-add/-set/-rm, still-add/-set/-rm, called via runGuiAction from
+// use-overlay-editors.ts) which only ever touch the one overlay named by id
+// and so need no revision guard at all - see tests/overlay-concurrency.test.ts.
+function assertRevisionMatches(
+  project: Project,
+  expectedRevision: number | undefined
+): void {
+  if (expectedRevision === undefined) {
+    return;
+  }
+  const current = project.revision ?? 0;
+  if (current !== expectedRevision) {
+    throw new Error(
+      "stale save rejected: project revision changed since this edit was staged " +
+        `(expected revision ${expectedRevision}, project is now at revision ${current}). ` +
+        "Reload and retry."
+    );
+  }
+}
+
 export async function saveZooms(
   slug: string,
-  zooms: unknown[]
-): Promise<ActionResult<{ zooms: ReturnType<typeof clampZoomItems> }>> {
+  zooms: unknown[],
+  expectedRevision?: number
+): Promise<
+  ActionResult<{ revision: number; zooms: ReturnType<typeof clampZoomItems> }>
+> {
   try {
-    const items = await mutateProject(
+    const { items, revision } = await mutateProject(
       slug,
       (project) => {
+        assertRevisionMatches(project, expectedRevision);
+        const revisionBefore = project.revision ?? 0;
         applyZooms(project, zooms);
-        return project.zooms;
+        return { items: project.zooms, revision: revisionBefore + 1 };
       },
       { ...guiMutateMeta("zooms", zooms) }
     );
-    return { ok: true, data: { zooms: items } };
+    return { ok: true, data: { zooms: items, revision } };
   } catch (e) {
     return fail(e);
   }
@@ -230,18 +264,26 @@ export async function saveZooms(
 
 export async function saveBroll(
   slug: string,
-  broll: unknown[]
-): Promise<ActionResult<{ broll: ReturnType<typeof clampBrollItems> }>> {
+  broll: unknown[],
+  expectedRevision?: number
+): Promise<
+  ActionResult<{
+    broll: ReturnType<typeof clampBrollItems>;
+    revision: number;
+  }>
+> {
   try {
-    const items = await mutateProject(
+    const { items, revision } = await mutateProject(
       slug,
       (project) => {
+        assertRevisionMatches(project, expectedRevision);
+        const revisionBefore = project.revision ?? 0;
         applyBroll(project, broll);
-        return project.broll;
+        return { items: project.broll, revision: revisionBefore + 1 };
       },
       { ...guiMutateMeta("broll", broll) }
     );
-    return { ok: true, data: { broll: items } };
+    return { ok: true, data: { broll: items, revision } };
   } catch (e) {
     return fail(e);
   }
@@ -249,18 +291,26 @@ export async function saveBroll(
 
 export async function saveTitles(
   slug: string,
-  titles: unknown[]
-): Promise<ActionResult<{ titles: ReturnType<typeof clampTitleItems> }>> {
+  titles: unknown[],
+  expectedRevision?: number
+): Promise<
+  ActionResult<{
+    revision: number;
+    titles: ReturnType<typeof clampTitleItems>;
+  }>
+> {
   try {
-    const items = await mutateProject(
+    const { items, revision } = await mutateProject(
       slug,
       (project) => {
+        assertRevisionMatches(project, expectedRevision);
+        const revisionBefore = project.revision ?? 0;
         applyTitles(project, titles);
-        return project.titles;
+        return { items: project.titles, revision: revisionBefore + 1 };
       },
       { ...guiMutateMeta("titles", titles) }
     );
-    return { ok: true, data: { titles: items } };
+    return { ok: true, data: { titles: items, revision } };
   } catch (e) {
     return fail(e);
   }
@@ -268,18 +318,26 @@ export async function saveTitles(
 
 export async function saveStills(
   slug: string,
-  stills: unknown[]
-): Promise<ActionResult<{ stills: ReturnType<typeof clampStillItems> }>> {
+  stills: unknown[],
+  expectedRevision?: number
+): Promise<
+  ActionResult<{
+    revision: number;
+    stills: ReturnType<typeof clampStillItems>;
+  }>
+> {
   try {
-    const items = await mutateProject(
+    const { items, revision } = await mutateProject(
       slug,
       (project) => {
+        assertRevisionMatches(project, expectedRevision);
+        const revisionBefore = project.revision ?? 0;
         applyStills(project, stills);
-        return project.stills;
+        return { items: project.stills, revision: revisionBefore + 1 };
       },
       { ...guiMutateMeta("stills", stills) }
     );
-    return { ok: true, data: { stills: items } };
+    return { ok: true, data: { stills: items, revision } };
   } catch (e) {
     return fail(e);
   }

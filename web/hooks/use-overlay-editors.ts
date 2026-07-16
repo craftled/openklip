@@ -16,13 +16,7 @@ import type {
   EditorZoomItem,
 } from "@/lib/editor-types";
 import type { ActionResult } from "../../app/actions.ts";
-import {
-  runGuiAction,
-  saveBroll,
-  saveStills,
-  saveTitles,
-  saveZooms,
-} from "../../app/actions.ts";
+import { runGuiAction, saveBroll } from "../../app/actions.ts";
 
 export interface UseOverlayEditorsParams {
   chosenAsset: string;
@@ -37,6 +31,17 @@ export interface UseOverlayEditorsParams {
   setTitleText: Dispatch<SetStateAction<string>>;
   titlePos: "lower" | "center" | "hero";
   titleText: string;
+}
+
+// Replace the array entry whose id === matchId with `item` (used to swap an
+// optimistic client-side item for the server's authoritative one once an
+// id-scoped add/set action round-trips - see CRAFT-6177).
+function reconcileById<T extends { id: string }>(
+  list: T[] | undefined,
+  matchId: string,
+  item: T
+): T[] {
+  return (list ?? []).map((x) => (x.id === matchId ? item : x));
 }
 
 export function useOverlayEditors({
@@ -58,21 +63,43 @@ export function useOverlayEditors({
       return;
     }
     const [a, b] = selRange;
-    const id = `z${Date.now()}`;
-    const zooms = [
-      ...(project.zooms ?? []),
-      {
-        id,
-        startSample: project.words[a].startSample,
-        endSample: project.words[b].endSample,
-        scale: 1.15,
-        rampSec: 0.6,
-      },
-    ];
-    setProject({ ...project, zooms });
-    enqueueSave(() => saveZooms(project.slug, zooms));
+    const tempId = `z${Date.now()}`;
+    const fromSec = project.words[a].startSample / project.sampleRate;
+    const toSec = project.words[b].endSample / project.sampleRate;
+    const optimistic: EditorZoomItem = {
+      id: tempId,
+      startSample: project.words[a].startSample,
+      endSample: project.words[b].endSample,
+      scale: 1.15,
+      rampSec: 0.6,
+    };
+    setProject((prev) => ({
+      ...prev,
+      zooms: [...(prev.zooms ?? []), optimistic],
+    }));
+    // ID-scoped: this only ever creates one new zoom, so it can never drop a
+    // zoom added by the CLI/MCP after this browser's project snapshot.
+    enqueueSave(async () => {
+      const res = await runGuiAction(project.slug, "zoom-add", {
+        fromSec,
+        toSec,
+      });
+      if (res.ok) {
+        const item = res.data.result as EditorZoomItem;
+        setProject((prev) => ({
+          ...prev,
+          zooms: reconcileById(prev.zooms, tempId, item),
+        }));
+        setSelected((prev) =>
+          prev?.kind === "zoom" && prev.id === tempId
+            ? { kind: "zoom", id: item.id }
+            : prev
+        );
+      }
+      return res;
+    });
     clearSelection();
-    setSelected({ kind: "zoom", id });
+    setSelected({ kind: "zoom", id: tempId });
   }, [clearSelection, enqueueSave, project, selRange, setProject, setSelected]);
 
   const addBroll = useCallback(() => {
@@ -80,22 +107,43 @@ export function useOverlayEditors({
       return;
     }
     const [a, b] = selRange;
-    const id = `br${Date.now()}`;
-    const broll = [
-      ...(project.broll ?? []),
-      {
-        id,
+    const tempId = `br${Date.now()}`;
+    const fromSec = project.words[a].startSample / project.sampleRate;
+    const toSec = project.words[b].endSample / project.sampleRate;
+    const optimistic: EditorBrollItem = {
+      id: tempId,
+      assetId: chosenAsset,
+      startSample: project.words[a].startSample,
+      endSample: project.words[b].endSample,
+      srcInSample: 0,
+      display: "cover",
+    };
+    setProject((prev) => ({
+      ...prev,
+      broll: [...(prev.broll ?? []), optimistic],
+    }));
+    enqueueSave(async () => {
+      const res = await runGuiAction(project.slug, "broll-add", {
         assetId: chosenAsset,
-        startSample: project.words[a].startSample,
-        endSample: project.words[b].endSample,
-        srcInSample: 0,
-        display: "cover" as const,
-      },
-    ];
-    setProject({ ...project, broll });
-    enqueueSave(() => saveBroll(project.slug, broll));
+        fromSec,
+        toSec,
+      });
+      if (res.ok) {
+        const item = res.data.result as EditorBrollItem;
+        setProject((prev) => ({
+          ...prev,
+          broll: reconcileById(prev.broll, tempId, item),
+        }));
+        setSelected((prev) =>
+          prev?.kind === "broll" && prev.id === tempId
+            ? { kind: "broll", id: item.id }
+            : prev
+        );
+      }
+      return res;
+    });
     clearSelection();
-    setSelected({ kind: "broll", id });
+    setSelected({ kind: "broll", id: tempId });
   }, [
     chosenAsset,
     clearSelection,
@@ -111,22 +159,45 @@ export function useOverlayEditors({
       return;
     }
     const [a, b] = selRange;
-    const id = `t${Date.now()}`;
-    const titles = [
-      ...(project.titles ?? []),
-      {
-        id,
-        text: titleText.trim(),
-        startSample: project.words[a].startSample,
-        endSample: project.words[b].endSample,
+    const tempId = `t${Date.now()}`;
+    const text = titleText.trim();
+    const fromSec = project.words[a].startSample / project.sampleRate;
+    const toSec = project.words[b].endSample / project.sampleRate;
+    const optimistic: EditorTitleItem = {
+      id: tempId,
+      text,
+      startSample: project.words[a].startSample,
+      endSample: project.words[b].endSample,
+      position: titlePos,
+    };
+    setProject((prev) => ({
+      ...prev,
+      titles: [...(prev.titles ?? []), optimistic],
+    }));
+    enqueueSave(async () => {
+      const res = await runGuiAction(project.slug, "title-add", {
+        fromSec,
+        toSec,
+        text,
         position: titlePos,
-      },
-    ];
-    setProject({ ...project, titles });
-    enqueueSave(() => saveTitles(project.slug, titles));
+      });
+      if (res.ok) {
+        const item = res.data.result as EditorTitleItem;
+        setProject((prev) => ({
+          ...prev,
+          titles: reconcileById(prev.titles, tempId, item),
+        }));
+        setSelected((prev) =>
+          prev?.kind === "title" && prev.id === tempId
+            ? { kind: "title", id: item.id }
+            : prev
+        );
+      }
+      return res;
+    });
     setTitleText("");
     clearSelection();
-    setSelected({ kind: "title", id });
+    setSelected({ kind: "title", id: tempId });
   }, [
     clearSelection,
     enqueueSave,
@@ -144,23 +215,44 @@ export function useOverlayEditors({
       return;
     }
     const [a, b] = selRange;
-    const id = `s${Date.now()}`;
-    const stills = [
-      ...(project.stills ?? []),
-      {
-        id,
+    const tempId = `s${Date.now()}`;
+    const fromSec = project.words[a].startSample / project.sampleRate;
+    const toSec = project.words[b].endSample / project.sampleRate;
+    const optimistic: EditorStillItem = {
+      id: tempId,
+      assetId: chosenStillAsset,
+      startSample: project.words[a].startSample,
+      endSample: project.words[b].endSample,
+      scale: 1.2,
+      focusX: 0.5,
+      focusY: 0.5,
+    };
+    setProject((prev) => ({
+      ...prev,
+      stills: [...(prev.stills ?? []), optimistic],
+    }));
+    enqueueSave(async () => {
+      const res = await runGuiAction(project.slug, "still-add", {
         assetId: chosenStillAsset,
-        startSample: project.words[a].startSample,
-        endSample: project.words[b].endSample,
-        scale: 1.2,
-        focusX: 0.5,
-        focusY: 0.5,
-      },
-    ];
-    setProject({ ...project, stills });
-    enqueueSave(() => saveStills(project.slug, stills));
+        fromSec,
+        toSec,
+      });
+      if (res.ok) {
+        const item = res.data.result as EditorStillItem;
+        setProject((prev) => ({
+          ...prev,
+          stills: reconcileById(prev.stills, tempId, item),
+        }));
+        setSelected((prev) =>
+          prev?.kind === "still" && prev.id === tempId
+            ? { kind: "still", id: item.id }
+            : prev
+        );
+      }
+      return res;
+    });
     clearSelection();
-    setSelected({ kind: "still", id });
+    setSelected({ kind: "still", id: tempId });
   }, [
     chosenStillAsset,
     clearSelection,
@@ -173,44 +265,142 @@ export function useOverlayEditors({
 
   const updateZoom = useCallback(
     (id: string, patch: Partial<EditorZoomItem>) => {
-      const zooms = (project.zooms ?? []).map((z) =>
-        z.id === id ? { ...z, ...patch } : z
-      );
-      setProject({ ...project, zooms });
-      enqueueSave(() => saveZooms(project.slug, zooms));
+      setProject((prev) => ({
+        ...prev,
+        zooms: (prev.zooms ?? []).map((z) =>
+          z.id === id ? { ...z, ...patch } : z
+        ),
+      }));
+      // ID-scoped patch: only touches this one zoom's fields under the lock,
+      // regardless of what else may have changed on the track meanwhile.
+      enqueueSave(async () => {
+        const res = await runGuiAction(project.slug, "zoom-set", {
+          id,
+          ...(patch.scale === undefined ? {} : { scale: patch.scale }),
+          ...(patch.rampSec === undefined ? {} : { rampSec: patch.rampSec }),
+          ...(patch.startSample === undefined
+            ? {}
+            : { fromSec: patch.startSample / project.sampleRate }),
+          ...(patch.endSample === undefined
+            ? {}
+            : { toSec: patch.endSample / project.sampleRate }),
+        });
+        if (res.ok) {
+          const item = res.data.result as EditorZoomItem;
+          setProject((prev) => ({
+            ...prev,
+            zooms: reconcileById(prev.zooms, id, item),
+          }));
+        }
+        return res;
+      });
     },
     [enqueueSave, project, setProject]
   );
 
   const updateTitle = useCallback(
     (id: string, patch: Partial<EditorTitleItem>) => {
-      const titles = (project.titles ?? []).map((t) =>
-        t.id === id ? { ...t, ...patch } : t
-      );
-      setProject({ ...project, titles });
-      enqueueSave(() => saveTitles(project.slug, titles));
+      setProject((prev) => ({
+        ...prev,
+        titles: (prev.titles ?? []).map((t) =>
+          t.id === id ? { ...t, ...patch } : t
+        ),
+      }));
+      enqueueSave(async () => {
+        const res = await runGuiAction(project.slug, "title-set", {
+          id,
+          ...(patch.text === undefined ? {} : { text: patch.text }),
+          ...(patch.position === undefined ? {} : { position: patch.position }),
+          ...(patch.startSample === undefined
+            ? {}
+            : { fromSec: patch.startSample / project.sampleRate }),
+          ...(patch.endSample === undefined
+            ? {}
+            : { toSec: patch.endSample / project.sampleRate }),
+        });
+        if (res.ok) {
+          const item = res.data.result as EditorTitleItem;
+          setProject((prev) => ({
+            ...prev,
+            titles: reconcileById(prev.titles, id, item),
+          }));
+        }
+        return res;
+      });
     },
     [enqueueSave, project, setProject]
   );
 
   const updateBroll = useCallback(
     (id: string, patch: Partial<EditorBrollItem>) => {
-      const broll = (project.broll ?? []).map((b) =>
-        b.id === id ? { ...b, ...patch } : b
-      );
-      setProject({ ...project, broll });
-      enqueueSave(() => saveBroll(project.slug, broll));
+      setProject((prev) => ({
+        ...prev,
+        broll: (prev.broll ?? []).map((b) =>
+          b.id === id ? { ...b, ...patch } : b
+        ),
+      }));
+      enqueueSave(async () => {
+        const res = await runGuiAction(project.slug, "broll-set", {
+          id,
+          ...(patch.assetId === undefined ? {} : { assetId: patch.assetId }),
+          ...(patch.display === undefined ? {} : { display: patch.display }),
+          ...(patch.audioMode === undefined
+            ? {}
+            : { audioMode: patch.audioMode }),
+          ...(patch.startSample === undefined
+            ? {}
+            : { fromSec: patch.startSample / project.sampleRate }),
+          ...(patch.endSample === undefined
+            ? {}
+            : { toSec: patch.endSample / project.sampleRate }),
+          ...(patch.srcInSample === undefined
+            ? {}
+            : { srcInSec: patch.srcInSample / project.sampleRate }),
+        });
+        if (res.ok) {
+          const item = res.data.result as EditorBrollItem;
+          setProject((prev) => ({
+            ...prev,
+            broll: reconcileById(prev.broll, id, item),
+          }));
+        }
+        return res;
+      });
     },
     [enqueueSave, project, setProject]
   );
 
   const updateStill = useCallback(
     (id: string, patch: Partial<EditorStillItem>) => {
-      const stills = (project.stills ?? []).map((s) =>
-        s.id === id ? { ...s, ...patch } : s
-      );
-      setProject({ ...project, stills });
-      enqueueSave(() => saveStills(project.slug, stills));
+      setProject((prev) => ({
+        ...prev,
+        stills: (prev.stills ?? []).map((s) =>
+          s.id === id ? { ...s, ...patch } : s
+        ),
+      }));
+      enqueueSave(async () => {
+        const res = await runGuiAction(project.slug, "still-set", {
+          id,
+          ...(patch.assetId === undefined ? {} : { assetId: patch.assetId }),
+          ...(patch.scale === undefined ? {} : { scale: patch.scale }),
+          ...(patch.focusX === undefined ? {} : { focusX: patch.focusX }),
+          ...(patch.focusY === undefined ? {} : { focusY: patch.focusY }),
+          ...(patch.startSample === undefined
+            ? {}
+            : { fromSec: patch.startSample / project.sampleRate }),
+          ...(patch.endSample === undefined
+            ? {}
+            : { toSec: patch.endSample / project.sampleRate }),
+        });
+        if (res.ok) {
+          const item = res.data.result as EditorStillItem;
+          setProject((prev) => ({
+            ...prev,
+            stills: reconcileById(prev.stills, id, item),
+          }));
+        }
+        return res;
+      });
     },
     [enqueueSave, project, setProject]
   );
@@ -253,7 +443,23 @@ export function useOverlayEditors({
             z.id === id ? { ...z, ...patch } : z
           );
           if (commit) {
-            enqueueSave(() => saveZooms(prev.slug, zooms));
+            const fromSec = timing.startSample / prev.sampleRate;
+            const toSec = timing.endSample / prev.sampleRate;
+            enqueueSave(async () => {
+              const res = await runGuiAction(prev.slug, "zoom-set", {
+                id,
+                fromSec,
+                toSec,
+              });
+              if (res.ok) {
+                const item = res.data.result as EditorZoomItem;
+                setProject((p) => ({
+                  ...p,
+                  zooms: reconcileById(p.zooms, id, item),
+                }));
+              }
+              return res;
+            });
           }
           return { ...prev, zooms };
         }
@@ -262,7 +468,23 @@ export function useOverlayEditors({
             b.id === id ? { ...b, ...patch } : b
           );
           if (commit) {
-            enqueueSave(() => saveBroll(prev.slug, broll));
+            const fromSec = timing.startSample / prev.sampleRate;
+            const toSec = timing.endSample / prev.sampleRate;
+            enqueueSave(async () => {
+              const res = await runGuiAction(prev.slug, "broll-set", {
+                id,
+                fromSec,
+                toSec,
+              });
+              if (res.ok) {
+                const item = res.data.result as EditorBrollItem;
+                setProject((p) => ({
+                  ...p,
+                  broll: reconcileById(p.broll, id, item),
+                }));
+              }
+              return res;
+            });
           }
           return { ...prev, broll };
         }
@@ -271,7 +493,23 @@ export function useOverlayEditors({
             t.id === id ? { ...t, ...patch } : t
           );
           if (commit) {
-            enqueueSave(() => saveTitles(prev.slug, titles));
+            const fromSec = timing.startSample / prev.sampleRate;
+            const toSec = timing.endSample / prev.sampleRate;
+            enqueueSave(async () => {
+              const res = await runGuiAction(prev.slug, "title-set", {
+                id,
+                fromSec,
+                toSec,
+              });
+              if (res.ok) {
+                const item = res.data.result as EditorTitleItem;
+                setProject((p) => ({
+                  ...p,
+                  titles: reconcileById(p.titles, id, item),
+                }));
+              }
+              return res;
+            });
           }
           return { ...prev, titles };
         }
@@ -314,7 +552,23 @@ export function useOverlayEditors({
           s.id === id ? { ...s, ...patch } : s
         );
         if (commit) {
-          enqueueSave(() => saveStills(prev.slug, stills));
+          const fromSec = timing.startSample / prev.sampleRate;
+          const toSec = timing.endSample / prev.sampleRate;
+          enqueueSave(async () => {
+            const res = await runGuiAction(prev.slug, "still-set", {
+              id,
+              fromSec,
+              toSec,
+            });
+            if (res.ok) {
+              const item = res.data.result as EditorStillItem;
+              setProject((p) => ({
+                ...p,
+                stills: reconcileById(p.stills, id, item),
+              }));
+            }
+            return res;
+          });
         }
         return { ...prev, stills };
       });
@@ -322,14 +576,30 @@ export function useOverlayEditors({
     [enqueueSave, setProject]
   );
 
+  // Whole-track op: paint-order restack genuinely needs to replace the full
+  // b-roll array (dnd-kit hands back the complete new order). Guarded by a
+  // compare-and-swap on the revision this browser last knew about, so a
+  // stale drag-drop from before a concurrent CLI/MCP edit is rejected instead
+  // of silently overwriting it (CRAFT-6177).
   const reorderBrollOrder = useCallback(
     (orderedIds: string[]) => {
       const map = new Map((project.broll ?? []).map((b) => [b.id, b]));
       const broll = orderedIds
         .map((id) => map.get(id))
         .filter((b): b is EditorBrollItem => Boolean(b));
+      const expectedRevision = project.revision;
       setProject({ ...project, broll });
-      enqueueSave(() => saveBroll(project.slug, broll));
+      enqueueSave(async () => {
+        const res = await saveBroll(project.slug, broll, expectedRevision);
+        if (res.ok) {
+          setProject((prev) => ({
+            ...prev,
+            broll: res.data.broll as EditorBrollItem[],
+            revision: res.data.revision,
+          }));
+        }
+        return res;
+      });
     },
     [enqueueSave, project, setProject]
   );
@@ -339,21 +609,25 @@ export function useOverlayEditors({
       return;
     }
     if (selected.kind === "zoom") {
-      const zooms = (project.zooms ?? []).filter((z) => z.id !== selected.id);
+      const id = selected.id;
+      const zooms = (project.zooms ?? []).filter((z) => z.id !== id);
       setProject({ ...project, zooms });
-      enqueueSave(() => saveZooms(project.slug, zooms));
+      enqueueSave(() => runGuiAction(project.slug, "zoom-rm", { id }));
     } else if (selected.kind === "broll") {
-      const broll = (project.broll ?? []).filter((b) => b.id !== selected.id);
+      const id = selected.id;
+      const broll = (project.broll ?? []).filter((b) => b.id !== id);
       setProject({ ...project, broll });
-      enqueueSave(() => saveBroll(project.slug, broll));
+      enqueueSave(() => runGuiAction(project.slug, "broll-rm", { id }));
     } else if (selected.kind === "title") {
-      const titles = (project.titles ?? []).filter((t) => t.id !== selected.id);
+      const id = selected.id;
+      const titles = (project.titles ?? []).filter((t) => t.id !== id);
       setProject({ ...project, titles });
-      enqueueSave(() => saveTitles(project.slug, titles));
+      enqueueSave(() => runGuiAction(project.slug, "title-rm", { id }));
     } else if (selected.kind === "still") {
-      const stills = (project.stills ?? []).filter((s) => s.id !== selected.id);
+      const id = selected.id;
+      const stills = (project.stills ?? []).filter((s) => s.id !== id);
       setProject({ ...project, stills });
-      enqueueSave(() => saveStills(project.slug, stills));
+      enqueueSave(() => runGuiAction(project.slug, "still-rm", { id }));
     } else if (selected.kind === "graphic") {
       const graphics = (project.graphics ?? []).filter(
         (g) => g.id !== selected.id
