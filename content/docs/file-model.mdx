@@ -1,0 +1,49 @@
+---
+title: File model
+description: project.json is the edit. working/ and output/ are derived.
+---
+
+Each project is a folder under the projects root:
+
+```text
+projects/<slug>/
+  project.json            the EDL (the only file you edit)
+  brief.md                optional project brief
+  assets/                 user originals (b-roll, music, stills)
+  graphics/               optional project-local graphic templates
+  working/                derived media + scratch
+  output/out.mp4          the rendered export
+```
+
+## project.json is the edit
+
+It holds every transcribed word with a `deleted` flag, b-roll and still overlays, push-in zooms, titles, graphics, music placements, captions, look flags, optional scene log and highlights, and export aspect/reframe. The GUI editor and CLI/MCP both read and write this same file.
+
+**Never hand-edit `project.json` when a command exists for the change.** Commands validate the schema and keep history/revert working.
+
+## brief.md
+
+Optional adjacent context: audience, goal, tone, must-use assets, avoid list, target length. Not part of the EDL revision counter. Read and write with `openklip brief <slug>`.
+
+## assets/
+
+User originals only. Register with:
+
+```bash
+openklip broll <slug> <file>
+openklip asset-add <slug> <file> --kind still|music|broll
+```
+
+Proxies for registered assets land under `working/assets/`.
+
+## working/
+
+Regenerated cache: `proxy.mp4`, `transcript.json`, audio analysis, frames, action history (`actions.jsonl`), tasks, chats, history snapshots, graphic render cache. Safe to treat as disposable for media; action history and tasks are product state for agents and undo.
+
+## output/
+
+`out.mp4` from `openklip export`. Highlight clips go under `output/highlights/`.
+
+## Time
+
+Word and overlay times are integer audio samples at 48 kHz. CLI commands take seconds where a human number is natural and convert for you.

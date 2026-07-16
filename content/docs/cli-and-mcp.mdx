@@ -1,0 +1,62 @@
+---
+title: CLI and MCP
+description: How to run commands and how they map to agent tools.
+---
+
+Run the CLI as `bun run src/cli.ts <command>` or via the `openklip` bin after install.
+
+## Discovery
+
+| Command | What it does |
+| --- | --- |
+| `openklip list` | List projects |
+| `openklip status <slug> [--json]` | Edit summary (runtime, overlays, look) |
+| `openklip doctor [slug]` | Environment and project health |
+| `openklip features` | Shipped product capabilities |
+| `openklip tools` | Full agent tool surface |
+| `openklip actions` | Registry mutations only |
+
+## Transcript
+
+| Command | What it does |
+| --- | --- |
+| `openklip transcript <slug>` | Full transcript (short clips) |
+| `openklip transcript grep <slug> "phrase"` | Find phrase runs |
+| `openklip transcript span <slug> w12-w20` | Slice around word ids |
+| `openklip cut <slug> w12-w20` | Mark words deleted |
+| `openklip cut <slug> --text "phrase" [--all]` | Cut by phrase |
+| `openklip restore <slug>` | Clear all cuts |
+
+## Overlays and look
+
+Phrase helpers place overlays on the first spoken match and remember an anchor so later cuts re-snap the window:
+
+```bash
+openklip broll-add-phrase <slug> <assetId> "spoken phrase"
+openklip title-add-phrase <slug> "spoken" "Title text"
+openklip zoom-add-phrase <slug> "spoken phrase"
+openklip captions <slug> on
+openklip look <slug> grade warm
+```
+
+## Export
+
+```bash
+openklip export <slug>
+openklip export <slug> --platform shorts
+openklip export <slug> --height 1080 --compression social
+```
+
+## MCP parity
+
+Query tools use snake_case (`project_status`, `transcript_grep`). Mutations keep registry kebab-case (`cut`, `broll-add`). Inspect the manifest:
+
+```bash
+openklip tools --json --surface mcp
+```
+
+Every registry action with an `mcp` surface is an MCP tool with `{ slug, … }` input. The browser live-syncs external MCP edits via a revision poll.
+
+## More depth
+
+The repo `README.md` and `AGENTS.md` are the full capability map for agents working in this codebase. These public docs stay shorter and product-facing.

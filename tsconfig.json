@@ -19,7 +19,8 @@
     ],
     "paths": {
       "@/*": ["./web/*"],
-      "@engine/*": ["./src/*"]
+      "@engine/*": ["./src/*"],
+      "collections/*": ["./.source/*"]
     },
     "allowJs": true,
     "incremental": true,
