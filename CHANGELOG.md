@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- **Atomic project.json writes** (PR #121, CRAFT-6176): `saveProject` (`src/projectStore.ts`) validates via `ProjectSchema.parse`, writes to a same-directory unique temp file (`project.json.tmp-<pid>-<uuid>`), `fsync`s it, then atomically renames over `project.json`, preserving the existing file's permission bits and unlinking the temp file on any failure. Stale `project.json.tmp-*` siblings left by a prior crash are swept on the next save. No public API/CLI/flag change; a crash mid-write can no longer leave the only EDL truncated or unloadable.
+- **Loopback-only serve + local trust boundary** (PR #122, CRAFT-6175): `openklip serve`/`dev` now binds to `127.0.0.1` by default instead of all interfaces; the new `OPENKLIP_HOST` env var overrides for deliberate LAN access and prints a security warning when set to a non-loopback value. New `src/local-trust.ts` (`trustGuard`), applied to all 19 mutating API route handlers, rejects requests carrying positive browser evidence of being off-device or cross-site (non-loopback Host, cross-origin Origin, cross-site Sec-Fetch-Site) with HTTP 403, while staying permissive for same-origin browser calls and non-browser CLI/MCP callers. Server action failures now attach a stack trace only when the new `OPENKLIP_DEBUG=1` env var is set; previously a stack leaked to the browser on every normal `serve`/`dev` launch (whenever `NODE_ENV !== "production"`).
+
 ## 0.42.0.4 - 2026-07-16
 
 ### Added

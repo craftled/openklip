@@ -169,6 +169,8 @@ bun run dev                            # latest project, or ?slug= in URL
 OPENKLIP_SLUG=<slug> bun run dev       # pin project when using serve-style env
 ```
 
+`serve`/`dev` binds to `127.0.0.1` (loopback) by default; there is no auth layer, so anything reachable at the bound host/port can read, edit, and delete your projects. `OPENKLIP_HOST` overrides the bind host for deliberate LAN access and prints a security warning when set to a non-loopback value. `OPENKLIP_DEBUG=1` includes stack traces in server action error results (off by default, so `next dev` never leaks them to the browser).
+
 Settings:
 
 - Interface sounds is optional. Enable it in Settings, Appearance, Interface sounds.
