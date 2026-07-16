@@ -152,3 +152,34 @@ test("createProjectFromVideo without force posts without a force flag", async ()
     globalThis.fetch = realFetch;
   }
 });
+
+test("createProjectFromVideo surfaces a clear message when the job was interrupted by a restart, not a 404", async () => {
+  // With durable persistence (CRAFT-6183) a restart reconciles an
+  // in-flight job to status "interrupted" instead of dropping its record:
+  // the poll route keeps returning 200 with this status, never a 404, so
+  // the old "Ingest job lost" message must never fire for this case.
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = ((input: RequestInfo | URL) => {
+    const url =
+      typeof input === "string" || input instanceof URL
+        ? String(input)
+        : input.url;
+    if (url.includes("/api/projects/ingest/")) {
+      return Promise.resolve(
+        jsonResponse({ slug: "demo", status: "interrupted" }, 200)
+      );
+    }
+    return Promise.resolve(jsonResponse({ jobId: "job-1", slug: "demo" }, 200));
+  }) as typeof fetch;
+  try {
+    await assert.rejects(
+      createProjectFromVideo(new File(["fake-bytes"], "demo.mp4")),
+      (e: unknown) =>
+        e instanceof Error &&
+        /interrupted/i.test(e.message) &&
+        !/job lost/i.test(e.message)
+    );
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});

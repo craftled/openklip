@@ -58,6 +58,30 @@ test("ingestCamFromVideo fails plainly when the route rejects the upload", async
   }
 });
 
+test("ingestCamFromVideo surfaces a clear message when the job was interrupted by a restart", async () => {
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = ((input: RequestInfo | URL) => {
+    const url = urlOf(input);
+    if (url.includes("/api/projects/ingest/")) {
+      return Promise.resolve(
+        jsonResponse({ slug: "demo", status: "interrupted" }, 200)
+      );
+    }
+    return Promise.resolve(jsonResponse({ jobId: "job-1", slug: "demo" }, 200));
+  }) as typeof fetch;
+  try {
+    await assert.rejects(
+      ingestCamFromVideo("demo", new File(["fake-bytes"], "angle.mp4")),
+      (e: unknown) =>
+        e instanceof Error &&
+        /interrupted/i.test(e.message) &&
+        !/job lost/i.test(e.message)
+    );
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
 test("ingestCamFromVideo sends optional name, role, and offset fields", async () => {
   const realFetch = globalThis.fetch;
   const bodies: FormData[] = [];

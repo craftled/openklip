@@ -9,7 +9,7 @@ interface IngestJobView {
   error?: string;
   progress?: IngestProgressView;
   slug: string;
-  status: "running" | "done" | "error" | "partial";
+  status: "running" | "done" | "error" | "partial" | "interrupted";
   warning?: string;
 }
 
@@ -189,6 +189,14 @@ async function pollIngestJob(
         job.slug,
         job.warning ??
           "Project was created but the original source could not be saved. Exports will use the proxy."
+      );
+    }
+    if (job.status === "interrupted") {
+      // The job record survives a restart (durable persistence): the poll
+      // route still returns 200 with this status, never a 404, so this
+      // never falls through to the "Ingest job lost" throw below.
+      throw new Error(
+        "Ingest was interrupted by an app restart. Please retry."
       );
     }
     if (job.status === "error") {
