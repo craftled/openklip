@@ -35,9 +35,18 @@ export function useTranscriptEdits({
           [id],
           revisionAfter
         );
+        // Send only the changed word: applyProjectEdits (src/projectMutations.ts)
+        // patches by id, so a narrow payload keeps this mutation independent
+        // of any other in-flight edit. A full-array snapshot would let a
+        // retry of THIS mutation (after a transient failure) resend stale
+        // deleted-state for every other word too, clobbering unrelated edits
+        // that already succeeded in the meantime.
+        const changed = words.find((w) => w.id === id);
         enqueueSave(() =>
           saveProjectEdits(prev.slug, {
-            words: words.map((w) => ({ id: w.id, deleted: w.deleted })),
+            words: changed
+              ? [{ deleted: changed.deleted, id: changed.id }]
+              : [],
           })
         );
         return { ...prev, words };
@@ -58,13 +67,18 @@ export function useTranscriptEdits({
           changedIds,
           revisionAfter
         );
+        // Same narrowing as toggleWord above: only the words in `range`
+        // actually changed, so only they need to ride in the save payload.
+        const changedIdSet = new Set(changedIds);
         enqueueSave(() =>
           saveProjectEdits(prev.slug, {
-            words: words.map((w) => ({
-              id: w.id,
-              deleted: w.deleted,
-              text: w.text,
-            })),
+            words: words
+              .filter((w) => changedIdSet.has(w.id))
+              .map((w) => ({
+                deleted: w.deleted,
+                id: w.id,
+                text: w.text,
+              })),
           })
         );
         return { ...prev, words };

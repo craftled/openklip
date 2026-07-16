@@ -35,6 +35,7 @@ import { buildCleanupCandidates } from "@/components/cleanup-panel";
 import type { TimelineClipKind } from "@/components/edit-timeline";
 import { EditorColumn } from "@/components/editor/editor-column";
 import { EditorRightRail } from "@/components/editor/editor-right-rail";
+import { SaveRecoveryBanner } from "@/components/editor/save-recovery-banner";
 import { EditorSidebarShortcuts } from "@/components/editor-sidebar-shortcuts";
 import {
   type GraphicSpanMode,
@@ -61,6 +62,7 @@ import {
   useTranscriptSearch,
 } from "@/hooks/use-transcript-search";
 import { setDefaultAgentModel } from "@/lib/agent-preferences";
+import { toastSaveError } from "@/lib/app-toast";
 import type { AssetBinUpdate } from "@/lib/asset-bin-update";
 import { shouldAutoOpenConfig } from "@/lib/config-panel-behavior";
 import type {
@@ -113,13 +115,20 @@ export function App({
     await onGuiSaveSucceededRef.current?.();
   }, []);
   const {
+    dirtyCount,
+    discardFailedSaves,
     enqueueSave,
+    failedSaves,
+    hasUnsavedWork,
     pendingSaves,
+    retryFailedSaves,
+    retryingCount,
     saveChainRef,
     saveError,
     saveErrorRef,
     setSaveError,
   } = useProjectSaves(onSaveSuccess);
+  const [reloadingFromDisk, setReloadingFromDisk] = useState(false);
   const [newKeyframeProperty, setNewKeyframeProperty] =
     useState<Keyframe["property"]>("opacity");
   const [captionsOn, setCaptionsOn] = useState(
@@ -239,6 +248,66 @@ export function App({
     pendingSaves,
     onExternalProject: onHistoryReverted,
   });
+
+  // Reload-from-disk: fetches the authoritative project (same reseed path as
+  // HistoryPanel onReverted / live sync), then drops any locally-failed
+  // mutations so the dirty/error banner clears in lockstep with the reseed.
+  // The banner itself (SaveRecoveryBanner) gates this behind its own
+  // confirm step, so this runs immediately once called.
+  const reloadFromDisk = useCallback(async () => {
+    const current = projectRef.current;
+    if (!current?.slug) {
+      return;
+    }
+    setReloadingFromDisk(true);
+    try {
+      const { project: remote } = await fetchProjectState(current.slug);
+      onHistoryRevertedRef.current(remote);
+      discardFailedSaves();
+    } finally {
+      setReloadingFromDisk(false);
+    }
+  }, [discardFailedSaves]);
+
+  const dirtyCountRef = useRef(dirtyCount);
+  dirtyCountRef.current = dirtyCount;
+
+  // Warn before an actual page unload (tab close, refresh, typed/bookmark
+  // navigation) while a save has failed or is still unpersisted.
+  useEffect(() => {
+    if (!hasUnsavedWork) {
+      return;
+    }
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [hasUnsavedWork]);
+
+  // Block an in-app project switch too, instead of silently losing local
+  // state. EditorHome remounts <App> keyed by slug on every project switch
+  // (app/lib/editor-home.tsx), and AgentSidebar/ProjectSwitcher navigate via
+  // next/navigation's router.push, which does not fire beforeunload and has
+  // no route-change guard hook in the App Router yet. This intercepts the
+  // history primitive the router itself uses to commit the navigation: the
+  // already-visible SaveRecoveryBanner (Retry / Reload from disk) is the
+  // way out, so this surfaces a toast rather than a second confirm dialog.
+  useEffect(() => {
+    if (!hasUnsavedWork) {
+      return;
+    }
+    const original = window.history.pushState.bind(window.history);
+    window.history.pushState = () => {
+      toastSaveError(
+        `Can't switch projects: ${dirtyCountRef.current} change(s) failed to save. Retry or reload from disk first.`
+      );
+    };
+    return () => {
+      window.history.pushState = original;
+    };
+  }, [hasUnsavedWork]);
 
   const {
     clearSel,
@@ -881,6 +950,17 @@ export function App({
           } as CSSProperties
         }
       >
+        <div className="pointer-events-none fixed top-14 right-3 z-50 flex max-w-sm justify-end">
+          <SaveRecoveryBanner
+            className="w-full"
+            dirtyCount={dirtyCount}
+            failedSaves={failedSaves}
+            onReload={() => void reloadFromDisk()}
+            onRetry={retryFailedSaves}
+            reloading={reloadingFromDisk}
+            retrying={retryingCount > 0}
+          />
+        </div>
         {cinema && (
           <CinemaPlayer
             captionsOn={captionsOn}
