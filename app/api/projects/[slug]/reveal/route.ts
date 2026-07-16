@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync } from "node:fs";
+import { trustGuard } from "@engine/local-trust";
 import { assertValidSlug, projectPaths } from "@engine/paths";
 import { revealInFileManager } from "@engine/reveal-path";
 import { z } from "zod";
@@ -17,6 +18,10 @@ const RevealRequestSchema = z
   .strict();
 
 export async function POST(req: Request, { params }: RouteParams) {
+  const denied = trustGuard(req);
+  if (denied) {
+    return denied;
+  }
   const { slug } = await params;
 
   try {

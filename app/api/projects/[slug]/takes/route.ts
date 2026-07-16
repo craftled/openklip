@@ -5,6 +5,7 @@ import { extname, join } from "node:path";
 import type { Take } from "@engine/edl";
 import { startIngestJob } from "@engine/ingest-jobs";
 import type { IngestProgress } from "@engine/ingest-types";
+import { trustGuard } from "@engine/local-trust";
 import { assertValidSlug, projectPaths, slugFromVideo } from "@engine/paths";
 import {
   MAX_ASSET_UPLOAD_BYTES,
@@ -84,6 +85,10 @@ export function createTakesPost({ loadIngestTake, tempRoot }: TakesPostDeps) {
     req: NextRequest,
     { params }: RouteParams
   ): Promise<Response> {
+    const denied = trustGuard(req);
+    if (denied) {
+      return denied;
+    }
     const { slug } = await params;
     const err = assertProject(slug);
     if (err) {

@@ -10,6 +10,7 @@ import {
   setActiveProjectThreadId,
   setProjectThreadArchived,
 } from "@engine/chats";
+import { trustGuard } from "@engine/local-trust";
 import type { NextRequest } from "next/server";
 
 export const runtime = "nodejs";
@@ -34,6 +35,10 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
 }
 
 export async function POST(req: NextRequest, { params }: RouteParams) {
+  const denied = trustGuard(req);
+  if (denied) {
+    return denied;
+  }
   const { slug } = await params;
   try {
     const body = (await req.json()) as {

@@ -1,5 +1,6 @@
 import { syncAssetsFromFolder } from "@engine/asset-scanner";
 import { listAssetsByKind } from "@engine/assets";
+import { trustGuard } from "@engine/local-trust";
 import { loadProject } from "@engine/projectStore";
 import type { NextRequest } from "next/server";
 
@@ -18,7 +19,11 @@ interface RouteParams {
 // side-effects during prefetching"). syncAssetsFromFolder serializes per-slug
 // so overlapping polls (interval + focus, or multiple tabs) collapse into
 // one sync and never interleave the project.json read-modify-write.
-export async function POST(_req: NextRequest, { params }: RouteParams) {
+export async function POST(req: NextRequest, { params }: RouteParams) {
+  const denied = trustGuard(req);
+  if (denied) {
+    return denied;
+  }
   const { slug } = await params;
   try {
     await syncAssetsFromFolder(slug);

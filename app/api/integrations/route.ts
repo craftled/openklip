@@ -10,6 +10,7 @@ import {
   testReveApiKey,
   testXaiApiKey,
 } from "@engine/integrations-config";
+import { trustGuard } from "@engine/local-trust";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -47,6 +48,10 @@ export function GET(): Response {
 }
 
 export async function PUT(req: Request): Promise<Response> {
+  const denied = trustGuard(req);
+  if (denied) {
+    return denied;
+  }
   let raw: unknown = {};
   try {
     raw = await readJsonBody(req);
@@ -80,6 +85,10 @@ export async function PUT(req: Request): Promise<Response> {
 }
 
 export async function POST(req: Request): Promise<Response> {
+  const denied = trustGuard(req);
+  if (denied) {
+    return denied;
+  }
   let raw: unknown = {};
   try {
     raw = await readJsonBody(req);
@@ -121,6 +130,10 @@ export async function POST(req: Request): Promise<Response> {
 }
 
 export function DELETE(req: Request): Response {
+  const denied = trustGuard(req);
+  if (denied) {
+    return denied;
+  }
   const provider = new URL(req.url).searchParams.get("provider");
   try {
     if (provider === "reve") {

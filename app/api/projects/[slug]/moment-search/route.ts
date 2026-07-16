@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import { embedText } from "@engine/embed-service";
+import { trustGuard } from "@engine/local-trust";
 import {
   buildMomentIndex,
   DEFAULT_SEARCH_LIMIT,
@@ -129,7 +130,11 @@ export async function GET(req: Request, { params }: RouteParams) {
 // Starts (or confirms) an index build in the background and returns
 // immediately; the caller polls GET for progress. force:false so a
 // still-current index is a fast no-op rather than a full re-embed.
-export async function POST(_req: Request, { params }: RouteParams) {
+export async function POST(req: Request, { params }: RouteParams) {
+  const denied = trustGuard(req);
+  if (denied) {
+    return denied;
+  }
   const { slug } = await params;
   const invalid = slugOrError(slug);
   if (invalid) {

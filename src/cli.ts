@@ -115,6 +115,7 @@ import {
   jsonRenderCatalogIdsLabel,
 } from "./json-render-catalogs.ts";
 import { type Keyframe, KeyframeSchema } from "./keyframes.ts";
+import { isLoopbackHost } from "./local-trust.ts";
 import { logger } from "./logger.ts";
 import { listLuts, lutPath } from "./lut.ts";
 import { startMcpServer } from "./mcp-server.ts";
@@ -812,8 +813,29 @@ try {
         console.log(`[serve] ${sigil} ${c.name}: ${c.detail}`);
       }
       const port = process.env.PORT ?? "4399";
+      // No auth layer: the server must stay reachable only from this
+      // machine. Bind loopback by default; OPENKLIP_HOST can override for
+      // deliberate LAN access, but that removes the only barrier keeping
+      // other devices out (see src/local-trust.ts for the request-level
+      // half of this defense).
+      const host = process.env.OPENKLIP_HOST ?? "127.0.0.1";
+      if (process.env.OPENKLIP_HOST && !isLoopbackHost(host)) {
+        console.log(
+          [
+            "",
+            "  ⚠️  SECURITY WARNING",
+            `  OpenKlip is binding to ${host}, not loopback.`,
+            "  The server has no authentication: any device that can reach",
+            "  this host and port can read, edit, and delete your projects.",
+            "  Only do this on a network you trust, and only if you",
+            "  understand the risk.",
+            "",
+          ].join("\n")
+        );
+      }
+      const displayHost = process.env.OPENKLIP_HOST ? host : "localhost";
       console.log(
-        `[serve] project: ${slug}\n\n  OpenKlip ready  ->  http://localhost:${port}/${slug}\n`
+        `[serve] project: ${slug}\n\n  OpenKlip ready  ->  http://${displayHost}:${port}/${slug}\n`
       );
       const proc = Bun.spawn(
         [
@@ -823,6 +845,8 @@ try {
           "dev",
           "-p",
           String(port),
+          "-H",
+          host,
         ],
         {
           cwd: process.cwd(),

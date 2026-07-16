@@ -1,4 +1,5 @@
 import { deleteAsset } from "@engine/assets";
+import { trustGuard } from "@engine/local-trust";
 import { assertValidSlug } from "@engine/paths";
 
 export const runtime = "nodejs";
@@ -8,7 +9,11 @@ interface RouteParams {
   params: Promise<{ slug: string; assetId: string }>;
 }
 
-export async function DELETE(_req: Request, { params }: RouteParams) {
+export async function DELETE(req: Request, { params }: RouteParams) {
+  const denied = trustGuard(req);
+  if (denied) {
+    return denied;
+  }
   const { slug, assetId } = await params;
 
   try {

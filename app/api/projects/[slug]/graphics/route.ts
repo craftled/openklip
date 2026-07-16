@@ -3,6 +3,7 @@ import {
   listGraphics,
   saveProjectGraphicTemplate,
 } from "@engine/graphics";
+import { trustGuard } from "@engine/local-trust";
 import { assertValidSlug } from "@engine/paths";
 
 export const runtime = "nodejs";
@@ -25,6 +26,10 @@ export async function POST(
   req: Request,
   { params }: { params: Promise<{ slug: string }> }
 ): Promise<Response> {
+  const denied = trustGuard(req);
+  if (denied) {
+    return denied;
+  }
   const { slug } = await params;
   try {
     assertValidSlug(slug);

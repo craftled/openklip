@@ -260,9 +260,9 @@ test("saveProjectEdits returns ok:false for missing projects", async () => {
   });
 });
 
-test("failed actions include a stack trace outside production", async () => {
-  const prev = process.env.NODE_ENV;
-  process.env.NODE_ENV = "development";
+test("failed actions include a stack trace when OPENKLIP_DEBUG=1", async () => {
+  const prev = process.env.OPENKLIP_DEBUG;
+  process.env.OPENKLIP_DEBUG = "1";
   try {
     await withTempProjectsRoot(async () => {
       const result = await saveProjectEdits("missing", {
@@ -274,13 +274,17 @@ test("failed actions include a stack trace outside production", async () => {
       }
     });
   } finally {
-    process.env.NODE_ENV = prev;
+    if (prev === undefined) {
+      delete process.env.OPENKLIP_DEBUG;
+    } else {
+      process.env.OPENKLIP_DEBUG = prev;
+    }
   }
 });
 
-test("failed actions omit the stack trace in production", async () => {
-  const prev = process.env.NODE_ENV;
-  process.env.NODE_ENV = "production";
+test("failed actions omit the stack trace without the debug opt-in", async () => {
+  const prev = process.env.OPENKLIP_DEBUG;
+  delete process.env.OPENKLIP_DEBUG;
   try {
     await withTempProjectsRoot(async () => {
       const result = await saveProjectEdits("missing", {
@@ -292,7 +296,11 @@ test("failed actions omit the stack trace in production", async () => {
       }
     });
   } finally {
-    process.env.NODE_ENV = prev;
+    if (prev === undefined) {
+      delete process.env.OPENKLIP_DEBUG;
+    } else {
+      process.env.OPENKLIP_DEBUG = prev;
+    }
   }
 });
 

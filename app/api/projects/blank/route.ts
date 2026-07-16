@@ -1,4 +1,5 @@
 import { type BlankAspect, ingestBlank } from "@engine/blank-ingest";
+import { trustGuard } from "@engine/local-trust";
 import { assertValidSlug } from "@engine/paths";
 import type { NextRequest } from "next/server";
 
@@ -6,6 +7,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest): Promise<Response> {
+  const denied = trustGuard(req);
+  if (denied) {
+    return denied;
+  }
   let body: {
     slug?: string;
     durationSec?: number;

@@ -50,12 +50,14 @@ export type ActionResult<T = void> =
   | { ok: false; error: string; stack?: string };
 
 // Next sanitizes thrown server-action errors in production, so we return a
-// structured failure instead. The stack is attached only outside production so
-// it never leaks to end users but is there when debugging the dev server.
+// structured failure instead. The stack is attached only behind an explicit
+// debug opt-in (OPENKLIP_DEBUG=1): `serve`/`dev` runs `next dev`, so
+// NODE_ENV !== "production" on every normal local launch, and gating on that
+// alone would leak stacks to the browser by default.
 function fail(error: unknown): { ok: false; error: string; stack?: string } {
   const e = error as Error;
   const base = { ok: false as const, error: e?.message ?? String(error) };
-  if (process.env.NODE_ENV === "production") {
+  if (process.env.OPENKLIP_DEBUG !== "1") {
     return base;
   }
   return { ...base, stack: e?.stack };
