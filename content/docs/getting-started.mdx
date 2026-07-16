@@ -1,0 +1,73 @@
+---
+title: Getting started
+description: Install OpenKlip, ingest a video, make a cut, and export.
+---
+
+## Requirements
+
+- [Bun](https://bun.sh) `>= 1.3.14`
+- Node `>= 24` (used by Whisper transcription subprocesses)
+
+## Install
+
+```bash
+git clone https://github.com/craftled/openklip.git
+cd openklip
+bun install
+```
+
+ffmpeg and ffprobe come from npm (`ffmpeg-static`, `@ffprobe-installer/ffprobe`). No system install required. Run `bun run src/cli.ts doctor` to verify the environment.
+
+## Projects root
+
+Projects live as folders under a projects root:
+
+1. `OPENKLIP_PROJECTS_ROOT` if set
+2. else `.openklip/projects-root` in the app cwd (GUI folder picker)
+3. else `~/Movies/OpenKlip`
+
+On Linux or CI, set `OPENKLIP_PROJECTS_ROOT` to a writable path before ingest or `serve`.
+
+## Ingest a video
+
+```bash
+bun run src/cli.ts ingest /path/to/clip.mp4
+```
+
+Ingest probes the file, builds a 720p proxy, extracts audio, and runs local Whisper (`Xenova/whisper-base.en`, downloaded once). You get a project slug and a `project.json` with a timed transcript.
+
+Re-ingest requires `--force` (it wipes the project folder contents for that slug).
+
+## Open the editor
+
+```bash
+bun run src/cli.ts serve <slug>
+```
+
+Or `bun run dev` and open `http://localhost:4399/<slug>`. The GUI and CLI share the same `project.json`.
+
+## Make a cut
+
+Read the transcript, then cut filler or a bad take:
+
+```bash
+bun run src/cli.ts transcript grep <slug> "you know"
+bun run src/cli.ts cut <slug> --text "you know" --all
+bun run src/cli.ts status <slug>
+```
+
+Prefer cutting whole sentences, not single mid-sentence words.
+
+## Export
+
+```bash
+bun run src/cli.ts export <slug>
+```
+
+Output lands at `projects/<slug>/output/out.mp4` (under your projects root).
+
+## Next
+
+- [File model](/docs/file-model): what each folder and file means
+- [Agent workflow](/docs/agent-workflow): how agents should drive the edit loop
+- [CLI and MCP](/docs/cli-and-mcp): the full tool surface

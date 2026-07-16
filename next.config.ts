@@ -1,9 +1,12 @@
 import bundleAnalyzer from "@next/bundle-analyzer";
+import { createMDX } from "fumadocs-mdx/next";
 import type { NextConfig } from "next";
 
 const withBundleAnalyzer = bundleAnalyzer({
   enabled: process.env.ANALYZE === "true",
 });
+
+const withMDX = createMDX();
 
 const nextConfig: NextConfig = {
   outputFileTracingExcludes: {
@@ -38,4 +41,4 @@ const nextConfig: NextConfig = {
   ],
 };
 
-export default withBundleAnalyzer(nextConfig);
+export default withMDX(withBundleAnalyzer(nextConfig));

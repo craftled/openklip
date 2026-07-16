@@ -1,4 +1,6 @@
+import { RootProvider } from "fumadocs-ui/provider/next";
 import type { Metadata } from "next";
+import { Inter } from "next/font/google";
 import Script from "next/script";
 import type { ReactNode } from "react";
 import { Toaster } from "@/components/ui/sonner";
@@ -8,7 +10,6 @@ import { cn } from "@/lib/utils";
 import { THEME_NO_FLASH_SCRIPT } from "../web/lib/theme-preferences";
 import { geistMono } from "./fonts";
 import "./globals.css";
-import { Inter } from "next/font/google";
 
 const inter = Inter({
   display: "swap",
@@ -20,7 +21,15 @@ const marketing = isMarketingSite();
 
 export const metadata: Metadata = {
   metadataBase: marketing ? new URL("https://openklip.com") : undefined,
-  title: marketing ? "OpenKlip | Agent-native video toolchain" : "OpenKlip",
+  title: marketing
+    ? {
+        default: "OpenKlip | Agent-native video toolchain",
+        template: "%s | OpenKlip",
+      }
+    : {
+        default: "OpenKlip",
+        template: "%s | OpenKlip",
+      },
   description: marketing
     ? "Local-first video editing for agents and humans. CLI edit loop, browser review, plain files on disk."
     : "Agent-native video editing : CLI edit loop, browser review.",
@@ -53,9 +62,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           {THEME_NO_FLASH_SCRIPT}
         </Script>
       </head>
-      <body>
-        <TooltipProvider>{children}</TooltipProvider>
-        <Toaster />
+      <body className="flex min-h-screen flex-col">
+        <RootProvider>
+          <TooltipProvider>{children}</TooltipProvider>
+          <Toaster />
+        </RootProvider>
       </body>
     </html>
   );

@@ -3,6 +3,7 @@ import {
   IconAlertTriangleFilled,
   IconAperture,
   IconArchiveFilled,
+  IconBookFilled,
   IconBoxMultipleFilled,
   IconCaretUpDownFilled,
   IconCheckFilled,
@@ -67,6 +68,8 @@ import {
   IconLoader as TablerIconLoader,
 } from "@tabler/icons-react";
 import type { ComponentPropsWithoutRef, ComponentType } from "react";
+import { AppleIcon } from "@/components/ui/svgs/appleIcon";
+import { GithubIcon } from "@/components/ui/svgs/githubIcon";
 import { cn } from "@/lib/utils";
 
 type SvgIcon = ComponentType<ComponentPropsWithoutRef<"svg">>;
@@ -103,8 +106,12 @@ export const IconX = muteIcon(IconXFilled);
 export const Aperture = muteIcon(IconAperture);
 export const Archive = muteIcon(IconArchiveFilled);
 export const ArrowDownIcon = muteIcon(IconCircleArrowDownFilled);
+export const Book = muteIcon(IconBookFilled);
 export const Bot = muteIcon(IconMessageChatbotFilled);
 export const Box = muteIcon(IconBoxMultipleFilled);
+/** Brand marks for marketing CTAs: keep full opacity (not muted UI chrome). */
+export const BrandApple = AppleIcon;
+export const BrandGithub = GithubIcon;
 export const Captions = muteIcon(IconSubtitles);
 export const Check = muteIcon(IconCheckFilled);
 export const CheckIcon = muteIcon(IconCheckFilled);

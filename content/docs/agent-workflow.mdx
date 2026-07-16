@@ -1,0 +1,75 @@
+---
+title: Agent workflow
+description: How external agents drive the OpenKlip edit loop.
+---
+
+OpenKlip ships no LLM. An external agent drives:
+
+```text
+read  → list / status --json / transcript grep / overlays
+plan  → decide phrases, spans, overlays
+act   → cut / broll-add / zoom-add / …
+verify→ status (and optional verify after export)
+done  → export
+```
+
+## Context at session start
+
+```bash
+openklip list
+openklip status <slug> --json
+openklip transcript grep <slug> "phrase"
+openklip overlays <slug> --json
+openklip assets <slug>
+```
+
+Prefer bounded transcript reads (`grep`, `span`, `phrase`) over dumping the full transcript on long clips.
+
+## Editing guardrails
+
+- **Cut whole sentences**, not single mid-sentence words.
+- **Keep b-roll spans short** (about 2-6 seconds).
+- **Captions are on by default.** Only turn them off when the project should not have them.
+- After cutting, run `status` before `export` so you do not render an empty cut.
+- Prefer one writer at a time (CLI or GUI) to avoid concurrent-process races on `project.json`.
+
+## Skills and templates
+
+Edit templates live under `templates/<id>/skill.md` (agent playbooks). Attach one with:
+
+```bash
+openklip template set <slug> talking-head
+openklip template show talking-head
+```
+
+MCP tool-calling agents can also call `load_skill` with a template id. Optional installable copies live under `skills/`.
+
+## MCP
+
+```bash
+openklip mcp
+# or: bun run mcp
+```
+
+Cursor ships `.cursor/mcp.json` in the repo. Set `OPENKLIP_PROJECTS_ROOT` in the server env if projects live outside the default path.
+
+By default the MCP server enables a core edit-loop set plus meta tools (`tools_catalog`, `tools_load`, `tools_invoke`). Overlay/look/multicam tools load on demand. Set `OPENKLIP_MCP_SURFACE=all` for every tool at connect.
+
+## History and revert
+
+Mutations append to `working/actions.jsonl` and snapshot the previous `project.json`. Undo with:
+
+```bash
+openklip revert <slug> --last
+openklip revert <slug> --to <rev>
+openklip revert <slug> --task <taskId>
+```
+
+## Verify after export
+
+```bash
+openklip export <slug>
+openklip verify <slug>
+```
+
+`verify` re-transcribes `output/out.mp4` and diffs against the EDL (filler that survived, deleted words that leaked, low coverage).

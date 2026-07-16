@@ -1,0 +1,22 @@
+---
+title: OpenKlip docs
+description: Local-first, agent-native video editing. CLI edit loop, browser review, plain files on disk.
+---
+
+OpenKlip is a local-first toolchain for programmatic video editing. An external agent (Cursor, Claude Code, Codex, or your scripts) runs the edit loop through CLI commands and MCP; the browser is where you review, adjust, and export. Every project is plain files on disk: `project.json` is the contract between agent and editor.
+
+## Guides
+
+<Cards>
+  <Card title="Getting started" href="/docs/getting-started" description="Install, ingest a clip, cut, and export." />
+  <Card title="File model" href="/docs/file-model" description="How projects, project.json, and working/ relate." />
+  <Card title="Agent workflow" href="/docs/agent-workflow" description="The read → plan → act → verify → export loop." />
+  <Card title="CLI and MCP" href="/docs/cli-and-mcp" description="Commands, tools, and parity with the GUI." />
+</Cards>
+
+## Principles
+
+- **Agent at the terminal.** Named CLI actions and MCP tools mutate the same edit the browser shows.
+- **Human at the browser.** Preview, refine cuts and overlays, drop assets into `assets/`.
+- **One edit, one file.** `project.json` is the EDL. Everything under `working/` and `output/` is derived.
+- **No bundled LLM.** Bring your own agent. OpenKlip ships the tools, not a model.
