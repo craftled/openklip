@@ -9,6 +9,7 @@
 import { readdirSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
+import { applyModelEnv, withModelRetry } from "./model-env.mjs";
 
 const [, , cmd, ...rest] = process.argv;
 
@@ -63,7 +64,30 @@ const {
   CLIPVisionModelWithProjection,
   RawImage,
 } = await import("@huggingface/transformers");
-env.allowLocalModels = false;
+applyModelEnv(env);
+
+// Wrap each model load so a transient huggingface.co blip retries instead of
+// failing the whole embed/index run (shares the policy in src/model-env.mjs).
+const onModelRetry = (err, attempt, delay) =>
+  console.error(
+    `[embed] model load failed (attempt ${attempt}), retrying in ${delay}ms: ${err?.message ?? err}`
+  );
+const loadTokenizer = () =>
+  withModelRetry(() => AutoTokenizer.from_pretrained(model), {
+    onRetry: onModelRetry,
+  });
+const loadTextModel = () =>
+  withModelRetry(() => CLIPTextModelWithProjection.from_pretrained(model), {
+    onRetry: onModelRetry,
+  });
+const loadProcessor = () =>
+  withModelRetry(() => AutoProcessor.from_pretrained(model), {
+    onRetry: onModelRetry,
+  });
+const loadVisionModel = () =>
+  withModelRetry(() => CLIPVisionModelWithProjection.from_pretrained(model), {
+    onRetry: onModelRetry,
+  });
 
 function l2Normalize(values) {
   let sumSquares = 0;
@@ -95,8 +119,8 @@ async function embedTextVector(tokenizer, textModel, text) {
 if (cmd === "query") {
   const text = arg1;
   console.error(`[embed] model=${model} query="${text}"`);
-  const tokenizer = await AutoTokenizer.from_pretrained(model);
-  const textModel = await CLIPTextModelWithProjection.from_pretrained(model);
+  const tokenizer = await loadTokenizer();
+  const textModel = await loadTextModel();
   const vector = await embedTextVector(tokenizer, textModel, text);
   process.stdout.write(
     `${JSON.stringify({
@@ -110,8 +134,8 @@ if (cmd === "query") {
 
 if (isServe) {
   console.error(`[embed] serve model=${model} : loading text encoder`);
-  const tokenizer = await AutoTokenizer.from_pretrained(model);
-  const textModel = await CLIPTextModelWithProjection.from_pretrained(model);
+  const tokenizer = await loadTokenizer();
+  const textModel = await loadTextModel();
   console.error("[embed] serve ready");
 
   // Line-delimited JSON protocol (mirrors src/embed-service.ts's parser):
@@ -168,9 +192,8 @@ console.error(
 let dim = 0;
 let flat = new Float32Array(0);
 if (files.length > 0) {
-  const processor = await AutoProcessor.from_pretrained(model);
-  const visionModel =
-    await CLIPVisionModelWithProjection.from_pretrained(model);
+  const processor = await loadProcessor();
+  const visionModel = await loadVisionModel();
   const vectors = [];
   for (let i = 0; i < files.length; i++) {
     const image = await RawImage.read(join(framesDir, files[i]));

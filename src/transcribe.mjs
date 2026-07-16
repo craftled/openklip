@@ -2,6 +2,7 @@
 // f32le mono 16 kHz PCM, writes word-level transcript JSON. Kept separate from
 // the Bun server so the ONNX runtime never has to load inside Bun.
 import { readFileSync, writeFileSync } from "node:fs";
+import { applyModelEnv, withModelRetry } from "./model-env.mjs";
 
 const [, , rawPath, outPath, modelArg] = process.argv;
 const MODEL = modelArg || "Xenova/whisper-base.en";
@@ -12,7 +13,7 @@ if (!(rawPath && outPath)) {
 }
 
 const { pipeline, env } = await import("@huggingface/transformers");
-env.allowLocalModels = false;
+applyModelEnv(env);
 
 const buf = readFileSync(rawPath);
 const audio = new Float32Array(
@@ -24,7 +25,15 @@ console.error(
   `[transcribe] model=${MODEL} ~${(audio.length / 16_000).toFixed(1)}s of audio`
 );
 
-const transcriber = await pipeline("automatic-speech-recognition", MODEL);
+const transcriber = await withModelRetry(
+  () => pipeline("automatic-speech-recognition", MODEL),
+  {
+    onRetry: (err, attempt, delay) =>
+      console.error(
+        `[transcribe] model load failed (attempt ${attempt}), retrying in ${delay}ms: ${err?.message ?? err}`
+      ),
+  }
+);
 const result = await transcriber(audio, {
   return_timestamps: "word",
   chunk_length_s: 30,
