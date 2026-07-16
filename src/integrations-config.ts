@@ -7,7 +7,7 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
-import { cwdPath } from "./repo-paths.ts";
+import { stateDir } from "./repo-paths.ts";
 
 const ProviderConfigSchema = z
   .object({
@@ -72,16 +72,8 @@ export interface XaiVoiceDetails {
   voices: string[];
 }
 
-// Writable local config state, not a bundled distribution asset: stays
-// cwd-relative (unlike repoPath's distribution-relative asset base, see
-// src/repo-paths.ts) until it gets its own Application-Support-style home
-// (tracked separately, out of scope for CRAFT-6185).
-function configDir(): string {
-  return cwdPath(".openklip");
-}
-
 function configPath(): string {
-  return join(configDir(), "integrations.json");
+  return join(stateDir(), "integrations.json");
 }
 
 function loadConfig(): z.infer<typeof IntegrationsConfigSchema> {
@@ -97,7 +89,7 @@ function loadConfig(): z.infer<typeof IntegrationsConfigSchema> {
 }
 
 function saveConfig(config: z.infer<typeof IntegrationsConfigSchema>): void {
-  mkdirSync(configDir(), { recursive: true });
+  mkdirSync(stateDir(), { recursive: true });
   const fp = configPath();
   writeFileSync(fp, `${JSON.stringify(config, null, 2)}\n`, "utf8");
   try {

@@ -2,7 +2,7 @@
 
 How to produce a signed + notarized OpenKlip.app / DMG. Steps marked **[human-only]** require an Apple Developer account and cannot be automated by an agent (they involve private credentials).
 
-> **Prerequisite — not yet complete.** The desktop shell in `src-tauri/` is a working **Stage A walking skeleton**: it spawns the OpenKlip production server (`openklip serve`, CRAFT-6185) as a sidecar and loads the editor in WKWebView (verified end-to-end). It currently runs the server from a repo checkout (`OPENKLIP_APP_ROOT`). Before this runbook yields a *shippable* app, **Stage B (self-contained runtime bundling)** must land — see `src-tauri/README.md`. Until then, `cargo tauri build` produces an installable-looking `.app` that still depends on the repo. The signing/notarization steps below are correct and ready; they just need the self-contained bundle to sign.
+> **Prerequisite — complete.** The desktop shell in `src-tauri/` is verified self-contained (Stage B): the bundled `.app` runs its own copy of the runtime (`Contents/Resources/app/`) and its own Bun binary (`Contents/MacOS/bun`) with zero reference to the repo checkout or a system-installed Bun — proved by driving a real ffmpeg export entirely through a `cargo tauri build --debug` output. Process-group teardown on quit is also verified (no orphaned `next start` after a real AppleEvent quit). See `src-tauri/README.md` for the full verification writeup and the still-open items (first-run UX, single-instance guard, log-file redirection) that don't block this runbook. One known caveat: `cargo tauri build`'s DMG step hung in the sandboxed session that built this — see the README's "Known gap" section before assuming a DMG failure on your machine is the same issue.
 
 ## One-time setup **[human-only]**
 
@@ -34,8 +34,9 @@ export APPLE_API_KEY_PATH="/absolute/path/AuthKey_<key-id>.p8"
 ## Build + sign + notarize
 
 ```bash
-bun run build                       # build the Next production app (bundled in Stage B)
-bunx @tauri-apps/cli@2 build        # builds src-tauri, signs, notarizes, staples, makes the DMG
+bun run build                                  # build the Next production app
+bun run scripts/prepare-desktop-bundle.ts       # stage the self-contained runtime tree into src-tauri/resources/app/
+bunx @tauri-apps/cli@2 build                    # builds src-tauri, signs, notarizes, staples, makes the DMG
 # output: src-tauri/target/release/bundle/{macos/OpenKlip.app, dmg/OpenKlip_<ver>_aarch64.dmg}
 ```
 
@@ -59,6 +60,6 @@ This runs `codesign --verify --deep --strict`, checks the signing authority + ha
 
 ## What the agent delivered vs. what's yours
 
-- **Delivered:** the Tauri shell + sidecar walking skeleton (proven), the entitlements, the signing/notarization wiring, this runbook, and the verification script — the pipeline is "one secret away."
+- **Delivered:** the self-contained Tauri shell + bundled Bun sidecar (verified: no repo/system dependency, a real export proven end-to-end), process-group teardown on quit (verified: no orphans after a real AppleEvent quit), Application-Support-relocated writable state, the entitlements, the signing/notarization wiring, this runbook, and the verification script — the pipeline is "one secret away."
 - **Yours [human-only]:** the Developer ID cert + App Store Connect key, the first real notarization run, and the clean-machine Gatekeeper test.
-- **Still to build (Stage B, agent-doable):** bundle the full runtime (built `.next` + runtime node_modules + ffmpeg + Bun + scripts + assets) into the app so it runs with no repo; relocate writable state (`.openklip`, model cache) to Application Support; sidecar process-group teardown + single-instance; first-run workspace/model-download UX.
+- **Still open (agent-doable, doesn't block this runbook):** first-run workspace picker + model-download UX, single-instance guard, sidecar log-file redirection. See `src-tauri/README.md`'s "Remaining" section.

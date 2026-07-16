@@ -82,3 +82,17 @@ export function appRoot(): string {
 export function repoPath(...segments: string[]): string {
   return resolve(/*turbopackIgnore: true*/ appRoot(), ...segments);
 }
+
+// Writable local state (workspace projects-root, integration provider keys —
+// currently ".openklip/", see workspace-config.ts and integrations-config.ts)
+// is deliberately NOT resolved against appRoot(): the app bundle/distribution
+// root is expected to be READ-ONLY (a packaged .app's Resources directory,
+// notarization-signed contents), so writable state needs its own base. Order:
+// an explicit override (set by a packaged launcher pointing at an OS-standard
+// location, e.g. ~/Library/Application Support/OpenKlip on macOS) > cwdPath
+// (dev fallback — unchanged prior behavior, a plain repo-root-relative dir).
+export function stateDir(...segments: string[]): string {
+  const override = process.env.OPENKLIP_STATE_DIR;
+  const base = override ? resolve(override) : cwdPath(".openklip");
+  return resolve(base, ...segments);
+}
