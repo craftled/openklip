@@ -6,10 +6,14 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join, resolve } from "node:path";
-import { repoPath } from "./repo-paths.ts";
+import { cwdPath } from "./repo-paths.ts";
 
+// Writable local config state, not a bundled distribution asset: stays
+// cwd-relative (unlike repoPath's distribution-relative asset base, see
+// src/repo-paths.ts) until it gets its own Application-Support-style home
+// (tracked separately, out of scope for CRAFT-6185).
 function configDir(): string {
-  return repoPath(".openklip");
+  return cwdPath(".openklip");
 }
 
 function configPath(): string {

@@ -1,6 +1,6 @@
 import { chmodSync, existsSync } from "node:fs";
 import { createRequire } from "node:module";
-import { join } from "node:path";
+import { repoPath } from "./repo-paths.ts";
 
 const require = createRequire(import.meta.url);
 
@@ -12,8 +12,11 @@ function optionalRequire<T>(id: string): T | null {
   }
 }
 
+// Resolves against the distribution app base (see src/repo-paths.ts), not
+// raw cwd, so bundled binaries still resolve when OpenKlip is launched from
+// an installed/relocated layout, not just a repo checkout.
 function localBinary(...parts: string[]): string | null {
-  const fp = join(process.cwd(), "node_modules", ...parts);
+  const fp = repoPath("node_modules", ...parts);
   return existsSync(fp) ? fp : null;
 }
 

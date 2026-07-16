@@ -71,3 +71,11 @@ test("runDoctor reports an invalid slug as a failed check, not a throw", async (
   const report = await runDoctor("../../etc");
   assert.equal(report.ok, false);
 });
+
+test("runDoctor reports the resolved app-root base", async () => {
+  const report = await runDoctor();
+  const check = findCheck(report, "app-root");
+  assert.ok(check, 'expected an "app-root" check');
+  assert.equal(check?.status, "ok");
+  assert.ok(check && check.detail.length > 0);
+});
