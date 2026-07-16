@@ -89,6 +89,6 @@ jobs:
         run: bun run build
 
       - name: Browser integration tests
-        run: OPENKLIP_INTEGRATION=1 bun test tests/transcript-diff-browser.test.ts tests/json-graphic-browser.test.ts
+        run: OPENKLIP_INTEGRATION=1 bun test tests/transcript-diff-browser.test.ts tests/json-graphic-browser.test.ts tests/golden-path-browser.test.ts
         env:
           OPENKLIP_CHROME_PATH: chrome

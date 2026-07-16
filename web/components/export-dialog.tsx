@@ -418,7 +418,11 @@ export function ExportDialog({
             <Button onClick={handleCancel} type="button" variant="outline">
               Cancel
             </Button>
-            <Button className={cn("gap-2")} onClick={handleExport}>
+            <Button
+              className={cn("gap-2")}
+              data-testid="export-confirm"
+              onClick={handleExport}
+            >
               <Download data-icon="inline-start" />
               Export to file…
               <Kbd className="bg-primary-foreground/15 text-primary-foreground">
