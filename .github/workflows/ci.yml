@@ -80,6 +80,7 @@ jobs:
           bun-version: 1.3.14
 
       - name: Setup Chrome
+        id: setup-chrome
         uses: browser-actions/setup-chrome@v1
 
       - name: Install dependencies
@@ -88,7 +89,20 @@ jobs:
       - name: Build
         run: bun run build
 
+      # Resolve a REAL Chrome binary path and hard-fail if none is found. The
+      # tests' chromeAvailable() gate is existsSync(OPENKLIP_CHROME_PATH), so a
+      # bare "chrome" (not a path) silently SKIPPED every browser test and left
+      # this job hollow-green. Resolve via the setup-chrome output first, then
+      # PATH; `test -x` guarantees the job fails loudly rather than skipping.
       - name: Browser integration tests
-        run: OPENKLIP_INTEGRATION=1 bun test tests/transcript-diff-browser.test.ts tests/json-graphic-browser.test.ts
-        env:
-          OPENKLIP_CHROME_PATH: chrome
+        run: |
+          CHROME="${{ steps.setup-chrome.outputs.chrome-path }}"
+          if [ -z "$CHROME" ] || [ ! -x "$CHROME" ]; then
+            CHROME="$(command -v chrome || command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          fi
+          echo "Resolved Chrome: $CHROME"
+          if [ -z "$CHROME" ] || [ ! -x "$CHROME" ]; then
+            echo "::error::No Chrome binary found; browser integration tests would skip." && exit 1
+          fi
+          export OPENKLIP_CHROME_PATH="$CHROME"
+          OPENKLIP_INTEGRATION=1 bun test tests/transcript-diff-browser.test.ts tests/json-graphic-browser.test.ts tests/golden-path-browser.test.ts

@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import puppeteer from "puppeteer-core";
-import { chromeAvailable } from "./helpers/integration-gate.ts";
+import {
+  chromeAvailable,
+  launchIntegrationBrowser,
+} from "./helpers/integration-gate.ts";
 import { prepareIntegrationJsonGraphicFixture } from "./helpers/integration-json-graphic-fixture.ts";
 import { spawnIntegrationServer } from "./helpers/integration-server.ts";
 
@@ -57,10 +59,7 @@ test("editor selects json-render graphic on timeline and shows inspector", {
     fixture.cleanup();
   });
 
-  const browser = await puppeteer.launch({
-    executablePath: CHROME_PATH,
-    headless: true,
-  });
+  const browser = await launchIntegrationBrowser();
   try {
     const page = await browser.newPage();
     await page.setViewport({ width: 1600, height: 1000 });
