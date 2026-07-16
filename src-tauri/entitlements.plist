@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- Bun embeds a JavaScriptCore JIT. The hardened runtime (required for
+       notarization) blocks JIT and W^X-violating memory without these two
+       entitlements; without them the bundled Bun sidecar crashes on launch. -->
+  <key>com.apple.security.cs.allow-jit</key>
+  <true/>
+  <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+  <true/>
+  <!-- The sidecar loads native .node addons + .dylibs (ffmpeg-static,
+       onnxruntime, etc.) that are signed with their own Developer ID, not the
+       app's team-bound signature. Library validation would reject them. -->
+  <key>com.apple.security.cs.disable-library-validation</key>
+  <true/>
+</dict>
+</plist>
