@@ -23,3 +23,8 @@ tmp/
 .qa/
 tools/vision-focus
 .vercel
+
+# CRAFT-6186: acceptance corpus is generated fresh by
+# scripts/acceptance-corpus.ts on every run (including manifest.json, which
+# embeds an absolute path + generation timestamp); never commit it.
+/fixtures/acceptance/
