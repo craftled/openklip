@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import type { Cam, CamRole } from "@engine/cams";
 import { startIngestJob } from "@engine/ingest-jobs";
+import { trustGuard } from "@engine/local-trust";
 import { assertValidSlug, projectPaths } from "@engine/paths";
 import {
   MAX_ASSET_UPLOAD_BYTES,
@@ -98,6 +99,10 @@ export function createCamsPost({ loadIngestCam, tempRoot }: CamsPostDeps) {
     req: NextRequest,
     { params }: RouteParams
   ): Promise<Response> {
+    const denied = trustGuard(req);
+    if (denied) {
+      return denied;
+    }
     const { slug } = await params;
     const err = assertProject(slug);
     if (err) {

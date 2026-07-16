@@ -1,5 +1,6 @@
 import { listAssetsByKind, registerAssetBytes } from "@engine/assets";
 import { type Asset, type AssetKind, AssetKindSchema } from "@engine/edl";
+import { trustGuard } from "@engine/local-trust";
 import { loadProject } from "@engine/projectStore";
 import {
   MAX_ASSET_UPLOAD_BYTES,
@@ -29,6 +30,10 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
 }
 
 export async function POST(req: NextRequest, { params }: RouteParams) {
+  const denied = trustGuard(req);
+  if (denied) {
+    return denied;
+  }
   const { slug } = await params;
   try {
     const form = await req.formData();

@@ -1,5 +1,6 @@
 import { platform } from "node:os";
 import { formatDisplayPath } from "@engine/display-path";
+import { trustGuard } from "@engine/local-trust";
 import { projectsRoot } from "@engine/paths";
 import { pickFolder } from "@engine/pick-folder";
 import { listProjects } from "@engine/projectStore";
@@ -41,6 +42,10 @@ export function GET(): Response {
 }
 
 export async function POST(req: Request): Promise<Response> {
+  const denied = trustGuard(req);
+  if (denied) {
+    return denied;
+  }
   let raw: unknown = {};
   try {
     const text = await req.text();

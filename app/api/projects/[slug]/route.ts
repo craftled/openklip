@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import { deleteProject } from "@engine/delete-project";
+import { trustGuard } from "@engine/local-trust";
 import { assertValidSlug, projectPaths } from "@engine/paths";
 import { listProjects, loadProject } from "@engine/projectStore";
 import type { NextRequest } from "next/server";
@@ -43,7 +44,11 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
   }
 }
 
-export async function DELETE(_req: NextRequest, { params }: RouteParams) {
+export async function DELETE(req: NextRequest, { params }: RouteParams) {
+  const denied = trustGuard(req);
+  if (denied) {
+    return denied;
+  }
   const { slug } = await params;
 
   try {

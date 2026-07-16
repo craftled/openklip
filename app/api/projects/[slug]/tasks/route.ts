@@ -5,6 +5,7 @@ import {
   getAgentTask,
   listAgentTasks,
 } from "@engine/agent-tasks";
+import { trustGuard } from "@engine/local-trust";
 import { assertValidSlug, projectPaths } from "@engine/paths";
 import type { NextRequest } from "next/server";
 
@@ -51,6 +52,10 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
 // POST { action: "cancel", taskId } best-effort kills any live process
 // registered for the task, then marks the stored task cancelled.
 export async function POST(req: NextRequest, { params }: RouteParams) {
+  const denied = trustGuard(req);
+  if (denied) {
+    return denied;
+  }
   const { slug } = await params;
   const err = assertProject(slug);
   if (err) {

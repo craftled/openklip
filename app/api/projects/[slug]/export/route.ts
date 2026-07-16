@@ -7,6 +7,7 @@ import {
   exportCut,
   GIF_MAX_WIDTH_OVERRIDE_CEILING_PX,
 } from "@engine/exporter";
+import { trustGuard } from "@engine/local-trust";
 import { assertValidSlug, projectPaths } from "@engine/paths";
 import { loadProject } from "@engine/projectStore";
 import type { NextRequest } from "next/server";
@@ -57,6 +58,10 @@ const ExportRequestSchema = z
   .strict();
 
 export async function POST(req: NextRequest, { params }: RouteParams) {
+  const denied = trustGuard(req);
+  if (denied) {
+    return denied;
+  }
   const { slug } = await params;
 
   // 1. Reject hostile slugs before any path is built.
