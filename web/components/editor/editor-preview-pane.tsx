@@ -55,6 +55,7 @@ export interface EditorPreviewPaneProps {
   keptDurationSec: number;
   mediaVersion: number;
   mobileChatOpen?: boolean;
+  mobileConfigOpen?: boolean;
   musicBedCount: number;
   musicMuted: boolean;
   musicRef: RefObject<HTMLAudioElement | null>;
@@ -63,6 +64,7 @@ export interface EditorPreviewPaneProps {
   onFocusTranscriptSearch: () => void;
   onFullscreen: () => void;
   onOpenChat?: () => void;
+  onOpenConfig?: () => void;
   onOrientationChange: (orientation: Orientation) => void;
   onPlayToggle: () => void | Promise<void>;
   onPreviewClick: (event: MouseEvent<HTMLDivElement>) => void;
@@ -126,6 +128,7 @@ export function EditorPreviewPane({
   keptDurationSec,
   mediaVersion,
   mobileChatOpen,
+  mobileConfigOpen,
   musicBedCount,
   musicMuted,
   musicRef,
@@ -134,6 +137,7 @@ export function EditorPreviewPane({
   onFocusTranscriptSearch,
   onFullscreen,
   onOpenChat,
+  onOpenConfig,
   onOrientationChange,
   onPlayToggle,
   onPreviewClick,
@@ -188,8 +192,10 @@ export function EditorPreviewPane({
           fmtTime={fmtTime}
           keptDurationSec={keptDurationSec}
           mobileChatOpen={mobileChatOpen}
+          mobileConfigOpen={mobileConfigOpen}
           onExport={onExport}
           onOpenChat={onOpenChat}
+          onOpenConfig={onOpenConfig}
           onOrientationChange={onOrientationChange}
           onSafeAreaGuideChange={onSafeAreaGuideChange}
           orientation={orientation}
