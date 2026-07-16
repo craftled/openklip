@@ -10,7 +10,7 @@ interface CamIngestJobView {
   error?: string;
   progress?: IngestProgressView;
   slug: string;
-  status: "running" | "done" | "error";
+  status: "running" | "done" | "error" | "interrupted";
 }
 
 export interface CamIngestOptions {
@@ -67,6 +67,11 @@ async function pollCamIngestJob(
     }
     if (job.status === "done") {
       return job.slug;
+    }
+    if (job.status === "interrupted") {
+      throw new Error(
+        "Camera ingest was interrupted by an app restart. Please retry."
+      );
     }
     if (job.status === "error") {
       throw new Error(job.error ?? "Camera ingest failed");

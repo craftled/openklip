@@ -16,7 +16,7 @@ interface TakeIngestJobView {
   error?: string;
   progress?: IngestProgressView;
   slug: string;
-  status: "running" | "done" | "error";
+  status: "running" | "done" | "error" | "interrupted";
 }
 
 export interface TakeIngestOptions {
@@ -68,6 +68,11 @@ async function pollTakeIngestJob(
     }
     if (job.status === "done") {
       return job.slug;
+    }
+    if (job.status === "interrupted") {
+      throw new Error(
+        "Take ingest was interrupted by an app restart. Please retry."
+      );
     }
     if (job.status === "error") {
       throw new Error(job.error ?? "Take ingest failed");

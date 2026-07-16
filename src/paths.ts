@@ -52,6 +52,25 @@ export function projectDir(slug: string): string {
   return join(projectsRoot(), assertValidSlug(slug));
 }
 
+// Workspace-level directory for background-job stores that aren't scoped to
+// any single project (see src/job-store.ts, src/ingest-jobs.ts). Ingest
+// CREATES the project the job is for, so a job can be in flight (or have
+// failed outright) with no project dir on disk yet; its durable record can't
+// live inside a project it may never produce. Named with a leading "."
+// so assertValidSlug's SLUG_PATTERN (must start with an alnum) can never
+// match it: a project slug can never collide with this directory.
+export function jobsStoreDir(): string {
+  return join(projectsRoot(), ".openklip-jobs");
+}
+
+/** Durable workspace-level store for ingest jobs (upload/folder/url/scan-inbox
+ * ingest, plus take/cam ingest, which reuse the same registry). Write-through
+ * persisted on job create and on every status transition; see
+ * src/ingest-jobs.ts and src/job-store.ts. */
+export function ingestJobsStorePath(): string {
+  return join(jobsStoreDir(), "ingest-jobs.json");
+}
+
 // Layered project layout. `project.json` (the edit) stays at the project root;
 // user originals live in assets/; everything derived lives under working/
 // (proxy, transcript, audio, frames, asset proxies) and rendered output under
@@ -89,6 +108,12 @@ export function projectPaths(slug: string) {
     chats: join(working, "chats.json"),
     /** Agent task-progress store: mutates in place (see src/agent-tasks.ts). */
     tasks: join(working, "tasks.json"),
+    /** Durable per-project store for silences-analysis jobs: mutates in
+     * place, write-through persisted on create and status transitions (see
+     * src/silences-jobs.ts, src/job-store.ts). Derived job bookkeeping (not
+     * part of the edit itself), but kept durable across restarts like
+     * tasks.json above. */
+    silencesJobs: join(working, "silences-jobs.json"),
     /** Append-only action history: one JSON entry per line. */
     actionsLog: join(working, "actions.jsonl"),
     /** Pre-mutation project.json snapshots, one per logged revision (rev-<n>.json). */
