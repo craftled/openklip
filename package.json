@@ -87,7 +87,7 @@
     "cam-devex-smoke": "bun run scripts/cam-devex-smoke.ts",
     "demo-gif": "bash scripts/record-demo-gif.sh",
     "test": "bun test --isolate",
-    "test:integration": "OPENKLIP_INTEGRATION=1 bun test tests/transcript-diff-browser.test.ts tests/json-graphic-browser.test.ts tests/golden-path-browser.test.ts",
+    "test:integration": "OPENKLIP_INTEGRATION=1 bun test tests/transcript-diff-browser.test.ts tests/json-graphic-browser.test.ts tests/golden-path-browser.test.ts tests/mobile-overlays-browser.test.ts",
     "typecheck": "tsc --noEmit",
     "check": "ultracite check",
     "fix": "ultracite fix",

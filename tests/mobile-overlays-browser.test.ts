@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import puppeteer from "puppeteer-core";
 import { prepareIntegrationEditorFixture } from "./helpers/integration-editor-fixture.ts";
-import { chromeAvailable } from "./helpers/integration-gate.ts";
+import {
+  chromeAvailable,
+  launchIntegrationBrowser,
+} from "./helpers/integration-gate.ts";
 import { spawnIntegrationServer } from "./helpers/integration-server.ts";
 
 const CHROME_PATH =
@@ -32,10 +34,7 @@ test("mobile viewport exposes chat and config overlay toggles", {
     fixture.cleanup();
   });
 
-  const browser = await puppeteer.launch({
-    executablePath: CHROME_PATH,
-    headless: true,
-  });
+  const browser = await launchIntegrationBrowser();
   t.after(async () => {
     await browser.close();
   });
@@ -54,14 +53,79 @@ test("mobile viewport exposes chat and config overlay toggles", {
     timeout: 30_000,
   });
 
+  // Open Config: reveals the left sidebar as a mobile dialog with the
+  // config tabs visible.
   await page.click('[aria-label="Open config"]');
   await page.waitForSelector("[data-config-tab-bar]", { timeout: 30_000 });
 
+  const configDialog = await page.waitForSelector(
+    '[data-slot="sidebar"][role="dialog"]',
+    { timeout: 30_000 }
+  );
+  assert.ok(configDialog, "config overlay renders a dialog role element");
+  const configDialogName = await page.$eval(
+    '[data-slot="sidebar"][role="dialog"]',
+    (el) => {
+      const labelledBy = el.getAttribute("aria-labelledby");
+      const label = labelledBy
+        ? document.getElementById(labelledBy)?.textContent?.trim()
+        : null;
+      return label ?? null;
+    }
+  );
+  assert.equal(configDialogName, "Sidebar");
+
+  // Switch a Config tab; confirm the panel reflects the new active tab.
+  await page.evaluate(() => {
+    const editTab = [
+      ...document.querySelectorAll("[data-config-tab-bar] button"),
+    ].find((button) => button.textContent?.trim() === "Edit");
+    (editTab as HTMLButtonElement | undefined)?.click();
+  });
+  await page.waitForFunction(
+    () => {
+      const editTab = [
+        ...document.querySelectorAll("[data-config-tab-bar] button"),
+      ].find((button) => button.textContent?.trim() === "Edit");
+      return editTab?.getAttribute("aria-pressed") === "true";
+    },
+    { timeout: 30_000 }
+  );
+
+  // Dismiss via Escape; the config overlay unmounts.
+  await page.keyboard.press("Escape");
+  await page.waitForFunction(
+    () => !document.querySelector("[data-config-tab-bar]"),
+    { timeout: 30_000 }
+  );
+
+  // Open Chat still works after the config overlay closes.
   await page.click('[aria-label="Open chat"]');
   await page.waitForSelector("[data-mobile-right-rail]", { timeout: 30_000 });
-  const railLabel = await page.$eval(
-    "[data-mobile-right-rail]",
-    (el) => el.getAttribute("aria-label") ?? ""
+  const chatDialog = await page.$eval(
+    "[data-mobile-right-rail] section",
+    (el) => ({
+      ariaLabel: el.getAttribute("aria-label"),
+      ariaModal: el.getAttribute("aria-modal"),
+      role: el.getAttribute("role"),
+    })
   );
-  assert.equal(railLabel, "Chat");
+  assert.deepEqual(chatDialog, {
+    ariaLabel: "Chat",
+    ariaModal: "true",
+    role: "dialog",
+  });
+
+  // Dismiss the chat overlay via its backdrop. The backdrop button spans the
+  // full overlay but the panel itself covers most of it visually, so
+  // dispatch the click directly rather than relying on hit-testing a point.
+  await page.evaluate(() => {
+    document
+      .querySelector('[data-mobile-right-rail] [aria-label="Close panel"]')
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  });
+  await page.waitForFunction(
+    () => !document.querySelector("[data-mobile-right-rail]"),
+    { timeout: 30_000 }
+  );
 });

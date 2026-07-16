@@ -105,4 +105,4 @@ jobs:
             echo "::error::No Chrome binary found; browser integration tests would skip." && exit 1
           fi
           export OPENKLIP_CHROME_PATH="$CHROME"
-          OPENKLIP_INTEGRATION=1 bun test tests/transcript-diff-browser.test.ts tests/json-graphic-browser.test.ts tests/golden-path-browser.test.ts
+          bun run test:integration

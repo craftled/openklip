@@ -8,7 +8,7 @@ import type {
   ExportDialogOptions,
   ExportResolution,
 } from "@/components/export-dialog";
-import { MessageSquare } from "@/lib/icon";
+import { MessageSquare, PanelLeft } from "@/lib/icon";
 import type { Orientation } from "@/lib/preview-layout";
 import { cn } from "@/lib/utils";
 
@@ -24,8 +24,10 @@ export interface EditorPreviewHeaderProps {
   fmtTime: (sec: number) => string;
   keptDurationSec: number;
   mobileChatOpen?: boolean;
+  mobileConfigOpen?: boolean;
   onExport: (options: ExportDialogOptions) => void | Promise<void>;
   onOpenChat?: () => void;
+  onOpenConfig?: () => void;
   onOrientationChange: (orientation: Orientation) => void;
   onSafeAreaGuideChange: (platform: SafeAreaPlatform) => void;
   orientation: Orientation;
@@ -49,8 +51,10 @@ export function EditorPreviewHeader({
   fmtTime,
   keptDurationSec,
   mobileChatOpen = false,
+  mobileConfigOpen = false,
   onExport,
   onOpenChat,
+  onOpenConfig,
   onOrientationChange,
   onSafeAreaGuideChange,
   orientation,
@@ -88,6 +92,20 @@ export function EditorPreviewHeader({
         />
       </div>
       <div className="flex shrink-0 items-center gap-2">
+        {onOpenConfig ? (
+          <button
+            aria-label="Open config"
+            className={cn(
+              "flex size-5 shrink-0 items-center justify-center rounded-sm text-muted-foreground/70 transition-colors hover:bg-muted/60 hover:text-foreground active:scale-[0.96] xl:hidden",
+              mobileConfigOpen && "bg-muted/60 text-foreground"
+            )}
+            onClick={onOpenConfig}
+            title="Open config"
+            type="button"
+          >
+            <PanelLeft className="size-3" />
+          </button>
+        ) : null}
         {onOpenChat ? (
           <button
             aria-label="Open chat"
