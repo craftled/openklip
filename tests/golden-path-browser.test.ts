@@ -2,11 +2,13 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { test } from "node:test";
 import type { Page } from "puppeteer-core";
-import puppeteer from "puppeteer-core";
 import type { Project } from "../src/edl.ts";
 import { probe } from "../src/ffmpeg.ts";
 import { projectPaths } from "../src/paths.ts";
-import { chromeAvailable } from "./helpers/integration-gate.ts";
+import {
+  chromeAvailable,
+  launchIntegrationBrowser,
+} from "./helpers/integration-gate.ts";
 import {
   GOLDEN_PATH_FFMPEG_OK,
   prepareIntegrationGoldenFixture,
@@ -164,10 +166,7 @@ test("golden path: navigate, cut, restore, re-cut, reload, export, controlled fa
     fixture.cleanup();
   });
 
-  const browser = await puppeteer.launch({
-    executablePath: CHROME_PATH,
-    headless: true,
-  });
+  const browser = await launchIntegrationBrowser();
   try {
     const page = await browser.newPage();
     await page.setViewport({ width: 1600, height: 1000 });

@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import puppeteer from "puppeteer-core";
 import { prepareIntegrationEditorFixture } from "./helpers/integration-editor-fixture.ts";
-import { chromeAvailable } from "./helpers/integration-gate.ts";
+import {
+  chromeAvailable,
+  launchIntegrationBrowser,
+} from "./helpers/integration-gate.ts";
 import { spawnIntegrationServer } from "./helpers/integration-server.ts";
 
 const CHROME_PATH =
@@ -113,10 +115,7 @@ test("editor History panel shows transcript diff for transcript actions", {
     fixture.cleanup();
   });
 
-  const browser = await puppeteer.launch({
-    executablePath: CHROME_PATH,
-    headless: true,
-  });
+  const browser = await launchIntegrationBrowser();
   try {
     const page = await browser.newPage();
     await page.setViewport({ width: 1600, height: 1000 });
