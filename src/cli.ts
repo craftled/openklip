@@ -609,6 +609,21 @@ function resolveCutIds(project: Project, tokens: string[]): string[] {
   return expandWordTokens(project, tokens);
 }
 
+/**
+ * Write JSON to stdout with full drain semantics. Ensures the complete
+ * serialized JSON is written to the pipe buffer before the process can exit,
+ * preventing truncation when output is piped (e.g., to jq or another consumer).
+ * Uses Node-style drain-aware write that waits for the OS buffer to drain.
+ */
+async function writeStdoutJson(value: unknown): Promise<void> {
+  const json = `${JSON.stringify(value, null, 2)}\n`;
+  const canContinue = process.stdout.write(json);
+  if (!canContinue) {
+    // If write returns false, the buffer is full; wait for drain before returning
+    await new Promise((resolve) => process.stdout.once("drain", resolve));
+  }
+}
+
 try {
   switch (cmd) {
     case "list": {
@@ -3610,7 +3625,7 @@ try {
       }
       const surface = surfaceArg as Surface | undefined;
       if (rest.includes("--json")) {
-        console.log(JSON.stringify(actionManifest(surface), null, 2));
+        await writeStdoutJson(actionManifest(surface));
         break;
       }
       console.log(actionTable(surface));
@@ -3628,7 +3643,7 @@ try {
       }
       const surface = surfaceArg as Surface | undefined;
       if (rest.includes("--json")) {
-        console.log(JSON.stringify(agentToolManifest(surface), null, 2));
+        await writeStdoutJson(agentToolManifest(surface));
         break;
       }
       console.log(agentToolTable(surface));
@@ -3680,7 +3695,7 @@ try {
         group: groupArg as FeatureGroupId | undefined,
       };
       if (rest.includes("--json")) {
-        console.log(JSON.stringify(featureManifest(listOpts), null, 2));
+        await writeStdoutJson(featureManifest(listOpts));
         break;
       }
       if (groupArg) {
