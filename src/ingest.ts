@@ -4,6 +4,7 @@ import { isAbsolute } from "node:path";
 import { type Project, ProjectSchema, SAMPLE_RATE, type Word } from "./edl.ts";
 import { FFMPEG, probe, run } from "./ffmpeg.ts";
 import { assertProjectCanBeIngested } from "./ingest-guard.ts";
+import { forceIngestWithSwap } from "./ingest-swap.ts";
 import type { IngestPhase, IngestProgress } from "./ingest-types.ts";
 import { buildMomentIndex } from "./moment-search.ts";
 import { projectPaths, slugFromVideo } from "./paths.ts";
@@ -304,10 +305,34 @@ export async function runTakeMediaPhases(opts: {
   return await deps.transcribeToWords(paths.audioRaw, paths.transcriptRawJson);
 }
 
-export async function ingest(
-  videoArg: string,
-  opts?: { force?: boolean; onProgress?: (p: IngestProgress) => void }
-): Promise<string> {
+export interface IngestOpts {
+  force?: boolean;
+  /**
+   * Test-only override for the media pipeline (proxy/audio/frames/index/
+   * transcribe). Production callers never pass this; it exists so tests can
+   * exercise the real staging+swap transaction (CRAFT-6181) with real ffmpeg
+   * for proxy/audio while stubbing the expensive Whisper/CLIP steps, the
+   * same way runIngestMediaPhases's own `deps` param is used directly by
+   * tests/ingest-parallel.test.ts.
+   */
+  mediaDeps?: Partial<IngestMediaDeps>;
+  onProgress?: (p: IngestProgress) => void;
+}
+
+// The actual ingest work for one target: probe -> proxy/audio/frames/index +
+// transcribe -> write project.json + transcript.json. `targetSlug` names the
+// directory this writes into; it is the LIVE slug for a normal ingest, and a
+// throwaway staging slug for a force re-ingest (see forceIngestWithSwap in
+// ./ingest-swap.ts), which is why nothing here assumes `targetSlug` is the
+// final slug baked into `source`.
+async function ingestCore(
+  source: string,
+  targetSlug: string,
+  opts?: {
+    onProgress?: (p: IngestProgress) => void;
+    mediaDeps?: Partial<IngestMediaDeps>;
+  }
+): Promise<void> {
   const emit = (phase: IngestPhase) => {
     if (!opts?.onProgress) {
       return;
@@ -317,17 +342,7 @@ export async function ingest(
       opts.onProgress(progress);
     }
   };
-  const source = isAbsolute(videoArg) ? videoArg : cwdPath(videoArg);
-  if (!existsSync(source)) {
-    throw new Error(`video not found: ${source}`);
-  }
-
-  const slug = slugFromVideo(source);
-  const p = projectPaths(slug);
-  // Re-ingesting a slug wipes the whole project dir. Refuse unless the caller
-  // explicitly opts in with --force, so an accidental re-upload can't destroy
-  // an existing edit.
-  assertProjectCanBeIngested(slug, opts?.force);
+  const p = projectPaths(targetSlug);
   await rm(p.dir, { recursive: true, force: true });
   await mkdir(p.assets, { recursive: true });
   await mkdir(p.frames, { recursive: true });
@@ -342,7 +357,7 @@ export async function ingest(
 
   const words = await runIngestMediaPhases({
     source,
-    slug,
+    slug: targetSlug,
     paths: {
       proxy: p.proxy,
       audioRaw: p.audioRaw,
@@ -350,12 +365,13 @@ export async function ingest(
       transcriptRawJson: `${p.working}/transcript.raw.json`,
     },
     emit,
+    deps: opts?.mediaDeps,
   });
 
   emit("finalize");
   const project: Project = ProjectSchema.parse({
     version: 1,
-    slug,
+    slug: targetSlug,
     source,
     proxy: "working/proxy.mp4",
     sampleRate: SAMPLE_RATE,
@@ -374,7 +390,44 @@ export async function ingest(
 
   emit("done");
   console.log(`[ingest] done: ${words.length} words`);
-  console.log(`[ingest] project -> ${p.dir}`);
+}
+
+export async function ingest(
+  videoArg: string,
+  opts?: IngestOpts
+): Promise<string> {
+  const source = isAbsolute(videoArg) ? videoArg : cwdPath(videoArg);
+  if (!existsSync(source)) {
+    throw new Error(`video not found: ${source}`);
+  }
+
+  const slug = slugFromVideo(source);
+  // Re-ingesting a slug wipes the whole project dir. Refuse unless the caller
+  // explicitly opts in with --force, so an accidental re-upload can't destroy
+  // an existing edit.
+  assertProjectCanBeIngested(slug, opts?.force);
+
+  if (opts?.force) {
+    // Transactional path (CRAFT-6181): stage the replacement under a
+    // throwaway slug, validate it, then atomically swap it in for `slug`.
+    // A failure at any point (staging, validation, swap) leaves the live
+    // project untouched, unlike the old wipe-then-ingest behavior which
+    // could destroy the only good copy before the replacement existed.
+    await forceIngestWithSwap(
+      source,
+      slug,
+      (src, targetSlug, coreOpts) =>
+        ingestCore(src, targetSlug, {
+          onProgress: coreOpts?.onProgress,
+          mediaDeps: opts.mediaDeps,
+        }),
+      opts
+    );
+  } else {
+    await ingestCore(source, slug, opts);
+  }
+
+  console.log(`[ingest] project -> ${projectPaths(slug).dir}`);
   console.log(`\nNext:  bun run serve ${slug}`);
   return slug;
 }
