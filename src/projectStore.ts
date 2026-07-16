@@ -1,8 +1,17 @@
 // Project-file access shared by the Next route handlers (and usable from the
 // CLI). Pure Node fs (no Bun globals) so it runs under Next on Bun or Node.
+import { randomUUID } from "node:crypto";
 import { existsSync, readdirSync, statSync } from "node:fs";
-import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import {
+  mkdir,
+  open,
+  readdir,
+  readFile,
+  rename,
+  unlink,
+  writeFile,
+} from "node:fs/promises";
+import { basename, dirname, join } from "node:path";
 import { gunzipSync, gzipSync } from "node:zlib";
 import {
   type Actor,
@@ -69,11 +78,71 @@ export async function loadProject(slug: string): Promise<Project> {
   return ProjectSchema.parse(JSON.parse(await readFile(fp, "utf8")));
 }
 
+// Best-effort sweep of `${base}.tmp-*` siblings in `dir`, left behind by a
+// crash mid-write (a prior process died between open and rename). Scoped to
+// the exact prefix so it never touches project.json itself or any other file
+// in the directory; failures (missing dir, permission) are swallowed since
+// this is opportunistic cleanup, not load-bearing for the current save.
+async function cleanupStaleTempFiles(dir: string, base: string): Promise<void> {
+  const prefix = `${base}.tmp-`;
+  let entries: string[];
+  try {
+    entries = await readdir(dir);
+  } catch {
+    return;
+  }
+  await Promise.all(
+    entries
+      .filter((name) => name.startsWith(prefix))
+      .map((name) => unlink(join(dir, name)).catch(() => undefined))
+  );
+}
+
+// Atomic tmp+rename write with fsync durability, mirroring writeHistorySnapshot
+// below (same-directory tmp + rename) plus two hardening steps a crash/kill
+// mid-write needs: fsync before rename (so the tmp's bytes are actually on
+// disk, not just buffered, before it's linked in as project.json) and
+// pre-write validation (so a malformed EDL never reaches disk even
+// truncated). project.json is the only copy of the EDL, so a torn write here
+// is unrecoverable; the history snapshots in working/history/ are a separate,
+// best-effort mechanism and don't cover this file.
 export async function saveProject(
   slug: string,
   project: Project
 ): Promise<void> {
-  await writeFile(projectPaths(slug).project, JSON.stringify(project, null, 2));
+  // Validate before touching disk at all: throws synchronously into the
+  // returned rejection, so an invalid project never creates a tmp file, let
+  // alone reaches project.json.
+  ProjectSchema.parse(project);
+  const json = JSON.stringify(project, null, 2);
+  const target = projectPaths(slug).project;
+  const dir = dirname(target);
+  const base = basename(target);
+  await cleanupStaleTempFiles(dir, base);
+
+  // Preserve the existing file's permission bits (mask off the file-type
+  // bits statSync includes) so an atomic replace can't silently loosen or
+  // tighten project.json's mode. No existing file (first save) means no mode
+  // to preserve; open() falls back to its own default (0o666 minus umask).
+  const mode = existsSync(target) ? statSync(target).mode & 0o777 : undefined;
+  const tmp = `${target}.tmp-${process.pid}-${randomUUID()}`;
+
+  try {
+    const fh = await open(tmp, "w", mode);
+    try {
+      await fh.writeFile(json);
+      // Flush before rename: without fsync, a crash right after rename can
+      // still lose the write (rename is durable, but the tmp's content may
+      // still be sitting in the page cache rather than on disk).
+      await fh.sync();
+    } finally {
+      await fh.close();
+    }
+    await rename(tmp, target);
+  } catch (err) {
+    await unlink(tmp).catch(() => undefined);
+    throw err;
+  }
 }
 
 // Describes a mutation for the per-project action history. Passing meta opts
