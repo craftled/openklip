@@ -121,6 +121,11 @@ test("the vfr fixture is the only one declaring vfr:true / fps:null", () => {
 
 test("generateAcceptanceCorpus writes every synthetic fixture + a manifest.json, and self-checks codec/dims", {
   skip: FFMPEG_OK ? false : "ffmpeg binary unavailable",
+  // Bun's default 5000ms test timeout was killing the encode mid-flight via
+  // SIGTERM on CI's slower/shared runner (confirmed: "Exiting normally,
+  // received signal 15" right after a fully-written, valid output file) -
+  // the 4K HEVC/libx265 fixture in particular needs real headroom.
+  timeout: 60_000,
 }, async () => {
   await withTempDirAsync(async (outDir) => {
     const manifest: AcceptanceManifest = await generateAcceptanceCorpus({
@@ -147,6 +152,9 @@ test("generateAcceptanceCorpus writes every synthetic fixture + a manifest.json,
 
 test("generateAcceptanceCorpus is safe to call repeatedly (regenerates deterministically)", {
   skip: FFMPEG_OK ? false : "ffmpeg binary unavailable",
+  // Generates the whole corpus twice in sequence; needs double the headroom
+  // of the single-generation test above for the same CI-runner-speed reason.
+  timeout: 120_000,
 }, async () => {
   await withTempDirAsync(async (outDir) => {
     const first = await generateAcceptanceCorpus({ outDir });
