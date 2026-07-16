@@ -1,12 +1,12 @@
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { repoPath } from "@engine/repo-paths";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 function readVersion(): string {
   try {
-    return readFileSync(join(process.cwd(), "VERSION"), "utf-8").trim();
+    return readFileSync(repoPath("VERSION"), "utf-8").trim();
   } catch {
     return "unknown";
   }

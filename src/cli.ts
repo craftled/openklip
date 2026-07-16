@@ -151,9 +151,16 @@ import {
   runAction,
   type Surface,
 } from "./registry.ts";
+import { appRoot } from "./repo-paths.ts";
 import { type RevertTarget, revertProject } from "./revert.ts";
 import { CAPTION_INSET_PLATFORMS } from "./safe-areas.ts";
 import { analyzeSceneLog } from "./scene-log.ts";
+import {
+  buildServeSpawnPlan,
+  hasProductionBuild,
+  isPortAvailable,
+  type ServeMode,
+} from "./serve-runtime.ts";
 import { resolveSourceMediaStatus } from "./source-media.ts";
 import {
   applyProjectTemplate,
@@ -186,7 +193,9 @@ Setup
   openklip ingest <video>            transcribe + build a project
   openklip ingest --blank            graphics-first blank canvas (no transcript)
                                        --brand <name>  apply a brand preset
-  openklip serve [slug]              open the local editor (default: latest)
+  openklip serve [slug]              open the local editor, production runtime (default: latest)
+                                       requires: bun run build
+  openklip dev [slug]                open the local editor, contributor dev runtime (HMR)
   openklip asset-add <slug> <file>   register b-roll, music, or still (auto-detect)
                                        --kind broll|music|still
   openklip asset-flags <slug> <assetId> [--must-use] [--avoid] [--clear]
@@ -813,12 +822,26 @@ try {
     case "serve":
     case "dev": {
       // Launch the Next.js editor, pinned to this project via OPENKLIP_SLUG.
+      // "serve" launches a production runtime (`next start`, requires a
+      // prior `bun run build`): no dev overlay, no HMR, no file watcher.
+      // "dev" keeps the contributor next-dev loop. Both spawn the next
+      // binary from the distribution-relative app base (src/repo-paths.ts),
+      // not a hardcoded cwd-relative path, so this keeps working when
+      // OpenKlip is launched from an installed/relocated layout, not just a
+      // repo checkout (see src/serve-runtime.ts).
+      const mode: ServeMode = cmd === "serve" ? "serve" : "dev";
       const slug = rest[0] ?? latestProject();
       if (!slug) {
         throw new Error("no projects found. Run: openklip ingest <video>");
       }
       if (!existsSync(projectPaths(slug).project)) {
         throw new Error(`project not found: ${slug}`);
+      }
+      const base = appRoot();
+      if (mode === "serve" && !hasProductionBuild(base)) {
+        throw new Error(
+          `no production build found at ${base}\n  run: bun run build`
+        );
       }
       // Surface a broken ffmpeg / whisper / proxy before the editor opens, so a
       // failed edit loop isn't the first signal something is wrong.
@@ -848,27 +871,21 @@ try {
           ].join("\n")
         );
       }
+      if (!(await isPortAvailable(Number(port), host))) {
+        throw new Error(
+          `port ${port} is already in use on ${host}.\n  set PORT=<a different port>, or stop the process already using it.`
+        );
+      }
       const displayHost = process.env.OPENKLIP_HOST ? host : "localhost";
       console.log(
-        `[serve] project: ${slug}\n\n  OpenKlip ready  ->  http://${displayHost}:${port}/${slug}\n`
+        `[serve] project: ${slug} (${mode})\n\n  OpenKlip ready  ->  http://${displayHost}:${port}/${slug}\n`
       );
-      const proc = Bun.spawn(
-        [
-          process.execPath,
-          "--bun",
-          "node_modules/next/dist/bin/next",
-          "dev",
-          "-p",
-          String(port),
-          "-H",
-          host,
-        ],
-        {
-          cwd: process.cwd(),
-          env: { ...process.env, OPENKLIP_SLUG: slug },
-          stdio: ["inherit", "inherit", "inherit"],
-        }
-      );
+      const plan = buildServeSpawnPlan({ mode, port, host, slug, base });
+      const proc = Bun.spawn(plan.args, {
+        cwd: plan.cwd,
+        env: { ...process.env, ...plan.env },
+        stdio: ["inherit", "inherit", "inherit"],
+      });
       await proc.exited;
       break;
     }

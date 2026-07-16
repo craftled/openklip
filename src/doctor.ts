@@ -8,6 +8,7 @@ import { isAbsolute, join } from "node:path";
 import { type Project, ProjectSchema } from "./edl.ts";
 import { FFMPEG, FFPROBE } from "./ffmpeg.ts";
 import { projectPaths, projectsRoot } from "./paths.ts";
+import { appRoot } from "./repo-paths.ts";
 import { transcribeScriptPath } from "./script-paths.ts";
 
 export type DoctorStatus = "ok" | "warn" | "fail";
@@ -50,6 +51,13 @@ function projectsRootCheck(): DoctorCheck {
   return existsSync(root)
     ? check("projects-root", "ok", root)
     : check("projects-root", "warn", `projects root not created yet: ${root}`);
+}
+
+// Surfaces the resolved distribution base (see src/repo-paths.ts appRoot) so
+// a wrong/relocated base is visible up front, instead of showing up later as
+// an unrelated "ffmpeg not found" or "whisper missing" failure.
+function appRootCheck(): DoctorCheck {
+  return check("app-root", "ok", appRoot());
 }
 
 function relPath(dir: string, p: string): string {
@@ -129,6 +137,7 @@ async function projectChecks(slug: string): Promise<DoctorCheck[]> {
 
 export async function runDoctor(slug?: string): Promise<DoctorReport> {
   const checks: DoctorCheck[] = [
+    appRootCheck(),
     binaryCheck("ffmpeg", FFMPEG),
     binaryCheck("ffprobe", FFPROBE),
     whisperCheck(),
