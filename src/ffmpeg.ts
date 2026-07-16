@@ -129,16 +129,47 @@ function spawnFfprobe(args: string[]) {
     : new Error(String(lastError ?? "ffprobe spawn failed"));
 }
 
+// Thrown instead of the generic exit-code error when a spawned subprocess
+// (or, for src/audio-analysis.ts's cooperative case, a pure-JS analysis
+// loop) was stopped because its AbortSignal fired rather than because it
+// genuinely failed. Callers (src/ingest-jobs.ts, src/silences-jobs.ts)
+// check `instanceof ProcessCancelledError` to land a job in "cancelled"
+// instead of "error".
+export class ProcessCancelledError extends Error {
+  constructor(label = "process") {
+    super(`${label} cancelled`);
+    this.name = "ProcessCancelledError";
+  }
+}
+
 export async function run(
   bin: string,
   args: string[],
-  label = "ffmpeg"
+  label = "ffmpeg",
+  signal?: AbortSignal
 ): Promise<void> {
+  if (signal?.aborted) {
+    throw new ProcessCancelledError(label);
+  }
   const proc = Bun.spawn([bin, ...args], { stdout: "pipe", stderr: "pipe" });
-  const code = await proc.exited;
-  if (code !== 0) {
-    const err = await new Response(proc.stderr).text();
-    throw new Error(`${label} failed (exit ${code}):\n${err.slice(-1800)}`);
+  let onAbort: (() => void) | undefined;
+  if (signal) {
+    onAbort = () => proc.kill();
+    signal.addEventListener("abort", onAbort, { once: true });
+  }
+  try {
+    const code = await proc.exited;
+    if (code !== 0) {
+      if (signal?.aborted) {
+        throw new ProcessCancelledError(label);
+      }
+      const err = await new Response(proc.stderr).text();
+      throw new Error(`${label} failed (exit ${code}):\n${err.slice(-1800)}`);
+    }
+  } finally {
+    if (signal && onAbort) {
+      signal.removeEventListener("abort", onAbort);
+    }
   }
 }
 

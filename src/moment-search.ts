@@ -8,6 +8,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { unlink } from "node:fs/promises";
 import type { Project } from "./edl.ts";
+import { ProcessCancelledError } from "./ffmpeg.ts";
 import { projectPaths } from "./paths.ts";
 import { normalizeText } from "./phrase-match.ts";
 import { acquireProjectFileLock } from "./project-file-lock.ts";
@@ -508,6 +509,10 @@ export function searchScenes(
 
 export interface BuildMomentIndexOptions {
   force?: boolean;
+  /** External cancellation (CRAFT-6253), alongside the internal
+   * MOMENT_INDEX_BUILD_TIMEOUT_MS kill-timeout below: either firing kills
+   * the spawned embed worker. */
+  signal?: AbortSignal;
 }
 
 export interface BuildMomentIndexResult {
@@ -581,6 +586,9 @@ export function buildMomentIndex(
         }
       }
 
+      if (opts.signal?.aborted) {
+        throw new ProcessCancelledError("moment index build");
+      }
       const proc = Bun.spawn(
         [
           "node",
@@ -596,13 +604,24 @@ export function buildMomentIndex(
         () => proc.kill(),
         MOMENT_INDEX_BUILD_TIMEOUT_MS
       );
+      let onAbort: (() => void) | undefined;
+      if (opts.signal) {
+        onAbort = () => proc.kill();
+        opts.signal.addEventListener("abort", onAbort, { once: true });
+      }
       let exitCode: number;
       try {
         exitCode = await proc.exited;
       } finally {
         clearTimeout(killTimer);
+        if (opts.signal && onAbort) {
+          opts.signal.removeEventListener("abort", onAbort);
+        }
       }
       if (exitCode !== 0) {
+        if (opts.signal?.aborted) {
+          throw new ProcessCancelledError("moment index build");
+        }
         throw new Error("moment index build failed");
       }
       const built = readIndexFile(indexPath);

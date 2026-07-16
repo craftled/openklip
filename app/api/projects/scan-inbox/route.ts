@@ -22,10 +22,12 @@ export function POST(req: Request): Response {
   }
   const pending = scanInboxRoot().filter((v) => !isSlugInFlight(v.slug));
   for (const v of pending) {
+    const sourcePath = inboxVideoPath(v.file);
     startIngestJob({
       filename: v.file,
       slug: v.slug,
-      run: (onProgress) => ingest(inboxVideoPath(v.file), { onProgress }),
+      sourcePath,
+      run: (onProgress, signal) => ingest(sourcePath, { onProgress, signal }),
     });
   }
   return Response.json({ jobs: listIngestJobs() });

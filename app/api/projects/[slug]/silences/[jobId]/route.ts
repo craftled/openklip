@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
+import { trustGuard } from "@engine/local-trust";
 import { assertValidSlug, projectPaths } from "@engine/paths";
-import { getSilencesJob } from "@engine/silences-jobs";
+import { deleteSilencesJobRecord, getSilencesJob } from "@engine/silences-jobs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,4 +31,40 @@ export async function GET(_req: Request, { params }: RouteParams) {
   }
 
   return Response.json(job);
+}
+
+// Clean up a terminal silences job's record (does not touch project data;
+// see src/silences-jobs.ts's deleteSilencesJobRecord doc). 404 for an
+// unknown job id (or one belonging to a different slug); 409 with an
+// actionable error when the job is still running.
+export async function DELETE(req: Request, { params }: RouteParams) {
+  const denied = trustGuard(req);
+  if (denied) {
+    return denied;
+  }
+  const { slug, jobId } = await params;
+  try {
+    assertValidSlug(slug);
+  } catch (e) {
+    return Response.json({ error: (e as Error).message }, { status: 400 });
+  }
+
+  if (!existsSync(projectPaths(slug).project)) {
+    return Response.json(
+      { error: `project not found: ${slug}` },
+      { status: 404 }
+    );
+  }
+
+  const job = getSilencesJob(jobId);
+  if (!job || job.slug !== slug) {
+    return Response.json({ error: "job not found" }, { status: 404 });
+  }
+
+  try {
+    deleteSilencesJobRecord(jobId);
+    return Response.json({ ok: true });
+  } catch (e) {
+    return Response.json({ error: (e as Error).message }, { status: 409 });
+  }
 }

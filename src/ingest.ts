@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { mkdir, rm } from "node:fs/promises";
 import { isAbsolute } from "node:path";
 import { type Project, ProjectSchema, SAMPLE_RATE, type Word } from "./edl.ts";
-import { FFMPEG, probe, run } from "./ffmpeg.ts";
+import { FFMPEG, ProcessCancelledError, probe, run } from "./ffmpeg.ts";
 import { assertProjectCanBeIngested } from "./ingest-guard.ts";
 import { forceIngestWithSwap } from "./ingest-swap.ts";
 import type { IngestPhase, IngestProgress } from "./ingest-types.ts";
@@ -27,7 +27,11 @@ interface RawChunk {
 // and the two paths cannot drift.
 
 /** Build the all-intra 720p proxy + 48k stereo AAC at `outProxy`. */
-export function buildProxy(source: string, outProxy: string): Promise<void> {
+export function buildProxy(
+  source: string,
+  outProxy: string,
+  signal?: AbortSignal
+): Promise<void> {
   return run(
     FFMPEG,
     [
@@ -60,12 +64,17 @@ export function buildProxy(source: string, outProxy: string): Promise<void> {
       "+faststart",
       outProxy,
     ],
-    "ffmpeg(proxy)"
+    "ffmpeg(proxy)",
+    signal
   );
 }
 
 /** Extract 16k mono f32 PCM to `outAudio` for Whisper. */
-export function extractAudio(source: string, outAudio: string): Promise<void> {
+export function extractAudio(
+  source: string,
+  outAudio: string,
+  signal?: AbortSignal
+): Promise<void> {
   return run(
     FFMPEG,
     [
@@ -81,14 +90,16 @@ export function extractAudio(source: string, outAudio: string): Promise<void> {
       "f32le",
       outAudio,
     ],
-    "ffmpeg(audio)"
+    "ffmpeg(audio)",
+    signal
   );
 }
 
 /** Sample frames from the proxy for moment search / agent cards (non-fatal). */
 export function extractSampleFrames(
   proxyPath: string,
-  framesDir: string
+  framesDir: string,
+  signal?: AbortSignal
 ): Promise<void> {
   return run(
     FFMPEG,
@@ -102,7 +113,8 @@ export function extractSampleFrames(
       "4",
       `${framesDir}/%04d.jpg`,
     ],
-    "ffmpeg(frames)"
+    "ffmpeg(frames)",
+    signal
   );
 }
 
@@ -126,17 +138,38 @@ export function wordsFromRawChunks(raw: RawChunk[]): Word[] {
 }
 
 // Run the Whisper transcriber on a 16k PCM file and return the canonical words.
-// `rawJson` is the scratch path the node side writes its chunk JSON to.
+// `rawJson` is the scratch path the node side writes its chunk JSON to. This
+// spawns directly with Bun.spawn (not src/ffmpeg.ts's run()), so it mirrors
+// run()'s own kill-on-abort + distinguishable-error pattern locally instead
+// of sharing it.
 export async function transcribeToWords(
   audioRaw: string,
-  rawJson: string
+  rawJson: string,
+  signal?: AbortSignal
 ): Promise<Word[]> {
+  if (signal?.aborted) {
+    throw new ProcessCancelledError("transcribe");
+  }
   const proc = Bun.spawn(["node", transcribeScriptPath(), audioRaw, rawJson], {
     stdout: "inherit",
     stderr: "inherit",
   });
-  if ((await proc.exited) !== 0) {
-    throw new Error("transcription step failed");
+  let onAbort: (() => void) | undefined;
+  if (signal) {
+    onAbort = () => proc.kill();
+    signal.addEventListener("abort", onAbort, { once: true });
+  }
+  try {
+    if ((await proc.exited) !== 0) {
+      if (signal?.aborted) {
+        throw new ProcessCancelledError("transcribe");
+      }
+      throw new Error("transcription step failed");
+    }
+  } finally {
+    if (signal && onAbort) {
+      signal.removeEventListener("abort", onAbort);
+    }
   }
   const raw = (
     JSON.parse(await Bun.file(rawJson).text()) as { chunks: RawChunk[] }
@@ -177,19 +210,37 @@ export function ingestProgressForPhase(
  * Defaults match production ffmpeg / Whisper / CLIP paths.
  */
 export interface IngestMediaDeps {
-  buildMomentIndex: (slug: string) => Promise<unknown>;
-  buildProxy: (source: string, outProxy: string) => Promise<void>;
-  extractAudio: (source: string, outAudio: string) => Promise<void>;
-  extractSampleFrames: (proxyPath: string, framesDir: string) => Promise<void>;
+  buildMomentIndex: (slug: string, signal?: AbortSignal) => Promise<unknown>;
+  buildProxy: (
+    source: string,
+    outProxy: string,
+    signal?: AbortSignal
+  ) => Promise<void>;
+  extractAudio: (
+    source: string,
+    outAudio: string,
+    signal?: AbortSignal
+  ) => Promise<void>;
+  extractSampleFrames: (
+    proxyPath: string,
+    framesDir: string,
+    signal?: AbortSignal
+  ) => Promise<void>;
   log?: (line: string) => void;
-  transcribeToWords: (audioRaw: string, rawJson: string) => Promise<Word[]>;
+  transcribeToWords: (
+    audioRaw: string,
+    rawJson: string,
+    signal?: AbortSignal
+  ) => Promise<Word[]>;
 }
 
 const defaultMediaDeps: IngestMediaDeps = {
   buildProxy,
   extractAudio,
   extractSampleFrames,
-  buildMomentIndex,
+  // Wrapped (not passed directly) because buildMomentIndex's real signature
+  // takes an options object, not a bare signal.
+  buildMomentIndex: (slug, signal) => buildMomentIndex(slug, { signal }),
   transcribeToWords,
   log: (line) => console.log(line),
 };
@@ -213,49 +264,74 @@ export async function runIngestMediaPhases(opts: {
   deps?: Partial<IngestMediaDeps>;
   emit?: (phase: IngestPhase) => void;
   paths: IngestMediaPaths;
+  signal?: AbortSignal;
   slug: string;
   source: string;
 }): Promise<Word[]> {
   const deps: IngestMediaDeps = { ...defaultMediaDeps, ...opts.deps };
   const log = deps.log ?? (() => undefined);
   const emit = opts.emit ?? (() => undefined);
-  const { source, slug, paths } = opts;
+  const { source, slug, paths, signal } = opts;
+
+  // Checked before starting each phase (not just relying on the spawned
+  // process's own abort listener) so an abort landing in the gap BETWEEN
+  // two phases is still honored promptly instead of waiting for the next
+  // phase to spawn and then immediately die.
+  const checkAborted = () => {
+    if (signal?.aborted) {
+      throw new ProcessCancelledError("ingest");
+    }
+  };
 
   const videoTrack = (async () => {
+    checkAborted();
     emit("proxy");
     log("[ingest] building all-intra 720p proxy (fast seeks) + 48k audio...");
-    await deps.buildProxy(source, paths.proxy);
+    await deps.buildProxy(source, paths.proxy, signal);
 
+    checkAborted();
     emit("frames");
     log("[ingest] extracting sample frames (for the agent layer later)...");
     try {
-      await deps.extractSampleFrames(paths.proxy, paths.frames);
+      await deps.extractSampleFrames(paths.proxy, paths.frames, signal);
     } catch (e) {
+      // A cancellation must propagate as a cancellation, not be swallowed
+      // by this phase's normal non-fatal handling.
+      if (e instanceof ProcessCancelledError) {
+        throw e;
+      }
       log(`[ingest]   frames skipped: ${(e as Error).message}`);
     }
 
+    checkAborted();
     emit("index");
     log(
       "[ingest] indexing frames for visual search (first run downloads the CLIP model)..."
     );
     // Non-fatal: embedding/model-download failure must not block a project.
     try {
-      await deps.buildMomentIndex(slug);
+      await deps.buildMomentIndex(slug, signal);
     } catch (e) {
+      if (e instanceof ProcessCancelledError) {
+        throw e;
+      }
       log(`[ingest]   moment index skipped: ${(e as Error).message}`);
     }
   })();
 
   const audioTrack = (async () => {
+    checkAborted();
     emit("audio");
     log("[ingest] extracting 16k mono PCM for transcription...");
-    await deps.extractAudio(source, paths.audioRaw);
+    await deps.extractAudio(source, paths.audioRaw, signal);
 
+    checkAborted();
     emit("transcribe");
     log("[ingest] transcribing (first run downloads the Whisper model)...");
     return await deps.transcribeToWords(
       paths.audioRaw,
-      paths.transcriptRawJson
+      paths.transcriptRawJson,
+      signal
     );
   })();
 
@@ -317,6 +393,10 @@ export interface IngestOpts {
    */
   mediaDeps?: Partial<IngestMediaDeps>;
   onProgress?: (p: IngestProgress) => void;
+  /** Cooperative cancellation (CRAFT-6253): threaded into every ffmpeg/
+   * Whisper/CLIP spawn and checked between phases. See src/ingest-jobs.ts's
+   * cancelIngestJob for the caller side. */
+  signal?: AbortSignal;
 }
 
 // The actual ingest work for one target: probe -> proxy/audio/frames/index +
@@ -331,8 +411,15 @@ async function ingestCore(
   opts?: {
     onProgress?: (p: IngestProgress) => void;
     mediaDeps?: Partial<IngestMediaDeps>;
+    signal?: AbortSignal;
   }
 ): Promise<void> {
+  const signal = opts?.signal;
+  const checkAborted = () => {
+    if (signal?.aborted) {
+      throw new ProcessCancelledError("ingest");
+    }
+  };
   const emit = (phase: IngestPhase) => {
     if (!opts?.onProgress) {
       return;
@@ -342,12 +429,14 @@ async function ingestCore(
       opts.onProgress(progress);
     }
   };
+  checkAborted();
   const p = projectPaths(targetSlug);
   await rm(p.dir, { recursive: true, force: true });
   await mkdir(p.assets, { recursive: true });
   await mkdir(p.frames, { recursive: true });
   await mkdir(p.output, { recursive: true });
 
+  checkAborted();
   console.log(`[ingest] ${source}`);
   emit("probe");
   const meta = await probe(source);
@@ -355,6 +444,7 @@ async function ingestCore(
     `[ingest] ${meta.width}x${meta.height} ${meta.fps}fps ${meta.durationSec.toFixed(1)}s`
   );
 
+  checkAborted();
   const words = await runIngestMediaPhases({
     source,
     slug: targetSlug,
@@ -366,8 +456,10 @@ async function ingestCore(
     },
     emit,
     deps: opts?.mediaDeps,
+    signal,
   });
 
+  checkAborted();
   emit("finalize");
   const project: Project = ProjectSchema.parse({
     version: 1,
@@ -420,6 +512,7 @@ export async function ingest(
         ingestCore(src, targetSlug, {
           onProgress: coreOpts?.onProgress,
           mediaDeps: opts.mediaDeps,
+          signal: opts.signal,
         }),
       opts
     );
