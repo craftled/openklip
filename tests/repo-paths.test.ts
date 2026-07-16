@@ -15,6 +15,7 @@ import {
   cwdPath,
   repoPath,
   resolveAppRootFrom,
+  stateDir,
 } from "../src/repo-paths.ts";
 import { templatesRoot } from "../src/templates.ts";
 
@@ -86,6 +87,83 @@ test("repoPath resolves against an overridden appRoot, not raw cwd", () => {
       process.env.OPENKLIP_APP_ROOT = prev;
     }
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ── Writable-state resolver (CRAFT-6187 Stage B) ──
+// Order: explicit OPENKLIP_STATE_DIR override (a packaged launcher pointing
+// at an OS-standard location, e.g. Application Support on macOS) >
+// cwdPath(".openklip") fallback (unchanged dev/pre-Stage-B behavior). Kept
+// deliberately separate from appRoot(): the app bundle is expected to be
+// READ-ONLY, so writable state (workspace root, integration provider keys)
+// needs a base that is never inside it.
+
+test("stateDir honors an explicit OPENKLIP_STATE_DIR override", () => {
+  const dir = mkdtempSync(join(tmpdir(), "openklip-state-dir-override-"));
+  const prev = process.env.OPENKLIP_STATE_DIR;
+  try {
+    process.env.OPENKLIP_STATE_DIR = dir;
+    assert.equal(stateDir(), resolve(dir));
+    assert.equal(
+      stateDir("integrations.json"),
+      join(resolve(dir), "integrations.json")
+    );
+  } finally {
+    if (prev === undefined) {
+      delete process.env.OPENKLIP_STATE_DIR;
+    } else {
+      process.env.OPENKLIP_STATE_DIR = prev;
+    }
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("stateDir falls back to cwdPath('.openklip') when no override is set", () => {
+  const prev = process.env.OPENKLIP_STATE_DIR;
+  try {
+    delete process.env.OPENKLIP_STATE_DIR;
+    assert.equal(stateDir(), cwdPath(".openklip"));
+    assert.equal(
+      stateDir("projects-root"),
+      join(cwdPath(".openklip"), "projects-root")
+    );
+  } finally {
+    if (prev === undefined) {
+      delete process.env.OPENKLIP_STATE_DIR;
+    } else {
+      process.env.OPENKLIP_STATE_DIR = prev;
+    }
+  }
+});
+
+test("stateDir override is independent of appRoot — a packaged launcher can point them at different places", () => {
+  const stateDirOverride = mkdtempSync(
+    join(tmpdir(), "openklip-state-dir-independent-")
+  );
+  const appRootOverride = mkdtempSync(
+    join(tmpdir(), "openklip-app-root-independent-")
+  );
+  const prevState = process.env.OPENKLIP_STATE_DIR;
+  const prevApp = process.env.OPENKLIP_APP_ROOT;
+  try {
+    process.env.OPENKLIP_STATE_DIR = stateDirOverride;
+    process.env.OPENKLIP_APP_ROOT = appRootOverride;
+    assert.equal(stateDir(), resolve(stateDirOverride));
+    assert.equal(appRoot(), resolve(appRootOverride));
+    assert.notEqual(stateDir(), appRoot());
+  } finally {
+    if (prevState === undefined) {
+      delete process.env.OPENKLIP_STATE_DIR;
+    } else {
+      process.env.OPENKLIP_STATE_DIR = prevState;
+    }
+    if (prevApp === undefined) {
+      delete process.env.OPENKLIP_APP_ROOT;
+    } else {
+      process.env.OPENKLIP_APP_ROOT = prevApp;
+    }
+    rmSync(stateDirOverride, { recursive: true, force: true });
+    rmSync(appRootOverride, { recursive: true, force: true });
   }
 });
 

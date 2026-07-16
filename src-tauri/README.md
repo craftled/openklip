@@ -4,48 +4,105 @@ Wraps OpenKlip as a macOS app. It spawns the existing production server
 (`openklip serve`, CRAFT-6185) as a **Bun sidecar** on a private loopback port
 and loads the editor in the system WebView (WKWebView).
 
-## Status: Stage A (walking skeleton) — working, verified
+## Status: Stage B (self-contained bundling) — working, verified
 
-- `cargo build` succeeds against the system WebKit (no bundled Chromium).
-- `main.rs` spawns the Bun production server, shows an instant splash, and
-  navigates to the editor once the server is listening; the sidecar is killed
-  on app exit.
-- **De-risked:** the full editor + real video playback + WebGL + MediaSource
-  render correctly in WKWebView (the reason Tauri was chosen over Electron —
-  no bundled Chromium — is validated).
+Verified end-to-end against a REAL `cargo tauri build --debug` output
+(`.app`, not just a dev binary), launched the standard way (`open`, going
+through LaunchServices) and quit the standard way (a real Quit AppleEvent):
+
+- **Fully self-contained**: the bundled `Contents/Resources/app/` (built
+  `.next`, a production-pruned `node_modules`, `src/`, and all runtime asset
+  dirs — `scripts/prepare-desktop-bundle.ts`) plus a bundled `bun` binary
+  (`Contents/MacOS/bun`, Tauri's `externalBin`) run with **zero reference to
+  the live repo checkout or a system-installed Bun**. Proved by running an
+  actual export through the bundled CLI + bundled `ffmpeg-static` and
+  confirming a real, valid H.264/AAC MP4 came out the other end.
+- **No orphaned processes on quit.** `serve` spawns its own `next start`
+  grandchild (see `src/cli.ts`); a naive kill of just the direct sidecar
+  child leaves it running. Fixed by spawning with `.process_group(0)`
+  (atomic, pre-exec) and killing the whole process group on
+  `RunEvent::Exit`. Verified via a real AppleEvent quit against a running
+  bundle: process tree fully clean afterward, zero orphans.
+  - Note for anyone modifying this: a *retroactive* `setpgid()` after
+    `spawn()` returns does **not** work here — POSIX only allows a parent to
+    change a child's process group before that child has exec'd, and
+    exec happens before Rust code can react. This was tried first (via
+    `tauri-plugin-shell`'s `Command::sidecar()`, which has no pre-exec
+    option) and empirically failed 100% of the time, not just as a rare
+    race — see the comment in `src/main.rs`.
+- **Writable state relocated** to OS-standard locations, never inside the
+  read-only bundle: workspace root + integration provider keys in
+  Application Support (`OPENKLIP_STATE_DIR`, `src/repo-paths.ts`'s
+  `stateDir()`), the Whisper/CLIP model cache in Caches
+  (`OPENKLIP_MODEL_CACHE`, already consumed since CRAFT-6243). Dev mode is
+  unchanged (still cwd-relative `.openklip/`).
+- **De-risked separately**: the full editor + real video playback + WebGL +
+  MediaSource render correctly in WKWebView (the reason Tauri was chosen
+  over Electron — no bundled Chromium — is validated).
 - Signing/notarization is wired (`entitlements.plist` + `tauri.conf.json`
   macOS block) and documented in `docs/desktop-packaging-runbook.md`.
 
-### Run the skeleton (dev)
+### Known gap: DMG bundling hangs in this (sandboxed/automated) session
+
+`cargo tauri build`'s `.app` bundling succeeds every time; the follow-on DMG
+step (`bundle_dmg.sh`, wrapping `create-dmg`) reliably hung in this
+environment. `create-dmg` opens a Finder window to lay out the icon/
+app-drop-link positions, which needs a real interactive desktop session —
+this sandboxed execution context doesn't have one. This has **not** been
+reproduced or ruled out on a normal interactive Mac session (which is how a
+human running the runbook would actually invoke it). If it recurs there,
+first suspects: Finder/Accessibility automation permissions for the
+terminal/IDE running the build, or pin a `create-dmg` version known to
+support headless/CI use. The `.app` bundle itself — the thing that actually
+gets signed, notarized, and tested — is unaffected either way.
+
+### Rebuild + test the bundle yourself
 
 ```bash
-bun run build                                   # build the Next production app
-# seed a project, then:
+bun run build                                 # production Next build
+bunx @tauri-apps/cli@2 build --debug          # unsigned .app (DMG may hang, see above)
+scripts/verify-macos-signature.sh src-tauri/target/debug/bundle/macos/OpenKlip.app  # only meaningful once signed (Stage C)
+
+# functional check, no signing needed:
+open -n src-tauri/target/debug/bundle/macos/OpenKlip.app
+# ...then, from another terminal, confirm no repo/system deps and a clean quit:
+ps -eo pid,ppid,pgid,command | grep -E 'OpenKlip.app|MacOS/bun'
+osascript -e 'tell application id "com.craftled.openklip" to quit'
+```
+
+### Run the raw dev skeleton (no bundling, fastest iteration loop)
+
+```bash
+bun run build
 OPENKLIP_APP_ROOT="$(pwd)" OPENKLIP_SLUG=<slug> OPENKLIP_PROJECTS_ROOT=<root> \
   src-tauri/target/debug/openklip-desktop
 ```
 
 ## Remaining
 
-### Stage B — self-contained bundling (agent-doable, the big lift)
-The skeleton runs `bun run src/cli.ts serve` from `OPENKLIP_APP_ROOT` (a repo
-checkout). To ship, bundle the runtime **into the app** so it needs no repo:
-
-- Bundle Bun + the built `.next` + the runtime `node_modules` subset + ffmpeg
-  (`ffmpeg-static`, `@ffprobe-installer`) + the `.mjs` model scripts + assets
-  (`graphics`/`templates`/`luts`/`brands`/`ingesters`/`tools`) into the app's
-  `Resources`, as an `externalBin`/resource set.
-- Point `OPENKLIP_APP_ROOT` at that Resources dir; `appRoot()` (CRAFT-6185)
-  already resolves read-only assets from it.
-- Relocate **writable** state to Application Support: `.openklip`
-  (workspace root + integration keys) and the model cache (`OPENKLIP_MODEL_CACHE`),
-  never inside the read-only app bundle or Caches.
-- Sidecar hardening: kill the whole process group on exit (the `next start`
-  grandchild currently orphans on hard-kill), single-instance lock, per-launch
-  token between webview and sidecar (loopback trust guard already exists,
-  CRAFT-6175).
-- First-run: workspace picker with a `~/Movies/OpenKlip` default; resumable,
-  checksummed model download that doesn't block reaching the editor.
+### Still open (agent-doable)
+- **First-run UX**: a workspace picker (native folder dialog, default
+  `~/Movies/OpenKlip`) and resumable/checksummed model-download UX that
+  doesn't block reaching the editor. Not yet built — first launch today
+  relies on whatever `openklip serve`'s existing doctor/health gate already
+  does, same as the CLI.
+- **Single-instance guard**: nothing yet prevents two copies of the app
+  running two sidecars. `tauri-plugin-single-instance` is the standard
+  building block; a stale-PID-file check in Application Support (same
+  mechanism as any future orphan-cleanup-on-relaunch) is a reasonable
+  pairing.
+- **Log-file redirection**: sidecar stdout/stderr currently inherit this
+  process's own (visible only if launched from a terminal, not from
+  Finder). Redirecting to a file under `app.path().app_log_dir()` (Application
+  Support/Logs) is a small, contained follow-up.
+- **Crash resilience beyond graceful quit**: the process-group fix
+  guarantees clean teardown on a *graceful* quit (menu Quit, Cmd+Q, an
+  AppleEvent). A hard `kill -9`/force-quit of the top-level app process
+  itself cannot be intercepted by anything, in any language — this is a
+  fundamental OS limitation, not specific to this app. The accepted
+  mitigation (not yet implemented) is a stale-sidecar cleanup check on the
+  *next* launch, which naturally falls out of the single-instance PID-file
+  mechanism above.
 
 ### Stage C — sign / notarize / release [human-only final step]
 Fully scripted; runs on the human's Developer ID. See
