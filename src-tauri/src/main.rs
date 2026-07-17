@@ -220,9 +220,19 @@ fn main() {
             let ready = Arc::new(AtomicBool::new(false));
             let sidecar_gone = Arc::new(AtomicBool::new(false));
             let stderr_tail = Arc::new(Mutex::new(String::new()));
+            // Set once the reader thread has drained the pipe to EOF. The
+            // child-wait thread below polls this (bounded) before it
+            // snapshots the tail: child.wait() returns the moment the
+            // process dies, which can beat the reader to the last buffered
+            // stderr — exactly the bytes that say WHY a fast-failing engine
+            // died. A bounded wait (not a join) because the `next start`
+            // grandchild inherits the write end of this pipe, so EOF may
+            // never come while it lives.
+            let stderr_done = Arc::new(AtomicBool::new(child.stderr.is_none()));
 
             if let Some(mut err) = child.stderr.take() {
                 let tail = Arc::clone(&stderr_tail);
+                let done = Arc::clone(&stderr_done);
                 std::thread::spawn(move || {
                     let mut buf = [0u8; 4096];
                     loop {
@@ -243,6 +253,7 @@ fn main() {
                             }
                         }
                     }
+                    done.store(true, Ordering::SeqCst);
                 });
             }
 
@@ -258,11 +269,20 @@ fn main() {
                 let ready = Arc::clone(&ready);
                 let gone = Arc::clone(&sidecar_gone);
                 let tail = Arc::clone(&stderr_tail);
+                let drained = Arc::clone(&stderr_done);
                 std::thread::spawn(move || {
                     let status = child.wait();
                     gone.store(true, Ordering::SeqCst);
                     if ready.load(Ordering::SeqCst) {
                         return;
+                    }
+                    // Give the reader up to ~1s to drain what the dead
+                    // process left buffered in the pipe before snapshotting.
+                    for _ in 0..20 {
+                        if drained.load(Ordering::SeqCst) {
+                            break;
+                        }
+                        std::thread::sleep(Duration::from_millis(50));
                     }
                     let code = status
                         .ok()
