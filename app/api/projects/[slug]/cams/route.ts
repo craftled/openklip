@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import type { Cam, CamRole } from "@engine/cams";
 import { startIngestJob } from "@engine/ingest-jobs";
+import type { IngestProgress } from "@engine/ingest-types";
 import { trustGuard } from "@engine/local-trust";
 import { assertValidSlug, projectPaths } from "@engine/paths";
 import {
@@ -34,6 +35,7 @@ export type IngestCamFn = (
     role?: CamRole;
     offsetMs?: number;
     force?: boolean;
+    onProgress?: (progress: IngestProgress) => void;
     signal?: AbortSignal;
   }
 ) => Promise<Cam>;
@@ -179,7 +181,7 @@ export function createCamsPost({ loadIngestCam, tempRoot }: CamsPostDeps) {
         // src/ingest-jobs.ts's retryIngestJob doc), but still the best
         // "original source" value to record for this job's record shape.
         sourcePath: tmpPath,
-        run: async (_onProgress, signal) => {
+        run: async (onProgress, signal) => {
           const camsRoot = projectPaths(slug).cams;
           const durablePath = join(
             camsRoot,
@@ -194,6 +196,7 @@ export function createCamsPost({ loadIngestCam, tempRoot }: CamsPostDeps) {
               role,
               offsetMs,
               force: true,
+              onProgress,
               signal,
             });
             return cam.id;

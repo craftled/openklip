@@ -118,6 +118,26 @@ test("ingestCam assigns cam1 then cam2 when ids are omitted", async () => {
   });
 });
 
+test("ingestCam reports probe, proxy, and audio progress in order", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    const video = join(projectPaths(slug).dir, "progress.mp4");
+    touchVideo(video);
+
+    const progress: Array<{ phase: string; step: number; total: number }> = [];
+    await ingestCam(slug, video, {
+      onProgress: (p) => {
+        progress.push({ phase: p.phase, step: p.step, total: p.total });
+      },
+    });
+
+    assert.deepEqual(progress, [
+      { phase: "probe", step: 1, total: 3 },
+      { phase: "proxy", step: 2, total: 3 },
+      { phase: "audio", step: 3, total: 3 },
+    ]);
+  });
+});
+
 test("ingestCam applies default speaker names by ingest order", async () => {
   await withTempProjectsRoot(async ({ slug }) => {
     const videoA = join(projectPaths(slug).dir, "a.mp4");
