@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { JobsList } from "../web/components/jobs-panel.tsx";
+import { JobsList, openTargetSlug } from "../web/components/jobs-panel.tsx";
 import type { JobView } from "../web/lib/jobs-client.ts";
 
 function job(overrides: Partial<JobView> = {}): JobView {
@@ -139,4 +139,23 @@ test("rows are keyed by kind+id so an ingest job and a silences job never collid
   });
   const rows = html.match(/data-job-row/g) ?? [];
   assert.equal(rows.length, 2);
+});
+
+test("openTargetSlug returns the parent slug for a composite take job", () => {
+  assert.equal(openTargetSlug(job({ slug: "demo/takes/abc123" })), "demo");
+});
+
+test("openTargetSlug returns the parent slug for a composite cam job", () => {
+  assert.equal(openTargetSlug(job({ slug: "demo/cams/abc123" })), "demo");
+});
+
+test("openTargetSlug returns a bare project slug unchanged", () => {
+  assert.equal(openTargetSlug(job({ slug: "demo" })), "demo");
+});
+
+test("openTargetSlug handles nested parent slugs before the takes marker", () => {
+  assert.equal(
+    openTargetSlug(job({ slug: "parent/child/takes/xyz" })),
+    "parent/child"
+  );
 });

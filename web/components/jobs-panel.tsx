@@ -44,6 +44,23 @@ function rowKey(job: JobView): string {
   return `${job.kind}:${job.id}`;
 }
 
+const COMPOSITE_SLUG_MARKERS = ["/takes/", "/cams/"] as const;
+
+/** Take/cam ingest jobs carry a composite `job.slug` of the form
+ * `${parentSlug}/takes/${id}` or `${parentSlug}/cams/${id}` (see
+ * src/ingest-jobs.ts). Those aren't real project routes, so Open must
+ * navigate to the parent project instead. Whole-project ingest jobs have
+ * a bare slug and pass through unchanged. */
+export function openTargetSlug(job: JobView): string {
+  for (const marker of COMPOSITE_SLUG_MARKERS) {
+    const index = job.slug.indexOf(marker);
+    if (index !== -1) {
+      return job.slug.slice(0, index);
+    }
+  }
+  return job.slug;
+}
+
 const RETRYABLE: ReadonlySet<JobView["status"]> = new Set([
   "error",
   "interrupted",
@@ -365,7 +382,7 @@ export function JobsPanel({ slug }: { slug: string | null }) {
 
   const handleOpen = useCallback(
     (job: JobView) => {
-      router.push(`/?slug=${encodeURIComponent(job.slug)}`);
+      router.push(`/?slug=${encodeURIComponent(openTargetSlug(job))}`);
     },
     [router]
   );
