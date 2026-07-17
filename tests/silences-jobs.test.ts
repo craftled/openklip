@@ -9,6 +9,7 @@ import {
   deleteSilencesJobRecord,
   getSilencesJob,
   isSlugSilencesAnalysisInFlight,
+  listSilencesJobs,
   resetSilencesJobsForTests,
   retrySilencesJob,
   startSilencesJob,
@@ -418,5 +419,86 @@ test("deleteSilencesJobRecord returns false for an unknown job id", async () => 
   await withTempProjectsRoot(() => {
     resetSilencesJobsForTests();
     assert.equal(deleteSilencesJobRecord("nope"), false);
+  });
+});
+
+// ── listSilencesJobs: per-project listing for the Job Center UI ───────────
+
+test("listSilencesJobs returns an empty array for a project with no jobs", async () => {
+  await withTempProjectsRoot(() => {
+    resetSilencesJobsForTests();
+    assert.deepEqual(listSilencesJobs("nope"), []);
+  });
+});
+
+test("listSilencesJobs returns a freshly started job for its slug", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    resetSilencesJobsForTests();
+    writeFixtureProject(slug, makeProject({ slug }));
+    const pcm = sinePcm(1);
+    writeFileSync(
+      projectPaths(slug).audioRaw,
+      Buffer.from(pcm.buffer, pcm.byteOffset, pcm.byteLength)
+    );
+    const job = startSilencesJob(slug);
+    const jobs = listSilencesJobs(slug);
+    assert.equal(jobs.length, 1);
+    assert.equal(jobs[0]?.id, job.id);
+    await pollSilencesUntilSettled(job.id);
+  });
+});
+
+test("listSilencesJobs hydrates a project's persisted history on a cold Map miss (restart)", async () => {
+  await withTempProjectsRoot(() => {
+    resetSilencesJobsForTests();
+    const now = Date.now();
+    const jobId = "restart-slug~orphan-2";
+    const storePath = projectPaths("restart-slug").silencesJobs;
+    mkdirSync(dirname(storePath), { recursive: true });
+    writeFileSync(
+      storePath,
+      JSON.stringify({
+        jobs: [
+          {
+            id: jobId,
+            slug: "restart-slug",
+            status: "done",
+            createdAt: now,
+            updatedAt: now,
+            silences: [],
+          },
+        ],
+      })
+    );
+    // No prior getSilencesJob/startSilencesJob call for this slug in this
+    // process: the Map has never been hydrated for it. listSilencesJobs must
+    // hydrate on its own, the same way getSilencesJob does on a cold miss.
+    const jobs = listSilencesJobs("restart-slug");
+    assert.equal(jobs.length, 1);
+    assert.equal(jobs[0]?.id, jobId);
+    assert.equal(jobs[0]?.status, "done");
+  });
+});
+
+test("listSilencesJobs only returns jobs belonging to the requested slug", async () => {
+  await withTempProjectsRoot(async ({ slug: slugA }) => {
+    resetSilencesJobsForTests();
+    const slugB = `${slugA}-b`;
+    writeFixtureProject(slugA, makeProject({ slug: slugA }));
+    writeFixtureProject(slugB, makeProject({ slug: slugB }));
+    const pcm = sinePcm(1);
+    for (const slug of [slugA, slugB]) {
+      writeFileSync(
+        projectPaths(slug).audioRaw,
+        Buffer.from(pcm.buffer, pcm.byteOffset, pcm.byteLength)
+      );
+    }
+    const jobA = startSilencesJob(slugA);
+    const jobB = startSilencesJob(slugB);
+    const jobsA = listSilencesJobs(slugA);
+    assert.equal(jobsA.length, 1);
+    assert.equal(jobsA[0]?.id, jobA.id);
+    await pollSilencesUntilSettled(jobA.id);
+    await pollSilencesUntilSettled(jobB.id);
   });
 });

@@ -5,6 +5,7 @@ export const CONFIG_TABS = [
   "cleanup",
   "tools",
   "history",
+  "jobs",
 ] as const;
 
 export type ConfigTabId = (typeof CONFIG_TABS)[number];
@@ -16,6 +17,7 @@ export const CONFIG_TAB_LABELS: Record<ConfigTabId, string> = {
   cleanup: "Cleanup",
   tools: "Tools",
   history: "History",
+  jobs: "Jobs",
 };
 
 export function isConfigTabId(value: string): value is ConfigTabId {
