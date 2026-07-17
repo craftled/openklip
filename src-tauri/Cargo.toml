@@ -1,6 +1,6 @@
 [package]
 name = "openklip-desktop"
-version = "0.42.0"
+version = "0.43.0"
 description = "OpenKlip desktop shell"
 edition = "2021"
 rust-version = "1.77"
@@ -22,3 +22,15 @@ lto = true
 opt-level = "s"
 panic = "abort"
 strip = true
+
+# Build scripts and proc-macro crates (e.g. tauri_macros) are host tools that
+# rustc loads as dylibs at compile time. Inheriting the aggressive release
+# settings above — LTO, codegen-units = 1, and especially strip = true — can
+# produce proc-macro dylibs rustc then fails to load ("can't find crate for
+# `tauri_macros`"), which broke `tauri build --release` intermittently. This
+# override compiles those host artifacts with plain, unstripped settings; it
+# does not affect the shipped binary's optimization, only the build tools.
+[profile.release.build-override]
+opt-level = 0
+codegen-units = 16
+strip = false
