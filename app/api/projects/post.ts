@@ -146,6 +146,7 @@ export function createProjectsPost({ loadIngest, tempRoot }: ProjectsPostDeps) {
         filename: file.name,
         slug,
         sourcePath: tmpPath,
+        force,
         run: async (onProgress, signal) => {
           try {
             const createdSlug = await ingest(tmpPath, {

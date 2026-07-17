@@ -131,6 +131,7 @@ export function createFolderProjectsPost({
         filename: primaryFile.name,
         slug,
         sourcePath: tmpPrimary,
+        force,
         run: async (onProgress, signal) => {
           try {
             const createdSlug = await ingest(tmpPrimary, {

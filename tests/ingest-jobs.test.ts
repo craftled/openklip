@@ -14,8 +14,12 @@ import {
   startIngestJob,
 } from "../src/ingest-jobs.ts";
 import type { IngestProgress } from "../src/ingest-types.ts";
-import { ingestJobsStorePath } from "../src/paths.ts";
-import { withTempProjectsRoot } from "./helpers/projectFixture.ts";
+import { ingestJobsStorePath, projectPaths } from "../src/paths.ts";
+import {
+  makeProject,
+  withTempProjectsRoot,
+  writeFixtureProject,
+} from "./helpers/projectFixture.ts";
 
 const tick = () => new Promise((r) => setTimeout(r, 5));
 
@@ -190,6 +194,41 @@ test("a running job orphaned by a restart is reconciled to interrupted, not lost
   });
 });
 
+test("hydration keeps pre-upgrade records that lack sourcePath, and retry refuses them honestly", async () => {
+  await withTempProjectsRoot(async () => {
+    resetIngestJobsForTests();
+    // A record exactly as a pre-CRAFT-6253 release persisted it: no
+    // sourcePath (the field didn't exist). Dropping it at hydration would
+    // erase the user's ingest history on upgrade — it must load intact.
+    const now = Date.now();
+    const legacyId = "legacy-job-1";
+    const storePath = ingestJobsStorePath();
+    mkdirSync(dirname(storePath), { recursive: true });
+    writeFileSync(
+      storePath,
+      JSON.stringify({
+        jobs: [
+          {
+            id: legacyId,
+            filename: "legacy.mp4",
+            slug: "legacy",
+            status: "error",
+            error: "transcode failed",
+            createdAt: now,
+            updatedAt: now,
+          },
+        ],
+      })
+    );
+
+    assert.equal(getIngestJob(legacyId)?.status, "error");
+
+    const result = await retryIngestJob(legacyId);
+    assert.equal(result.ok, false);
+    assert.match(result.error ?? "", /predates retry support/);
+  });
+});
+
 // ── cancelIngestJob (registry mechanics, no real subprocess) ──────────────
 
 test("cancelIngestJob returns false for an unknown job id", async () => {
@@ -240,6 +279,33 @@ test("cancelIngestJob aborts the run's signal and lands the job in cancelled, no
 
     const persisted = readStore().find((j) => j.id === job.id);
     assert.equal(persisted?.status, "cancelled");
+  });
+});
+
+test("a cancel that lands during unabortable post-ingest work still settles cancelled, not done", async () => {
+  await withTempProjectsRoot(async () => {
+    resetIngestJobsForTests();
+    // Models the route closures' post-ingest phase (source persist,
+    // folder-asset copy): work that never consults the signal and resolves
+    // successfully even after abort. The caller of cancelIngestJob was told
+    // true, so the record must not land on "done".
+    let finish: ((slug: string) => void) | null = null;
+    const job = startIngestJob({
+      filename: "late-cancel.mp4",
+      slug: "late-cancel",
+      sourcePath: "/tmp/late-cancel.mp4",
+      run: () =>
+        new Promise<string>((resolve) => {
+          finish = resolve;
+        }),
+    });
+
+    assert.equal(cancelIngestJob(job.id), true);
+    finish?.("late-cancel");
+    await pollUntilSettled(job.id);
+    assert.equal(getIngestJob(job.id)?.status, "cancelled");
+    assert.equal(getIngestJob(job.id)?.error, "Cancelled by user");
+    assert.equal(isSlugInFlight("late-cancel"), false);
   });
 });
 
@@ -375,6 +441,37 @@ test("retryIngestJob refuses a take/cam composite-slug job (not a whole-project 
     const result = await retryIngestJob(job.id);
     assert.equal(result.ok, false);
     assert.match(result.error ?? "", /whole-project ingest/);
+  });
+});
+
+test("retryIngestJob refuses synchronously when a non-force job's project already exists", async () => {
+  await withTempProjectsRoot(async ({ root }) => {
+    resetIngestJobsForTests();
+    // The dir can hold either this job's own half-written output (interrupted
+    // after project.json landed) or a project the original run was refused
+    // over. Retry must not silently escalate to force — and must say so NOW,
+    // not return ok:true and fail asynchronously inside ingest()'s
+    // assertProjectCanBeIngested.
+    const slug = "occupied";
+    writeFixtureProject(slug, makeProject({ slug }));
+    const sourcePath = join(root, "occupied-source.mp4");
+    writeFileSync(sourcePath, "not-a-real-video");
+
+    const job = startIngestJob({
+      filename: "occupied-source.mp4",
+      slug,
+      sourcePath,
+      run: () => Promise.reject(new Error("boom")),
+    });
+    await tick();
+    assert.equal(getIngestJob(job.id)?.status, "error");
+    assert.equal(existsSync(projectPaths(slug).project), true);
+
+    const result = await retryIngestJob(job.id);
+    assert.equal(result.ok, false);
+    assert.match(result.error ?? "", /already exists/);
+    // Still terminal — the refusal never flipped it back to running.
+    assert.equal(getIngestJob(job.id)?.status, "error");
   });
 });
 

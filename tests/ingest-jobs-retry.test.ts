@@ -27,10 +27,12 @@ interface FakeIngestOpts {
 let ingestCallCount = 0;
 let failNextCall = false;
 let ingestedSlug = "retry-fixture";
+let lastIngestForce: boolean | undefined;
 
 mock.module("../src/ingest.ts", () => ({
   ingest: (_source: string, opts?: FakeIngestOpts) => {
     ingestCallCount += 1;
+    lastIngestForce = opts?.force;
     return new Promise<string>((resolve, reject) => {
       // A microtask-scale delay (not synchronous) so a missing
       // exactly-once guard would have a real window to let two concurrent
@@ -113,6 +115,40 @@ test("retryIngestJob re-runs a failed job to completion, calling ingest exactly 
       2,
       "retry must call ingest exactly once more, not doubled"
     );
+  });
+});
+
+test("retryIngestJob replays the original force setting into ingest", async () => {
+  await withTempProjectsRoot(async ({ root }) => {
+    resetIngestJobsForTests();
+    ingestCallCount = 0;
+    failNextCall = true;
+    ingestedSlug = "retry-forced";
+    lastIngestForce = undefined;
+    const sourcePath = tempSourceFile(root);
+
+    // A force re-ingest that failed: its project may well still exist (the
+    // original force acknowledged overwriting it). Retry must run with the
+    // SAME force — dropping it would fail on "project already exists"
+    // (reviewer finding on #139); inventing it for non-force jobs would
+    // overwrite a project the user never agreed to wipe (covered by the
+    // sync-refusal test in tests/ingest-jobs.test.ts).
+    const job = startIngestJob({
+      filename: "source.mp4",
+      slug: "retry-forced",
+      sourcePath,
+      force: true,
+      run: (onProgress, signal) =>
+        ingest(sourcePath, { onProgress, signal, force: true }),
+    });
+    await pollUntilSettled(job.id);
+    assert.equal(getIngestJob(job.id)?.status, "error");
+
+    const result = await retryIngestJob(job.id);
+    assert.equal(result.ok, true);
+    await pollUntilSettled(job.id);
+    assert.equal(getIngestJob(job.id)?.status, "done");
+    assert.equal(lastIngestForce, true);
   });
 });
 

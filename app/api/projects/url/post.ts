@@ -72,6 +72,7 @@ export function createUrlProjectsPost({
         filename,
         slug,
         sourcePath: downloaded,
+        force,
         run: async (onProgress, signal) => {
           try {
             const createdSlug = await ingest(downloaded, {

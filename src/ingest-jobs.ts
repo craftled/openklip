@@ -21,7 +21,7 @@ import {
   loadJobRecords,
   saveJobRecord,
 } from "./job-store.ts";
-import { assertValidSlug, ingestJobsStorePath } from "./paths.ts";
+import { assertValidSlug, ingestJobsStorePath, projectPaths } from "./paths.ts";
 
 export type IngestJobStatus =
   | "running"
@@ -36,6 +36,12 @@ export interface IngestJob {
   error?: string;
   /** Source filename being ingested (for display). */
   filename: string;
+  /** Whether the original ingest ran with force (overwrite an existing
+   * project). Persisted so retryIngestJob replays the run with the same
+   * overwrite semantics instead of failing on its own half-written project
+   * (or, worse, being granted force it never had). Optional for the same
+   * pre-upgrade-records reason as sourcePath. */
+  force?: boolean;
   id: string;
   progress?: IngestProgress;
   /** Target/created project slug. */
@@ -49,8 +55,13 @@ export interface IngestJob {
    * path is typically already gone by the time a failed job could be
    * retried. Retry is most useful for scan-inbox jobs (a durable inbox
    * file) and jobs interrupted by a server restart before their temp dir
-   * was reaped. */
-  sourcePath: string;
+   * was reaped.
+   *
+   * Optional because records written by releases before this field existed
+   * don't have it: requiring it in isIngestJob would silently drop all
+   * pre-upgrade history at hydration (and the next store write would then
+   * permanently erase it). Jobs missing it simply aren't retryable. */
+  sourcePath?: string;
   status: IngestJobStatus;
   updatedAt: number;
   /** Set when ingest finished but a follow-up step failed (e.g. source persist). */
@@ -87,9 +98,16 @@ function isIngestJob(value: unknown): value is IngestJob {
   if (
     typeof row.id !== "string" ||
     typeof row.slug !== "string" ||
-    typeof row.filename !== "string" ||
-    typeof row.sourcePath !== "string"
+    typeof row.filename !== "string"
   ) {
+    return false;
+  }
+  // Absent on records written before these fields existed (see the field
+  // docs): tolerate undefined so hydration keeps pre-upgrade history.
+  if (row.sourcePath !== undefined && typeof row.sourcePath !== "string") {
+    return false;
+  }
+  if (row.force !== undefined && typeof row.force !== "boolean") {
     return false;
   }
   if (
@@ -231,6 +249,21 @@ function attachRunLifecycle(
     .then(
       (slug) => {
         job.slug = slug;
+        // A cancel can land while the run is inside post-ingest work that
+        // doesn't consume the signal (source persist, folder-asset copy in
+        // the route closures) and the run then resolves anyway. The caller
+        // of cancelIngestJob was already told true — landing this record on
+        // "done" would contradict that, so the abort flag wins over the
+        // resolution. The produced project is left on disk either way (same
+        // as a mid-pipeline cancel); "cancelled" describes the user's
+        // decision, not a guarantee that no artifacts exist.
+        if (controller.signal.aborted) {
+          job.status = "cancelled";
+          job.error = CANCELLED_MESSAGE;
+          job.updatedAt = Date.now();
+          persist(job);
+          return;
+        }
         job.status = "done";
         job.updatedAt = Date.now();
         persist(job);
@@ -275,6 +308,9 @@ export function startIngestJob(input: {
   /** Original source file path for this ingest; stored for retryIngestJob.
    * See the IngestJob.sourcePath field doc for the upload-route caveat. */
   sourcePath: string;
+  /** Whether this ingest runs with force (overwrite an existing project);
+   * stored so a retry replays the same overwrite semantics. */
+  force?: boolean;
   run: (
     onProgress: (p: IngestProgress) => void,
     signal: AbortSignal
@@ -287,6 +323,7 @@ export function startIngestJob(input: {
     filename: input.filename,
     slug: input.slug,
     sourcePath: input.sourcePath,
+    force: input.force,
     status: "running",
     createdAt: now,
     updatedAt: now,
@@ -385,10 +422,31 @@ export function retryIngestJob(id: string): Promise<IngestJobRetryResult> {
       error: "retry is only supported for whole-project ingest jobs",
     });
   }
-  if (!existsSync(job.sourcePath)) {
+  const sourcePath = job.sourcePath;
+  if (!sourcePath) {
+    // Records persisted before sourcePath existed (see the field doc) carry
+    // nothing to re-run against.
+    return Promise.resolve({
+      ok: false,
+      error: "job predates retry support; re-ingest manually",
+    });
+  }
+  if (!existsSync(sourcePath)) {
     return Promise.resolve({
       ok: false,
       error: "original source no longer available; re-ingest manually",
+    });
+  }
+  // Fail fast, synchronously and honestly, on the case ingest() would only
+  // reject later: a non-force job whose project dir already exists — either
+  // this job's own half-written output (interrupted after project.json) or
+  // a pre-existing project the original run was refused over. Granting
+  // force here implicitly could wipe a project the user never agreed to
+  // overwrite, so retry never escalates beyond the run's original setting.
+  if (!job.force && existsSync(projectPaths(job.slug).project)) {
+    return Promise.resolve({
+      ok: false,
+      error: `project already exists: ${job.slug}; delete it or re-ingest with force`,
     });
   }
 
@@ -410,11 +468,12 @@ export function retryIngestJob(id: string): Promise<IngestJobRetryResult> {
     job,
     originalSlug,
     controller,
-    ingest(job.sourcePath, {
+    ingest(sourcePath, {
       onProgress: (p) => {
         job.progress = p;
       },
       signal: controller.signal,
+      force: job.force,
     })
   );
   return Promise.resolve({ ok: true });
