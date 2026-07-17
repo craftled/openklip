@@ -1,10 +1,6 @@
 {
   "compilerOptions": {
-    "lib": [
-      "ESNext",
-      "DOM",
-      "DOM.Iterable"
-    ],
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "target": "ESNext",
     "module": "ESNext",
     "moduleResolution": "bundler",
@@ -15,26 +11,16 @@
     "noEmit": true,
     "strict": true,
     "skipLibCheck": true,
-    "types": [
-      "bun",
-      "react",
-      "react-dom"
-    ],
+    "types": ["bun", "react", "react-dom"],
     "plugins": [
       {
         "name": "next"
       }
     ],
     "paths": {
-      "@/*": [
-        "./web/*"
-      ],
-      "@engine/*": [
-        "./src/*"
-      ],
-      "collections/*": [
-        "./.source/*"
-      ]
+      "@/*": ["./web/*"],
+      "@engine/*": ["./src/*"],
+      "collections/*": ["./.source/*"]
     },
     "allowJs": true,
     "incremental": true,
@@ -47,10 +33,7 @@
     "app",
     "next-env.d.ts",
     ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts",
-    ".next/dev/dev/types/**/*.ts"
+    ".next/dev/types/**/*.ts"
   ],
-  "exclude": [
-    "node_modules"
-  ]
+  "exclude": ["node_modules"]
 }
