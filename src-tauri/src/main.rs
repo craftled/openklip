@@ -98,9 +98,10 @@ fn show_splash_error(handle: &tauri::AppHandle, message: &str, detail: &str) {
     };
     let js = format!(
         "(function() {{\
+           document.body.classList.add('engine-error');\
            var sp = document.querySelector('.spinner'); if (sp) sp.remove();\
            var s = document.querySelector('.status');\
-           if (s) {{ s.textContent = {msg}; s.style.color = '#ff8a80'; }}\
+           if (s) {{ s.textContent = {msg}; }}\
            var detail = {detail};\
            if (detail && !document.querySelector('.engine-error-detail')) {{\
              var d = document.createElement('pre');\
