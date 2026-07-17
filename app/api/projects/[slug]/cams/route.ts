@@ -173,6 +173,11 @@ export function createCamsPost({ loadIngestCam, tempRoot }: CamsPostDeps) {
       const job = startIngestJob({
         filename: file.name,
         slug: `${slug}/cams/${resolvedId}`,
+        // Not a whole-project sourcePath in the retryIngestJob sense (this
+        // composite slug key is never assertValidSlug-retryable; see
+        // src/ingest-jobs.ts's retryIngestJob doc), but still the best
+        // "original source" value to record for this job's record shape.
+        sourcePath: tmpPath,
         run: async () => {
           const camsRoot = projectPaths(slug).cams;
           const durablePath = join(

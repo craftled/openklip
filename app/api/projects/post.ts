@@ -24,7 +24,11 @@ import type { NextRequest } from "next/server";
 
 export type IngestFn = (
   videoArg: string,
-  opts?: { force?: boolean; onProgress?: (p: IngestProgress) => void }
+  opts?: {
+    force?: boolean;
+    onProgress?: (p: IngestProgress) => void;
+    signal?: AbortSignal;
+  }
 ) => Promise<string>;
 
 export interface ProjectsPostDeps {
@@ -141,9 +145,15 @@ export function createProjectsPost({ loadIngest, tempRoot }: ProjectsPostDeps) {
       const job = startIngestJob({
         filename: file.name,
         slug,
-        run: async (onProgress) => {
+        sourcePath: tmpPath,
+        force,
+        run: async (onProgress, signal) => {
           try {
-            const createdSlug = await ingest(tmpPath, { force, onProgress });
+            const createdSlug = await ingest(tmpPath, {
+              force,
+              onProgress,
+              signal,
+            });
             // Copy after ingest resolves (ingest wipes the project dir at
             // start) and before temp cleanup; a failed copy surfaces as a
             // partial-success job so the GUI can open the project with a warning.

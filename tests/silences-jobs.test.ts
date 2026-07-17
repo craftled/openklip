@@ -5,9 +5,12 @@ import { test } from "node:test";
 import { DEFAULT_SAMPLE_RATE } from "../src/audio-analysis-core.ts";
 import { projectPaths } from "../src/paths.ts";
 import {
+  cancelSilencesJob,
+  deleteSilencesJobRecord,
   getSilencesJob,
   isSlugSilencesAnalysisInFlight,
   resetSilencesJobsForTests,
+  retrySilencesJob,
   startSilencesJob,
 } from "../src/silences-jobs.ts";
 import {
@@ -166,5 +169,254 @@ test("a silences job orphaned by a restart is reconciled to interrupted, not los
     // slug threaded through): it must return "interrupted", never undefined.
     const job = getSilencesJob(jobId);
     assert.equal(job?.status, "interrupted");
+  });
+});
+
+async function pollSilencesUntilSettled(
+  id: string,
+  maxTicks = 400
+): Promise<void> {
+  for (let i = 0; i < maxTicks; i += 1) {
+    await tick();
+    if (getSilencesJob(id)?.status !== "running") {
+      return;
+    }
+  }
+  assert.fail(`silences job ${id} did not settle in time`);
+}
+
+// ── cancelSilencesJob: real, multi-chunk cancellation ──────────────────────
+// analyzePcmChunked splits into PCM_CHUNK_SEC=120s chunks and checks the
+// signal at the top of every chunk iteration. Measured empirically: pure-JS
+// windowed-RMS analysis over already-in-memory/OS-cached PCM is fast enough
+// that even a synthetic 600s (5-chunk) recording completes in under 20ms
+// wall time end to end, so there is no reliable wall-clock window to cancel
+// strictly "between" chunks. Cancelling synchronously, in the same tick
+// startSilencesJob returns in, is still a deterministic proof the signal
+// actually stops the loop rather than it eventually completing anyway:
+// computeAudioAnalysis's first `await stat(...)` yields before doing any
+// chunk work, so the abort() call below is guaranteed to land before
+// analyzePcmChunked's first per-chunk aborted-check ever runs, and this
+// still exercises the exact same signal plumbing a later-landing cancel
+// would use.
+test("cancelling a running silences job stops the chunk loop and lands in cancelled, not done", {
+  timeout: 20_000,
+}, async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    resetSilencesJobsForTests();
+    writeFixtureProject(slug, makeProject({ slug }));
+    const pcm = sinePcm(600); // 5 chunks at PCM_CHUNK_SEC=120
+    writeFileSync(
+      projectPaths(slug).audioRaw,
+      Buffer.from(pcm.buffer, pcm.byteOffset, pcm.byteLength)
+    );
+
+    const job = startSilencesJob(slug);
+    assert.equal(job.status, "running");
+    // No await between start and cancel: see comment above for why this is
+    // the deterministic window, not a race.
+    assert.equal(cancelSilencesJob(job.id), true);
+
+    await pollSilencesUntilSettled(job.id);
+    assert.equal(getSilencesJob(job.id)?.status, "cancelled");
+    assert.equal(getSilencesJob(job.id)?.error, "Cancelled by user");
+    assert.equal(isSlugSilencesAnalysisInFlight(slug), false);
+    // Never reached a "done" result: the chunked loop was stopped before
+    // producing (or persisting) a silences array.
+    assert.equal(getSilencesJob(job.id)?.silences, undefined);
+
+    const persisted = readStore(slug).find((j) => j.id === job.id);
+    assert.equal(persisted?.status, "cancelled");
+  });
+});
+
+test("cancelSilencesJob returns false for an unknown job id", async () => {
+  await withTempProjectsRoot(() => {
+    resetSilencesJobsForTests();
+    assert.equal(cancelSilencesJob("nope"), false);
+  });
+});
+
+test("cancelSilencesJob returns false for a job that already finished", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    resetSilencesJobsForTests();
+    writeFixtureProject(slug, makeProject({ slug }));
+    const pcm = sinePcm(1);
+    writeFileSync(
+      projectPaths(slug).audioRaw,
+      Buffer.from(pcm.buffer, pcm.byteOffset, pcm.byteLength)
+    );
+    const job = startSilencesJob(slug);
+    await pollSilencesUntilSettled(job.id);
+    assert.equal(getSilencesJob(job.id)?.status, "done");
+    assert.equal(cancelSilencesJob(job.id), false);
+  });
+});
+
+// ── retrySilencesJob ────────────────────────────────────────────────────────
+// No mocking needed: computeAudioAnalysis throws missingAudioRawError
+// synchronously whenever audioRaw is absent, which is a clean, real way to
+// force a first-run failure and then make retry succeed by supplying the
+// audio before retrying.
+
+test("retrySilencesJob re-runs a failed job to completion", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    resetSilencesJobsForTests();
+    writeFixtureProject(slug, makeProject({ slug }));
+    // No audioRaw yet: the first run fails immediately.
+    const job = startSilencesJob(slug);
+    await pollSilencesUntilSettled(job.id);
+    assert.equal(getSilencesJob(job.id)?.status, "error");
+
+    const pcm = sinePcm(2);
+    writeFileSync(
+      projectPaths(slug).audioRaw,
+      Buffer.from(pcm.buffer, pcm.byteOffset, pcm.byteLength)
+    );
+
+    const result = await retrySilencesJob(job.id);
+    assert.equal(result.ok, true);
+    if (!result.ok) {
+      return;
+    }
+    await pollSilencesUntilSettled(result.job.id);
+    assert.equal(getSilencesJob(result.job.id)?.status, "done");
+    assert.ok(Array.isArray(getSilencesJob(result.job.id)?.silences));
+  });
+});
+
+test("concurrent retrySilencesJob calls for the same job only run one analysis", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    resetSilencesJobsForTests();
+    writeFixtureProject(slug, makeProject({ slug }));
+    const job = startSilencesJob(slug);
+    await pollSilencesUntilSettled(job.id);
+    assert.equal(getSilencesJob(job.id)?.status, "error");
+
+    const pcm = sinePcm(2);
+    writeFileSync(
+      projectPaths(slug).audioRaw,
+      Buffer.from(pcm.buffer, pcm.byteOffset, pcm.byteLength)
+    );
+
+    const [r1, r2] = await Promise.all([
+      retrySilencesJob(job.id),
+      retrySilencesJob(job.id),
+    ]);
+    assert.equal(r1.ok, true);
+    assert.equal(r2.ok, true);
+    if (!(r1.ok && r2.ok)) {
+      return;
+    }
+    // startSilencesJob's own per-slug dedup means both retry calls resolve
+    // to the SAME running job: only one computeAudioAnalysis was started.
+    assert.equal(r1.job.id, r2.job.id);
+
+    await pollSilencesUntilSettled(r1.job.id);
+    assert.equal(getSilencesJob(r1.job.id)?.status, "done");
+  });
+});
+
+test("retrySilencesJob returns an actionable error for an unknown job id", async () => {
+  await withTempProjectsRoot(async () => {
+    resetSilencesJobsForTests();
+    const result = await retrySilencesJob("nope");
+    assert.equal(result.ok, false);
+    if (result.ok) {
+      return;
+    }
+    assert.match(result.error, /not found/);
+  });
+});
+
+test("retrySilencesJob refuses a still-running job", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    resetSilencesJobsForTests();
+    writeFixtureProject(slug, makeProject({ slug }));
+    const pcm = sinePcm(600);
+    writeFileSync(
+      projectPaths(slug).audioRaw,
+      Buffer.from(pcm.buffer, pcm.byteOffset, pcm.byteLength)
+    );
+    const job = startSilencesJob(slug);
+    assert.equal(job.status, "running");
+    const result = await retrySilencesJob(job.id);
+    assert.equal(result.ok, false);
+    if (result.ok) {
+      return;
+    }
+    assert.match(result.error, /running/);
+    cancelSilencesJob(job.id);
+    await pollSilencesUntilSettled(job.id);
+  });
+});
+
+test("retrySilencesJob refuses a job that already completed successfully", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    resetSilencesJobsForTests();
+    writeFixtureProject(slug, makeProject({ slug }));
+    const pcm = sinePcm(1);
+    writeFileSync(
+      projectPaths(slug).audioRaw,
+      Buffer.from(pcm.buffer, pcm.byteOffset, pcm.byteLength)
+    );
+    const job = startSilencesJob(slug);
+    await pollSilencesUntilSettled(job.id);
+    assert.equal(getSilencesJob(job.id)?.status, "done");
+
+    const result = await retrySilencesJob(job.id);
+    assert.equal(result.ok, false);
+    if (result.ok) {
+      return;
+    }
+    assert.match(result.error, /already completed/);
+  });
+});
+
+// ── deleteSilencesJobRecord (clean-up) ─────────────────────────────────────
+
+test("deleteSilencesJobRecord removes a terminal job from memory and the per-project store file", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    resetSilencesJobsForTests();
+    writeFixtureProject(slug, makeProject({ slug }));
+    const pcm = sinePcm(1);
+    writeFileSync(
+      projectPaths(slug).audioRaw,
+      Buffer.from(pcm.buffer, pcm.byteOffset, pcm.byteLength)
+    );
+    const job = startSilencesJob(slug);
+    await pollSilencesUntilSettled(job.id);
+    assert.equal(getSilencesJob(job.id)?.status, "done");
+
+    assert.equal(deleteSilencesJobRecord(job.id), true);
+    assert.equal(getSilencesJob(job.id), undefined);
+    assert.equal(
+      readStore(slug).some((j) => j.id === job.id),
+      false
+    );
+  });
+});
+
+test("deleteSilencesJobRecord refuses a running job with an actionable error", async () => {
+  await withTempProjectsRoot(async ({ slug }) => {
+    resetSilencesJobsForTests();
+    writeFixtureProject(slug, makeProject({ slug }));
+    const pcm = sinePcm(600);
+    writeFileSync(
+      projectPaths(slug).audioRaw,
+      Buffer.from(pcm.buffer, pcm.byteOffset, pcm.byteLength)
+    );
+    const job = startSilencesJob(slug);
+    assert.throws(() => deleteSilencesJobRecord(job.id), /still running/i);
+    assert.equal(getSilencesJob(job.id)?.status, "running");
+    cancelSilencesJob(job.id);
+    await pollSilencesUntilSettled(job.id);
+  });
+});
+
+test("deleteSilencesJobRecord returns false for an unknown job id", async () => {
+  await withTempProjectsRoot(() => {
+    resetSilencesJobsForTests();
+    assert.equal(deleteSilencesJobRecord("nope"), false);
   });
 });

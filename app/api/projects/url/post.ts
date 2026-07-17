@@ -71,9 +71,15 @@ export function createUrlProjectsPost({
       const job = startIngestJob({
         filename,
         slug,
-        run: async (onProgress) => {
+        sourcePath: downloaded,
+        force,
+        run: async (onProgress, signal) => {
           try {
-            const createdSlug = await ingest(downloaded, { force, onProgress });
+            const createdSlug = await ingest(downloaded, {
+              force,
+              onProgress,
+              signal,
+            });
             try {
               await persistUploadedSource(createdSlug, filename, downloaded);
             } catch (persistError) {

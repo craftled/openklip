@@ -130,9 +130,15 @@ export function createFolderProjectsPost({
       const job = startIngestJob({
         filename: primaryFile.name,
         slug,
-        run: async (onProgress) => {
+        sourcePath: tmpPrimary,
+        force,
+        run: async (onProgress, signal) => {
           try {
-            const createdSlug = await ingest(tmpPrimary, { force, onProgress });
+            const createdSlug = await ingest(tmpPrimary, {
+              force,
+              onProgress,
+              signal,
+            });
             try {
               await persistUploadedSource(createdSlug, filename, tmpPrimary);
             } catch (persistError) {

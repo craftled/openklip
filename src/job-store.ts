@@ -223,3 +223,20 @@ export function saveJobRecord<J extends JobStoreRecord>(
       : current.map((r, i) => (i === idx ? record : r));
   writeRecordsSync(config, next);
 }
+
+/** Remove one record by id and persist the result. Used by CRAFT-6253's
+ * job clean-up (deleteIngestJobRecord / deleteSilencesJobRecord) to drop a
+ * terminal job's history entirely rather than upsert a new state into it.
+ * Returns whether a record with that id was actually found and removed. */
+export function deleteJobRecord<J extends JobStoreRecord>(
+  config: JobStoreConfig<J>,
+  id: string
+): boolean {
+  const current = readRecordsSync(config);
+  const next = current.filter((r) => r.id !== id);
+  if (next.length === current.length) {
+    return false;
+  }
+  writeRecordsSync(config, next);
+  return true;
+}

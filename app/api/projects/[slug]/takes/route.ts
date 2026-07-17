@@ -150,6 +150,11 @@ export function createTakesPost({ loadIngestTake, tempRoot }: TakesPostDeps) {
       const job = startIngestJob({
         filename: file.name,
         slug: `${slug}/takes/${id}`,
+        // Not a whole-project sourcePath in the retryIngestJob sense (this
+        // composite slug key is never assertValidSlug-retryable; see
+        // src/ingest-jobs.ts's retryIngestJob doc), but still the best
+        // "original source" value to record for this job's record shape.
+        sourcePath: tmpPath,
         run: async (onProgress) => {
           // ingestTake records whatever path it is given as the take's
           // `source`, and the temp upload dir is deleted once this job

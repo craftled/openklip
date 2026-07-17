@@ -31,6 +31,7 @@ import {
   mergeSilenceSpans,
   type SilenceSpan,
 } from "./audio-analysis-core.ts";
+import { ProcessCancelledError } from "./ffmpeg.ts";
 import { projectPaths } from "./paths.ts";
 
 export type {
@@ -161,7 +162,8 @@ async function analyzePcmChunked(
   slug: string,
   resolved: ReturnType<typeof resolveAnalysisOpts>,
   totalSec: number,
-  onProgress?: (p: AudioAnalysisProgress) => void
+  onProgress?: (p: AudioAnalysisProgress) => void,
+  signal?: AbortSignal
 ): Promise<{ silences: SilenceSpan[]; totalSteps: number }> {
   const chunkCount = Math.max(1, Math.ceil(totalSec / PCM_CHUNK_SEC));
   const totalSteps = chunkCount + 2;
@@ -172,6 +174,12 @@ async function analyzePcmChunked(
   const spans: SilenceSpan[] = [];
 
   for (let i = 0; i < chunkCount; i++) {
+    // Cooperative cancellation: there is no subprocess to kill here (this
+    // is pure JS over already-extracted PCM), so the loop just checks
+    // between chunk iterations rather than mid-chunk.
+    if (signal?.aborted) {
+      throw new ProcessCancelledError("audio analysis");
+    }
     const chunkStart = i * PCM_CHUNK_SEC;
     const chunkEnd = Math.min(totalSec, (i + 1) * PCM_CHUNK_SEC);
     const readFrom =
@@ -195,6 +203,9 @@ async function analyzePcmChunked(
     spans.push(...chunkSpans);
   }
 
+  if (signal?.aborted) {
+    throw new ProcessCancelledError("audio analysis");
+  }
   onProgress?.({
     phase: "analyzing",
     message: "Merging silence spans",
@@ -241,7 +252,8 @@ export async function tryLoadCachedAudioAnalysis(
 export async function computeAudioAnalysis(
   slug: string,
   opts: AnalyzeSilencesOpts = {},
-  onProgress?: (p: AudioAnalysisProgress) => void
+  onProgress?: (p: AudioAnalysisProgress) => void,
+  signal?: AbortSignal
 ): Promise<AudioAnalysis> {
   const paths = projectPaths(slug);
   if (!existsSync(paths.audioRaw)) {
@@ -257,7 +269,8 @@ export async function computeAudioAnalysis(
     slug,
     resolved,
     totalSec,
-    onProgress
+    onProgress,
+    signal
   );
 
   const analysis: AudioAnalysis = {
