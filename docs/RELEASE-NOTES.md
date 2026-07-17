@@ -2,7 +2,28 @@
 
 Use these bodies when publishing releases. Each section matches a tag in `CHANGELOG.md` without duplicating the full changelog. **Known gaps:** always link to [TODO.md](../TODO.md#known-limitations); do not duplicate the list here.
 
-Publishing status checked on 2026-07-16 (`gh release list`): published through `v0.42.0.4` on GitHub. Multicam programmatic acceptance (`tests/multicam-acceptance.test.ts`, `tests/cam-devex-smoke.test.ts`) satisfies the machinery gate; human eyeball on real per-speaker footage remains deferred.
+Publishing status checked on 2026-07-16 (`gh release list`): published through `v0.42.0.4` on GitHub. `v0.43.0` is expected to publish alongside this doc update; not independently verified here. Multicam programmatic acceptance (`tests/multicam-acceptance.test.ts`, `tests/cam-devex-smoke.test.ts`) satisfies the machinery gate; human eyeball on real per-speaker footage remains deferred.
+
+---
+
+## v0.43.0
+
+**A macOS desktop app, a production launcher, durable and cancellable background jobs, and a batch of reliability/security hardening across ingest, uploads, saves, and the local trust boundary (PRs #121-#142, CRAFT-6175/6176/6177/6178/6179/6180/6181/6182/6183/6184/6185/6186/6187/6243/6253).**
+
+### Highlights
+- **macOS desktop app (Tauri v2, CRAFT-6187, #135/#137/#138)**: a native shell against system WebKit spawns `openklip serve` as a self-contained Bun sidecar behind a splash screen, with the full runtime (`.next`, pruned `node_modules`, ffmpeg) bundled into the `.app` so it runs with no repo checkout, writable state relocated to Application Support, and a real quit that kills the whole sidecar process group instead of orphaning `next start`. The real OpenKlip icon replaces the placeholder. Signing/notarization scaffolding is ready; the actual Developer ID signing pass is human-only and not done yet (Stage C).
+- **Production launcher (CRAFT-6185, #133)**: `openklip serve` now runs a production `next start` build instead of `next dev` (no HMR/dev overlay in a shipped launch), resolving bundled assets against a distribution-relative `appRoot()` instead of a hardcoded checkout path. A follow-up (#140) lets `serve`/`dev` boot against a completely empty workspace instead of refusing to start, and surfaces engine startup failures on the desktop splash instead of hanging silently.
+- **Job Center: durable, cancellable, retryable background jobs (CRAFT-6183/6253, #132/#139/#141/#142)**: ingest and silences jobs now persist to disk and survive an app restart with an honest "interrupted" status instead of a lost 404. Jobs can be cancelled mid-run (including, as of #142, take and cam ingest jobs), retried exactly once, and cleaned up from a new **Jobs** tab in the Config sidebar, with live status badges and progress.
+- **Deterministic media acceptance gate (CRAFT-6186, #134)**: five reproducible ffmpeg-lavfi fixtures (1080p, 4K HEVC 10-bit, VFR, portrait, long-sparse) run through real ingest → cut → export → ffprobe structural verification in a new CI `acceptance` job, gating releases on deterministic facts rather than flaky perceptual thresholds.
+- **Security and reliability hardening**: `project.json` writes are now atomic and crash-safe (CRAFT-6176, #121); `serve`/`dev` binds to loopback only with a `trustGuard` rejecting off-device mutation requests on all mutating routes (CRAFT-6175, #122); force re-ingest is transactional with an active-edit refusal instead of deleting the live project first (CRAFT-6181, #126); large asset uploads stream to disk instead of buffering in memory (CRAFT-6179, #127); the GUI can no longer silently overwrite a concurrent CLI/MCP overlay edit (CRAFT-6177, #129); a failed optimistic editor save now shows a persistent recovery banner with retry and reload-from-disk instead of silently dropping the edit (CRAFT-6182, #130); large CLI `--json` output (the ~92KB tool manifest) no longer truncates when piped (CRAFT-6180, #131); mobile Config access is restored and the mobile browser test now actually runs in CI (CRAFT-6178, #128); a required golden-path browser test now gates edit-to-verified-export end to end (CRAFT-6184, #125); CI no longer depends on live HuggingFace downloads for Whisper/CLIP (CRAFT-6243, #124).
+- **Marketing site + docs (#136)**: redesigned landing page and a new Fumadocs `/docs` surface so the nav Docs link resolves to real content.
+- **Verification**: `bun test --isolate` (2710 tests: 2696 pass, 14 skip); 98 MCP tools; 54 capabilities; 46 registry actions; `bun run typecheck` and `bun run check` clean on every PR in this batch.
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues. Notably: desktop Stage C (Developer ID signing/notarization) is human-only and not done; Job Center clean-up removes only the job record, never the project directory; cam ingest jobs don't report phase progress yet.
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#0430---2026-07-17)
 
 ---
 

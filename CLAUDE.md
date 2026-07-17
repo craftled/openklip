@@ -14,14 +14,14 @@ See `AGENTS.md` for the full OpenKlip edit loop, CLI commands, MCP tools, and gu
 
 ## Current release memory
 
-Re-checked 2026-07-16 after v0.42.0.4 (segment export b-roll, editor code-split, gzip history, install footprint; PRs #115–#119 on top of #107–#113).
+Re-checked 2026-07-17 after v0.43.0 (macOS desktop app + production launcher + Job Center durable/cancellable/retryable background jobs + deterministic acceptance gate + a batch of security/reliability hardening: atomic project writes, loopback bind + trust guard, transactional force re-ingest, streamed uploads, overlay-save concurrency, optimistic-save recovery, pipe-safe JSON output; PRs #121–#142 on top of #107–#119).
 
-- **Version:** `0.42.0.4` in `VERSION` and `package.json`.
-- **Tests:** Prefer `bun test --isolate` / `bun run test` (fresh global object per file). Integration browser tests skip without `OPENKLIP_INTEGRATION=1`.
+- **Version:** `0.43.0` in `VERSION` and `package.json`.
+- **Tests:** Prefer `bun test --isolate` / `bun run test` (fresh global object per file). Integration browser tests skip without `OPENKLIP_INTEGRATION=1`; the acceptance gate skips without `OPENKLIP_ACCEPTANCE=1`.
 - **Test flake:** plain `bun test` (no `--isolate`) can leak `mock.module` stubs across files in one process; see AGENTS.md "Known test flake".
-- **Counts:** 98 MCP tools in the full manifest (`openklip tools --json --surface mcp`; measure via file+parse, not pipe+grep); default MCP connect enables core + meta only. 54 capabilities (`openklip features --json`), 46 registry actions (`openklip actions --json`). Test suite measured at 2473 (2467 pass, 6 skip) for this docs pass.
+- **Counts:** 98 MCP tools in the full manifest (`openklip tools --json --surface mcp`; measure via file+parse, not pipe+grep); default MCP connect enables core + meta only. 54 capabilities (`openklip features --json`), 46 registry actions (`openklip actions --json`). Test suite measured at 2710 (2696 pass, 14 skip) for this docs pass.
 - **Release docs:** `CHANGELOG.md` is authoritative history, `docs/RELEASE-NOTES.md` holds GitHub release bodies, `TODO.md#known-limitations` is the single current gaps list. Keep `docs/specs`, `docs/solutions`, and `docs/acceptance`; do not reintroduce post-ship `docs/ship|progress|qa` archives that duplicate CHANGELOG.
-- **Published GitHub releases:** through `v0.42.0.4`.
+- **Published GitHub releases:** through `v0.43.0` (stated on the orchestrator's authority for this cut; not independently verified via `gh release list` in this pass).
 
 ## Subagent fleet (cost routing)
 
