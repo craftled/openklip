@@ -2,8 +2,14 @@ import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
-import { FFMPEG, run } from "../src/ffmpeg.ts";
-import { ingest, wordsFromRawChunks } from "../src/ingest.ts";
+import { ingestTake } from "../src/assembly.ts";
+import { ingestCam } from "../src/cams.ts";
+import { FFMPEG, ProcessCancelledError, probe, run } from "../src/ffmpeg.ts";
+import {
+  ingest,
+  runTakeMediaPhases,
+  wordsFromRawChunks,
+} from "../src/ingest.ts";
 import {
   cancelIngestJob,
   deleteIngestJobRecord,
@@ -309,34 +315,34 @@ test("a cancel that lands during unabortable post-ingest work still settles canc
   });
 });
 
-test("cancelIngestJob refuses a take/cam job (composite slug) instead of reporting a false success", async () => {
+test("cancelIngestJob cancels a take/cam job (composite slug) now that its pipeline consumes the signal", async () => {
   await withTempProjectsRoot(async () => {
     resetIngestJobsForTests();
     let aborted = false;
     // Mirrors how app/api/projects/[slug]/takes/route.ts and .../cams/route.ts
     // key their jobs: a composite `${slug}/takes/${id}` string, never a bare
-    // SLUG_PATTERN match — ingestTake/ingestCam don't consume a signal yet
-    // (out of CRAFT-6253's file-ownership scope), so aborting their
-    // controller would do nothing; cancelIngestJob must say so honestly.
+    // SLUG_PATTERN match. CRAFT-6253 threaded the signal into
+    // ingestTake/ingestCam (src/assembly.ts, src/cams.ts), so cancelIngestJob
+    // no longer refuses these jobs: controller.abort() is kind-agnostic and
+    // this run closure genuinely listens for it.
     const job = startIngestJob({
       filename: "take.mp4",
       slug: "project/takes/abc123",
       sourcePath: "/tmp/take.mp4",
       run: (_onProgress, signal) =>
-        new Promise<string>((resolve) => {
+        new Promise<string>((resolve, reject) => {
           signal.addEventListener("abort", () => {
             aborted = true;
+            reject(new ProcessCancelledError("take"));
           });
           setTimeout(() => resolve("project/takes/abc123"), 20);
         }),
     });
 
-    assert.equal(cancelIngestJob(job.id), false);
+    assert.equal(cancelIngestJob(job.id), true);
     await pollUntilSettled(job.id);
-    // The job ran to its natural completion — cancellation genuinely never
-    // reached it, proving the false return wasn't just a guessed message.
-    assert.equal(aborted, false);
-    assert.equal(getIngestJob(job.id)?.status, "done");
+    assert.equal(aborted, true);
+    assert.equal(getIngestJob(job.id)?.status, "cancelled");
   });
 });
 
@@ -475,6 +481,31 @@ test("retryIngestJob refuses synchronously when a non-force job's project alread
   });
 });
 
+// ── probe()/ffprobeJson() honor an already-aborted signal ─────────────────
+
+test("probe rejects with ProcessCancelledError when handed an already-aborted signal", async () => {
+  const controller = new AbortController();
+  controller.abort();
+  await assert.rejects(
+    probe("/does/not/matter.mp4", controller.signal),
+    (e: unknown) => e instanceof ProcessCancelledError
+  );
+});
+
+test("ingestTake rejects with ProcessCancelledError when handed an already-aborted signal", async () => {
+  await withTempProjectsRoot(async ({ root }) => {
+    const slug = "take-preaborted";
+    const videoPath = join(root, "source.mp4");
+    writeFileSync(videoPath, "not-a-real-video");
+    const controller = new AbortController();
+    controller.abort();
+    await assert.rejects(
+      ingestTake(slug, videoPath, { id: "take1", signal: controller.signal }),
+      (e: unknown) => e instanceof ProcessCancelledError
+    );
+  });
+});
+
 // ── Real subprocess proof: cancellation actually kills ffmpeg ─────────────
 // Mirrors tests/ingest-swap.test.ts's lavfi fixture pattern: real buildProxy
 // (real ffmpeg) with the expensive/model-download steps
@@ -558,6 +589,96 @@ test("cancelling a real ingest job kills the ffmpeg subprocess and settles to ca
     assert.ok(
       elapsedMs < 8000,
       `cancellation took too long to settle: ${elapsedMs}ms`
+    );
+  });
+});
+
+test("cancelling a real take-ingest job kills the ffmpeg subprocess and settles to cancelled promptly", {
+  skip: FFMPEG_OK ? false : "ffmpeg binary unavailable",
+  timeout: 30_000,
+}, async () => {
+  await withTempProjectsRoot(async ({ root }) => {
+    resetIngestJobsForTests();
+    const videoPath = join(root, "take-cancel-fixture.mp4");
+    await makeSlowClip(videoPath, 25);
+
+    // Goes through runTakeMediaPhases directly (the same pipeline
+    // ingestTake calls internally) so the real buildProxy/extractAudio
+    // ffmpeg spawns are genuinely exercised and killed, while the
+    // Whisper transcribe step is stubbed out (no model download needed).
+    const job = startIngestJob({
+      filename: "take-cancel-fixture.mp4",
+      slug: "take-cancel-fixture/takes/take1",
+      sourcePath: videoPath,
+      run: (_onProgress, signal) =>
+        runTakeMediaPhases({
+          source: videoPath,
+          paths: {
+            proxy: join(root, "take-proxy.mp4"),
+            audioRaw: join(root, "take-audio.f32"),
+            transcriptRawJson: join(root, "take-raw.json"),
+          },
+          signal,
+          deps: {
+            transcribeToWords: () =>
+              Promise.resolve(
+                wordsFromRawChunks([{ text: "hi", start: 0, end: 0.2 }])
+              ),
+          },
+        }).then(() => "take-cancel-fixture/takes/take1"),
+    });
+
+    await new Promise((r) => setTimeout(r, 150));
+    assert.equal(getIngestJob(job.id)?.status, "running");
+    assert.equal(cancelIngestJob(job.id), true);
+
+    const start = Date.now();
+    await pollUntilSettled(job.id, 2000);
+    const elapsedMs = Date.now() - start;
+
+    assert.equal(getIngestJob(job.id)?.status, "cancelled");
+    assert.ok(
+      elapsedMs < 8000,
+      `take cancellation took too long to settle: ${elapsedMs}ms`
+    );
+  });
+});
+
+test("cancelling a real cam-ingest job kills the ffmpeg subprocess and settles to cancelled promptly", {
+  skip: FFMPEG_OK ? false : "ffmpeg binary unavailable",
+  timeout: 30_000,
+}, async () => {
+  await withTempProjectsRoot(async ({ root }) => {
+    resetIngestJobsForTests();
+    const videoPath = join(root, "cam-cancel-fixture.mp4");
+    await makeSlowClip(videoPath, 25);
+    const slug = "cam-cancel-fixture";
+
+    // Cams have no transcribe/index step, so ingestCam itself (probe +
+    // buildProxy + extractAudio, all real ffmpeg) can be exercised directly
+    // without stubbing anything.
+    const job = startIngestJob({
+      filename: "cam-cancel-fixture.mp4",
+      slug: `${slug}/cams/cam1`,
+      sourcePath: videoPath,
+      run: (_onProgress, signal) =>
+        ingestCam(slug, videoPath, { id: "cam1", signal }).then(
+          (cam) => `${slug}/cams/${cam.id}`
+        ),
+    });
+
+    await new Promise((r) => setTimeout(r, 150));
+    assert.equal(getIngestJob(job.id)?.status, "running");
+    assert.equal(cancelIngestJob(job.id), true);
+
+    const start = Date.now();
+    await pollUntilSettled(job.id, 2000);
+    const elapsedMs = Date.now() - start;
+
+    assert.equal(getIngestJob(job.id)?.status, "cancelled");
+    assert.ok(
+      elapsedMs < 8000,
+      `cam cancellation took too long to settle: ${elapsedMs}ms`
     );
   });
 });

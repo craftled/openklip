@@ -352,6 +352,7 @@ export async function runTakeMediaPhases(opts: {
   >;
   emit?: (phase: IngestPhase) => void;
   paths: { audioRaw: string; proxy: string; transcriptRawJson: string };
+  signal?: AbortSignal;
   source: string;
 }): Promise<Word[]> {
   const deps = {
@@ -361,24 +362,38 @@ export async function runTakeMediaPhases(opts: {
     log: opts.deps?.log ?? ((line: string) => console.log(line)),
   };
   const emit = opts.emit ?? (() => undefined);
-  const { source, paths } = opts;
+  const { source, paths, signal } = opts;
 
+  // Checked before each phase (mirrors runIngestMediaPhases's checkAborted)
+  // so an abort landing in the gap between phases is still honored promptly.
+  const checkAborted = () => {
+    if (signal?.aborted) {
+      throw new ProcessCancelledError("take");
+    }
+  };
+
+  checkAborted();
   await Promise.all([
     (async () => {
       emit("proxy");
       deps.log("[take] building proxy...");
-      await deps.buildProxy(source, paths.proxy);
+      await deps.buildProxy(source, paths.proxy, signal);
     })(),
     (async () => {
       emit("audio");
       deps.log("[take] extracting audio...");
-      await deps.extractAudio(source, paths.audioRaw);
+      await deps.extractAudio(source, paths.audioRaw, signal);
     })(),
   ]);
 
+  checkAborted();
   emit("transcribe");
   deps.log("[take] transcribing...");
-  return await deps.transcribeToWords(paths.audioRaw, paths.transcriptRawJson);
+  return await deps.transcribeToWords(
+    paths.audioRaw,
+    paths.transcriptRawJson,
+    signal
+  );
 }
 
 export interface IngestOpts {
@@ -439,7 +454,7 @@ async function ingestCore(
   checkAborted();
   console.log(`[ingest] ${source}`);
   emit("probe");
-  const meta = await probe(source);
+  const meta = await probe(source, signal);
   console.log(
     `[ingest] ${meta.width}x${meta.height} ${meta.fps}fps ${meta.durationSec.toFixed(1)}s`
   );

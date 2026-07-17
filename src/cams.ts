@@ -3,7 +3,7 @@ import { mkdir, rm } from "node:fs/promises";
 import { isAbsolute, join } from "node:path";
 import { z } from "zod";
 import { SAMPLE_RATE } from "./edl.ts";
-import { probe } from "./ffmpeg.ts";
+import { ProcessCancelledError, probe } from "./ffmpeg.ts";
 import { buildProxy, extractAudio } from "./ingest.ts";
 import { camDir, camFile, projectPaths } from "./paths.ts";
 import { cwdPath } from "./repo-paths.ts";
@@ -112,6 +112,7 @@ export async function ingestCam(
     role?: CamRole;
     offsetMs?: number;
     force?: boolean;
+    signal?: AbortSignal;
   }
 ): Promise<Cam> {
   const source = isAbsolute(videoArg) ? videoArg : cwdPath(videoArg);
@@ -142,10 +143,19 @@ export async function ingestCam(
   const proxyPath = join(dir, "proxy.mp4");
   const audioRaw = join(dir, "audio16k.f32");
 
+  const signal = opts?.signal;
+  const checkAborted = () => {
+    if (signal?.aborted) {
+      throw new ProcessCancelledError("cam");
+    }
+  };
+
   console.log(`[cam] ${camId} <- ${source}`);
-  const meta = await probe(source);
-  await buildProxy(source, proxyPath);
-  await extractAudio(source, audioRaw);
+  const meta = await probe(source, signal);
+  checkAborted();
+  await buildProxy(source, proxyPath, signal);
+  await extractAudio(source, audioRaw, signal);
+  checkAborted();
 
   const cam: Cam = CamSchema.parse({
     id: camId,

@@ -350,23 +350,15 @@ export function startIngestJob(input: {
 // attachRunLifecycle above), not synchronously here. Cancellation is only as
 // effective as the `run` closure's own signal-handling: the whole-project
 // ingest routes (post/folder/url/scan-inbox) thread this signal all the way
-// into ingest()'s ffmpeg/Whisper/CLIP spawns, but the takes/cams routes'
-// ingestTake/ingestCam pipelines (src/assembly.ts, src/cams.ts) don't
-// consume one yet. Rather than abort a controller nothing is listening to
-// and report success, this refuses take/cam jobs the same way
-// retryIngestJob does (assertValidSlug rejects their composite
-// `${slug}/takes/${id}` / `${slug}/cams/${id}` job.slug — never a bare
-// SLUG_PATTERN match) — returning false, not a lying true, so a caller never
-// learns a job was cancelled when its subprocess is still running.
+// into ingest()'s ffmpeg/Whisper/CLIP spawns, and (CRAFT-6253) the
+// takes/cams routes' ingestTake/ingestCam pipelines (src/assembly.ts,
+// src/cams.ts) now consume it too, so a composite-slug take/cam job.slug is
+// no longer refused here — controller.abort() is kind-agnostic and every
+// run closure now has something listening on the signal.
 export function cancelIngestJob(id: string): boolean {
   ensureHydrated();
   const job = jobs.get(id);
   if (job?.status !== "running") {
-    return false;
-  }
-  try {
-    assertValidSlug(job.slug);
-  } catch {
     return false;
   }
   const controller = liveControllers.get(id);

@@ -60,6 +60,7 @@ export async function ingestTake(
     id?: string;
     label?: string;
     onProgress?: (progress: IngestProgress) => void;
+    signal?: AbortSignal;
   }
 ): Promise<Take> {
   const total = TAKE_INGEST_STEPS.length;
@@ -93,7 +94,7 @@ export async function ingestTake(
 
   console.log(`[take] ${takeId} <- ${source}`);
   emit("probe");
-  const meta = await probe(source);
+  const meta = await probe(source, opts?.signal);
   // proxy ∥ audio, then Whisper (CRAFT-6170).
   const words = await runTakeMediaPhases({
     source,
@@ -103,6 +104,7 @@ export async function ingestTake(
       transcriptRawJson: rawJson,
     },
     emit,
+    signal: opts?.signal,
   });
 
   const take: Take = TakeSchema.parse({
