@@ -34,6 +34,7 @@ export type IngestCamFn = (
     role?: CamRole;
     offsetMs?: number;
     force?: boolean;
+    signal?: AbortSignal;
   }
 ) => Promise<Cam>;
 
@@ -178,7 +179,7 @@ export function createCamsPost({ loadIngestCam, tempRoot }: CamsPostDeps) {
         // src/ingest-jobs.ts's retryIngestJob doc), but still the best
         // "original source" value to record for this job's record shape.
         sourcePath: tmpPath,
-        run: async () => {
+        run: async (_onProgress, signal) => {
           const camsRoot = projectPaths(slug).cams;
           const durablePath = join(
             camsRoot,
@@ -193,6 +194,7 @@ export function createCamsPost({ loadIngestCam, tempRoot }: CamsPostDeps) {
               role,
               offsetMs,
               force: true,
+              signal,
             });
             return cam.id;
           } catch (error) {

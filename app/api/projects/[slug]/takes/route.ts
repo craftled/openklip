@@ -33,6 +33,7 @@ export type IngestTakeFn = (
     id?: string;
     label?: string;
     onProgress?: (progress: IngestProgress) => void;
+    signal?: AbortSignal;
   }
 ) => Promise<Take>;
 
@@ -155,7 +156,7 @@ export function createTakesPost({ loadIngestTake, tempRoot }: TakesPostDeps) {
         // src/ingest-jobs.ts's retryIngestJob doc), but still the best
         // "original source" value to record for this job's record shape.
         sourcePath: tmpPath,
-        run: async (onProgress) => {
+        run: async (onProgress, signal) => {
           // ingestTake records whatever path it is given as the take's
           // `source`, and the temp upload dir is deleted once this job
           // settles. Copy into the project's takes/ parking lot FIRST (a
@@ -175,6 +176,7 @@ export function createTakesPost({ loadIngestTake, tempRoot }: TakesPostDeps) {
               id,
               label,
               onProgress,
+              signal,
             });
             return take.id;
           } catch (error) {

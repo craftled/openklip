@@ -192,15 +192,36 @@ function parseProbeJson(out: string): {
 
 export async function ffprobeJson(
   args: string[],
-  label = "ffprobe"
+  label = "ffprobe",
+  signal?: AbortSignal
 ): Promise<ReturnType<typeof parseProbeJson>> {
+  if (signal?.aborted) {
+    throw new ProcessCancelledError(label);
+  }
   const proc = spawnFfprobe(args);
-  const [out, err, code] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-    proc.exited,
-  ]);
+  let onAbort: (() => void) | undefined;
+  if (signal) {
+    onAbort = () => proc.kill();
+    signal.addEventListener("abort", onAbort, { once: true });
+  }
+  let out: string;
+  let err: string;
+  let code: number;
+  try {
+    [out, err, code] = await Promise.all([
+      new Response(proc.stdout).text(),
+      new Response(proc.stderr).text(),
+      proc.exited,
+    ]);
+  } finally {
+    if (signal && onAbort) {
+      signal.removeEventListener("abort", onAbort);
+    }
+  }
   if (code !== 0) {
+    if (signal?.aborted) {
+      throw new ProcessCancelledError(label);
+    }
     throw new Error(
       `${label} failed (exit ${code}):\n${err.slice(-1800) || out.slice(-1800)}`
     );
@@ -208,7 +229,10 @@ export async function ffprobeJson(
   return parseProbeJson(out);
 }
 
-export async function probe(file: string): Promise<ProbeResult> {
+export async function probe(
+  file: string,
+  signal?: AbortSignal
+): Promise<ProbeResult> {
   const json = await ffprobeJson(
     [
       "-v",
@@ -219,7 +243,8 @@ export async function probe(file: string): Promise<ProbeResult> {
       "-show_format",
       file,
     ],
-    "ffprobe"
+    "ffprobe",
+    signal
   );
   const v = (json.streams ?? []).find((s) => s.codec_type === "video");
   const a = (json.streams ?? []).find((s) => s.codec_type === "audio");
@@ -247,11 +272,13 @@ export async function probe(file: string): Promise<ProbeResult> {
 
 /** Duration-only probe for audio files (no video stream required). */
 export async function probeAudio(
-  file: string
+  file: string,
+  signal?: AbortSignal
 ): Promise<{ durationSec: number }> {
   const json = await ffprobeJson(
     ["-v", "quiet", "-print_format", "json", "-show_format", file],
-    "ffprobe(audio)"
+    "ffprobe(audio)",
+    signal
   );
   return { durationSec: Number(json.format?.duration ?? 0) };
 }
