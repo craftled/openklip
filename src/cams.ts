@@ -5,6 +5,7 @@ import { z } from "zod";
 import { SAMPLE_RATE } from "./edl.ts";
 import { ProcessCancelledError, probe } from "./ffmpeg.ts";
 import { buildProxy, extractAudio } from "./ingest.ts";
+import type { IngestPhase, IngestProgress } from "./ingest-types.ts";
 import { camDir, camFile, projectPaths } from "./paths.ts";
 import { cwdPath } from "./repo-paths.ts";
 
@@ -48,6 +49,15 @@ export function nextCamId(existing: Cam[]): string {
   }
   throw new Error(`cam limit reached: max ${MAX_CAMS} cams per project`);
 }
+
+const CAM_INGEST_STEPS: ReadonlyArray<{
+  phase: IngestPhase;
+  message: string;
+}> = [
+  { phase: "probe", message: "Probing cam" },
+  { phase: "proxy", message: "Building cam proxy" },
+  { phase: "audio", message: "Extracting cam audio" },
+];
 
 function speakerCount(cams: Cam[]): number {
   return cams.filter((cam) => cam.role === "speaker").length;
@@ -112,9 +122,25 @@ export async function ingestCam(
     role?: CamRole;
     offsetMs?: number;
     force?: boolean;
+    onProgress?: (progress: IngestProgress) => void;
     signal?: AbortSignal;
   }
 ): Promise<Cam> {
+  const total = CAM_INGEST_STEPS.length;
+  const emit = (phase: IngestPhase) => {
+    if (!opts?.onProgress) {
+      return;
+    }
+    const index = CAM_INGEST_STEPS.findIndex((step) => step.phase === phase);
+    if (index >= 0) {
+      opts.onProgress({
+        phase,
+        message: CAM_INGEST_STEPS[index].message,
+        step: index + 1,
+        total,
+      });
+    }
+  };
   const source = isAbsolute(videoArg) ? videoArg : cwdPath(videoArg);
   if (!existsSync(source)) {
     throw new Error(`cam video not found: ${source}`);
@@ -151,9 +177,12 @@ export async function ingestCam(
   };
 
   console.log(`[cam] ${camId} <- ${source}`);
+  emit("probe");
   const meta = await probe(source, signal);
   checkAborted();
+  emit("proxy");
   await buildProxy(source, proxyPath, signal);
+  emit("audio");
   await extractAudio(source, audioRaw, signal);
   checkAborted();
 
