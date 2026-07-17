@@ -75,7 +75,7 @@ Agent sidebar chats use `working/chats.json`, not `localStorage` (color scheme a
 
 ## What works today
 
-Verified against the current codebase (`VERSION` / `package.json` `0.42.0.4`, 2473 tests: 2467 pass, 6 skip without `OPENKLIP_INTEGRATION=1` and env-gated fixtures):
+Verified against the current codebase (`VERSION` / `package.json` `0.43.0`, 2710 tests: 2696 pass, 14 skip without `OPENKLIP_INTEGRATION=1`/`OPENKLIP_ACCEPTANCE=1` and env-gated fixtures):
 
 - **Ingest**: video → local transcript + preview proxy + `project.json` (`openklip ingest`; refuses re-ingest unless `--force`)
 - **Transcript editing**: click words to toggle `deleted`; `openklip cut` / `cut --text` / `restore` on CLI
@@ -134,6 +134,8 @@ Verified against the current codebase (`VERSION` / `package.json` `0.42.0.4`, 24
 
 Phrase-based cutting works on both surfaces: the transcript UI has search with batch cut and restore, and the CLI has `openklip cut --text`. First project on a machine: upload or drop a video in the browser, or use `openklip ingest` from the CLI. Known gaps: **[TODO.md](./TODO.md)**.
 
+Also new this release: ingest and silences jobs now persist to disk and survive a server/app restart, with real cancel/retry/clean-up from a Config sidebar Jobs tab (`GET /api/projects/jobs`, per-job cancel/retry/delete routes, no CLI verb yet); `openklip serve` runs a production `next start` build (`bun run build` first) instead of `next dev`, with runtime assets resolved against a distribution-relative `appRoot()`; and a native macOS desktop app (Tauri v2) bundles the full runtime into a self-contained `.app`, though it is not yet signed/notarized or distributed (see Quick start and [TODO.md](./TODO.md#known-limitations)).
+
 ### Shorts workflow (v0.21-0.25)
 
 End-to-end path from a long talking-head edit to a vertical short:
@@ -151,13 +153,14 @@ See `templates/make-short/skill.md` (one short from an existing edit) and `templ
 
 ## Quick start
 
-**Platform:** OpenKlip targets **macOS** today. Ingest (Whisper), export (ffmpeg), rich graphics (headless Chrome), and Vision reframe assume a Mac dev environment. The CLI and MCP server may run elsewhere for read/query workflows, but the full edit loop is macOS-only for now.
+**Platform:** OpenKlip targets **macOS** today. Ingest (Whisper), export (ffmpeg), rich graphics (headless Chrome), and Vision reframe assume a Mac dev environment. The CLI and MCP server may run elsewhere for read/query workflows, but the full edit loop is macOS-only for now. A native macOS desktop app (Tauri v2) exists but is not yet signed/notarized or distributed; see Known Limitations.
 
 **Requirements:** Bun 1.3.14+, Node 24+ (`package.json` `engines`), macOS for the full pipeline.
 
 ```bash
 bun install
 bun run ingest /path/to/video.mp4   # creates projects/<slug>/
+bun run build                          # required once before serve (production next start)
 bun run serve <slug>                   # opens editor (sets OPENKLIP_SLUG)
 bun run export <slug>
 ```
@@ -205,7 +208,7 @@ In Cursor, enable the bundled MCP server (`.cursor/mcp.json`) and call the same 
 
 ### Browser integration tests
 
-Three editor flows have optional headless Chrome tests that boot a real Next dev server against a fixture project: `tests/json-graphic-browser.test.ts`, `tests/transcript-diff-browser.test.ts`, and `tests/mobile-overlays-browser.test.ts`. They skip in the default `bun test` run. To run them locally:
+Six editor flows have optional headless Chrome tests that boot a real Next server against a fixture project: `tests/json-graphic-browser.test.ts`, `tests/transcript-diff-browser.test.ts`, `tests/mobile-overlays-browser.test.ts`, `tests/golden-path-browser.test.ts` (edit to verified export against a production `next start` server), `tests/save-recovery-browser.test.ts`, and `tests/job-center-browser.test.ts`. They skip in the default `bun test` run; `bun run test:integration` runs all six. To run one locally:
 
 ```bash
 OPENKLIP_INTEGRATION=1 bun test tests/transcript-diff-browser.test.ts
