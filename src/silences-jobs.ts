@@ -189,6 +189,15 @@ export function getSilencesJob(id: string): SilencesJob | undefined {
   return jobs.get(id);
 }
 
+// All of one project's silences jobs (running + terminal history), for the
+// Job Center UI. Hydrates that project's store on a cold Map miss the same
+// way getSilencesJob does, so this also works right after a restart before
+// any other silences-jobs call has touched this slug.
+export function listSilencesJobs(slug: string): SilencesJob[] {
+  ensureHydrated(slug);
+  return [...jobs.values()].filter((job) => job.slug === slug);
+}
+
 export function getRunningSilencesJobForSlug(
   slug: string
 ): SilencesJob | undefined {

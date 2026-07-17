@@ -29,11 +29,19 @@ interface SilencesStartResponse {
   status?: "running";
 }
 
+// Mirrors src/silences-jobs.ts's SilencesJobStatus. That union has grown
+// terminal statuses over time (interrupted, cancelled) that this poller
+// used to not know about at all: an unrecognized status fell through to the
+// "still going" branch below and polled forever, since a terminal job's
+// status never changes on a later poll. Any status that isn't "running" or
+// "done" is now treated as terminal (same outcome as "error": give up and
+// resolve null) so a status this type doesn't yet know about fails safely
+// instead of hanging.
 interface SilencesJobResponse {
   error?: string;
   progress?: CleanupSilencesProgress;
   silences?: SilenceSpan[];
-  status: "done" | "error" | "running";
+  status: "cancelled" | "done" | "error" | "interrupted" | "running";
 }
 
 const POLL_MS = 700;
@@ -41,7 +49,7 @@ const POLL_MS = 700;
 const silencesCache = new Map<string, SilenceSpan[] | null>();
 const peaksCache = new Map<string, CleanupPeaksResponse>();
 
-async function pollSilencesJob(
+export async function pollSilencesJob(
   slug: string,
   jobId: string,
   onProgress?: (p: CleanupSilencesProgress) => void
@@ -60,7 +68,7 @@ async function pollSilencesJob(
     if (job.status === "done") {
       return job.silences ?? [];
     }
-    if (job.status === "error") {
+    if (job.status !== "running") {
       return null;
     }
     await new Promise((r) => {

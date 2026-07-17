@@ -22,6 +22,7 @@ import {
 } from "@/components/config/look-tab-panel";
 import { EditorToolsControls } from "@/components/editor-tools-controls";
 import { HistoryPanel } from "@/components/history-panel";
+import { JobsPanel } from "@/components/jobs-panel";
 import { PlaybackLoopControls } from "@/components/playback-loop-controls";
 import { Button } from "@/components/ui/button";
 import type { ConfigInspectorSummary } from "@/lib/config-inspector";
@@ -138,6 +139,7 @@ export function ConfigPanel({
                 slug={history.slug}
               />
             ) : null}
+            {activeTab === "jobs" ? <JobsPanel slug={history.slug} /> : null}
           </div>
         </div>
       </div>
