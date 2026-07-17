@@ -42,26 +42,37 @@ through LaunchServices) and quit the standard way (a real Quit AppleEvent):
 - Signing/notarization is wired (`entitlements.plist` + `tauri.conf.json`
   macOS block) and documented in `docs/desktop-packaging-runbook.md`.
 
-### Known gap: DMG bundling hangs in this (sandboxed/automated) session
+### Resolved: DMG bundling works; earlier "hang" was a downstream symptom
 
-`cargo tauri build`'s `.app` bundling succeeds every time; the follow-on DMG
-step (`bundle_dmg.sh`, wrapping `create-dmg`) reliably hung in this
-environment. `create-dmg` opens a Finder window to lay out the icon/
-app-drop-link positions, which needs a real interactive desktop session —
-this sandboxed execution context doesn't have one. This has **not** been
-reproduced or ruled out on a normal interactive Mac session (which is how a
-human running the runbook would actually invoke it). If it recurs there,
-first suspects: Finder/Accessibility automation permissions for the
-terminal/IDE running the build, or pin a `create-dmg` version known to
-support headless/CI use. The `.app` bundle itself — the thing that actually
-gets signed, notarized, and tested — is unaffected either way.
+An earlier note here flagged the DMG step (`bundle_dmg.sh` → `create-dmg`) as
+reliably hanging in automated sessions. That was a misdiagnosis: the DMG step
+is never reached when the release `.app` fails to compile, and two separate
+build failures were masking it (see CRAFT-6261):
+
+1. **Sandboxed compilation corrupted the parallel Rust build.** Running
+   `cargo build --release` under a filesystem sandbox produced intermittent
+   `E0463: can't find crate for <proc-macro>` errors and outright Mach-O
+   dylib corruption (`dlopen: mis-aligned LINKEDIT string pool`), on a
+   different crate each run. Building **non-sandboxed** fixed it.
+2. **The aggressive `[profile.release]` settings broke proc-macro dylibs.**
+   `tauri build` compiles with the production `custom-protocol` feature,
+   recompiling `tauri_macros` under `lto = true` / `codegen-units = 1` /
+   `strip = true`. Stripped/LTO'd proc-macro dylibs fail to load. Fixed with
+   a `[profile.release.build-override]` (opt-level 0, unstripped) that
+   exempts host build tools without changing the shipped binary.
+
+With both fixed, `bunx @tauri-apps/cli build --bundles app,dmg` produces a
+valid, `hdiutil verify`-clean DMG (~327 MB) in a couple of minutes — no
+Finder-automation hang. Build the release artifacts on a normal interactive
+Mac session (not inside a sandboxed automation harness).
 
 ### Rebuild + test the bundle yourself
 
 ```bash
 bun run build                                 # production Next build
-bunx @tauri-apps/cli@2 build --debug          # unsigned .app (DMG may hang, see above)
-scripts/verify-macos-signature.sh src-tauri/target/debug/bundle/macos/OpenKlip.app  # only meaningful once signed (Stage C)
+bun run desktop:prepare-bundle                # stage Resources/app (release)
+bunx @tauri-apps/cli@2 build --bundles app,dmg  # release .app + valid DMG (run non-sandboxed)
+scripts/verify-macos-signature.sh src-tauri/target/release/bundle/macos/OpenKlip.app  # only meaningful once signed (Stage C)
 
 # functional check, no signing needed:
 open -n src-tauri/target/debug/bundle/macos/OpenKlip.app
