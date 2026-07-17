@@ -830,13 +830,19 @@ try {
       // OpenKlip is launched from an installed/relocated layout, not just a
       // repo checkout (see src/serve-runtime.ts).
       const mode: ServeMode = cmd === "serve" ? "serve" : "dev";
-      const slug = rest[0] ?? latestProject();
-      if (!slug) {
-        throw new Error("no projects found. Run: openklip ingest <video>");
+      // An EMPTY workspace is a valid state to serve: the editor renders its
+      // first-run EmptyWorkspace onboarding at "/" (app/lib/editor-home.tsx),
+      // and every slug consumer downstream tolerates an unset pin
+      // (resolveSlug falls back per-request, agent scoping trims empties).
+      // Refusing to start here is what left the packaged desktop app
+      // (src-tauri) spinning on its splash forever on a clean install — the
+      // sidecar exited before ever binding the port. Only an EXPLICITLY
+      // requested slug that doesn't exist is still an error.
+      const explicitSlug = rest[0];
+      if (explicitSlug && !existsSync(projectPaths(explicitSlug).project)) {
+        throw new Error(`project not found: ${explicitSlug}`);
       }
-      if (!existsSync(projectPaths(slug).project)) {
-        throw new Error(`project not found: ${slug}`);
-      }
+      const slug = explicitSlug ?? latestProject() ?? "";
       const base = appRoot();
       if (mode === "serve" && !hasProductionBuild(base)) {
         throw new Error(
@@ -845,7 +851,7 @@ try {
       }
       // Surface a broken ffmpeg / whisper / proxy before the editor opens, so a
       // failed edit loop isn't the first signal something is wrong.
-      const health = await runDoctor(slug);
+      const health = await runDoctor(slug || undefined);
       for (const c of health.checks.filter((x) => x.status !== "ok")) {
         const sigil = c.status === "fail" ? "✗" : "!";
         console.log(`[serve] ${sigil} ${c.name}: ${c.detail}`);
@@ -878,7 +884,7 @@ try {
       }
       const displayHost = process.env.OPENKLIP_HOST ? host : "localhost";
       console.log(
-        `[serve] project: ${slug} (${mode})\n\n  OpenKlip ready  ->  http://${displayHost}:${port}/${slug}\n`
+        `[serve] project: ${slug || "(empty workspace)"} (${mode})\n\n  OpenKlip ready  ->  http://${displayHost}:${port}/${slug}\n`
       );
       const plan = buildServeSpawnPlan({ mode, port, host, slug, base });
       const proc = Bun.spawn(plan.args, {

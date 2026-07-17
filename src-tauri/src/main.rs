@@ -38,10 +38,12 @@
     windows_subsystem = "windows"
 )]
 
+use std::io::Read;
 use std::net::{TcpListener, TcpStream};
 use std::os::unix::process::CommandExt;
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tauri::{Manager, RunEvent, Url};
 
@@ -68,15 +70,50 @@ fn pick_free_port() -> u16 {
         .unwrap_or(4399)
 }
 
-/// Poll until the sidecar is accepting TCP connections (server bound its port).
-fn wait_until_listening(port: u16, attempts: u32) -> bool {
+/// Poll until the sidecar is accepting TCP connections (server bound its
+/// port), bailing out early if the sidecar process already exited (`gone`) —
+/// a dead engine will never bind, so waiting out the full budget just leaves
+/// the user staring at the splash spinner.
+fn wait_until_listening(port: u16, attempts: u32, gone: &AtomicBool) -> bool {
     for _ in 0..attempts {
         if TcpStream::connect(("127.0.0.1", port)).is_ok() {
             return true;
         }
+        if gone.load(Ordering::SeqCst) {
+            return false;
+        }
         std::thread::sleep(Duration::from_millis(300));
     }
     false
+}
+
+/// Replace the splash's spinner/status with a visible failure message (plus
+/// the sidecar's captured stderr tail, when there is one). The splash page is
+/// ours (src-tauri/loading/index.html), so driving it with a snippet of eval'd
+/// JS is safe; all interpolated text goes through serde_json string encoding.
+fn show_splash_error(handle: &tauri::AppHandle, message: &str, detail: &str) {
+    eprintln!("[openklip-desktop] {message}");
+    let Some(win) = handle.get_webview_window("main") else {
+        return;
+    };
+    let js = format!(
+        "(function() {{\
+           var sp = document.querySelector('.spinner'); if (sp) sp.remove();\
+           var s = document.querySelector('.status');\
+           if (s) {{ s.textContent = {msg}; s.style.color = '#ff8a80'; }}\
+           var detail = {detail};\
+           if (detail && !document.querySelector('.engine-error-detail')) {{\
+             var d = document.createElement('pre');\
+             d.className = 'engine-error-detail';\
+             d.textContent = detail;\
+             d.style.cssText = 'margin:16px auto 0;max-width:540px;max-height:220px;overflow:auto;text-align:left;white-space:pre-wrap;font:11px/1.4 ui-monospace,monospace;color:#9aa0a6;';\
+             var w = document.querySelector('.wrap'); if (w) w.appendChild(d);\
+           }}\
+         }})();",
+        msg = serde_json::to_string(message).unwrap_or_else(|_| "\"engine failed\"".into()),
+        detail = serde_json::to_string(detail.trim()).unwrap_or_else(|_| "\"\"".into()),
+    );
+    let _ = win.eval(&js);
 }
 
 /// The bundled runtime tree's root, if `tauri build` actually populated it
@@ -162,6 +199,14 @@ fn main() {
                 }
             }
 
+            // Pipe stderr instead of inheriting it: launched from Finder,
+            // inherited stderr goes nowhere, which is exactly how an
+            // instantly-exiting engine used to leave the splash spinning
+            // forever with zero diagnostics. The tee thread below echoes it
+            // to our own stderr AND keeps a bounded tail to show on the
+            // splash if the engine dies before becoming ready.
+            cmd.stderr(std::process::Stdio::piped());
+
             let mut child = cmd.spawn().unwrap_or_else(|e| {
                 panic!(
                     "failed to spawn the OpenKlip sidecar ({}): {e}",
@@ -169,28 +214,90 @@ fn main() {
                 )
             });
             let pid = child.id();
+            app.state::<SidecarState>().0.lock().unwrap().replace(pid);
+
+            let ready = Arc::new(AtomicBool::new(false));
+            let sidecar_gone = Arc::new(AtomicBool::new(false));
+            let stderr_tail = Arc::new(Mutex::new(String::new()));
+
+            if let Some(mut err) = child.stderr.take() {
+                let tail = Arc::clone(&stderr_tail);
+                std::thread::spawn(move || {
+                    let mut buf = [0u8; 4096];
+                    loop {
+                        match err.read(&mut buf) {
+                            Ok(0) | Err(_) => break,
+                            Ok(n) => {
+                                let chunk = String::from_utf8_lossy(&buf[..n]).into_owned();
+                                eprint!("{chunk}");
+                                let mut t = tail.lock().unwrap();
+                                t.push_str(&chunk);
+                                if t.len() > 4000 {
+                                    let mut cut = t.len() - 4000;
+                                    while !t.is_char_boundary(cut) {
+                                        cut += 1;
+                                    }
+                                    t.replace_range(..cut, "");
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
             // Reap in the background regardless of how the child ends up
             // exiting (normal exit, or killed via the group-kill in our own
             // exit handler below) — std::process::Child does not auto-wait
             // on drop, so an un-reaped exited child sits as a zombie
-            // process-table entry until something calls wait().
-            std::thread::spawn(move || {
-                let _ = child.wait();
-            });
-            app.state::<SidecarState>().0.lock().unwrap().replace(pid);
+            // process-table entry until something calls wait(). If it exits
+            // BEFORE the server ever became ready, that's a startup failure:
+            // surface it on the splash instead of spinning forever.
+            {
+                let handle = app.handle().clone();
+                let ready = Arc::clone(&ready);
+                let gone = Arc::clone(&sidecar_gone);
+                let tail = Arc::clone(&stderr_tail);
+                std::thread::spawn(move || {
+                    let status = child.wait();
+                    gone.store(true, Ordering::SeqCst);
+                    if ready.load(Ordering::SeqCst) {
+                        return;
+                    }
+                    let code = status
+                        .ok()
+                        .and_then(|s| s.code())
+                        .map(|c| format!(" (exit {c})"))
+                        .unwrap_or_default();
+                    let detail = tail.lock().unwrap().clone();
+                    show_splash_error(
+                        &handle,
+                        &format!("The local engine stopped before it became ready{code}."),
+                        &detail,
+                    );
+                });
+            }
 
             // Once the server is listening, swap the splash for the editor.
             let handle = app.handle().clone();
             let url = editor_url.clone();
             std::thread::spawn(move || {
-                if wait_until_listening(port, 200) {
+                if wait_until_listening(port, 200, &sidecar_gone) {
+                    ready.store(true, Ordering::SeqCst);
                     if let Ok(parsed) = url.parse::<Url>() {
                         if let Some(win) = handle.get_webview_window("main") {
                             let _ = win.navigate(parsed);
                         }
                     }
-                } else {
-                    eprintln!("[openklip-desktop] sidecar never became ready on port {port}");
+                } else if !sidecar_gone.load(Ordering::SeqCst) {
+                    // Still running but never bound the port within the
+                    // budget (~60s). The exit path above owns the message
+                    // when the process died; this covers a live-but-stuck
+                    // engine.
+                    show_splash_error(
+                        &handle,
+                        &format!("The local engine never became ready on port {port}."),
+                        &stderr_tail.lock().unwrap().clone(),
+                    );
                 }
             });
             Ok(())
