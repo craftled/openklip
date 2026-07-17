@@ -85,3 +85,23 @@ test("openklip serve reports project-not-found before checking for a production 
     assert.match(r.out, /project not found/);
   });
 });
+
+// An empty workspace must be SERVABLE, not a startup error: the editor
+// renders EmptyWorkspace onboarding at "/" (app/lib/editor-home.tsx), and the
+// packaged desktop app (src-tauri) launches `serve` with no slug against a
+// fresh Application Support state dir on first run — refusing to start here
+// left the app stuck on its splash forever. Proven by the guard ORDER: with
+// zero projects the CLI must fall through the old "no projects found" throw
+// and reach the NEXT preflight (missing production build) instead, which
+// exits before any real server spawns, keeping this test fast and leak-free.
+test("openklip serve with no slug and an empty workspace proceeds instead of failing with no-projects", async () => {
+  await withTempProjectsRoot(async ({ root }) => {
+    const r = await runCli(["serve"], {
+      OPENKLIP_PROJECTS_ROOT: join(root, "empty-projects"),
+      OPENKLIP_APP_ROOT: join(root, "no-build-app-root"),
+    });
+    assert.notEqual(r.code, 0);
+    assert.doesNotMatch(r.out, /no projects found/);
+    assert.match(r.out, /bun run build/);
+  });
+});
