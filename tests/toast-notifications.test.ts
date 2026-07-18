@@ -24,10 +24,14 @@ import {
   findFillerSuccessToast,
   nothingToPlayToast,
   playbackFailedToast,
+  projectCompactedToast,
+  projectCompactFailedToast,
   projectCreateFailedToast,
   projectDeletedToast,
   projectDeleteFailedToast,
   projectIngestLoadingMessage,
+  projectRebuildFailedToast,
+  projectRebuildStartedToast,
   proxyExportWarningToast,
   revealFailedToast,
   revertFailedToast,
@@ -216,6 +220,34 @@ test("project lifecycle toasts", () => {
     description: "locked",
   });
   assert.equal(projectIngestLoadingMessage(), "Ingesting video…");
+});
+
+test("project disk-management toasts", () => {
+  assert.deepEqual(projectCompactedToast(52_428_800), {
+    kind: "success",
+    title: "Freed 50 MB",
+    description: "Derived media removed. Rebuild before playing again.",
+  });
+  assert.deepEqual(projectCompactedToast(0), {
+    kind: "info",
+    title: "Nothing to compact",
+    description: "This project has no derived media to remove.",
+  });
+  assert.deepEqual(projectCompactFailedToast("locked"), {
+    kind: "error",
+    title: "Could not compact project",
+    description: "locked",
+  });
+  assert.deepEqual(projectRebuildStartedToast(), {
+    kind: "info",
+    title: "Rebuilding…",
+    description: "Regenerating proxy, audio, and frames from the source.",
+  });
+  assert.deepEqual(projectRebuildFailedToast("ffmpeg failed"), {
+    kind: "error",
+    title: "Could not rebuild project",
+    description: "ffmpeg failed",
+  });
 });
 
 test("workspacePickerToasts on cancelled returns empty", () => {
