@@ -47,6 +47,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tauri::{Manager, RunEvent, Url};
+use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
+use tauri_plugin_updater::UpdaterExt;
 
 /// Base filename for the sidecar's tee'd log, under `app.path().app_log_dir()`
 /// (`~/Library/Logs/com.craftled.openklip/` on macOS). Findable, persistent
@@ -217,6 +219,56 @@ fn resolve_runtime(app: &tauri::App) -> (PathBuf, PathBuf, bool) {
     (PathBuf::from("bun"), PathBuf::from(app_root), false)
 }
 
+/// Check the GitHub Releases feed for a newer version shortly after launch, and
+/// on the user's confirmation download + install it, then relaunch. Entirely
+/// Rust-driven (the webview loads a remote localhost URL, so there is no JS
+/// updater to call) and entirely best-effort: no feed published yet, offline,
+/// or a malformed manifest are all logged and ignored — never a crash, never a
+/// blocked launch. The install/relaunch branch only runs when the feed actually
+/// carries a signed update (see docs/desktop-packaging-runbook.md for how a
+/// release publishes `latest.json` + the signed artifact), so it stays dormant
+/// until then.
+fn spawn_update_check(handle: tauri::AppHandle) {
+    std::thread::spawn(move || {
+        // Let the editor finish loading before any prompt could interrupt.
+        std::thread::sleep(Duration::from_secs(4));
+        tauri::async_runtime::block_on(async move {
+            let updater = match handle.updater() {
+                Ok(u) => u,
+                Err(e) => {
+                    eprintln!("[openklip-desktop] updater unavailable: {e}");
+                    return;
+                }
+            };
+            match updater.check().await {
+                Ok(Some(update)) => {
+                    let version = update.version.clone();
+                    let confirmed = handle
+                        .dialog()
+                        .message(format!(
+                            "OpenKlip {version} is available. Download and install it now? OpenKlip will restart."
+                        ))
+                        .title("Update available")
+                        .buttons(MessageDialogButtons::OkCancelCustom(
+                            "Update".to_string(),
+                            "Later".to_string(),
+                        ))
+                        .blocking_show();
+                    if !confirmed {
+                        return;
+                    }
+                    match update.download_and_install(|_chunk, _total| {}, || {}).await {
+                        Ok(_) => handle.restart(),
+                        Err(e) => eprintln!("[openklip-desktop] update install failed: {e}"),
+                    }
+                }
+                Ok(None) => eprintln!("[openklip-desktop] up to date"),
+                Err(e) => eprintln!("[openklip-desktop] update check skipped: {e}"),
+            }
+        });
+    });
+}
+
 fn main() {
     let port = pick_free_port();
     let slug = std::env::var("OPENKLIP_SLUG").unwrap_or_default();
@@ -228,6 +280,8 @@ fn main() {
     };
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_dialog::init())
         .manage(SidecarState(Mutex::new(None)))
         .setup(move |app| {
             let projects_root = std::env::var("OPENKLIP_PROJECTS_ROOT").ok();
@@ -462,6 +516,10 @@ fn main() {
                     );
                 }
             });
+
+            // Auto-update check (CRAFT-6266): dormant until a release publishes
+            // a signed feed; a no-op/logged skip otherwise.
+            spawn_update_check(app.handle().clone());
             Ok(())
         })
         .build(tauri::generate_context!())

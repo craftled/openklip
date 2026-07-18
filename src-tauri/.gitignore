@@ -6,3 +6,6 @@
 # Generated runtime bundle (full .next + node_modules + assets), populated by
 # scripts/prepare-desktop-bundle.ts before `tauri build`. Never committed.
 /resources/app
+
+# Updater signing key — SECRET, never commit
+.tauri/

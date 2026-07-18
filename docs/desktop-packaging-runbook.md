@@ -57,6 +57,34 @@ xcrun stapler staple "$DMG"
 
 The hardened runtime + Bun-JIT entitlements (`com.apple.security.cs.allow-jit`, `allow-unsigned-executable-memory`, `disable-library-validation`) are in `src-tauri/entitlements.plist`; the deep-sign script applies them to `bun` + the shell.
 
+## Auto-update (CRAFT-6266)
+
+The app checks for updates on launch (Rust-driven, `spawn_update_check` in `src-tauri/src/main.rs`) against the feed in `tauri.conf.json` → `plugins.updater.endpoints`:
+`https://github.com/craftled/openklip/releases/latest/download/latest.json`. On finding a newer signed version it prompts, then downloads + installs + relaunches. **It stays dormant until a release actually publishes the feed** — no feed = a logged skip, never a crash.
+
+The updater **public** key is committed in `tauri.conf.json`. The **private** key was generated to `src-tauri/.tauri/openklip-updater.key` — this is **gitignored and must be moved somewhere secret** (a password manager / secure store). If you lose it, you can never sign updates again and must ship a new pubkey (breaking auto-update for installed apps).
+
+To **activate** it, each release must publish updater artifacts + a manifest:
+
+```bash
+# In addition to the sign/notarize flow above, at release time:
+export TAURI_SIGNING_PRIVATE_KEY="$(cat /path/to/openklip-updater.key)"   # the secret you stored
+# (export TAURI_SIGNING_PRIVATE_KEY_PASSWORD=… only if you regenerated the key WITH a passphrase)
+
+# Build with updater artifacts enabled (not on by default, so normal/CI builds
+# don't need the key). This emits OpenKlip.app.tar.gz + .sig alongside the .app/.dmg.
+APPLE_SIGNING_IDENTITY="Developer ID Application: Craftled, MB (4RRUYWAP8F)" \
+  bunx @tauri-apps/cli@2 build --bundles app,dmg \
+  --config '{"bundle":{"createUpdaterArtifacts":true}}'
+
+# Write latest.json (the update manifest) — version, notes, pub_date, and a
+# platforms."darwin-aarch64" entry with the .sig contents + the .tar.gz URL on
+# the GitHub release. Then attach latest.json + OpenKlip.app.tar.gz (+ its .sig)
+# to the GitHub release so the endpoint above resolves.
+```
+
+Until that publish step runs for a release, installed apps simply find no update and carry on. The Apple Developer ID signing/notarization (above) and the Tauri updater signature are **separate keys** — an update artifact needs both: notarized *and* updater-signed.
+
 ## Verify **[human-only, on a clean Mac]**
 
 ```bash
