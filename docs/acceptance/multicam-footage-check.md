@@ -55,7 +55,7 @@ From [`docs/specs/contextual-cam-switch-v1.md`](../specs/contextual-cam-switch-v
 | Pipeline | `cam-add` once per file → `cam-mix` → mixed `source.mp4` / `proxy.mp4` + `project.multicam` provenance |
 | Acceptance gate | Eyeball the switch plan + rendered mix on **real** multi-cam footage before tagging/publishing **0.42.0.0** |
 
-Explicit v1 **non-goals** (also in spec and `TODO.md#known-limitations`):
+Explicit v1 **non-goals** (also in spec; tracked in the OpenKlip Linear project, CRAFT-6283):
 
 - Virtual cams from a single gallery/grid recording (e.g. one Zoom/Meet composite)
 - Shared-mic diarization (one file, two speakers on one track)

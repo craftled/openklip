@@ -364,8 +364,8 @@ test("exportProject rejects an unknown format before any export work", async () 
   });
 });
 
-// gifMaxWidth overrides GIF_MAX_WIDTH_PX for one export (TODO.md known
-// limitation: "no user-facing control to customize these ceilings"); server
+// gifMaxWidth overrides GIF_MAX_WIDTH_PX for one export (otherwise there is no
+// user-facing control to customize these ceilings); server
 // actions enforce the same 1920 hard ceiling as the HTTP route and MCP tool.
 test("exportProject rejects an out-of-bounds gifMaxWidth before any export work", async () => {
   await withTempProjectsRoot(async ({ slug }) => {

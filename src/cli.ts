@@ -2775,8 +2775,8 @@ try {
         format = formatRaw as ExportFormat;
       }
       // Overrides GIF_MAX_WIDTH_PX (960) for this export's GIF-specific
-      // second pass only (TODO.md known limitation: "no user-facing control
-      // to customize these ceilings"). exporter.ts clamps to
+      // second pass only (there is no user-facing control to customize these
+      // ceilings). exporter.ts clamps to
       // GIF_MAX_WIDTH_OVERRIDE_CEILING_PX regardless of caller, but failing
       // fast here gives an immediate, actionable error instead of a silently
       // clamped result.

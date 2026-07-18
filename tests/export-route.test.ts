@@ -135,8 +135,8 @@ test("export route returns 400 for an unknown format value", async () => {
   });
 });
 
-// gifMaxWidth overrides the GIF export's default width ceiling (TODO.md known
-// limitation: "no user-facing control to customize these ceilings"); bounded
+// gifMaxWidth overrides the GIF export's default width ceiling (otherwise there
+// is no user-facing control to customize these ceilings); bounded
 // at 1920, the hard ceiling exporter.ts clamps to regardless of caller.
 test("export route accepts a gifMaxWidth within bounds (404 for a missing project, not 400)", async () => {
   await withTempProjectsRoot(async () => {

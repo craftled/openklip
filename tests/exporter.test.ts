@@ -1333,7 +1333,7 @@ test("exportCut applies the requested fps and compression (smoke)", {
 });
 
 // ── clampGifDimensions (pure) ────────────────────────────────────────────────
-// GIF export has no size or duration cap (TODO.md known limitation): file
+// GIF export has no size or duration cap by default: file
 // size and encode time scale with frame count (fps x duration) and pixel
 // count (width x height), so this clamps the GIF-only second pass down to a
 // sane ceiling regardless of the export's own resolved resolution/fps.
@@ -1379,8 +1379,8 @@ test("clampGifDimensions clamps fps independently of width (width already under 
   assert.equal(result.fps, GIF_MAX_FPS);
 });
 
-// ── clampGifDimensions maxWidth override (TODO.md: "no user-facing control
-// to customize these ceilings") ─────────────────────────────────────────────
+// ── clampGifDimensions maxWidth override (no user-facing control otherwise
+// to customize these ceilings) ──────────────────────────────────────────────
 
 test("clampGifDimensions overrides the width ceiling only when maxWidth is explicitly given", () => {
   const overridden = clampGifDimensions({
