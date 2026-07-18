@@ -9,7 +9,7 @@ import { ClaudeAiIcon } from "@/components/ui/svgs/claudeAiIcon";
 import { CursorLight } from "@/components/ui/svgs/cursorLight";
 import { Openai } from "@/components/ui/svgs/openai";
 import { fetchGitHubStars, openklipGitHubUrl } from "@/lib/github-repo";
-import { Book, BrandGithub, PlugConnected } from "@/lib/icon";
+import { Book, BrandApple, BrandGithub, PlugConnected } from "@/lib/icon";
 import { cn } from "@/lib/utils";
 
 const SUPPORTS: {
@@ -127,12 +127,23 @@ export async function MarketingSite() {
             <Button
               nativeButton={false}
               render={
+                <a href="/docs/download-install">
+                  <BrandApple data-icon="inline-start" />
+                  Download for Mac
+                </a>
+              }
+              size="lg"
+            />
+            <Button
+              nativeButton={false}
+              render={
                 <a href="/docs/getting-started">
                   <BrandGithub data-icon="inline-start" />
                   Get started
                 </a>
               }
               size="lg"
+              variant="outline"
             />
             <Button
               nativeButton={false}
@@ -161,6 +172,7 @@ export async function MarketingSite() {
               variant="outline"
             />
           </div>
+          <p className="text-muted-foreground text-xs">macOS · Apple Silicon</p>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-2 text-sm">
             <span className="text-muted-foreground">Supports</span>
             <ul className="flex flex-wrap items-center gap-x-4 gap-y-2 text-foreground">
