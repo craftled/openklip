@@ -19,9 +19,13 @@ import {
   momentKeptToast,
   nothingToPlayToast,
   playbackFailedToast,
+  projectCompactedToast,
+  projectCompactFailedToast,
   projectCreateFailedToast,
   projectDeletedToast,
   projectDeleteFailedToast,
+  projectRebuildFailedToast,
+  projectRebuildStartedToast,
   proxyExportWarningToast,
   revealFailedToast,
   revertFailedToast,
@@ -261,6 +265,22 @@ export function toastProjectDeleted(): void {
 
 export function toastProjectDeleteFailed(error: string): void {
   show(projectDeleteFailedToast(error));
+}
+
+export function toastProjectCompacted(bytesFreed: number): void {
+  show(projectCompactedToast(bytesFreed));
+}
+
+export function toastProjectCompactFailed(error: string): void {
+  show(projectCompactFailedToast(error));
+}
+
+export function toastProjectRebuildStarted(): void {
+  show(projectRebuildStartedToast());
+}
+
+export function toastProjectRebuildFailed(error: string): void {
+  show(projectRebuildFailedToast(error));
 }
 
 export function toastWorkspacePickFailed(error: string): void {

@@ -28,6 +28,7 @@ import {
   type MusicPlacementView,
   MusicSectionControls,
 } from "@/components/music-controls";
+import { ProjectDiskPanel } from "@/components/project-disk-panel";
 import { TakesPanel } from "@/components/takes-panel";
 
 const DEFAULT_AUDIO: Audio = AudioSchema.parse(undefined);
@@ -224,6 +225,9 @@ export function ConfigProjectTab({
           onPatchSnap={onPatchSnap}
           snap={snap ?? DEFAULT_CUT_SNAP}
         />
+      </Section>
+      <Section title="Disk">
+        <ProjectDiskPanel slug={slug} />
       </Section>
     </>
   );

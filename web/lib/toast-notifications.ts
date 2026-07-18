@@ -259,6 +259,46 @@ export function projectDeleteFailedToast(error: string): ToastPayload {
   };
 }
 
+export function projectCompactedToast(bytesFreed: number): ToastPayload {
+  if (bytesFreed <= 0) {
+    return {
+      kind: "info",
+      title: "Nothing to compact",
+      description: "This project has no derived media to remove.",
+    };
+  }
+  const mb = Math.round(bytesFreed / (1024 * 1024));
+  return {
+    kind: "success",
+    title: `Freed ${mb} MB`,
+    description: "Derived media removed. Rebuild before playing again.",
+  };
+}
+
+export function projectCompactFailedToast(error: string): ToastPayload {
+  return {
+    kind: "error",
+    title: "Could not compact project",
+    description: error,
+  };
+}
+
+export function projectRebuildStartedToast(): ToastPayload {
+  return {
+    kind: "info",
+    title: "Rebuilding…",
+    description: "Regenerating proxy, audio, and frames from the source.",
+  };
+}
+
+export function projectRebuildFailedToast(error: string): ToastPayload {
+  return {
+    kind: "error",
+    title: "Could not rebuild project",
+    description: error,
+  };
+}
+
 export function workspacePickerToasts(
   result: WorkspacePickerResult
 ): ToastPayload[] {
