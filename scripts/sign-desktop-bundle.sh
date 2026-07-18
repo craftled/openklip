@@ -44,7 +44,10 @@ while IFS= read -r f; do
   [ "$f" = "$APP/Contents/MacOS/openklip-desktop" ] && continue
   case "$(file -b "$f" 2>/dev/null)" in
     *Mach-O*)
-      codesign --force --timestamp --options runtime -s "$IDENTITY" "$f"
+      # `</dev/null` is load-bearing: without it codesign inherits (and
+      # consumes) this while-loop's stdin — the `find` stream — and the loop
+      # dies after the first binary, silently leaving the rest unsigned.
+      codesign --force --timestamp --options runtime -s "$IDENTITY" "$f" </dev/null
       signed=$((signed + 1))
       ;;
   esac
