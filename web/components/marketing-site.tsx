@@ -127,23 +127,21 @@ export async function MarketingSite() {
             <Button
               nativeButton={false}
               render={
-                <a href="/docs/download-install">
+                // Direct download of the latest notarized DMG. The version-less
+                // `OpenKlip-macos-arm64.dmg` asset name keeps this URL stable
+                // across releases (GitHub serves it Content-Disposition:
+                // attachment, so it downloads rather than navigates); every
+                // release must publish that stable-named asset — see
+                // docs/desktop-packaging-runbook.md.
+                <a
+                  download
+                  href="https://github.com/craftled/openklip/releases/latest/download/OpenKlip-macos-arm64.dmg"
+                >
                   <BrandApple data-icon="inline-start" />
                   Download for Mac
                 </a>
               }
               size="lg"
-            />
-            <Button
-              nativeButton={false}
-              render={
-                <a href="/docs/getting-started">
-                  <BrandGithub data-icon="inline-start" />
-                  Get started
-                </a>
-              }
-              size="lg"
-              variant="outline"
             />
             <Button
               nativeButton={false}
@@ -250,12 +248,15 @@ bun run export <slug>`}
               className="h-9 gap-1.5 overflow-visible rounded-full bg-neutral-200 px-4 font-medium text-[13px] text-neutral-950 leading-none tracking-tight hover:bg-white sm:h-9 [&_svg]:overflow-visible"
               nativeButton={false}
               render={
-                <a href="/docs/getting-started">
-                  <BrandGithub
+                <a
+                  download
+                  href="https://github.com/craftled/openklip/releases/latest/download/OpenKlip-macos-arm64.dmg"
+                >
+                  <BrandApple
                     aria-hidden
                     className="size-4 shrink-0 overflow-visible"
                   />
-                  Get started
+                  Download for Mac
                 </a>
               }
               size="lg"

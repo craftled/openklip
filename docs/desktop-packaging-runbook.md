@@ -85,6 +85,22 @@ APPLE_SIGNING_IDENTITY="Developer ID Application: Craftled, MB (4RRUYWAP8F)" \
 
 Until that publish step runs for a release, installed apps simply find no update and carry on. The Apple Developer ID signing/notarization (above) and the Tauri updater signature are **separate keys** — an update artifact needs both: notarized *and* updater-signed.
 
+## Publish the DMG (required each release)
+
+Attach the notarized DMG to the GitHub release under **two** names:
+
+```bash
+# 1. The versioned artifact (canonical, matches the tag).
+gh release upload vX.Y.Z src-tauri/target/release/bundle/dmg/OpenKlip_X.Y.Z_aarch64.dmg
+# 2. A version-less alias — the marketing "Download for Mac" button links to
+#    https://github.com/craftled/openklip/releases/latest/download/OpenKlip-macos-arm64.dmg
+#    which only resolves if EVERY latest release carries this exact asset name.
+cp src-tauri/target/release/bundle/dmg/OpenKlip_X.Y.Z_aarch64.dmg /tmp/OpenKlip-macos-arm64.dmg
+gh release upload vX.Y.Z /tmp/OpenKlip-macos-arm64.dmg
+```
+
+Forgetting the version-less alias silently breaks the site's download button (404 on `releases/latest/download/OpenKlip-macos-arm64.dmg`).
+
 ## Verify **[human-only, on a clean Mac]**
 
 ```bash
