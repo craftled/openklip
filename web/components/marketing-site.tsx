@@ -84,6 +84,12 @@ export async function MarketingSite() {
           aria-label="Marketing"
           className="flex items-center gap-5 text-muted-foreground text-sm"
         >
+          <a
+            className="transition-colors hover:text-foreground"
+            href="/docs/download-install"
+          >
+            Download
+          </a>
           <a className="transition-colors hover:text-foreground" href="/docs">
             Docs
           </a>
