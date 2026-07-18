@@ -38,14 +38,85 @@
     windows_subsystem = "windows"
 )]
 
-use std::io::Read;
+use std::fs::{self, File, OpenOptions};
+use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::os::unix::process::CommandExt;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tauri::{Manager, RunEvent, Url};
+
+/// Base filename for the sidecar's tee'd log, under `app.path().app_log_dir()`
+/// (`~/Library/Logs/com.craftled.openklip/` on macOS). Findable, persistent
+/// diagnostics for a Finder-launched app with no attached terminal — the
+/// privacy-respecting alternative to telemetry: everything stays on local
+/// disk, nothing phones home.
+const LOG_FILE_NAME: &str = "openklip-engine.log";
+
+/// Resolve (and create) the OS log directory for this run. Best-effort: any
+/// failure (permission denied, resolver error on an unusual platform, etc.)
+/// returns `None` and the caller silently skips file logging rather than
+/// panicking — a missing log file must never block the app from launching.
+fn resolve_log_dir(app: &tauri::App) -> Option<PathBuf> {
+    let dir = app.path().app_log_dir().ok()?;
+    fs::create_dir_all(&dir).ok()?;
+    Some(dir)
+}
+
+/// Append `suffix` to the log file's name (not extension: `with_extension`
+/// would clobber the existing `.log`, giving `openklip-engine.1` instead of
+/// the intended `openklip-engine.log.1`).
+fn sibling_log_path(log_path: &Path, suffix: &str) -> PathBuf {
+    let mut name = log_path.file_name().unwrap_or_default().to_os_string();
+    name.push(suffix);
+    log_path.with_file_name(name)
+}
+
+/// Rotate the previous run's log before opening a fresh one for this run:
+/// `.log.1` -> `.log.2` -> gone, `.log` -> `.log.1`. Keeps the last two runs
+/// without pulling in a rotation crate. Best-effort: a failed rename just
+/// means the old log is lost, never a reason to fail startup.
+fn rotate_log(log_path: &Path) {
+    let gen1 = sibling_log_path(log_path, ".1");
+    let gen2 = sibling_log_path(log_path, ".2");
+    let _ = fs::remove_file(&gen2);
+    let _ = fs::rename(&gen1, &gen2);
+    let _ = fs::rename(log_path, &gen1);
+}
+
+/// Delete any previously retained crash log(s) so retention stays bounded to
+/// the single most recent crash, then copy the current (already-flushed) log
+/// file to `openklip-engine.crash-<exitcode>.log` so a failing run's log
+/// survives the next launch's rotation. Best-effort throughout.
+fn retain_crash_log(log_dir: &Path, log_path: &Path, exit_label: &str) {
+    if let Ok(entries) = fs::read_dir(log_dir) {
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            if name.starts_with("openklip-engine.crash-") && name.ends_with(".log") {
+                let _ = fs::remove_file(entry.path());
+            }
+        }
+    }
+    let crash_path = log_dir.join(format!("openklip-engine.crash-{exit_label}.log"));
+    let _ = fs::copy(log_path, crash_path);
+}
+
+/// Append a chunk of tee'd sidecar output to the shared log file, when one
+/// was successfully opened. Flushed immediately so a subsequent crash
+/// doesn't lose the tail sitting in a userspace write buffer.
+fn append_to_log(log_file: &Arc<Mutex<Option<File>>>, chunk: &str) {
+    let Ok(mut guard) = log_file.lock() else {
+        return;
+    };
+    let Some(file) = guard.as_mut() else {
+        return;
+    };
+    let _ = file.write_all(chunk.as_bytes());
+    let _ = file.flush();
+}
 
 /// Holds the sidecar's pid so the exit handler can terminate its whole
 /// process group (negative pid addresses the group, not just the one
@@ -200,12 +271,35 @@ fn main() {
                 }
             }
 
-            // Pipe stderr instead of inheriting it: launched from Finder,
-            // inherited stderr goes nowhere, which is exactly how an
-            // instantly-exiting engine used to leave the splash spinning
-            // forever with zero diagnostics. The tee thread below echoes it
-            // to our own stderr AND keeps a bounded tail to show on the
-            // splash if the engine dies before becoming ready.
+            // Resolve the findable on-disk log before spawning: rotate the
+            // previous run's file out of the way, then open a fresh one.
+            // Best-effort throughout (resolve_log_dir already swallows
+            // errors) so an unwritable log dir never blocks launch, it just
+            // means this run has no file logging.
+            let log_dir = resolve_log_dir(app);
+            let log_path = log_dir.as_ref().map(|dir| dir.join(LOG_FILE_NAME));
+            if let Some(path) = &log_path {
+                rotate_log(path);
+            }
+            let log_file: Arc<Mutex<Option<File>>> = Arc::new(Mutex::new(
+                log_path
+                    .as_ref()
+                    .and_then(|path| OpenOptions::new().create(true).append(true).open(path).ok()),
+            ));
+            append_to_log(
+                &log_file,
+                &format!("[openklip-desktop] engine starting, port={port}, packaged={packaged}\n"),
+            );
+
+            // Pipe stdout and stderr instead of inheriting them: launched
+            // from Finder, inherited streams go nowhere, which is exactly
+            // how an instantly-exiting engine used to leave the splash
+            // spinning forever with zero diagnostics. The tee threads below
+            // echo each stream to our own stdout/stderr AND append it to the
+            // log file opened above; the stderr thread additionally keeps a
+            // bounded tail to show on the splash if the engine dies before
+            // becoming ready.
+            cmd.stdout(std::process::Stdio::piped());
             cmd.stderr(std::process::Stdio::piped());
 
             let mut child = cmd.spawn().unwrap_or_else(|e| {
@@ -233,6 +327,7 @@ fn main() {
             if let Some(mut err) = child.stderr.take() {
                 let tail = Arc::clone(&stderr_tail);
                 let done = Arc::clone(&stderr_done);
+                let log_file = Arc::clone(&log_file);
                 std::thread::spawn(move || {
                     let mut buf = [0u8; 4096];
                     loop {
@@ -241,6 +336,7 @@ fn main() {
                             Ok(n) => {
                                 let chunk = String::from_utf8_lossy(&buf[..n]).into_owned();
                                 eprint!("{chunk}");
+                                append_to_log(&log_file, &chunk);
                                 let mut t = tail.lock().unwrap();
                                 t.push_str(&chunk);
                                 if t.len() > 4000 {
@@ -257,6 +353,28 @@ fn main() {
                 });
             }
 
+            // Symmetric stdout tee: no error-splash tail needed (that's
+            // stderr's job, matching src/logger.ts writing there), just echo
+            // to our own stdout and append to the same log file so the
+            // engine's stdout (e.g. the `next start` banner) ends up in one
+            // place alongside stderr.
+            if let Some(mut out) = child.stdout.take() {
+                let log_file = Arc::clone(&log_file);
+                std::thread::spawn(move || {
+                    let mut buf = [0u8; 4096];
+                    loop {
+                        match out.read(&mut buf) {
+                            Ok(0) | Err(_) => break,
+                            Ok(n) => {
+                                let chunk = String::from_utf8_lossy(&buf[..n]).into_owned();
+                                print!("{chunk}");
+                                append_to_log(&log_file, &chunk);
+                            }
+                        }
+                    }
+                });
+            }
+
             // Reap in the background regardless of how the child ends up
             // exiting (normal exit, or killed via the group-kill in our own
             // exit handler below) — std::process::Child does not auto-wait
@@ -270,19 +388,42 @@ fn main() {
                 let gone = Arc::clone(&sidecar_gone);
                 let tail = Arc::clone(&stderr_tail);
                 let drained = Arc::clone(&stderr_done);
+                let log_dir = log_dir.clone();
+                let log_path = log_path.clone();
                 std::thread::spawn(move || {
                     let status = child.wait();
                     gone.store(true, Ordering::SeqCst);
-                    if ready.load(Ordering::SeqCst) {
-                        return;
-                    }
-                    // Give the reader up to ~1s to drain what the dead
-                    // process left buffered in the pipe before snapshotting.
-                    for _ in 0..20 {
-                        if drained.load(Ordering::SeqCst) {
-                            break;
+                    let was_ready = ready.load(Ordering::SeqCst);
+                    let exit_ok = status.as_ref().map(|s| s.success()).unwrap_or(true);
+
+                    // A crash is either dying before ever becoming ready, or
+                    // a non-zero exit at any point (including after ready,
+                    // e.g. the engine dies mid-session). Either way, retain
+                    // this run's log distinctly so it survives the next
+                    // launch's rotation, purely local, no telemetry.
+                    if !was_ready || !exit_ok {
+                        // Give the readers up to ~1s to drain what the dead
+                        // process left buffered in the pipes before
+                        // snapshotting/copying.
+                        for _ in 0..20 {
+                            if drained.load(Ordering::SeqCst) {
+                                break;
+                            }
+                            std::thread::sleep(Duration::from_millis(50));
                         }
-                        std::thread::sleep(Duration::from_millis(50));
+                        if let (Some(dir), Some(path)) = (&log_dir, &log_path) {
+                            let label = status
+                                .as_ref()
+                                .ok()
+                                .and_then(|s| s.code())
+                                .map(|c| c.to_string())
+                                .unwrap_or_else(|| "unknown".into());
+                            retain_crash_log(dir, path, &label);
+                        }
+                    }
+
+                    if was_ready {
+                        return;
                     }
                     let code = status
                         .ok()
