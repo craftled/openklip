@@ -2,7 +2,7 @@
 // src/exporter.ts so client components (export dialog) can use these without
 // pulling puppeteer/ffmpeg/node-only export code into the Next.js bundle.
 
-// GIF export caps (TODO.md known limitation: "no size or duration cap"). A
+// GIF export caps (GIF output has no size or duration cap by default). A
 // GIF's file size and encode time scale primarily with frame count (fps x
 // duration) and pixel count (width x height), so both are bounded here. The
 // mp4 pipeline is completely untouched by these constants; they apply ONLY to

@@ -31,7 +31,7 @@ reframe, export) works on it unchanged.
 | 11 | GUI scope | Full screenshot parity: mode picker (Follow speaker / Auto scene mix) with mix-timeline visualization, speaker table with editable name, role, cam thumbnail (from its proxy), per-cam audio audition. Click-to-edit spans in the mix bar is deferred |
 | 12 | Naming | features.ts id `contextual-cam-switch`, title "Contextual cam switch". CLI: `cam-add` / `cams` / `cam-mix` / `cam-set`. MCP: `cam_add`, `list_cams`, `cam_mix`, `cam_override` |
 | 13 | Release | 0.42.0.0, status **shipped** (not beta), single release. Consequence: real-footage acceptance is a release GATE |
-| 14 | Non-goals (v1) | Waveform auto-sync; shared-mic diarization; gallery-recording virtual cams; speaker-labeled captions; GUI span editing; NLE/FCPXML plan export. All land in `TODO.md#known-limitations` |
+| 14 | Non-goals (v1) | Waveform auto-sync; shared-mic diarization; gallery-recording virtual cams; speaker-labeled captions; GUI span editing; NLE/FCPXML plan export. Tracked in the OpenKlip Linear project (CRAFT-6283) |
 | 15 | Acceptance | User provides a real multi-cam recording; eyeballing the plan + rendered mix on it gates the release. Synthetic fixtures prove machinery only |
 
 ## Pipeline

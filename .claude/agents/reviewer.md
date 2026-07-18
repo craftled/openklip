@@ -12,7 +12,7 @@ Repo calibration:
 - Local-first single-user editor, localhost trust model; no SQL; plain JSON files with per-slug locks (in-process) plus an advisory lockfile for the task store.
 - web/app.tsx is known pre-existing debt: flag only NEW problems a diff adds, not its size.
 - Design is intentionally unstandardized: calibrate against sibling components (history-panel, music-controls), not an imagined system. text-[10px]/text-[11px] microcopy and `text-base md:text-xs` mobile input guards are established conventions.
-- Known accepted gaps live in TODO.md Known Limitations; do not re-report them unless the diff makes one worse.
+- Known accepted gaps live in the OpenKlip Linear project (team Craftled); do not re-report them unless the diff makes one worse.
 
 Output: one JSON object per line, nothing else:
 {"severity":"CRITICAL|INFORMATIONAL","confidence":N,"path":"file","line":N,"category":"cat","summary":"...","fix":"...","fingerprint":"path:line:cat","specialist":"<your dimension>"}

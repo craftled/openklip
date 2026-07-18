@@ -427,8 +427,8 @@ test("export tool schema accepts a known format and rejects an unknown one", () 
   );
 });
 
-// gifMaxWidth overrides GIF_MAX_WIDTH_PX (TODO.md known limitation: "no
-// user-facing control to customize these ceilings"); bounded at 1920 (the
+// gifMaxWidth overrides GIF_MAX_WIDTH_PX (otherwise there is no user-facing
+// control to customize these ceilings); bounded at 1920 (the
 // hard ceiling exporter.ts clamps to regardless of caller).
 test("export tool schema accepts gifMaxWidth up to 1920 and rejects out-of-range or non-positive values", () => {
   const tool = getAgentTool("export");
