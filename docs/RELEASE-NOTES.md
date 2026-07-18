@@ -2,7 +2,25 @@
 
 Use these bodies when publishing releases. Each section matches a tag in `CHANGELOG.md` without duplicating the full changelog. **Known gaps:** always link to [TODO.md](../TODO.md#known-limitations); do not duplicate the list here.
 
-Publishing status checked on 2026-07-16 (`gh release list`): published through `v0.42.0.4` on GitHub. `v0.43.0` is expected to publish alongside this doc update; not independently verified here. `v0.44.0` is expected to publish alongside this doc update on the orchestrator's authority; not independently verified via `gh release list` in this pass either. Multicam programmatic acceptance (`tests/multicam-acceptance.test.ts`, `tests/cam-devex-smoke.test.ts`) satisfies the machinery gate; human eyeball on real per-speaker footage remains deferred.
+Publishing status verified on 2026-07-18 (`gh release list`): published through `v0.44.1` on GitHub. `v0.44.1` is a docs/marketing patch whose **app binary is identical to v0.44.0** — no new signed DMG is built for it; the v0.44.0 DMG is re-attached under both `OpenKlip_0.44.0_aarch64.dmg` and the version-less `OpenKlip-macos-arm64.dmg` alias the marketing download button needs. Neither v0.44.0 nor v0.44.1 carries a `latest.json` updater feed, so the in-app auto-updater stays dormant by design (see [TODO.md](../TODO.md#known-limitations)). Multicam programmatic acceptance (`tests/multicam-acceptance.test.ts`, `tests/cam-devex-smoke.test.ts`) satisfies the machinery gate; human eyeball on real per-speaker footage remains deferred.
+
+---
+
+## v0.44.1
+
+**Docs/marketing patch: the "Download for Mac" button now downloads the DMG directly, and the desktop sign script retries throttled `codesign` calls (PRs #154, #156, #157). No app-binary change from v0.44.0.**
+
+### Highlights
+- **Direct DMG download (#154, #157)**: the marketing hero and bottom CTA now lead with a **Download for Mac** button linking straight to the notarized DMG via the stable, version-less `OpenKlip-macos-arm64.dmg` asset on the latest release (`releases/latest/download/…`, served as an attachment). The old "Get started" buttons were dropped now that download is the primary action. Every release must publish that version-less alias or the button 404s — `docs/desktop-packaging-runbook.md` now documents the required publish step.
+- **Reliable bundle signing (#156)**: `scripts/sign-desktop-bundle.sh` now retries throttled `codesign` calls (5 attempts, linear backoff, exit-code check) instead of silently shipping unsigned binaries. `--timestamp` hits Apple's timestamp server, which throttles the ~13-binary signing burst; this was the second half of the #153 sign-script bug. Takes effect on the next real DMG rebuild.
+- **App binary**: unchanged from v0.44.0. This release re-attaches v0.44.0's DMG (versioned + version-less alias); no new signed/notarized build was produced.
+- **Verification**: `bun test --isolate` (2743 tests: 2729 pass, 14 skip); 98 MCP tools; 54 capabilities; 46 registry actions; `bun run typecheck` and `bun run check` clean.
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations). Notably: the version-less DMG alias is not enforced by CI, so a future release that forgets it silently breaks the download button; still Apple-Silicon-only, no Intel/universal build; no published `latest.json` updater feed.
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#0441---2026-07-18)
 
 ---
 

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.44.1 - 2026-07-18
+
+A docs/marketing patch. The macOS **app binary is unchanged from v0.44.0** — no new signed DMG is built for this tag; the v0.44.0 DMG is re-published under the version-less `OpenKlip-macos-arm64.dmg` alias so the marketing download button keeps resolving. The build-script fix below takes effect on the next real DMG rebuild.
+
+### Changed
+- **Marketing "Download for Mac" is the primary CTA and downloads the DMG directly** (PR #154, PR #157): the redesigned hero (and the bottom "Try now" CTA) now lead with a **Download for Mac** button that links straight to the notarized DMG via the stable, version-less `OpenKlip-macos-arm64.dmg` asset on the latest GitHub release (`releases/latest/download/…`, served `Content-Disposition: attachment`, so it downloads rather than navigating), with a "macOS · Apple Silicon" caption. The old "Get started" buttons were removed now that download is the primary action (Read Docs + the docs nav still cover onboarding). `docs/desktop-packaging-runbook.md` gained a **"Publish the DMG (required each release)"** step: every release must upload the DMG under both the versioned name *and* the version-less `OpenKlip-macos-arm64.dmg` alias, or the site's download button 404s on `releases/latest/download/OpenKlip-macos-arm64.dmg`.
+
+### Fixed
+- **`sign-desktop-bundle.sh` retries throttled `codesign` calls instead of shipping unsigned binaries** (PR #156): the second half of the #153 sign-script bug. `--timestamp` contacts Apple's timestamp server, which throttles when the bundle signs ~13 nested binaries back-to-back right after `tauri build` already hit it; a throttled sign previously failed silently (no exit-code check, no retry) and left the binary unsigned, surfacing only at notarization — the first real 0.44.0 rebuild left 13 nested binaries adhoc. Every `codesign` call now routes through a `sign()` helper (5 attempts, linear backoff, `</dev/null` stdin guard) that propagates failure with `|| exit 1`, so a genuinely unsignable binary fails the script loudly instead of shipping unsigned.
+
 ## 0.44.0 - 2026-07-18
 
 ### Added
