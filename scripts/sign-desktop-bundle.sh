@@ -35,6 +35,25 @@ security find-identity -v -p codesigning | grep -qF "$IDENTITY" \
 echo "Signing bundle: $APP"
 echo "Identity:       $IDENTITY"
 
+# codesign wrapper with retries. `--timestamp` contacts Apple's timestamp
+# server, which throttles under a burst (this bundle signs ~13 binaries back to
+# back, right after `tauri build` already hit it): a throttled sign fails, and
+# without a retry + exit-code check the binary is silently left unsigned and
+# only surfaces at notarization. `</dev/null` keeps codesign from consuming a
+# calling while-loop's stdin (the `find` stream). Args after the flags below.
+sign() {
+  local attempt
+  for attempt in 1 2 3 4 5; do
+    if codesign --force --timestamp --options runtime "$@" </dev/null; then
+      return 0
+    fi
+    echo "      codesign retry $attempt…" >&2
+    sleep $((attempt * 2))
+  done
+  echo "error: codesign failed after retries: ${*: -1}" >&2
+  return 1
+}
+
 # 1. Every nested Mach-O, leaf-first. Helpers get hardened runtime + timestamp
 #    but no entitlements — only the executables that need JIT/library-loading do.
 echo "[1/4] Signing nested Mach-O binaries (by content)…"
@@ -44,10 +63,7 @@ while IFS= read -r f; do
   [ "$f" = "$APP/Contents/MacOS/openklip-desktop" ] && continue
   case "$(file -b "$f" 2>/dev/null)" in
     *Mach-O*)
-      # `</dev/null` is load-bearing: without it codesign inherits (and
-      # consumes) this while-loop's stdin — the `find` stream — and the loop
-      # dies after the first binary, silently leaving the rest unsigned.
-      codesign --force --timestamp --options runtime -s "$IDENTITY" "$f" </dev/null
+      sign -s "$IDENTITY" "$f" || exit 1
       signed=$((signed + 1))
       ;;
   esac
@@ -57,12 +73,12 @@ echo "      signed $signed nested binaries"
 # 2. bun + the shell binary need the entitlements (JavaScriptCore JIT +
 #    disable-library-validation so bun can load the native .node addons).
 echo "[2/4] Signing bun + shell with entitlements…"
-codesign --force --timestamp --options runtime --entitlements "$ENT" -s "$IDENTITY" "$APP/Contents/MacOS/bun"
-codesign --force --timestamp --options runtime --entitlements "$ENT" -s "$IDENTITY" "$APP/Contents/MacOS/openklip-desktop"
+sign --entitlements "$ENT" -s "$IDENTITY" "$APP/Contents/MacOS/bun" || exit 1
+sign --entitlements "$ENT" -s "$IDENTITY" "$APP/Contents/MacOS/openklip-desktop" || exit 1
 
 # 3. Seal the outer bundle last (its seal covers every nested signature above).
 echo "[3/4] Sealing the app bundle…"
-codesign --force --timestamp --options runtime --entitlements "$ENT" -s "$IDENTITY" "$APP"
+sign --entitlements "$ENT" -s "$IDENTITY" "$APP" || exit 1
 
 # 4. Every Mach-O must carry OUR Developer ID (catches leftover adhoc/linker
 #    signatures that `codesign -v` alone would pass). </dev/null stops codesign
