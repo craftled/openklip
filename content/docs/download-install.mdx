@@ -1,0 +1,48 @@
+---
+title: Download & install
+description: Get the notarized macOS app, install it, and find where your data lives.
+---
+
+## Get the app
+
+OpenKlip ships as a native macOS app (Tauri) built for Apple Silicon (arm64). It is not on the App Store; grab the DMG from the project's [GitHub Releases page](https://github.com/craftled/openklip/releases).
+
+There is no direct download link outside of Releases: pick the latest release, expand its Assets, and download the `.dmg`. An Intel (x86_64) build is not produced yet.
+
+## Install
+
+1. Open the downloaded DMG.
+2. Drag **OpenKlip** into **Applications**.
+3. Launch it from Applications or Spotlight.
+
+The app is signed with a Developer ID and notarized by Apple, so it just opens: no "unidentified developer" warning and no right-click, Open workaround. That's only needed for unsigned builds, which this isn't.
+
+## First run
+
+On first launch the app starts a local engine (you'll see a brief splash), then the editor opens. The first time you ingest a video, OpenKlip downloads the Whisper and CLIP models it needs to `~/Library/Caches/com.craftled.openklip/models`. That happens once; every ingest after that runs offline.
+
+## Where your data lives
+
+| What | Path |
+| --- | --- |
+| Projects (your workspace) | `~/Movies/OpenKlip/` |
+| App config | `~/Library/Application Support/com.craftled.openklip/` |
+| Model cache | `~/Library/Caches/com.craftled.openklip/` |
+| Logs | `~/Library/Logs/com.craftled.openklip/` |
+
+If something goes wrong, the logs directory is the first place to look.
+
+## Uninstall
+
+Drag `OpenKlip.app` to the Trash. That removes the app itself but leaves the directories above in place.
+
+To remove everything, also delete:
+
+- `~/Library/Application Support/com.craftled.openklip/`
+- `~/Library/Caches/com.craftled.openklip/`
+- `~/Library/Logs/com.craftled.openklip/`
+- `~/Movies/OpenKlip/` (this is where your projects live; deleting it deletes your edits)
+
+## Build from source
+
+Prefer to run from a checkout, or need Linux/CI for read-only workflows? See [Getting started](/docs/getting-started) and the repo [README](https://github.com/craftled/openklip#readme).

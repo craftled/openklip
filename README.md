@@ -153,6 +153,8 @@ See `templates/make-short/skill.md` (one short from an existing edit) and `templ
 
 ## Quick start
 
+**Download the macOS app:** notarized build on the [Releases page](https://github.com/craftled/openklip/releases). See [Download & install](/docs/download-install).
+
 **Platform:** OpenKlip targets **macOS** today. Ingest (Whisper), export (ffmpeg), rich graphics (headless Chrome), and Vision reframe assume a Mac dev environment. The CLI and MCP server may run elsewhere for read/query workflows, but the full edit loop is macOS-only for now. A native macOS desktop app (Tauri v2) exists but is not yet signed/notarized or distributed; see Known Limitations.
 
 **Requirements:** Bun 1.3.14+, Node 24+ (`package.json` `engines`), macOS for the full pipeline.

@@ -3,6 +3,7 @@
   "pages": [
     "index",
     "getting-started",
+    "download-install",
     "file-model",
     "agent-workflow",
     "cli-and-mcp"
