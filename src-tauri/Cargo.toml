@@ -1,6 +1,6 @@
 [package]
 name = "openklip-desktop"
-version = "0.43.0"
+version = "0.44.0"
 description = "OpenKlip desktop shell"
 edition = "2021"
 rust-version = "1.77"
