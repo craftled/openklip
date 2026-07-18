@@ -2,7 +2,28 @@
 
 Use these bodies when publishing releases. Each section matches a tag in `CHANGELOG.md` without duplicating the full changelog. **Known gaps:** always link to [TODO.md](../TODO.md#known-limitations); do not duplicate the list here.
 
-Publishing status checked on 2026-07-16 (`gh release list`): published through `v0.42.0.4` on GitHub. `v0.43.0` is expected to publish alongside this doc update; not independently verified here. Multicam programmatic acceptance (`tests/multicam-acceptance.test.ts`, `tests/cam-devex-smoke.test.ts`) satisfies the machinery gate; human eyeball on real per-speaker footage remains deferred.
+Publishing status checked on 2026-07-16 (`gh release list`): published through `v0.42.0.4` on GitHub. `v0.43.0` is expected to publish alongside this doc update; not independently verified here. `v0.44.0` is expected to publish alongside this doc update on the orchestrator's authority; not independently verified via `gh release list` in this pass either. Multicam programmatic acceptance (`tests/multicam-acceptance.test.ts`, `tests/cam-devex-smoke.test.ts`) satisfies the machinery gate; human eyeball on real per-speaker footage remains deferred.
+
+---
+
+## v0.44.0
+
+**The macOS app is signed, notarized, and downloadable, with in-app auto-update, project disk compaction, and Job Center polish (PRs #144-#153, CRAFT-6261/6262/6263/6264/6265/6266).**
+
+### Highlights
+- **Signed, notarized, downloadable macOS app (CRAFT-6262, #147, #153)**: the app is now Developer ID-signed (Craftled, MB), Apple-notarized, and stapled, completing Stage C. `scripts/sign-desktop-bundle.sh` deep-signs every native binary bundled in `node_modules` (ffmpeg, ffprobe, onnxruntime, sharp, next-swc, esbuild, and more) since `tauri build --deep` never reaches them; a follow-up fix (#153) closed a stdin bug that had silently left 12 of 13 nested binaries unsigned on every real rebuild since #147. The DMG is downloadable from the [Releases page](https://github.com/craftled/openklip/releases), with a new [Download & install](https://github.com/craftled/openklip) docs page (CRAFT-6266, #149) covering install, first-run, data locations, and uninstall.
+- **In-app auto-update (CRAFT-6266, #151, #152)**: a Rust-driven updater checks a GitHub Releases `latest.json` feed on launch and prompts to download, install, and relaunch on a newer signed version. Dormant and best-effort by default: no published feed, offline, or a malformed manifest are all logged and ignored, never a crash or blocked launch. The production passphrase-protected signing key now backs the committed public key (#152).
+- **Project disk management (CRAFT-6265, #150)**: a new Compact action reclaims disk by deleting regenerable derived media (proxy, transcript, frames, moment index, audio analysis, exports) while keeping the edit itself, assets, and history; a paired Rebuild action re-runs ingest as a Job Center job to restore playback. Config → Project **Disk** section surfaces both, with a "needs rebuild" banner.
+- **Engine log file + crash retention (CRAFT-6266, #148)**: the bundled sidecar's stdout and stderr now tee to a rotating log file (`~/Library/Logs/com.craftled.openklip/openklip-engine.log` on macOS) with bounded crash-log retention, giving a Finder-launched app findable diagnostics with no telemetry.
+- **Job Center fixes (#144, #145)**: cam ingest jobs now report phase progress like take and whole-project ingest jobs (CRAFT-6263); Job Center's Open action on take/cam jobs now navigates to the parent project instead of a dead composite-slug route (CRAFT-6264).
+- **Reliable release build (CRAFT-6261, #146)**: the release macOS build now compiles non-sandboxed with a `[profile.release.build-override]` that keeps host build tools (proc-macro dylibs) plainly compiled, fixing intermittent `E0463` proc-macro load failures that made the release build unreliable.
+- **Verification**: `bun test --isolate` (2743 tests: 2729 pass, 14 skip); 98 MCP tools; 54 capabilities; 46 registry actions; `bun run typecheck` and `bun run check` clean.
+
+### Known gaps
+
+See [TODO.md](../TODO.md#known-limitations) for the current gaps and known issues. Notably: no Intel/x86_64 build is produced yet, only Apple Silicon; the in-app updater's install/relaunch path is compile-verified and structurally correct but not yet exercised end to end against a real published feed; project Compact does not check for an in-flight job on the same project before deleting derived media.
+
+**Full changelog:** [CHANGELOG.md](../CHANGELOG.md#0440---2026-07-18)
 
 ---
 
