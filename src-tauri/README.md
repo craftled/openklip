@@ -102,10 +102,16 @@ OPENKLIP_APP_ROOT="$(pwd)" OPENKLIP_SLUG=<slug> OPENKLIP_PROJECTS_ROOT=<root> \
   building block; a stale-PID-file check in Application Support (same
   mechanism as any future orphan-cleanup-on-relaunch) is a reasonable
   pairing.
-- **Log-file redirection**: sidecar stdout/stderr currently inherit this
-  process's own (visible only if launched from a terminal, not from
-  Finder). Redirecting to a file under `app.path().app_log_dir()` (Application
-  Support/Logs) is a small, contained follow-up.
+- **Log-file redirection**: **done** (CRAFT-6266). Sidecar stdout and stderr
+  are piped and tee'd to `app.path().app_log_dir()` (on macOS,
+  `~/Library/Logs/com.craftled.openklip/openklip-engine.log`) in addition to
+  the existing terminal echo and splash-error tail. The previous run's log is
+  rotated on launch (`.log` -> `.log.1` -> `.log.2`, keeping the last two),
+  and a run that exits non-zero or dies before the server became ready has
+  its log retained separately as `openklip-engine.crash-<exitcode>.log`
+  (only the most recent crash log is kept). Everything stays on local disk —
+  no telemetry, nothing leaves the machine. Logging is best-effort: an
+  unwritable log directory is skipped silently and never blocks launch.
 - **Crash resilience beyond graceful quit**: the process-group fix
   guarantees clean teardown on a *graceful* quit (menu Quit, Cmd+Q, an
   AppleEvent). A hard `kill -9`/force-quit of the top-level app process
