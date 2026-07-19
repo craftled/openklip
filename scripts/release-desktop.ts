@@ -300,10 +300,6 @@ function preflight(
   if (!identities.includes(identity)) {
     throw new Error(`release: signing identity not in keychain: ${identity}`);
   }
-  runner.run(
-    ["xcrun", "notarytool", "history", "--keychain-profile", notaryProfile],
-    { cwd: repoRoot }
-  );
   if (
     !(
       process.env.TAURI_SIGNING_PRIVATE_KEY ||
@@ -314,6 +310,15 @@ function preflight(
       "release: set TAURI_SIGNING_PRIVATE_KEY or TAURI_SIGNING_PRIVATE_KEY_PATH from the secret store"
     );
   }
+  if (!process.env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD) {
+    throw new Error(
+      "release: set TAURI_SIGNING_PRIVATE_KEY_PASSWORD for the passphrase-protected updater key"
+    );
+  }
+  runner.run(
+    ["xcrun", "notarytool", "history", "--keychain-profile", notaryProfile],
+    { cwd: repoRoot }
+  );
 }
 
 function buildDmg(
@@ -402,7 +407,8 @@ function publishDraft(
   tag: string,
   version: string,
   paths: ReleasePaths,
-  manifest: string
+  manifest: string,
+  repoNameWithOwner: string
 ): void {
   runner.run(["gh", "release", "create", tag, "--draft", "--generate-notes"], {
     cwd: repoRoot,
@@ -456,6 +462,7 @@ function publishDraft(
     ),
     version
   );
+  const latestDownloadBase = `https://github.com/${repoNameWithOwner}/releases/latest/download`;
   runner.run(
     [
       "curl",
@@ -465,7 +472,20 @@ function publishDraft(
       "--show-error",
       "--output",
       "/dev/null",
-      `https://github.com/craftled/openklip/releases/latest/download/${basename(paths.dmgAlias)}`,
+      `${latestDownloadBase}/${basename(paths.dmgAlias)}`,
+    ],
+    { cwd: repoRoot }
+  );
+  runner.run(
+    [
+      "curl",
+      "--fail",
+      "--location",
+      "--silent",
+      "--show-error",
+      "--output",
+      "/dev/null",
+      `${latestDownloadBase}/latest.json`,
     ],
     { cwd: repoRoot }
   );
@@ -595,7 +615,7 @@ export function runReleaseDesktop(opts: RunReleaseDesktopOptions = {}): void {
       })
     );
     copyFileSync(paths.dmg, paths.dmgAlias);
-    publishDraft(runner, repoRoot, tag, version, paths, paths.manifest);
+    publishDraft(runner, repoRoot, tag, version, paths, paths.manifest, owner);
     console.log(
       `release: ${tag} published with signed DMG alias and updater feed`
     );

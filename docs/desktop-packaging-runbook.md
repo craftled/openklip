@@ -4,11 +4,9 @@ How to produce a signed + notarized OpenKlip.app / DMG. Steps marked **[human-on
 
 > **Prerequisite — complete.** The desktop shell in `src-tauri/` is verified self-contained (Stage B): the bundled `.app` runs its own copy of the runtime (`Contents/Resources/app/`) and its own Bun binary (`Contents/MacOS/bun`) with zero reference to the repo checkout or a system-installed Bun — proved by driving a real ffmpeg export entirely through a `cargo tauri build --debug` output. Process-group teardown on quit is also verified (no orphaned `next start` after a real AppleEvent quit). See `src-tauri/README.md` for the full verification writeup and the still-open items (first-run UX, single-instance guard, log-file redirection) that don't block this runbook. The release `.app` **and** a valid DMG both build cleanly (CRAFT-6261) — an earlier "DMG hangs" caveat was a misdiagnosis of two release-build failures (a sandbox corrupting the Rust compile, and aggressive `[profile.release]` settings breaking proc-macro dylibs). Both are fixed; build non-sandboxed. See `src-tauri/README.md` for the full write-up.
 
-> **Status: DONE for v0.43.0.** `OpenKlip_0.43.0_aarch64.dmg` was signed as
-> **Developer ID Application: Craftled, MB (4RRUYWAP8F)**, notarized by Apple,
-> and stapled (both the DMG and the app inside). `spctl -a` → *accepted,
-> Notarized Developer ID*. The steps below are the reproducible process; the
-> earlier "Tauri signs + notarizes automatically" claim was wrong — see Step 2.
+> **Status:** The release automation is implemented. The latest published
+> release (v0.44.1) still carries only the downloadable DMGs; the updater feed
+> becomes active after the first successful `release:desktop` run.
 
 ## One-time setup **[human-only]**
 
@@ -41,15 +39,17 @@ bun run release:desktop
 ```
 
 The command refuses a dirty or untagged worktree, validates the Developer ID
-identity and `openklip-notary` keychain profile, then builds, deep-signs,
+identity, `openklip-notary` keychain profile, and both updater-key environment
+variables, then builds, deep-signs,
 notarizes and staples the app; repackages, signs, notarizes and staples the
 DMG; rebuilds the updater archive from the final stapled app; and signs it.
 It creates a **draft** GitHub release, uploads the versioned DMG, stable
 `OpenKlip-macos-arm64.dmg` alias, updater archive/signature, and `latest.json`,
-checks that every asset exists, then publishes the draft and verifies the
-marketing download URL. `bun run release:desktop --dry-run` checks version
-alignment and prints the release target without touching signing, notarization,
-or GitHub.
+checks that every asset exists, then publishes the draft and verifies both the
+marketing DMG alias and `latest.json` through the `releases/latest/download`
+URLs. `bun run release:desktop --dry-run` checks version alignment and prints
+the release target; it intentionally does not run machine, credential, or
+GitHub preflight checks.
 
 The hardened runtime + Bun-JIT entitlements (`com.apple.security.cs.allow-jit`, `allow-unsigned-executable-memory`, `disable-library-validation`) are in `src-tauri/entitlements.plist`; the deep-sign script applies them to `bun` + the shell.
 
@@ -91,8 +91,14 @@ This runs `codesign --verify --deep --strict`, checks the signing authority + ha
 4. Ingest a short clip → editor loads → make a cut → export → the file exists and plays.
 5. Quit the app; confirm no orphaned `bun`/`ffmpeg`/`next` processes remain (`pgrep -fl bun`).
 
-## Status (v0.43.0)
+## Status
 
-- **Done:** signed as Developer ID Application: Craftled, MB (4RRUYWAP8F), notarized by Apple, stapled (DMG + app inside), `spctl -a` accepted. The deep-sign step is codified in `scripts/sign-desktop-bundle.sh`. Reproducible for future releases via the process above.
-- **Yours [human-only, recurring per release]:** run the deep-sign + notarize flow above (needs the keychain cert + notary profile), and a clean-machine Gatekeeper smoke test.
-- **Still open (agent-doable, doesn't block distribution):** first-run workspace picker + model-download UX, single-instance guard, sidecar log-file redirection (see `src-tauri/README.md`); auto-update + install docs (CRAFT-6266).
+- **Automation:** `bun run release:desktop` is the canonical build, signing,
+  notarization, packaging, updater-feed, and GitHub publishing path.
+- **Human-only:** the release Mac still needs the Developer ID certificate,
+  notarytool keychain profile, and updater key from the secret store; a clean-Mac
+  install and Gatekeeper smoke test remain manual verification.
+- **Next release verification:** run CRAFT-6272 against an installed v0.44.0
+  app after the first release publishes `latest.json`.
+- **Separate product work:** first-run workspace/model UX and single-instance
+  protection remain tracked in Linear (see `src-tauri/README.md`).
