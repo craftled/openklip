@@ -93,6 +93,7 @@
     "test:acceptance": "OPENKLIP_ACCEPTANCE=1 bun test --isolate tests/acceptance-gate.test.ts",
     "cam-devex-smoke": "bun run scripts/cam-devex-smoke.ts",
     "desktop:prepare-bundle": "bun run scripts/prepare-desktop-bundle.ts",
+    "release:desktop": "bun run scripts/release-desktop.ts",
     "demo-gif": "bash scripts/record-demo-gif.sh",
     "test": "bun test --isolate",
     "test:integration": "OPENKLIP_INTEGRATION=1 bun test --isolate tests/transcript-diff-browser.test.ts tests/json-graphic-browser.test.ts tests/golden-path-browser.test.ts tests/mobile-overlays-browser.test.ts tests/save-recovery-browser.test.ts tests/job-center-browser.test.ts",
