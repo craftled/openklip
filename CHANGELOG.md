@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+- **Automated desktop release pipeline** (PR #160, CRAFT-6273): `bun run release:desktop` now validates release versions and credentials, builds and deep-signs the Apple Silicon app, notarizes and staples the app and DMG, rebuilds and signs the updater archive from the final stapled app, publishes the stable DMG alias and `latest.json` through a draft-first GitHub release, and verifies both public download URLs.
+
 ## 0.44.1 - 2026-07-18
 
 A docs/marketing patch. The macOS **app binary is unchanged from v0.44.0** — no new signed DMG is built for this tag; the v0.44.0 DMG is re-published under the version-less `OpenKlip-macos-arm64.dmg` alias so the marketing download button keeps resolving. The build-script fix below takes effect on the next real DMG rebuild.
