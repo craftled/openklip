@@ -79,7 +79,6 @@ function parseRole(raw: FormDataEntryValue | null): CamRole | undefined {
   if (raw !== null && raw !== "") {
     throw new Error("role must be speaker or wide");
   }
-  return;
 }
 
 function parseOffsetMs(raw: FormDataEntryValue | null): number | undefined {

@@ -180,7 +180,6 @@ function overlayIdFromMutation(
     const i = input as { id?: string } | undefined;
     return i?.id;
   }
-  return;
 }
 
 function findOverlay(
@@ -200,7 +199,6 @@ function findOverlay(
       return found;
     }
   }
-  return;
 }
 
 /** Stamp overlay-level provenance after add/set mutations. */

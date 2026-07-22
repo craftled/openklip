@@ -163,7 +163,6 @@ function maxHeightForResolution(
   if (resolution === "1080") {
     return 1080;
   }
-  return;
 }
 
 /**

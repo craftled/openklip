@@ -8,6 +8,7 @@ test("sweepOptionsForPlan maps a crossfade plan to a bright, moderate flash", ()
     sweepMs: 800,
     outroMs: 320,
   });
+  assert.equal(options.midpoint, 0.5);
   assert.equal(options.sweepMs, 800);
   assert.equal(options.outroMs, 320);
   assert.ok(options.peakAlpha !== undefined);
@@ -21,6 +22,7 @@ test("sweepOptionsForPlan maps a dip plan to a near-black band", () => {
     sweepMs: 500,
     outroMs: 225,
   });
+  assert.equal(options.midpoint, 0.5);
   assert.equal(options.sweepMs, 500);
   assert.equal(options.outroMs, 225);
   assert.ok(options.palette);

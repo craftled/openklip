@@ -7,7 +7,7 @@
 
 /** The minimal shape the registry needs from a spawned agent process. */
 export interface AgentRunProcess {
-  kill(): void;
+  kill: () => void;
 }
 
 const runs = new Map<string, AgentRunProcess>();

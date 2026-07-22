@@ -95,7 +95,6 @@ export function useCleanupSilences({
     if (silencesCache.has(slug)) {
       return silencesCache.get(slug) ?? [];
     }
-    return;
   });
   const [silencesProgress, setSilencesProgress] =
     useState<CleanupSilencesProgress | null>(null);

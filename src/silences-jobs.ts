@@ -207,7 +207,6 @@ export function getRunningSilencesJobForSlug(
       return job;
     }
   }
-  return;
 }
 
 export function isSlugSilencesAnalysisInFlight(slug: string): boolean {

@@ -198,7 +198,6 @@ export function cutTransitionFallbackReason(
   if (gate.ranges.length > SEGMENT_EXPORT_MAX_RANGES) {
     return "too-many-ranges";
   }
-  return;
 }
 
 /** Human-readable explanation, shared by the CLI export summary and the GUI

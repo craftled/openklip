@@ -58,8 +58,8 @@ export interface ReleasePaths {
 }
 
 export interface CommandRunner {
-  capture(args: string[], opts?: { cwd?: string }): string;
-  run(args: string[], opts?: { cwd?: string }): void;
+  capture: (args: string[], opts?: { cwd?: string }) => string;
+  run: (args: string[], opts?: { cwd?: string }) => void;
 }
 
 function versionFromToml(contents: string, file: string): string {
