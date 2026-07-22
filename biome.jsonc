@@ -1,5 +1,8 @@
 {
   "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "assist": {
+    "enabled": false
+  },
   "extends": [
     "ultracite/biome/core",
     "ultracite/biome/next",
@@ -21,26 +24,42 @@
       },
       "complexity": {
         "noExcessiveCognitiveComplexity": "off",
-        "noVoid": "off"
+        "noVoid": "off",
+        "useArrayFind": "off"
       },
       "correctness": {
         "useExhaustiveDependencies": "off"
       },
+      // Keep the pre-Ultracite-7.9 lint contract while upgrading the
+      // formatter. These rules were newly enabled by the preset and would
+      // otherwise create a large, unrelated migration across the app.
       "performance": {
+        "noAwaitInLoops": "off",
+        "noJsxPropsBind": "off",
         "noNamespaceImport": "off",
         "useTopLevelRegex": "off"
       },
+      "suspicious": {
+        "noArrayIndexKey": "off",
+        "noEmptyBlockStatements": "off",
+        "noEvolvingTypes": "off",
+        "noEqualsToNull": "off",
+        "noLeakedRender": "off",
+        "noShadow": "off",
+        "noUnnecessaryConditions": "off",
+        "noUnknownAttribute": "off",
+        "useArraySortCompare": "off",
+        "noBitwiseOperators": "off"
+      },
       "style": {
         "noNestedTernary": "off",
+        "noIncrementDecrement": "off",
+        "useDestructuring": "off",
+        "useErrorCause": "off",
         "useAtIndex": "off",
         "useConsistentArrayType": "off",
         "useFilenamingConvention": "off",
         "useReadonlyClassProperties": "off"
-      },
-      "suspicious": {
-        "noArrayIndexKey": "off",
-        "noEvolvingTypes": "off",
-        "noBitwiseOperators": "off"
       }
     }
   },

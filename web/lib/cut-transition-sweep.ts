@@ -26,6 +26,10 @@ const DIP_PALETTE: Palette = accentPair("#000000", "#050505");
 // capped in the 0.6-0.85 band so the band never fully whites out the frame.
 const CROSSFADE_PALETTE: Palette = PALETTES.azure;
 const CROSSFADE_PEAK_ALPHA = 0.75;
+// Glimm 0.1.x fired the page swap at the halfway point. Keep that timing
+// explicit across the 0.3.x default change to 0.56 so cut previews do not
+// shift when the dependency is upgraded.
+const LEGACY_SWEEP_MIDPOINT = 0.5;
 
 /**
  * Maps a pure cut-transition sweep plan to concrete glimm SweepOptions.
@@ -37,6 +41,7 @@ export function sweepOptionsForPlan(
 ): SweepOptions {
   if (plan.type === "dip") {
     return {
+      midpoint: LEGACY_SWEEP_MIDPOINT,
       sweepMs: plan.sweepMs,
       outroMs: plan.outroMs,
       palette: DIP_PALETTE,
@@ -44,6 +49,7 @@ export function sweepOptionsForPlan(
     };
   }
   return {
+    midpoint: LEGACY_SWEEP_MIDPOINT,
     sweepMs: plan.sweepMs,
     outroMs: plan.outroMs,
     palette: CROSSFADE_PALETTE,

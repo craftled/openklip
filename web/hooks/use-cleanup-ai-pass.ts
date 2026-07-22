@@ -81,7 +81,6 @@ export function useCleanupAiPass({
         ? `Sign in first : run: ${activeStatus.signInCmd}`
         : "Agent CLI is not signed in";
     }
-    return;
   })();
 
   const onRunAiPass = useCallback(async () => {

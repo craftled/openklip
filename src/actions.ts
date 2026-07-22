@@ -1248,9 +1248,7 @@ function tryLoadBriefSync(slug: string): string | undefined {
   }
   try {
     return readFileSync(briefPath, "utf8");
-  } catch {
-    return;
-  }
+  } catch {}
 }
 
 function tryLoadSilencesSync(slug: string): SilenceSpan[] | null {
