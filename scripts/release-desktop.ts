@@ -195,7 +195,8 @@ export function releasePaths(repoRoot: string, version: string): ReleasePaths {
     app: join(macosBundleDir, `${PRODUCT_NAME}.app`),
     appNotaryZip: join(stagingDir, `${PRODUCT_NAME}.app-notary.zip`),
     dmg,
-    dmgTmp: `${dmg}.tmp`,
+    // hdiutil appends .dmg when the output path has no disk-image suffix.
+    dmgTmp: `${dmg}.tmp.dmg`,
     dmgAlias: join(stagingDir, `${PRODUCT_NAME}-macos-arm64.dmg`),
     updaterArchive: join(macosBundleDir, `${PRODUCT_NAME}.app.tar.gz`),
     updaterSignature: join(macosBundleDir, `${PRODUCT_NAME}.app.tar.gz.sig`),
