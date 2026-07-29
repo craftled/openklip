@@ -88,7 +88,7 @@ bad=0
 while IFS= read -r f; do
   case "$(file -b "$f" 2>/dev/null)" in
     *Mach-O*)
-      codesign -dvv "$f" </dev/null 2>&1 | grep -qF "Authority=$IDENTITY" \
+      codesign -dvv "$f" </dev/null 2>&1 | grep -F "Authority=$IDENTITY" >/dev/null \
         || { echo "      NOT SIGNED WITH DEVELOPER ID: ${f#"$APP"/}"; bad=$((bad + 1)); }
       ;;
   esac
