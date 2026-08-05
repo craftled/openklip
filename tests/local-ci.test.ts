@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import {
   assertMinimumVersion,
@@ -107,4 +108,12 @@ test("assertMinimumVersion accepts supported runtimes and rejects older ones", (
     () => assertMinimumVersion("Bun", "1.3.13", "1.3.14"),
     /Bun 1\.3\.14 or newer is required/
   );
+});
+
+test("production builds use Node until Bun's Next 16.3 Linux crash is released", () => {
+  const pkg = JSON.parse(
+    readFileSync(new URL("../package.json", import.meta.url), "utf8")
+  ) as { scripts?: { build?: string } };
+
+  assert.equal(pkg.scripts?.build, "next build");
 });
