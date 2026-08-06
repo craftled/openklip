@@ -1,6 +1,6 @@
 {
   "name": "openklip",
-  "version": "0.44.2",
+  "version": "0.44.3",
   "private": true,
   "description": "Agent-native video editor: CLI edit loop, browser review, plain files on disk.",
   "homepage": "https://openklip.com",

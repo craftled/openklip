@@ -2,9 +2,17 @@
 
 ## Unreleased
 
+## 0.44.3 - 2026-08-06
+
+A maintenance release: dependency modernization and documentation accuracy. No feature or behaviour changes to the editor, CLI, or MCP surface — 98 MCP tools, 54 capabilities, and 46 registry actions are unchanged from 0.44.2.
+
 ### Changed
 - **Dependency modernization pass** (PRs #166, #168–#173): every package flagged by `bun outdated` was audited against its own release notes and this repo's actual usage, then landed in separately verified batches. Taken: `@base-ui/react` 1.7.0 (no breaking changes; Select/Combobox/Drawer/Menu fixes across 30 import sites), `fumadocs-core`/`fumadocs-ui` 16.14.0 with `fumadocs-mdx` 15.2.2 (the built-in search engine moves from `@orama/orama` to **ZBSearch** — module paths and APIs are unchanged, but the exported static search data is now a ZBSearch database, so core and ui must move together), `motion` 12.43.0, `@pierre/diffs` 1.3.4, `@paper-design/shaders` 0.0.78, `@modelcontextprotocol/sdk` 1.30.0, `ai` 7.0.55, `puppeteer-core` 25.5.0, `livekit-client` 2.21.0, `lucide-react` 1.28.0, `@tabler/icons-react` 3.46.0, `nanoid` 6.0.1, `shadcn` 4.16.1, plus toolchain (`@biomejs/biome` 2.5.7, `ultracite` 7.10.1, `knip` 6.32.0, `jscpd` 5.0.14, React types). Ultracite 7.10 turns on assist actions for package.json-like files, so `useSortedPackageJson` now reorders `package.json` and the onnxruntime-web stub; 7.10.1 also moves `@typescript-eslint/utils` out of runtime dependencies, dropping eslint and the typescript-eslint tree from the install.
 - **Held back deliberately** (each documented on its PR): `next` 16.3.0 carries the CVE-2025-13465 vendored-lodash fix but segfaults `bun run build` on Linux (upstream oven-sh/bun#36866; the lodash copies are build-time only and unreachable here, so waiting is cheap); `typescript` 7 ships no stable programmatic compiler API until 7.1, which MDX tooling needs; `maplibre-gl` 6 is ESM-only and WebGL2-required, and `src/headless-render.ts` still pins the 5.24.0 CSS; `motion` 13 would split majors against `fumadocs-ui`'s `motion ^12` dependency; `cuelume` 0.2.2 is API-compatible but may have retuned its sound palette.
+
+### Fixed
+- **Documentation matched to measured state** (PR #174): `CHANGELOG.md` had no `0.44.2` section — the automated desktop release pipeline (#160) sat under "Unreleased" despite shipping in that tag — so 0.44.2 was reconstructed from the tag ancestry and published release body. `CLAUDE.md` (version, release memory, published releases) and `README.md` (version, test counts) were corrected against re-measured values; the suite is 2747 tests across 293 files (2733 pass, 14 skip locally; 2732 pass / 15 skip on Linux CI, where one darwin-only test skips).
+- **`src-tauri/Cargo.lock` version realigned**: the `openklip-desktop` entry still read `0.44.0`, having been missed by both the v0.44.1 and v0.44.2 release preps. It now tracks the release version alongside `VERSION`, `package.json`, `src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json`.
 
 ## 0.44.2 - 2026-07-29
 
