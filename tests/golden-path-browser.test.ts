@@ -241,7 +241,7 @@ test("golden path: navigate, cut, restore, re-cut, reload, export, controlled fa
     // ── Step 1: navigate and confirm the editor mounted ──
     const response = await page.goto(editorUrl, {
       timeout: 90_000,
-      waitUntil: "networkidle2",
+      waitUntil: "domcontentloaded",
     });
     assert.equal(response?.status(), 200);
     await page.waitForSelector('[aria-label="Transcript editor"]', {
@@ -285,7 +285,7 @@ test("golden path: navigate, cut, restore, re-cut, reload, export, controlled fa
     // ── Step 6: reload and confirm the cut survived on disk ──
     const reloadResponse = await page.goto(editorUrl, {
       timeout: 90_000,
-      waitUntil: "networkidle2",
+      waitUntil: "domcontentloaded",
     });
     assert.equal(reloadResponse?.status(), 200);
     await page.waitForSelector('[aria-label="Transcript editor"]', {

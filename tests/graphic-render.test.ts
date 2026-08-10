@@ -136,7 +136,7 @@ function chromeHeadlessInstalled(): boolean {
 
 test("rich-kind graphic throws an actionable error when Chrome is absent", async () => {
   if (chromeHeadlessInstalled()) {
-    // Chrome is installed; skip cleanly so CI with Chrome stays green without
+    // Chrome is installed; skip cleanly so local CI stays green without
     // spawning a real headless render here.
     return;
   }
@@ -166,7 +166,7 @@ test("rich-kind graphic throws an actionable error when Chrome is absent", async
 
 // Distinct from the Chrome-missing path: a rich graphic whose composition.html
 // is absent must fail with a clear error BEFORE any headless render runs (so the
-// check is Chrome-free and deterministic in CI). Reuse a real rich manifest but
+// check is Chrome-free and deterministic in local CI). Reuse a real rich manifest but
 // point the template id at a directory that does not exist.
 test("rich-kind graphic errors clearly when composition.html is missing", async () => {
   const dir = tmp();

@@ -185,7 +185,7 @@ test("embedText spawns the warm worker once and reuses it for a fast second quer
     assert.equal(second.model, MOMENT_MODEL);
     assert.equal(second.vector.length, first.vector.length);
     // The worker is already warm for this second call: well under a cold
-    // model load, generous to stay non-flaky under CI load.
+    // model load, generous to stay non-flaky under local CI load.
     assert.ok(
       elapsedMs < 10_000,
       `expected the warm second call to be fast, took ${elapsedMs}ms`

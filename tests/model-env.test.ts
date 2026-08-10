@@ -1,5 +1,5 @@
 // Unit coverage for the pure model-loading helpers (src/model-env.mjs) that
-// keep transcribe/embed off huggingface.co in CI. The real model loads are
+// keep transcribe/embed off huggingface.co in local CI. The real model loads are
 // network-bound and covered by the cam acceptance tests running offline against
 // the warmed cache; here we prove the env wiring and the retry policy in
 // isolation, with no network and no real delays.
@@ -35,7 +35,7 @@ test("applyModelEnv pins the download cache and stays online by default", () => 
 });
 
 test("offline + cache dir loads from the warmed cache as localModelPath", () => {
-  // The critical CI path: remote forbidden, model resolved from the warmed
+  // The critical local CI path: remote forbidden, model resolved from the warmed
   // cache dir (which Transformers.js reads via localModelPath, not cacheDir).
   const env = fakeEnv();
   applyModelEnv(env, {

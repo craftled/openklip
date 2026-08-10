@@ -217,7 +217,7 @@ OPENKLIP_INTEGRATION=1 bun test tests/transcript-diff-browser.test.ts
 OPENKLIP_INTEGRATION=1 bun test tests/mobile-overlays-browser.test.ts
 ```
 
-Set `OPENKLIP_CHROME_PATH` when Chrome is not at the default macOS path. CI runs these in the `integration` job.
+Set `OPENKLIP_CHROME_PATH` when Chrome is not at a path the local CI runner can discover. `bun run ci` resolves Chrome on macOS and Linux and fails if the browser suite would otherwise skip.
 
 GUI human edits and CLI/MCP mutations all write the same `project.json`. The open editor auto-refreshes when the on-disk revision advances (poll + focus).
 
@@ -237,7 +237,7 @@ Deterministic scripts:
 
 ```bash
 bun run agent-demo <slug> --phrases scripts/example-phrases.txt --export
-bun run agent-smoke-audit   # lavfi fixture (CI); --real for edgaras-raw when present; --all for both
+bun run agent-smoke-audit   # lavfi fixture (local CI); --real for edgaras-raw when present; --all for both
 ```
 
 Ingester plugins: `openklip ingesters` lists manifests under `ingesters/` (URL download via yt-dlp, folder import documented in `ingesters/folder/`).
@@ -259,13 +259,12 @@ Command reference: **[AGENTS.md](./AGENTS.md)**. Mutation manifest: `openklip ac
 ## Development
 
 ```bash
-bun run check
-bun run typecheck
-bun test
-bun run build
+bun run ci
 ```
 
-GitHub Actions (`.github/workflows/ci.yml`): `check`, `typecheck`, `test`, `agent-smoke-audit`, `build` on push/PR to `main`.
+`bun run ci` is the complete local gate: frozen dependency install, model-cache warmup, lint and format checks, typechecking, isolated unit tests, multicam ffmpeg integration tests, the agent smoke audit, production build, deterministic media acceptance, and real-Chrome browser integration tests. Models are cached outside the checkout and model-dependent checks run offline after warmup. Set `OPENKLIP_MODEL_CACHE` or `OPENKLIP_CHROME_PATH` to override automatic macOS/Linux discovery.
+
+`bun install` configures this checkout to use `.githooks`; the pre-push hook runs the same complete gate and blocks a push on failure. Reapply it with `bun run hooks:install`. A deliberate `git push --no-verify` bypasses the local gate. There is no hosted GitHub Actions CI or required status check.
 
 ## Limitations & non-goals
 

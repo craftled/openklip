@@ -64,7 +64,7 @@ The updater **public** key is committed in `tauri.conf.json`. The **private** ke
 release build, then replaces Tauri's pre-notarization archive with one made
 from the final stapled app and signs that exact archive. It writes and publishes
 the `latest.json` manifest with a `darwin-aarch64` entry and the `.sig`
-**contents**. Normal development and CI builds never need the updater key.
+**contents**. Normal development and local CI builds never need the updater key.
 
 Until that publish step runs for a release, installed apps simply find no update and carry on. The Apple Developer ID signing/notarization (above) and the Tauri updater signature are **separate keys** — an update artifact needs both: notarized *and* updater-signed.
 

@@ -30,7 +30,7 @@ test("ffmpeg module resolves @ffprobe-installer/ffprobe", () => {
   assert.doesNotMatch(src, /localBinary\(\s*"ffprobe-static"/);
 });
 
-test("platform ffprobe binary can be made executable (CI often drops +x on unpack)", async () => {
+test("platform ffprobe binary can be made executable (archives may drop +x on unpack)", async () => {
   const platformPkg = join(
     root,
     "node_modules",

@@ -333,7 +333,7 @@ export async function runAcceptanceGate(
     for (const fixture of manifest.fixtures) {
       // Sequential on purpose: bounded, predictable resource usage (each
       // fixture already spins up ffmpeg + Whisper) beats parallel fan-out
-      // for a CI gate.
+      // for a local CI gate.
       const result = await runFixtureGate(fixture);
       results.push(result);
     }

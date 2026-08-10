@@ -26,7 +26,7 @@ const FFMPEG_OK = typeof FFMPEG === "string" && existsSync(FFMPEG);
 // download"). Gate the slow end-to-end run behind OPENKLIP_ACCEPTANCE=1
 // (mirrors OPENKLIP_INTEGRATION's convention for the browser suite) so plain
 // `bun test` stays fast and network-independent; `bun run test:acceptance`
-// and the CI "acceptance" job opt in explicitly.
+// and the local CI runner opts in explicitly.
 const ACCEPTANCE_OK = FFMPEG_OK && process.env.OPENKLIP_ACCEPTANCE === "1";
 
 async function withTempDirAsync<T>(
@@ -122,7 +122,7 @@ test("the vfr fixture is the only one declaring vfr:true / fps:null", () => {
 test("generateAcceptanceCorpus writes every synthetic fixture + a manifest.json, and self-checks codec/dims", {
   skip: FFMPEG_OK ? false : "ffmpeg binary unavailable",
   // Bun's default 5000ms test timeout was killing the encode mid-flight via
-  // SIGTERM on CI's slower/shared runner (confirmed: "Exiting normally,
+  // SIGTERM on a slower local CI machine (confirmed: "Exiting normally,
   // received signal 15" right after a fully-written, valid output file) -
   // the 4K HEVC/libx265 fixture in particular needs real headroom.
   timeout: 60_000,
@@ -153,7 +153,7 @@ test("generateAcceptanceCorpus writes every synthetic fixture + a manifest.json,
 test("generateAcceptanceCorpus is safe to call repeatedly (regenerates deterministically)", {
   skip: FFMPEG_OK ? false : "ffmpeg binary unavailable",
   // Generates the whole corpus twice in sequence; needs double the headroom
-  // of the single-generation test above for the same CI-runner-speed reason.
+  // of the single-generation test above for the same runner-speed reason.
   timeout: 120_000,
 }, async () => {
   await withTempDirAsync(async (outDir) => {
@@ -197,7 +197,7 @@ test("runAcceptanceGate passes every generated fixture and skips the absent user
     const result = byId.get(spec.id);
     assert.ok(result, `missing gate result for ${spec.id}`);
     if (spec.id === "talking-head-real") {
-      // Never fails CI on a missing user-provisioned fixture.
+      // Never fails local CI on a missing user-provisioned fixture.
       assert.equal(result?.status, "skipped");
       continue;
     }

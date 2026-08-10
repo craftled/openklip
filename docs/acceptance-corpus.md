@@ -3,7 +3,7 @@
 A small, reproducible media corpus and a deterministic release gate that runs
 every fixture through the real ingest -> edit -> export pipeline and checks
 only **structural, deterministic facts** about the output. This is a hard
-CI gate: it fails on a real regression (wrong codec, wrong dimensions, a
+local CI gate: it fails on a real regression (wrong codec, wrong dimensions, a
 dropped audio track, a duration that drifted, ffmpeg/ingest throwing) and it
 is not flaky, because nothing it asserts depends on perceptual quality,
 model output content, or timing that varies run to run.
@@ -56,7 +56,7 @@ adds coverage no synthetic fixture can. To include it:
 2. Drop it at `fixtures/acceptance/user-provided/talking-head.mp4`.
 3. Re-run the gate; it will pick the file up automatically.
 
-Whenever this file is **absent** (the default, including in CI), the gate
+Whenever this file is **absent** (the default, including in local CI), the gate
 reports that fixture as `skipped` and never fails the run because of it.
 
 ## The gate
@@ -104,7 +104,7 @@ bun run acceptance-gate
 # Full gate as JSON (machine-readable pass/fail + measured vs expected):
 bun run scripts/acceptance-gate.ts --json
 
-# Same, via the test suite (what CI runs):
+# Same, via the test suite (what the local gate runs):
 bun run test:acceptance
 ```
 
@@ -115,15 +115,14 @@ the browser suite. Plain `bun test` stays fast and network-independent: it
 still runs the fast, always-on pure/corpus-generation tests in that file, and
 skips the full gate.
 
-## CI wiring
+## Local CI wiring
 
-A dedicated `acceptance` job in `.github/workflows/ci.yml` mirrors the `test`
-job's model-cache pattern (`actions/cache` on the Transformers.js download
-cache + a `Warm model cache` step) so Whisper loads offline
-(`TRANSFORMERS_OFFLINE=1`) against a cache warmed once per run, then executes
-`bun run test:acceptance`. It is a separate job (not folded into `test`)
-because it is the one place in CI that runs real Whisper transcription on
-every PR.
+`bun run ci` uses a persistent platform-native Transformers.js cache outside
+the checkout, or `OPENKLIP_MODEL_CACHE` when set. It warms Whisper and CLIP
+once with network access, then sets `TRANSFORMERS_OFFLINE=1` for the test
+steps and runs `bun run test:acceptance` as part of the complete pre-push
+gate. This acceptance step is the one place in the local gate that runs real
+Whisper transcription for every push.
 
 ## Deferred: perceptual checks
 
@@ -138,7 +137,7 @@ Explicitly **out of scope** for this gate, tracked as follow-up work:
   `docs/acceptance/`.
 
 Both were deliberately left out of the hard gate: perceptual scores are
-noisy enough (encoder non-determinism, minor filter changes) that gating CI
+noisy enough (encoder non-determinism, minor filter changes) that gating local CI
 on them either flakes or gets disabled, defeating the point of a release
 gate. The deterministic gate here should stay green on every real pass and
 red on every real regression; perceptual tooling belongs in a softer,

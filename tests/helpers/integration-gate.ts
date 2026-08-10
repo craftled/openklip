@@ -10,11 +10,11 @@ export function chromeAvailable(
   return existsSync(chromePath);
 }
 
-// Single launch path for every browser integration test so CI-launch flags
-// stay consistent. GitHub Actions Linux runs as root with no usable sandbox
-// and a small /dev/shm; without these flags Chromium dies immediately with
-// "Failed to launch the browser process". The flags are harmless on
-// macOS/local, so the same launch works everywhere.
+// Single launch path for every browser integration test so launch flags stay
+// consistent. Linux containers may run as root with no usable sandbox and a
+// small /dev/shm; without these flags Chromium dies immediately with "Failed
+// to launch the browser process". The flags are harmless on macOS, so the same
+// launch works everywhere.
 export function launchIntegrationBrowser(): Promise<Browser> {
   return puppeteer.launch({
     executablePath: process.env.OPENKLIP_CHROME_PATH ?? DEFAULT_CHROME_PATH,

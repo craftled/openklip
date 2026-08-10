@@ -1,4 +1,4 @@
-// CI model warmer: populate the Transformers.js download cache once so the
+// Local CI model warmer: populate the Transformers.js download cache once so the
 // test suite doesn't re-fetch Whisper/CLIP from huggingface.co on every run
 // (see src/model-env.mjs). Run after `bun install`, before the tests, with
 // OPENKLIP_MODEL_CACHE set and WITHOUT the offline flag — this is the single

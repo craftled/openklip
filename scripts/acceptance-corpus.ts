@@ -320,7 +320,7 @@ export const ACCEPTANCE_FIXTURE_SPECS: AcceptanceFixtureSpec[] = [
       "auto-generated. Drop a local file at " +
       "fixtures/acceptance/user-provided/talking-head.mp4 (documented in " +
       "docs/acceptance-corpus.md) to include it in the gate; the gate skips " +
-      "this fixture gracefully whenever the file is absent and never fails CI " +
+      "this fixture gracefully whenever the file is absent and never fails local CI " +
       "because of that absence.",
     relPath: join("user-provided", "talking-head.mp4"),
     userProvided: true,

@@ -61,7 +61,7 @@ Explicit v1 **non-goals** (also in spec; tracked in the OpenKlip Linear project,
 - Shared-mic diarization (one file, two speakers on one track)
 - Waveform auto-sync across angles
 
-Synthetic lavfi fixtures in CI prove machinery only; they do not satisfy the release gate.
+Synthetic lavfi fixtures in local CI prove machinery only; they do not satisfy the release gate.
 
 ## Search: `multicam*` under `/Users/tomaslau/Sites/`
 
@@ -127,8 +127,8 @@ Related paths that are **not** acceptance footage:
 
 ## Release impact
 
-- **Merge / CI:** unaffected (feature already on `main`).
-- **Programmatic acceptance (v0.42 gate):** **PASS.** `tests/multicam-acceptance.test.ts` generates lavfi twin-cam files, runs `cam-add` → `cam-mix --mode follow`, and asserts switched `source.mp4` duration, plan shots, and `project.multicam` provenance. CI also runs `OPENKLIP_INTEGRATION=1` cam-mix integration tests in the test job.
+- **Merge / local CI:** unaffected (feature already on `main`).
+- **Programmatic acceptance (v0.42 gate):** **PASS.** `tests/multicam-acceptance.test.ts` generates lavfi twin-cam files, runs `cam-add` → `cam-mix --mode follow`, and asserts switched `source.mp4` duration, plan shots, and `project.multicam` provenance. Local CI also runs the `OPENKLIP_INTEGRATION=1` cam-mix integration tests.
 - **Human eyeball on real multi-cam footage:** deferred until product adoption surfaces field issues. `multicam.MP4` remains invalid input (see verdict above).
 
 ## Programmatic acceptance (release gate)
